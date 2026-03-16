@@ -1,0 +1,60 @@
+//@version=6
+strategy("趨勢策略（完整版）", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === 🧠 使用者參數 ===
+stop_loss_pct     = input.float(1.0, "停損 (%)") / 100
+take_profit_pct   = input.float(5.0, "第一目標獲利 (%)") / 100
+trail_offset_pct  = input.float(6.0, "移動停利觸發 (%)") / 100
+trail_points_pct  = input.float(4.0, "移動停利距離 (%)") / 100
+
+ema_length        = input.int(25, "EMA 長度")
+obv_ema_length    = input.int(21, "OBV EMA 長度")
+
+// === 📊 指標計算 ===
+// EMA
+ema = ta.ema(close, ema_length)
+
+// OBV + OBV EMA
+obv = ta.cum(close > close[1] ? volume : close < close[1] ? -volume : 0)
+obv_ema = ta.ema(obv, obv_ema_length)
+obv_osc = obv - obv_ema
+
+// OBV 穿越訊號
+obv_cross_up = obv_osc > 0 and obv_osc[1] <= 0
+obv_cross_down = obv_osc < 0 and obv_osc[1] >= 0
+
+// 進場條件（只看 EMA 趨勢方向 + OBV 穿越）
+long_condition = close > ema and obv_cross_up
+short_condition = close < ema and obv_cross_down
+
+// === 🚀 進場指令 ===
+if long_condition
+    strategy.entry("Long", strategy.long)
+if short_condition
+    strategy.entry("Short", strategy.short)
+
+// === 💰 出場條件 ===
+long_entry_price  = strategy.opentrades.entry_price(0)
+long_tp_price     = long_entry_price * (1 + take_profit_pct)
+long_sl_price     = long_entry_price * (1 - stop_loss_pct)
+
+short_entry_price = strategy.opentrades.entry_price(0)
+short_tp_price    = short_entry_price * (1 - take_profit_pct)
+short_sl_price    = short_entry_price * (1 + stop_loss_pct)
+
+// 多單出場
+if strategy.position_size > 0
+    strategy.exit("TP1", from_entry="Long", qty_percent=50, limit=long_tp_price)
+    // 價格已超過 TP1 再啟動移動停利（避免 trail 搶先出場）
+    if close >= long_tp_price
+        strategy.exit("Trail", from_entry="Long", qty_percent=50,trail_points = close * trail_points_pct,trail_offset = close * trail_offset_pct)
+    if close < long_sl_price
+        strategy.close("Long", comment="StopLoss")
+
+// 空單出場
+if strategy.position_size < 0
+    strategy.exit("TP1", from_entry="Short", qty_percent=50, limit=short_tp_price)
+    if close <= short_tp_price
+        strategy.exit("Trail", from_entry="Short", qty_percent=50,trail_points = close * trail_points_pct,trail_offset = close * trail_offset_pct)
+    if close > short_sl_price
+        strategy.close("Short", comment="StopLoss")
