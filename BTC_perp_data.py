@@ -110,6 +110,7 @@ logger = logging.getLogger(__name__)
 # =========================================================
 tz_taipei = timezone(timedelta(hours=8))
 
+# TV 快訊觸發後，持續監控 taker flow 的時間視窗
 EVENT_WINDOW_SECONDS = 900  # 15分鐘
 
 TIMEFRAMES = {
@@ -210,6 +211,10 @@ def get_symbol_from_instid(inst_id: str) -> str:
         return ""
 
 
+def format_duration_minutes(seconds: int) -> str:
+    return f"{seconds // 60} 分鐘"
+
+
 def send_message(chat_id: str, text: str) -> None:
     if not chat_id:
         logger.warning("send_message skipped: chat_id is empty")
@@ -245,6 +250,7 @@ def get_db_conn():
         cursorclass=pymysql.cursors.DictCursor,
         ssl={"ssl": {}}
     )
+
 
 def init_db():
     logger.info("🚀 開始初始化 MySQL 資料表...")
@@ -354,7 +360,7 @@ def create_event(event_type: str, liquidity_side: str, price: float, symbol: str
         "tv_time": tv_time,
         "trigger_ts": current_ts(),
         "trigger_time_text": now_taipei_str(),
-        "window_seconds": 900,
+        "window_seconds": EVENT_WINDOW_SECONDS,
         "buy_amount": 0.0,
         "sell_amount": 0.0,
         "trade_count": 0,
@@ -398,7 +404,7 @@ def generate_event_summary(event: dict) -> str:
         f"symbol: {event['symbol']}",
         f"tv_time: {event['tv_time'] or 'N/A'}",
         f"trigger_time: {event['trigger_time_text']}",
-        f"window: {event['window_seconds']}s",
+        f"window: {format_duration_minutes(event['window_seconds'])}",
         f"event_uuid: {event['event_uuid']}",
         "─" * 30,
         f"total_buy: {format_number(event['buy_amount'])}",
@@ -435,7 +441,7 @@ def generate_current_event_report() -> str:
             f"symbol: {current_event['symbol']}\n"
             f"tv_time: {current_event['tv_time'] or 'N/A'}\n"
             f"event_uuid: {current_event['event_uuid']}\n"
-            f"elapsed: {age}s / {current_event['window_seconds']}s\n"
+            f"elapsed: {age // 60} 分 / {current_event['window_seconds'] // 60} 分\n"
             f"buy_amount: {format_number(current_event['buy_amount'])}\n"
             f"sell_amount: {format_number(current_event['sell_amount'])}\n"
             f"delta: {format_number(delta)}\n"
@@ -539,6 +545,7 @@ def generate_status_report() -> str:
         f"TV Secret：{'已設定' if TV_WEBHOOK_SECRET else '未設定'}\n"
         f"MySQL：{mysql_status}\n"
         f"事件狀態：{event_status}\n"
+        f"事件視窗：{EVENT_WINDOW_SECONDS} 秒 ({format_duration_minutes(EVENT_WINDOW_SECONDS)})\n"
         f"最後錯誤：{bot_status['last_error'] or '無'}"
     )
 
@@ -589,20 +596,29 @@ def on_message(ws, message):
                 continue
 
             try:
-                size = float(trade["sz"])
+                contracts = float(trade["sz"])
                 price = float(trade["px"])
             except (KeyError, ValueError, TypeError):
                 continue
 
             trade_ts = safe_get_trade_timestamp(trade)
-            amount = size * price
+
+            contract_size = CONTRACT_SIZES.get(symbol, 1.0)
+            base_qty = contracts * contract_size
+            amount = base_qty * price
 
             entry = {
                 "timestamp": trade_ts,
                 "amount": amount,
-                "type": trade_side
+                "type": trade_side,
+                "contracts": contracts,
+                "contract_size": contract_size,
+                "base_qty": base_qty,
+                "price": price,
+                "inst_id": inst_id
             }
             new_entries.append((symbol, entry))
+
             bot_status["last_trade_ts"] = trade_ts
             bot_status["total_trades"] += 1
 
@@ -614,7 +630,7 @@ def on_message(ws, message):
                         if trade_side == "buy":
                             current_event["buy_amount"] += amount
                             current_event["symbol_stats"][symbol]["buy_amount"] += amount
-                        elif trade_side == "sell":
+                        else:
                             current_event["sell_amount"] += amount
                             current_event["symbol_stats"][symbol]["sell_amount"] += amount
 
@@ -801,7 +817,7 @@ def tradingview_webhook():
             f"price: {price}\n"
             f"time: {tv_time}\n"
             f"symbol: {symbol}\n"
-            f"window: {new_event['window_seconds']}s\n"
+            f"window: {format_duration_minutes(new_event['window_seconds'])}\n"
             f"event_uuid: {new_event['event_uuid']}\n"
             "事件監控已啟動"
         )
@@ -892,6 +908,8 @@ def start_background_threads():
 
 if __name__ == "__main__":
     logger.info("✅ Taker 資金動能監控機器人啟動中...")
+    logger.info("Event window seconds: %s", EVENT_WINDOW_SECONDS)
+    logger.info("Event window text: %s", format_duration_minutes(EVENT_WINDOW_SECONDS))
 
     try:
         init_db()
