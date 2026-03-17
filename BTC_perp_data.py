@@ -122,6 +122,7 @@ TRACK_SYMBOLS = {
 # 全域狀態
 # =========================================================
 data_lock = threading.Lock()
+event_lock = threading.Lock()
 
 taker_data = {
     symbol: {
@@ -138,6 +139,8 @@ bot_status = {
     "last_error": ""
 }
 
+current_event = None
+
 app = Flask(__name__)
 
 # =========================================================
@@ -145,6 +148,10 @@ app = Flask(__name__)
 # =========================================================
 def current_ts() -> int:
     return int(time.time())
+
+
+def now_taipei_str() -> str:
+    return datetime.now(tz_taipei).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def format_number(x: float) -> str:
@@ -191,8 +198,107 @@ def get_symbol_from_instid(inst_id: str) -> str:
         return ""
 
 
-def now_taipei_str() -> str:
-    return datetime.now(tz_taipei).strftime("%Y-%m-%d %H:%M:%S")
+def safe_float(value, default=0.0) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def create_event(event_type: str, side: str, price: float, symbol: str, tv_time: str):
+    return {
+        "event_type": event_type,
+        "side": side,
+        "price": price,
+        "symbol": symbol,
+        "tv_time": tv_time,
+        "trigger_ts": current_ts(),
+        "trigger_time_text": now_taipei_str(),
+        "window_seconds": 60,
+        "buy_amount": 0.0,
+        "sell_amount": 0.0,
+        "trade_count": 0,
+        "finished": False,
+        "symbol_stats": {
+            "BTC": {
+                "buy_amount": 0.0,
+                "sell_amount": 0.0,
+                "trade_count": 0
+            },
+            "ETH": {
+                "buy_amount": 0.0,
+                "sell_amount": 0.0,
+                "trade_count": 0
+            }
+        }
+    }
+
+
+def generate_event_summary(event: dict) -> str:
+    delta = event["buy_amount"] - event["sell_amount"]
+    emoji = "🟢" if delta > 0 else "🔴" if delta < 0 else "🟡"
+
+    btc_delta = (
+        event["symbol_stats"]["BTC"]["buy_amount"] -
+        event["symbol_stats"]["BTC"]["sell_amount"]
+    )
+    eth_delta = (
+        event["symbol_stats"]["ETH"]["buy_amount"] -
+        event["symbol_stats"]["ETH"]["sell_amount"]
+    )
+
+    btc_emoji = "🟢" if btc_delta > 0 else "🔴" if btc_delta < 0 else "🟡"
+    eth_emoji = "🟢" if eth_delta > 0 else "🔴" if eth_delta < 0 else "🟡"
+
+    lines = [
+        "✅ 流動性事件完成",
+        f"event: {event['event_type']}",
+        f"side: {event['side']}",
+        f"price: {event['price']}",
+        f"symbol: {event['symbol']}",
+        f"tv_time: {event['tv_time'] or 'N/A'}",
+        f"trigger_time: {event['trigger_time_text']}",
+        f"window: {event['window_seconds']}s",
+        "─" * 30,
+        f"total_buy: {format_number(event['buy_amount'])}",
+        f"total_sell: {format_number(event['sell_amount'])}",
+        f"total_delta: {format_number(delta)} {emoji}",
+        f"total_trades: {event['trade_count']}",
+        "─" * 30,
+        f"BTC buy: {format_number(event['symbol_stats']['BTC']['buy_amount'])}",
+        f"BTC sell: {format_number(event['symbol_stats']['BTC']['sell_amount'])}",
+        f"BTC delta: {format_number(btc_delta)} {btc_emoji}",
+        f"BTC trades: {event['symbol_stats']['BTC']['trade_count']}",
+        "─" * 30,
+        f"ETH buy: {format_number(event['symbol_stats']['ETH']['buy_amount'])}",
+        f"ETH sell: {format_number(event['symbol_stats']['ETH']['sell_amount'])}",
+        f"ETH delta: {format_number(eth_delta)} {eth_emoji}",
+        f"ETH trades: {event['symbol_stats']['ETH']['trade_count']}",
+    ]
+    return "\n".join(lines)
+
+
+def generate_current_event_report() -> str:
+    with event_lock:
+        if not current_event:
+            return "目前沒有進行中的事件"
+
+        age = current_ts() - current_event["trigger_ts"]
+        delta = current_event["buy_amount"] - current_event["sell_amount"]
+
+        return (
+            f"🚧 事件進行中\n"
+            f"event: {current_event['event_type']}\n"
+            f"side: {current_event['side']}\n"
+            f"price: {current_event['price']}\n"
+            f"symbol: {current_event['symbol']}\n"
+            f"tv_time: {current_event['tv_time'] or 'N/A'}\n"
+            f"elapsed: {age}s / {current_event['window_seconds']}s\n"
+            f"buy_amount: {format_number(current_event['buy_amount'])}\n"
+            f"sell_amount: {format_number(current_event['sell_amount'])}\n"
+            f"delta: {format_number(delta)}\n"
+            f"trade_count: {current_event['trade_count']}"
+        )
 
 
 # =========================================================
@@ -273,6 +379,9 @@ def generate_status_report() -> str:
 
     whitelist_text = ", ".join(ALLOWED_USERS) if ALLOWED_USERS else "未設定"
 
+    with event_lock:
+        event_status = "有進行中事件" if current_event and not current_event["finished"] else "無進行中事件"
+
     return (
         f"🤖 Bot 狀態報告\n"
         f"設定來源：{config['source']}\n"
@@ -284,6 +393,7 @@ def generate_status_report() -> str:
         f"重連次數：{bot_status['reconnect_count']}\n"
         f"白名單：{whitelist_text}\n"
         f"TV Secret：{'已設定' if TV_WEBHOOK_SECRET else '未設定'}\n"
+        f"事件狀態：{event_status}\n"
         f"最後錯誤：{bot_status['last_error'] or '無'}"
     )
 
@@ -351,6 +461,21 @@ def on_message(ws, message):
             bot_status["last_trade_ts"] = trade_ts
             bot_status["total_trades"] += 1
 
+            with event_lock:
+                if current_event and not current_event["finished"]:
+                    age = current_ts() - current_event["trigger_ts"]
+
+                    if age <= current_event["window_seconds"]:
+                        if side == "buy":
+                            current_event["buy_amount"] += amount
+                            current_event["symbol_stats"][symbol]["buy_amount"] += amount
+                        elif side == "sell":
+                            current_event["sell_amount"] += amount
+                            current_event["symbol_stats"][symbol]["sell_amount"] += amount
+
+                        current_event["trade_count"] += 1
+                        current_event["symbol_stats"][symbol]["trade_count"] += 1
+
         if not new_entries:
             return
 
@@ -409,6 +534,33 @@ def ws_watchdog():
             time.sleep(5)
 
 
+def event_watchdog():
+    global current_event
+
+    while True:
+        try:
+            finished_event = None
+
+            with event_lock:
+                if current_event and not current_event["finished"]:
+                    age = current_ts() - current_event["trigger_ts"]
+
+                    if age >= current_event["window_seconds"]:
+                        current_event["finished"] = True
+                        finished_event = dict(current_event)
+                        current_event = None
+
+            if finished_event:
+                send_message(CHAT_ID, generate_event_summary(finished_event))
+                logger.info("Event finished: %s", finished_event)
+
+            time.sleep(2)
+
+        except Exception as e:
+            logger.exception("event_watchdog error: %s", e)
+            time.sleep(5)
+
+
 def start_ws_forever():
     reconnect_delay = 5
 
@@ -449,6 +601,8 @@ def index():
 
 @app.route("/tv", methods=["POST"])
 def tradingview_webhook():
+    global current_event
+
     try:
         data = request.get_json(silent=True)
 
@@ -465,9 +619,14 @@ def tradingview_webhook():
 
         event = str(data.get("event", "unknown")).strip()
         side = str(data.get("side", "unknown")).strip()
-        price = str(data.get("price", "")).strip()
+        price = safe_float(data.get("price", 0), 0.0)
         tv_time = str(data.get("time", "")).strip()
         symbol = str(data.get("symbol", "")).strip()
+
+        new_event = create_event(event, side, price, symbol, tv_time)
+
+        with event_lock:
+            current_event = new_event
 
         msg = (
             "📩 收到 TradingView 快訊\n"
@@ -475,7 +634,9 @@ def tradingview_webhook():
             f"side: {side}\n"
             f"price: {price}\n"
             f"time: {tv_time}\n"
-            f"symbol: {symbol}"
+            f"symbol: {symbol}\n"
+            f"window: {new_event['window_seconds']}s\n"
+            "事件監控已啟動"
         )
 
         send_message(CHAT_ID, msg)
@@ -505,12 +666,10 @@ def webhook():
         chat_type = str(chat.get("type", "")).strip().lower()
         text = text.strip().lower()
 
-        # 只允許 private chat
         if chat_type != "private":
             logger.warning("Rejected non-private chat: %s (%s)", chat_id, chat_type)
             return "ok"
 
-        # 白名單檢查
         if ALLOWED_USERS and chat_id not in ALLOWED_USERS:
             logger.warning("Unauthorized access: %s", chat_id)
             return "ok"
@@ -529,6 +688,9 @@ def webhook():
         elif text == "/status":
             send_message(chat_id, generate_status_report())
 
+        elif text == "/event_status":
+            send_message(chat_id, generate_current_event_report())
+
         elif text in ["/start", "/help"]:
             help_msg = (
                 "📊 合約資金流監控機器人\n\n"
@@ -536,7 +698,8 @@ def webhook():
                 "/flow_futures_btc\n"
                 "/flow_futures_eth\n"
                 "/flow_futures_all\n"
-                "/status"
+                "/status\n"
+                "/event_status"
             )
             send_message(chat_id, help_msg)
 
@@ -557,6 +720,7 @@ def start_background_threads():
     threading.Thread(target=start_ws_forever, daemon=True).start()
     threading.Thread(target=clean_old_data, daemon=True).start()
     threading.Thread(target=ws_watchdog, daemon=True).start()
+    threading.Thread(target=event_watchdog, daemon=True).start()
 
 
 if __name__ == "__main__":
