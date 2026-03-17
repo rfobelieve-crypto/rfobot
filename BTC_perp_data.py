@@ -229,7 +229,8 @@ def get_db_conn():
         database=MYSQL_DB,
         charset="utf8mb4",
         autocommit=True,
-        cursorclass=pymysql.cursors.DictCursor
+        cursorclass=pymysql.cursors.DictCursor,
+        ssl={"ssl": {}}
     )
 
 
