@@ -76,6 +76,8 @@ DEBUG_MODE = config["debug"]
 PORT = config["port"]
 ALLOWED_USERS = config["allowed_users"]
 
+TV_WEBHOOK_SECRET = os.getenv("TV_WEBHOOK_SECRET", "")
+
 API_URL = f"https://api.telegram.org/bot{TOKEN}"
 HOST = "0.0.0.0"
 
@@ -189,6 +191,10 @@ def get_symbol_from_instid(inst_id: str) -> str:
         return ""
 
 
+def now_taipei_str() -> str:
+    return datetime.now(tz_taipei).strftime("%Y-%m-%d %H:%M:%S")
+
+
 # =========================================================
 # 清理舊資料
 # =========================================================
@@ -277,6 +283,7 @@ def generate_status_report() -> str:
         f"總成交筆數：{bot_status['total_trades']}\n"
         f"重連次數：{bot_status['reconnect_count']}\n"
         f"白名單：{whitelist_text}\n"
+        f"TV Secret：{'已設定' if TV_WEBHOOK_SECRET else '未設定'}\n"
         f"最後錯誤：{bot_status['last_error'] or '無'}"
     )
 
@@ -433,11 +440,51 @@ def start_ws_forever():
 
 
 # =========================================================
-# Telegram Webhook
+# Flask Routes
 # =========================================================
 @app.route("/", methods=["GET"])
 def index():
     return "OKX Taker Flow Bot is running."
+
+
+@app.route("/tv", methods=["POST"])
+def tradingview_webhook():
+    try:
+        data = request.get_json(silent=True)
+
+        if not data:
+            logger.warning("TV webhook received empty body")
+            return {"status": "ignored", "reason": "empty body"}, 200
+
+        secret = str(data.get("secret", "")).strip()
+        if TV_WEBHOOK_SECRET and secret != TV_WEBHOOK_SECRET:
+            logger.warning("Invalid TV webhook secret")
+            return {"status": "forbidden"}, 403
+
+        logger.info("TV webhook received: %s", data)
+
+        event = str(data.get("event", "unknown")).strip()
+        side = str(data.get("side", "unknown")).strip()
+        price = str(data.get("price", "")).strip()
+        tv_time = str(data.get("time", "")).strip()
+        symbol = str(data.get("symbol", "")).strip()
+
+        msg = (
+            "📩 收到 TradingView 快訊\n"
+            f"event: {event}\n"
+            f"side: {side}\n"
+            f"price: {price}\n"
+            f"time: {tv_time}\n"
+            f"symbol: {symbol}"
+        )
+
+        send_message(CHAT_ID, msg)
+
+        return {"status": "ok"}, 200
+
+    except Exception as e:
+        logger.exception("TradingView webhook error: %s", e)
+        return {"status": "error", "message": str(e)}, 200
 
 
 @app.route(f"/{TOKEN}", methods=["POST"])
@@ -517,6 +564,7 @@ if __name__ == "__main__":
     logger.info("Config source: %s", config["source"])
     logger.info("Port: %s", PORT)
     logger.info("Allowed users: %s", ALLOWED_USERS if ALLOWED_USERS else "ALL")
+    logger.info("TV webhook secret: %s", "SET" if TV_WEBHOOK_SECRET else "NOT SET")
 
     start_background_threads()
     app.run(host=HOST, port=PORT)
