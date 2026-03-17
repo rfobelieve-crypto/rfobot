@@ -133,6 +133,17 @@ TRACK_SYMBOLS = {
 data_lock = threading.Lock()
 event_lock = threading.Lock()
 
+# =========================================================
+# 合約面值（contract size）
+# 注意：sz 是「contracts」，不是直接的 coin 數量
+# BTC-USDT-SWAP 目前 OKX 規格為 0.01 BTC / contract
+# ETH 請你到 OKX 商品規格再確認一次；先用常見值 0.01 ETH
+# =========================================================
+CONTRACT_SIZES = {
+    "BTC": 0.01,
+    "ETH": 0.01,
+}
+
 taker_data = {
     symbol: {
         tf: [] for tf in TIMEFRAMES
@@ -232,7 +243,6 @@ def get_db_conn():
         cursorclass=pymysql.cursors.DictCursor,
         ssl={"ssl": {}}
     )
-
 
 def init_db():
     logger.info("🚀 開始初始化 MySQL 資料表...")
@@ -577,32 +587,42 @@ def on_message(ws, message):
                 continue
 
             try:
-                size = float(trade["sz"])
+                contracts = float(trade["sz"])   # 合約張數，不是 coin qty
                 price = float(trade["px"])
             except (KeyError, ValueError, TypeError):
                 continue
 
             trade_ts = safe_get_trade_timestamp(trade)
-            amount = size * price
+
+            contract_size = CONTRACT_SIZES.get(symbol, 1.0)
+            base_qty = contracts * contract_size
+            amount = base_qty * price   # 名目成交額（USDT）
 
             entry = {
                 "timestamp": trade_ts,
                 "amount": amount,
-                "type": trade_side
+                "type": trade_side,
+                "contracts": contracts,
+                "contract_size": contract_size,
+                "base_qty": base_qty,
+                "price": price,
+                "inst_id": inst_id
             }
             new_entries.append((symbol, entry))
+
             bot_status["last_trade_ts"] = trade_ts
             bot_status["total_trades"] += 1
 
             with event_lock:
                 if current_event and not current_event["finished"]:
+                    # 仍然沿用你現在的伺服器時間窗口
                     age = current_ts() - current_event["trigger_ts"]
 
                     if age <= current_event["window_seconds"]:
                         if trade_side == "buy":
                             current_event["buy_amount"] += amount
                             current_event["symbol_stats"][symbol]["buy_amount"] += amount
-                        elif trade_side == "sell":
+                        else:
                             current_event["sell_amount"] += amount
                             current_event["symbol_stats"][symbol]["sell_amount"] += amount
 
@@ -622,7 +642,6 @@ def on_message(ws, message):
     except Exception as e:
         bot_status["last_error"] = str(e)
         logger.exception("on_message error: %s", e)
-
 
 def on_error(ws, error):
     bot_status["ws_connected"] = False
