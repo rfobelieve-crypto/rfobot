@@ -725,6 +725,14 @@ def start_background_threads():
 
 if __name__ == "__main__":
     logger.info("✅ Taker 資金動能監控機器人啟動中...")
+
+    # 🔥 這行加在這裡（最重要）
+    try:
+        init_db()
+        logger.info("✅ MySQL table 檢查 / 建立完成")
+    except Exception as e:
+        logger.exception("❌ init_db 失敗: %s", e)
+
     logger.info("Config source: %s", config["source"])
     logger.info("Port: %s", PORT)
     logger.info("Allowed users: %s", ALLOWED_USERS if ALLOWED_USERS else "ALL")
