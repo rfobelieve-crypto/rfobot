@@ -205,10 +205,10 @@ def safe_float(value, default=0.0) -> float:
         return default
 
 
-def create_event(event_type: str, side: str, price: float, symbol: str, tv_time: str):
+def create_event(event_type: str, liquidity_side: str, price: float, symbol: str, tv_time: str):
     return {
         "event_type": event_type,
-        "side": side,
+        "liquidity_side": liquidity_side,
         "price": price,
         "symbol": symbol,
         "tv_time": tv_time,
@@ -253,7 +253,7 @@ def generate_event_summary(event: dict) -> str:
     lines = [
         "✅ 流動性事件完成",
         f"event: {event['event_type']}",
-        f"side: {event['side']}",
+        f"liquidity_side: {event['liquidity_side']}",
         f"price: {event['price']}",
         f"symbol: {event['symbol']}",
         f"tv_time: {event['tv_time'] or 'N/A'}",
@@ -289,7 +289,7 @@ def generate_current_event_report() -> str:
         return (
             f"🚧 事件進行中\n"
             f"event: {current_event['event_type']}\n"
-            f"side: {current_event['side']}\n"
+            f"liquidity_side: {current_event['liquidity_side']}\n"
             f"price: {current_event['price']}\n"
             f"symbol: {current_event['symbol']}\n"
             f"tv_time: {current_event['tv_time'] or 'N/A'}\n"
@@ -439,8 +439,8 @@ def on_message(ws, message):
             if symbol not in taker_data:
                 continue
 
-            side = trade.get("side", "").lower()
-            if side not in ("buy", "sell"):
+            trade_side = trade.get("side", "").lower()
+            if trade_side not in ("buy", "sell"):
                 continue
 
             try:
@@ -455,7 +455,7 @@ def on_message(ws, message):
             entry = {
                 "timestamp": trade_ts,
                 "amount": amount,
-                "type": side
+                "type": trade_side
             }
             new_entries.append((symbol, entry))
             bot_status["last_trade_ts"] = trade_ts
@@ -466,10 +466,10 @@ def on_message(ws, message):
                     age = current_ts() - current_event["trigger_ts"]
 
                     if age <= current_event["window_seconds"]:
-                        if side == "buy":
+                        if trade_side == "buy":
                             current_event["buy_amount"] += amount
                             current_event["symbol_stats"][symbol]["buy_amount"] += amount
-                        elif side == "sell":
+                        elif trade_side == "sell":
                             current_event["sell_amount"] += amount
                             current_event["symbol_stats"][symbol]["sell_amount"] += amount
 
@@ -618,12 +618,12 @@ def tradingview_webhook():
         logger.info("TV webhook received: %s", data)
 
         event = str(data.get("event", "unknown")).strip()
-        side = str(data.get("side", "unknown")).strip()
+        liquidity_side = str(data.get("liquidity_side", "unknown")).strip().lower()
         price = safe_float(data.get("price", 0), 0.0)
         tv_time = str(data.get("time", "")).strip()
         symbol = str(data.get("symbol", "")).strip()
 
-        new_event = create_event(event, side, price, symbol, tv_time)
+        new_event = create_event(event, liquidity_side, price, symbol, tv_time)
 
         with event_lock:
             current_event = new_event
@@ -631,7 +631,7 @@ def tradingview_webhook():
         msg = (
             "📩 收到 TradingView 快訊\n"
             f"event: {event}\n"
-            f"side: {side}\n"
+            f"liquidity_side: {liquidity_side}\n"
             f"price: {price}\n"
             f"time: {tv_time}\n"
             f"symbol: {symbol}\n"
