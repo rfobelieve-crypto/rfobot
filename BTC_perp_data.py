@@ -110,6 +110,8 @@ logger = logging.getLogger(__name__)
 # =========================================================
 tz_taipei = timezone(timedelta(hours=8))
 
+EVENT_WINDOW_SECONDS = 900  # 15分鐘
+
 TIMEFRAMES = {
     "5m": 5,
     "15m": 15,
@@ -352,7 +354,7 @@ def create_event(event_type: str, liquidity_side: str, price: float, symbol: str
         "tv_time": tv_time,
         "trigger_ts": current_ts(),
         "trigger_time_text": now_taipei_str(),
-        "window_seconds": 60,
+        "window_seconds": 900,
         "buy_amount": 0.0,
         "sell_amount": 0.0,
         "trade_count": 0,
@@ -587,42 +589,32 @@ def on_message(ws, message):
                 continue
 
             try:
-                contracts = float(trade["sz"])   # 合約張數，不是 coin qty
+                size = float(trade["sz"])
                 price = float(trade["px"])
             except (KeyError, ValueError, TypeError):
                 continue
 
             trade_ts = safe_get_trade_timestamp(trade)
-
-            contract_size = CONTRACT_SIZES.get(symbol, 1.0)
-            base_qty = contracts * contract_size
-            amount = base_qty * price   # 名目成交額（USDT）
+            amount = size * price
 
             entry = {
                 "timestamp": trade_ts,
                 "amount": amount,
-                "type": trade_side,
-                "contracts": contracts,
-                "contract_size": contract_size,
-                "base_qty": base_qty,
-                "price": price,
-                "inst_id": inst_id
+                "type": trade_side
             }
             new_entries.append((symbol, entry))
-
             bot_status["last_trade_ts"] = trade_ts
             bot_status["total_trades"] += 1
 
             with event_lock:
                 if current_event and not current_event["finished"]:
-                    # 仍然沿用你現在的伺服器時間窗口
                     age = current_ts() - current_event["trigger_ts"]
 
                     if age <= current_event["window_seconds"]:
                         if trade_side == "buy":
                             current_event["buy_amount"] += amount
                             current_event["symbol_stats"][symbol]["buy_amount"] += amount
-                        else:
+                        elif trade_side == "sell":
                             current_event["sell_amount"] += amount
                             current_event["symbol_stats"][symbol]["sell_amount"] += amount
 
@@ -642,6 +634,7 @@ def on_message(ws, message):
     except Exception as e:
         bot_status["last_error"] = str(e)
         logger.exception("on_message error: %s", e)
+
 
 def on_error(ws, error):
     bot_status["ws_connected"] = False
