@@ -732,3 +732,45 @@ if __name__ == "__main__":
 
     start_background_threads()
     app.run(host=HOST, port=PORT)
+
+
+
+# =========================================================
+# database
+# =========================================================
+def init_db():
+    conn = get_db_conn()
+    sql = """
+    CREATE TABLE IF NOT EXISTS liquidity_events (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        event_uuid VARCHAR(64) NOT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        liquidity_side VARCHAR(20) NOT NULL,
+        symbol VARCHAR(50) NOT NULL,
+        trigger_price DECIMAL(18,8) NOT NULL,
+        tv_time VARCHAR(64),
+        trigger_ts INT NOT NULL,
+        trigger_time_text VARCHAR(32),
+        window_seconds INT NOT NULL,
+
+        total_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
+        total_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
+        total_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
+        total_trades INT NOT NULL DEFAULT 0,
+
+        btc_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
+        btc_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
+        btc_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
+        btc_trades INT NOT NULL DEFAULT 0,
+
+        eth_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
+        eth_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
+        eth_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
+        eth_trades INT NOT NULL DEFAULT 0,
+
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+    with conn.cursor() as cursor:
+        cursor.execute(sql)
+    conn.close()
