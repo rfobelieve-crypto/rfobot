@@ -3,8 +3,11 @@ import json
 import time
 import threading
 import logging
+import uuid
+
 import requests
 import websocket
+import pymysql
 
 from flask import Flask, request
 from datetime import datetime, timedelta, timezone
@@ -77,6 +80,12 @@ PORT = config["port"]
 ALLOWED_USERS = config["allowed_users"]
 
 TV_WEBHOOK_SECRET = os.getenv("TV_WEBHOOK_SECRET", "")
+
+MYSQL_HOST = os.getenv("MYSQL_HOST", "")
+MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
+MYSQL_USER = os.getenv("MYSQL_USER", "")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
+MYSQL_DB = os.getenv("MYSQL_DB", "")
 
 API_URL = f"https://api.telegram.org/bot{TOKEN}"
 HOST = "0.0.0.0"
@@ -165,21 +174,11 @@ def format_number(x: float) -> str:
     return f"{x:,.0f}"
 
 
-def send_message(chat_id: str, text: str) -> None:
-    if not chat_id:
-        logger.warning("send_message skipped: chat_id is empty")
-        return
-
+def safe_float(value, default=0.0) -> float:
     try:
-        resp = requests.post(
-            f"{API_URL}/sendMessage",
-            data={"chat_id": chat_id, "text": text},
-            timeout=10
-        )
-        if resp.status_code != 200:
-            logger.error("Telegram sendMessage failed: %s - %s", resp.status_code, resp.text)
-    except Exception as e:
-        logger.exception("send_message error: %s", e)
+        return float(value)
+    except Exception:
+        return default
 
 
 def safe_get_trade_timestamp(trade: dict) -> int:
@@ -198,15 +197,143 @@ def get_symbol_from_instid(inst_id: str) -> str:
         return ""
 
 
-def safe_float(value, default=0.0) -> float:
+def send_message(chat_id: str, text: str) -> None:
+    if not chat_id:
+        logger.warning("send_message skipped: chat_id is empty")
+        return
+
     try:
-        return float(value)
-    except Exception:
-        return default
+        resp = requests.post(
+            f"{API_URL}/sendMessage",
+            data={"chat_id": chat_id, "text": text},
+            timeout=10
+        )
+        if resp.status_code != 200:
+            logger.error("Telegram sendMessage failed: %s - %s", resp.status_code, resp.text)
+    except Exception as e:
+        logger.exception("send_message error: %s", e)
 
 
+# =========================================================
+# MySQL
+# =========================================================
+def get_db_conn():
+    if not MYSQL_HOST or not MYSQL_USER or not MYSQL_DB:
+        raise ValueError("MySQL 環境變數未完整設定")
+
+    return pymysql.connect(
+        host=MYSQL_HOST,
+        port=MYSQL_PORT,
+        user=MYSQL_USER,
+        password=MYSQL_PASSWORD,
+        database=MYSQL_DB,
+        charset="utf8mb4",
+        autocommit=True,
+        cursorclass=pymysql.cursors.DictCursor
+    )
+
+
+def init_db():
+    logger.info("🚀 開始初始化 MySQL 資料表...")
+
+    conn = get_db_conn()
+    try:
+        sql = """
+        CREATE TABLE IF NOT EXISTS liquidity_events (
+            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+            event_uuid VARCHAR(64) NOT NULL,
+            event_type VARCHAR(50) NOT NULL,
+            liquidity_side VARCHAR(20) NOT NULL,
+            symbol VARCHAR(50) NOT NULL,
+            trigger_price DECIMAL(18,8) NOT NULL,
+            tv_time VARCHAR(64),
+            trigger_ts INT NOT NULL,
+            trigger_time_text VARCHAR(32),
+            window_seconds INT NOT NULL,
+
+            total_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
+            total_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
+            total_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
+            total_trades INT NOT NULL DEFAULT 0,
+
+            btc_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
+            btc_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
+            btc_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
+            btc_trades INT NOT NULL DEFAULT 0,
+
+            eth_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
+            eth_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
+            eth_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
+            eth_trades INT NOT NULL DEFAULT 0,
+
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_event_uuid (event_uuid),
+            INDEX idx_trigger_ts (trigger_ts),
+            INDEX idx_liquidity_side (liquidity_side),
+            INDEX idx_symbol (symbol)
+        );
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(sql)
+
+        logger.info("✅ MySQL table 檢查 / 建立完成")
+    finally:
+        conn.close()
+
+
+def save_event_to_db(event: dict):
+    sql = """
+    INSERT INTO liquidity_events (
+        event_uuid, event_type, liquidity_side, symbol, trigger_price,
+        tv_time, trigger_ts, trigger_time_text, window_seconds,
+        total_buy, total_sell, total_delta, total_trades,
+        btc_buy, btc_sell, btc_delta, btc_trades,
+        eth_buy, eth_sell, eth_delta, eth_trades
+    ) VALUES (
+        %s, %s, %s, %s, %s,
+        %s, %s, %s, %s,
+        %s, %s, %s, %s,
+        %s, %s, %s, %s,
+        %s, %s, %s, %s
+    )
+    """
+
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(sql, (
+                event["event_uuid"],
+                event["event_type"],
+                event["liquidity_side"],
+                event["symbol"],
+                event["price"],
+                event["tv_time"],
+                event["trigger_ts"],
+                event["trigger_time_text"],
+                event["window_seconds"],
+                event["buy_amount"],
+                event["sell_amount"],
+                event["buy_amount"] - event["sell_amount"],
+                event["trade_count"],
+                event["symbol_stats"]["BTC"]["buy_amount"],
+                event["symbol_stats"]["BTC"]["sell_amount"],
+                event["symbol_stats"]["BTC"]["buy_amount"] - event["symbol_stats"]["BTC"]["sell_amount"],
+                event["symbol_stats"]["BTC"]["trade_count"],
+                event["symbol_stats"]["ETH"]["buy_amount"],
+                event["symbol_stats"]["ETH"]["sell_amount"],
+                event["symbol_stats"]["ETH"]["buy_amount"] - event["symbol_stats"]["ETH"]["sell_amount"],
+                event["symbol_stats"]["ETH"]["trade_count"]
+            ))
+    finally:
+        conn.close()
+
+
+# =========================================================
+# Event
+# =========================================================
 def create_event(event_type: str, liquidity_side: str, price: float, symbol: str, tv_time: str):
     return {
+        "event_uuid": str(uuid.uuid4()),
         "event_type": event_type,
         "liquidity_side": liquidity_side,
         "price": price,
@@ -259,6 +386,7 @@ def generate_event_summary(event: dict) -> str:
         f"tv_time: {event['tv_time'] or 'N/A'}",
         f"trigger_time: {event['trigger_time_text']}",
         f"window: {event['window_seconds']}s",
+        f"event_uuid: {event['event_uuid']}",
         "─" * 30,
         f"total_buy: {format_number(event['buy_amount'])}",
         f"total_sell: {format_number(event['sell_amount'])}",
@@ -293,6 +421,7 @@ def generate_current_event_report() -> str:
             f"price: {current_event['price']}\n"
             f"symbol: {current_event['symbol']}\n"
             f"tv_time: {current_event['tv_time'] or 'N/A'}\n"
+            f"event_uuid: {current_event['event_uuid']}\n"
             f"elapsed: {age}s / {current_event['window_seconds']}s\n"
             f"buy_amount: {format_number(current_event['buy_amount'])}\n"
             f"sell_amount: {format_number(current_event['sell_amount'])}\n"
@@ -382,6 +511,8 @@ def generate_status_report() -> str:
     with event_lock:
         event_status = "有進行中事件" if current_event and not current_event["finished"] else "無進行中事件"
 
+    mysql_status = "已設定" if MYSQL_HOST and MYSQL_USER and MYSQL_DB else "未設定完整"
+
     return (
         f"🤖 Bot 狀態報告\n"
         f"設定來源：{config['source']}\n"
@@ -393,6 +524,7 @@ def generate_status_report() -> str:
         f"重連次數：{bot_status['reconnect_count']}\n"
         f"白名單：{whitelist_text}\n"
         f"TV Secret：{'已設定' if TV_WEBHOOK_SECRET else '未設定'}\n"
+        f"MySQL：{mysql_status}\n"
         f"事件狀態：{event_status}\n"
         f"最後錯誤：{bot_status['last_error'] or '無'}"
     )
@@ -551,8 +683,14 @@ def event_watchdog():
                         current_event = None
 
             if finished_event:
+                try:
+                    save_event_to_db(finished_event)
+                    logger.info("✅ Event saved to DB: %s", finished_event["event_uuid"])
+                except Exception as db_error:
+                    logger.exception("save_event_to_db error: %s", db_error)
+
                 send_message(CHAT_ID, generate_event_summary(finished_event))
-                logger.info("Event finished: %s", finished_event)
+                logger.info("Event finished: %s", finished_event["event_uuid"])
 
             time.sleep(2)
 
@@ -626,6 +764,21 @@ def tradingview_webhook():
         new_event = create_event(event, liquidity_side, price, symbol, tv_time)
 
         with event_lock:
+            if current_event and not current_event["finished"]:
+                logger.warning("New TV event ignored because another event is still running: %s", current_event["event_uuid"])
+
+                send_message(
+                    CHAT_ID,
+                    "⚠️ 新的 TV 快訊已收到，但目前已有事件進行中，這筆先略過\n"
+                    f"event: {event}\n"
+                    f"liquidity_side: {liquidity_side}\n"
+                    f"price: {price}\n"
+                    f"time: {tv_time}\n"
+                    f"symbol: {symbol}"
+                )
+
+                return {"status": "ignored", "reason": "event already running"}, 200
+
             current_event = new_event
 
         msg = (
@@ -636,6 +789,7 @@ def tradingview_webhook():
             f"time: {tv_time}\n"
             f"symbol: {symbol}\n"
             f"window: {new_event['window_seconds']}s\n"
+            f"event_uuid: {new_event['event_uuid']}\n"
             "事件監控已啟動"
         )
 
@@ -726,10 +880,8 @@ def start_background_threads():
 if __name__ == "__main__":
     logger.info("✅ Taker 資金動能監控機器人啟動中...")
 
-    # 🔥 這行加在這裡（最重要）
     try:
         init_db()
-        logger.info("✅ MySQL table 檢查 / 建立完成")
     except Exception as e:
         logger.exception("❌ init_db 失敗: %s", e)
 
@@ -737,48 +889,8 @@ if __name__ == "__main__":
     logger.info("Port: %s", PORT)
     logger.info("Allowed users: %s", ALLOWED_USERS if ALLOWED_USERS else "ALL")
     logger.info("TV webhook secret: %s", "SET" if TV_WEBHOOK_SECRET else "NOT SET")
+    logger.info("MySQL host: %s", MYSQL_HOST if MYSQL_HOST else "NOT SET")
+    logger.info("MySQL db: %s", MYSQL_DB if MYSQL_DB else "NOT SET")
 
     start_background_threads()
     app.run(host=HOST, port=PORT)
-
-
-
-# =========================================================
-# database
-# =========================================================
-def init_db():
-    conn = get_db_conn()
-    sql = """
-    CREATE TABLE IF NOT EXISTS liquidity_events (
-        id BIGINT PRIMARY KEY AUTO_INCREMENT,
-        event_uuid VARCHAR(64) NOT NULL,
-        event_type VARCHAR(50) NOT NULL,
-        liquidity_side VARCHAR(20) NOT NULL,
-        symbol VARCHAR(50) NOT NULL,
-        trigger_price DECIMAL(18,8) NOT NULL,
-        tv_time VARCHAR(64),
-        trigger_ts INT NOT NULL,
-        trigger_time_text VARCHAR(32),
-        window_seconds INT NOT NULL,
-
-        total_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
-        total_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
-        total_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
-        total_trades INT NOT NULL DEFAULT 0,
-
-        btc_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
-        btc_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
-        btc_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
-        btc_trades INT NOT NULL DEFAULT 0,
-
-        eth_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
-        eth_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
-        eth_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
-        eth_trades INT NOT NULL DEFAULT 0,
-
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    """
-    with conn.cursor() as cursor:
-        cursor.execute(sql)
-    conn.close()
