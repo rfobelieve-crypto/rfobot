@@ -1,4 +1,4 @@
 flask
 requests
 websocket-client
-pymysql
+pymysql==1.1.0
