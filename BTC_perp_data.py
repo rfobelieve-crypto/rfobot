@@ -117,9 +117,9 @@ TIMEFRAMES = {
     "1h": 60
 }
 
-# 事件規則：改成 1 分鐘觀察
-EVENT_OBSERVATION_SECONDS = 60   # 1 分鐘
-OUTCOME_PCT = 0.001              # ±0.1%
+# 事件規則
+EVENT_OBSERVATION_SECONDS = 3600  # 1 小時
+OUTCOME_PCT = 0.01                # ±1%
 
 # =========================================================
 # 幣種設定（目前只做 BTC）
@@ -322,10 +322,10 @@ def init_db():
             flow_until_hit_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
             flow_until_hit_trades INT NOT NULL DEFAULT 0,
 
-            flow_observation_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
-            flow_observation_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
-            flow_observation_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
-            flow_observation_trades INT NOT NULL DEFAULT 0,
+            flow_1h_buy DECIMAL(20,8) NOT NULL DEFAULT 0,
+            flow_1h_sell DECIMAL(20,8) NOT NULL DEFAULT 0,
+            flow_1h_delta DECIMAL(20,8) NOT NULL DEFAULT 0,
+            flow_1h_trades INT NOT NULL DEFAULT 0,
 
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uk_event_uuid (event_uuid),
@@ -338,7 +338,8 @@ def init_db():
         with conn.cursor() as cursor:
             cursor.execute(sql)
 
-        ensure_column(conn, "liquidity_events", "observation_seconds", "INT NOT NULL DEFAULT 60")
+        # 若舊表已存在，補欄位
+        ensure_column(conn, "liquidity_events", "observation_seconds", "INT NOT NULL DEFAULT 3600")
         ensure_column(conn, "liquidity_events", "upper_target", "DECIMAL(18,8) NOT NULL DEFAULT 0")
         ensure_column(conn, "liquidity_events", "lower_target", "DECIMAL(18,8) NOT NULL DEFAULT 0")
         ensure_column(conn, "liquidity_events", "first_hit_side", "VARCHAR(20) DEFAULT 'none'")
@@ -350,10 +351,10 @@ def init_db():
         ensure_column(conn, "liquidity_events", "flow_until_hit_sell", "DECIMAL(20,8) NOT NULL DEFAULT 0")
         ensure_column(conn, "liquidity_events", "flow_until_hit_delta", "DECIMAL(20,8) NOT NULL DEFAULT 0")
         ensure_column(conn, "liquidity_events", "flow_until_hit_trades", "INT NOT NULL DEFAULT 0")
-        ensure_column(conn, "liquidity_events", "flow_observation_buy", "DECIMAL(20,8) NOT NULL DEFAULT 0")
-        ensure_column(conn, "liquidity_events", "flow_observation_sell", "DECIMAL(20,8) NOT NULL DEFAULT 0")
-        ensure_column(conn, "liquidity_events", "flow_observation_delta", "DECIMAL(20,8) NOT NULL DEFAULT 0")
-        ensure_column(conn, "liquidity_events", "flow_observation_trades", "INT NOT NULL DEFAULT 0")
+        ensure_column(conn, "liquidity_events", "flow_1h_buy", "DECIMAL(20,8) NOT NULL DEFAULT 0")
+        ensure_column(conn, "liquidity_events", "flow_1h_sell", "DECIMAL(20,8) NOT NULL DEFAULT 0")
+        ensure_column(conn, "liquidity_events", "flow_1h_delta", "DECIMAL(20,8) NOT NULL DEFAULT 0")
+        ensure_column(conn, "liquidity_events", "flow_1h_trades", "INT NOT NULL DEFAULT 0")
 
         logger.info("✅ MySQL table 檢查 / 建立完成")
     finally:
@@ -368,7 +369,7 @@ def save_event_to_db(event: dict):
         upper_target, lower_target,
         first_hit_side, outcome_label, hit_price, hit_ts, hit_latency_seconds,
         flow_until_hit_buy, flow_until_hit_sell, flow_until_hit_delta, flow_until_hit_trades,
-        flow_observation_buy, flow_observation_sell, flow_observation_delta, flow_observation_trades
+        flow_1h_buy, flow_1h_sell, flow_1h_delta, flow_1h_trades
     ) VALUES (
         %s, %s, %s, %s, %s,
         %s, %s, %s, %s,
@@ -403,10 +404,10 @@ def save_event_to_db(event: dict):
                 event["flow_until_hit_sell"],
                 event["flow_until_hit_buy"] - event["flow_until_hit_sell"],
                 event["flow_until_hit_trades"],
-                event["flow_observation_buy"],
-                event["flow_observation_sell"],
-                event["flow_observation_buy"] - event["flow_observation_sell"],
-                event["flow_observation_trades"]
+                event["flow_1h_buy"],
+                event["flow_1h_sell"],
+                event["flow_1h_buy"] - event["flow_1h_sell"],
+                event["flow_1h_trades"]
             ))
     finally:
         conn.close()
@@ -433,22 +434,26 @@ def create_event(event_type: str, liquidity_side: str, price: float, symbol: str
         "upper_target": upper_target,
         "lower_target": lower_target,
 
-        "status": "active",
+        # 狀態
+        "status": "active",         # active / hit_locked / finished
         "finished": False,
 
-        "first_hit_side": "none",
+        # hit 結果
+        "first_hit_side": "none",   # upper / lower / none
         "outcome_label": "unknown",
         "hit_price": None,
         "hit_ts": None,
         "hit_latency_seconds": None,
 
+        # until hit 統計
         "flow_until_hit_buy": 0.0,
         "flow_until_hit_sell": 0.0,
         "flow_until_hit_trades": 0,
 
-        "flow_observation_buy": 0.0,
-        "flow_observation_sell": 0.0,
-        "flow_observation_trades": 0,
+        # 完整 1h 統計
+        "flow_1h_buy": 0.0,
+        "flow_1h_sell": 0.0,
+        "flow_1h_trades": 0,
     }
 
 
@@ -456,7 +461,7 @@ def detect_first_hit(event: dict, price: float, trade_ts: int):
     """
     只要碰到就算 hit。
     hit 後立刻鎖定 label，但事件仍持續到 observation_seconds 結束，
-    用來收完整 observation flow，同時這段期間不接受新事件。
+    用來收完整 1h flow，同時這段期間不接受新事件。
     """
     if event["status"] != "active":
         return
@@ -480,6 +485,9 @@ def detect_first_hit(event: dict, price: float, trade_ts: int):
 
 
 def finalize_neutral_if_needed(event: dict):
+    """
+    若 observation_seconds 到時仍未 hit，標記 neutral。
+    """
     if event["first_hit_side"] == "none":
         event["outcome_label"] = outcome_label_from_hit(event["liquidity_side"], "none")
         event["status"] = "hit_locked"
@@ -487,10 +495,10 @@ def finalize_neutral_if_needed(event: dict):
 
 def generate_event_summary(event: dict) -> str:
     flow_until_hit_delta = event["flow_until_hit_buy"] - event["flow_until_hit_sell"]
-    flow_observation_delta = event["flow_observation_buy"] - event["flow_observation_sell"]
+    flow_1h_delta = event["flow_1h_buy"] - event["flow_1h_sell"]
 
     until_hit_emoji = "🟢" if flow_until_hit_delta > 0 else "🔴" if flow_until_hit_delta < 0 else "🟡"
-    observation_emoji = "🟢" if flow_observation_delta > 0 else "🔴" if flow_observation_delta < 0 else "🟡"
+    flow_1h_emoji = "🟢" if flow_1h_delta > 0 else "🔴" if flow_1h_delta < 0 else "🟡"
 
     hit_price_text = f"{event['hit_price']}" if event["hit_price"] is not None else "N/A"
     hit_ts_text = (
@@ -522,10 +530,10 @@ def generate_event_summary(event: dict) -> str:
         f"flow_until_hit_delta: {format_number(flow_until_hit_delta)} {until_hit_emoji}",
         f"flow_until_hit_trades: {event['flow_until_hit_trades']}",
         "─" * 30,
-        f"flow_observation_buy: {format_number(event['flow_observation_buy'])}",
-        f"flow_observation_sell: {format_number(event['flow_observation_sell'])}",
-        f"flow_observation_delta: {format_number(flow_observation_delta)} {observation_emoji}",
-        f"flow_observation_trades: {event['flow_observation_trades']}",
+        f"flow_1h_buy: {format_number(event['flow_1h_buy'])}",
+        f"flow_1h_sell: {format_number(event['flow_1h_sell'])}",
+        f"flow_1h_delta: {format_number(flow_1h_delta)} {flow_1h_emoji}",
+        f"flow_1h_trades: {event['flow_1h_trades']}",
     ]
     return "\n".join(lines)
 
@@ -537,7 +545,7 @@ def generate_current_event_report() -> str:
 
         age = current_ts() - current_event["trigger_ts"]
         flow_until_hit_delta = current_event["flow_until_hit_buy"] - current_event["flow_until_hit_sell"]
-        flow_observation_delta = current_event["flow_observation_buy"] - current_event["flow_observation_sell"]
+        flow_1h_delta = current_event["flow_1h_buy"] - current_event["flow_1h_sell"]
 
         return (
             f"🚧 事件進行中\n"
@@ -553,7 +561,7 @@ def generate_current_event_report() -> str:
             f"elapsed: {age}s / {current_event['observation_seconds']}s\n"
             f"hit_latency_seconds: {current_event['hit_latency_seconds'] if current_event['hit_latency_seconds'] is not None else 'N/A'}\n"
             f"flow_until_hit_delta: {format_number(flow_until_hit_delta)}\n"
-            f"flow_observation_delta: {format_number(flow_observation_delta)}\n"
+            f"flow_1h_delta: {format_number(flow_1h_delta)}\n"
             f"event_uuid: {current_event['event_uuid']}"
         )
 
@@ -732,17 +740,20 @@ def on_message(ws, message):
             bot_status["last_trade_ts"] = trade_ts
             bot_status["total_trades"] += 1
 
+            # 事件統計與 hit 檢查：只做 BTC
             with event_lock:
                 if current_event and not current_event["finished"] and symbol == "BTC":
                     age = current_ts() - current_event["trigger_ts"]
 
                     if age <= current_event["observation_seconds"]:
+                        # 完整 1h flow：永遠累加到 1 小時結束
                         if trade_side == "buy":
-                            current_event["flow_observation_buy"] += amount
+                            current_event["flow_1h_buy"] += amount
                         else:
-                            current_event["flow_observation_sell"] += amount
-                        current_event["flow_observation_trades"] += 1
+                            current_event["flow_1h_sell"] += amount
+                        current_event["flow_1h_trades"] += 1
 
+                        # until hit：只有還沒 hit 時才累加
                         if current_event["first_hit_side"] == "none":
                             if trade_side == "buy":
                                 current_event["flow_until_hit_buy"] += amount
@@ -907,6 +918,7 @@ def tradingview_webhook():
         tv_time = str(data.get("time", "")).strip()
         symbol = str(data.get("symbol", "")).strip()
 
+        # 只接 BTC 事件
         if "BTC" not in symbol.upper():
             logger.warning("Ignored non-BTC TV event: %s", symbol)
             return {"status": "ignored", "reason": "only BTC supported"}, 200
