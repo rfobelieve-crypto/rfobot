@@ -229,6 +229,64 @@ def send_message(chat_id: str, text: str) -> None:
         logger.exception("send_message error: %s", e)
 
 
+# =========================================================
+# Session 判斷（依 UTC 時間）
+# =========================================================
+def determine_session(event_ts: int) -> str:
+    """
+    根據事件發生的 UTC 時間判斷交易時段。
+    Asia:   00:00–08:00 UTC (台北 08:00–16:00)
+    London: 08:00–13:00 UTC (台北 16:00–21:00)
+    NY:     13:00–21:00 UTC (台北 21:00–05:00)
+    其餘歸類為 Off-hours。
+    可依需求調整時段邊界。
+    """
+    from datetime import timezone as _tz
+    utc_hour = datetime.fromtimestamp(event_ts, tz=_tz.utc).hour
+
+    if 0 <= utc_hour < 8:
+        return "Asia"
+    elif 8 <= utc_hour < 13:
+        return "London"
+    elif 13 <= utc_hour < 21:
+        return "NY"
+    else:
+        return "Off-hours"
+
+
+# =========================================================
+# Reaction Type 判斷
+# =========================================================
+def determine_reaction_type(liquidity_side: str, first_hit_side: str) -> str:
+    """
+    判斷 first_hit_side 與 sweep 後預期延續方向的關係。
+
+    BSL (buy / 掃高點)：
+      預期延續方向 = upper（繼續往上）
+      first_hit_side == upper → acceptance（市場接受突破）
+      first_hit_side == lower → rejection（市場拒絕突破）
+
+    SSL (sell / 掃低點)：
+      預期延續方向 = lower（繼續往下）
+      first_hit_side == lower → acceptance
+      first_hit_side == upper → rejection
+
+    未命中 → neutral
+    """
+    liquidity_side = str(liquidity_side or "").lower()
+    first_hit_side = str(first_hit_side or "").lower()
+
+    if first_hit_side == "none" or not first_hit_side:
+        return "neutral"
+
+    if liquidity_side == "buy":
+        return "acceptance" if first_hit_side == "upper" else "rejection"
+    elif liquidity_side == "sell":
+        return "acceptance" if first_hit_side == "lower" else "rejection"
+
+    return "unknown"
+
+
 def outcome_label_from_hit(liquidity_side: str, first_hit_side: str) -> str:
     liquidity_side = str(liquidity_side or "").lower()
     first_hit_side = str(first_hit_side or "").lower()
@@ -358,6 +416,17 @@ def init_db():
         ensure_column(conn, "liquidity_events", "flow_1h_delta", "DECIMAL(20,8) NOT NULL DEFAULT 0")
         ensure_column(conn, "liquidity_events", "flow_1h_trades", "INT NOT NULL DEFAULT 0")
 
+        # ── 新增欄位：edge 統計用 ──
+        ensure_column(conn, "liquidity_events", "sweep_ref_price", "DECIMAL(18,8) DEFAULT NULL COMMENT '被掃的前高/前低價格'")
+        ensure_column(conn, "liquidity_events", "sweep_size_pct", "DECIMAL(10,4) DEFAULT NULL COMMENT '掃蕩幅度百分比'")
+        ensure_column(conn, "liquidity_events", "entry_time", "VARCHAR(32) DEFAULT NULL COMMENT '進場時間（K棒收盤）'")
+        ensure_column(conn, "liquidity_events", "entry_price", "DECIMAL(18,8) DEFAULT NULL COMMENT '進場價格（K棒收盤價）'")
+        ensure_column(conn, "liquidity_events", "return_5m", "DECIMAL(10,4) DEFAULT NULL COMMENT '進場後5分鐘報酬率%'")
+        ensure_column(conn, "liquidity_events", "return_15m", "DECIMAL(10,4) DEFAULT NULL COMMENT '進場後15分鐘報酬率%'")
+        ensure_column(conn, "liquidity_events", "return_1h", "DECIMAL(10,4) DEFAULT NULL COMMENT '進場後1小時報酬率%'")
+        ensure_column(conn, "liquidity_events", "session", "VARCHAR(20) DEFAULT NULL COMMENT 'Asia/London/NY/Off-hours'")
+        ensure_column(conn, "liquidity_events", "reaction_type", "VARCHAR(20) DEFAULT NULL COMMENT 'acceptance/rejection/neutral'")
+
         logger.info("✅ MySQL table 檢查 / 建立完成")
     finally:
         conn.close()
@@ -371,14 +440,22 @@ def save_event_to_db(event: dict):
         upper_target, lower_target,
         first_hit_side, outcome_label, hit_price, hit_ts, hit_latency_seconds,
         flow_until_hit_buy, flow_until_hit_sell, flow_until_hit_delta, flow_until_hit_trades,
-        flow_1h_buy, flow_1h_sell, flow_1h_delta, flow_1h_trades
+        flow_1h_buy, flow_1h_sell, flow_1h_delta, flow_1h_trades,
+        sweep_ref_price, sweep_size_pct,
+        entry_time, entry_price,
+        return_5m, return_15m, return_1h,
+        session, reaction_type
     ) VALUES (
         %s, %s, %s, %s, %s,
         %s, %s, %s, %s,
         %s, %s,
         %s, %s, %s, %s, %s,
         %s, %s, %s, %s,
-        %s, %s, %s, %s
+        %s, %s, %s, %s,
+        %s, %s,
+        %s, %s,
+        %s, %s, %s,
+        %s, %s
     )
     """
 
@@ -409,7 +486,16 @@ def save_event_to_db(event: dict):
                 event["flow_1h_buy"],
                 event["flow_1h_sell"],
                 event["flow_1h_buy"] - event["flow_1h_sell"],
-                event["flow_1h_trades"]
+                event["flow_1h_trades"],
+                event.get("sweep_ref_price"),
+                event.get("sweep_size_pct"),
+                event.get("entry_time"),
+                event.get("entry_price"),
+                event.get("return_5m"),
+                event.get("return_15m"),
+                event.get("return_1h"),
+                event.get("session"),
+                event.get("reaction_type"),
             ))
     finally:
         conn.close()
@@ -418,9 +504,26 @@ def save_event_to_db(event: dict):
 # =========================================================
 # Event
 # =========================================================
-def create_event(event_type: str, liquidity_side: str, price: float, symbol: str, tv_time: str):
+def create_event(event_type: str, liquidity_side: str, price: float,
+                  symbol: str, tv_time: str, sweep_ref_price: float = None):
     upper_target = price * (1 + OUTCOME_PCT)
     lower_target = price * (1 - OUTCOME_PCT)
+
+    trigger_ts = current_ts()
+
+    # ── entry_time：事件觸發當下那根 1 分鐘 K 棒的收盤時間（秒級 UTC timestamp）
+    # 取天花板到下一分鐘邊界，例如 13:42:37 → 13:43:00
+    entry_candle_close_ts = (trigger_ts // 60 + 1) * 60
+
+    # ── sweep_size_pct：掃蕩幅度百分比
+    sweep_size_pct = None
+    if sweep_ref_price and sweep_ref_price > 0:
+        if liquidity_side == "buy":
+            # BSL: trigger_price 高於 ref (前高)
+            sweep_size_pct = (price - sweep_ref_price) / sweep_ref_price * 100
+        elif liquidity_side == "sell":
+            # SSL: trigger_price 低於 ref (前低)
+            sweep_size_pct = (sweep_ref_price - price) / sweep_ref_price * 100
 
     return {
         "event_uuid": str(uuid.uuid4()),
@@ -429,7 +532,7 @@ def create_event(event_type: str, liquidity_side: str, price: float, symbol: str
         "price": price,
         "symbol": symbol,
         "tv_time": tv_time,
-        "trigger_ts": current_ts(),
+        "trigger_ts": trigger_ts,
         "trigger_time_text": now_taipei_str(),
         "observation_seconds": EVENT_OBSERVATION_SECONDS,
 
@@ -456,6 +559,30 @@ def create_event(event_type: str, liquidity_side: str, price: float, symbol: str
         "flow_1h_buy": 0.0,
         "flow_1h_sell": 0.0,
         "flow_1h_trades": 0,
+
+        # ── 新增欄位：掃蕩參考價 & 幅度 ──
+        "sweep_ref_price": sweep_ref_price,       # 被掃的前高 / 前低價格
+        "sweep_size_pct": sweep_size_pct,          # 掃蕩幅度 %
+
+        # ── 新增欄位：固定進場 ──
+        "entry_candle_close_ts": entry_candle_close_ts,  # 內部用，K 棒收盤 ts
+        "entry_time": None,                        # K 棒收盤時間（格式化字串）
+        "entry_price": None,                       # K 棒收盤價（最後一筆成交價）
+        "_entry_price_locked": False,               # 內部狀態：entry_price 是否已鎖定
+
+        # ── 新增欄位：forward return ──
+        "return_5m": None,                         # 進場後 5 分鐘報酬率 %
+        "return_15m": None,                        # 進場後 15 分鐘報酬率 %
+        "return_1h": None,                         # 進場後 1 小時報酬率 %
+        "_return_5m_ts": entry_candle_close_ts + 300,    # 內部：5m 快照時間
+        "_return_15m_ts": entry_candle_close_ts + 900,   # 內部：15m 快照時間
+        "_return_1h_ts": entry_candle_close_ts + 3600,   # 內部：1h 快照時間
+
+        # ── 新增欄位：市場環境 ──
+        "session": determine_session(trigger_ts),  # Asia / London / NY / Off-hours
+
+        # ── 新增欄位：reaction type ──
+        "reaction_type": None,                     # acceptance / rejection / neutral
     }
 
 
@@ -464,6 +591,7 @@ def detect_first_hit(event: dict, price: float, trade_ts: int):
     只要碰到就算 hit。
     hit 後立刻鎖定 label，但事件仍持續到 observation_seconds 結束，
     用來收完整 1h flow，同時這段期間不接受新事件。
+    同時設定 reaction_type。
     """
     if event["status"] != "active":
         return
@@ -485,13 +613,18 @@ def detect_first_hit(event: dict, price: float, trade_ts: int):
     event["hit_latency_seconds"] = max(0, int(trade_ts) - int(event["trigger_ts"]))
     event["status"] = "hit_locked"
 
+    # 設定 reaction_type
+    event["reaction_type"] = determine_reaction_type(event["liquidity_side"], hit_side)
+
 
 def finalize_neutral_if_needed(event: dict):
     """
     若 observation_seconds 到時仍未 hit，標記 neutral。
+    同時設定 reaction_type 為 neutral。
     """
     if event["first_hit_side"] == "none":
         event["outcome_label"] = outcome_label_from_hit(event["liquidity_side"], "none")
+        event["reaction_type"] = "neutral"
         event["status"] = "hit_locked"
 
 
@@ -508,6 +641,18 @@ def generate_event_summary(event: dict) -> str:
         if event["hit_ts"] else "N/A"
     )
 
+    # 新增欄位的顯示值
+    entry_price_text = f"{event['entry_price']:.2f}" if event.get("entry_price") else "N/A"
+    entry_time_text = event.get("entry_time") or "N/A"
+    sweep_ref_text = f"{event['sweep_ref_price']:.2f}" if event.get("sweep_ref_price") else "N/A"
+    sweep_size_text = f"{event['sweep_size_pct']:.4f}%" if event.get("sweep_size_pct") is not None else "N/A"
+
+    def fmt_return(val):
+        if val is None:
+            return "N/A"
+        emoji = "🟢" if val > 0 else "🔴" if val < 0 else "🟡"
+        return f"{val:+.4f}% {emoji}"
+
     lines = [
         "✅ 流動性事件完成",
         f"event: {event['event_type']}",
@@ -519,13 +664,24 @@ def generate_event_summary(event: dict) -> str:
         f"tv_time: {event['tv_time'] or 'N/A'}",
         f"trigger_time: {event['trigger_time_text']}",
         f"observation: {format_duration_minutes(event['observation_seconds'])}",
+        f"session: {event.get('session', 'N/A')}",
         f"event_uuid: {event['event_uuid']}",
+        "─" * 30,
+        f"sweep_ref_price: {sweep_ref_text}",
+        f"sweep_size_pct: {sweep_size_text}",
+        f"entry_time: {entry_time_text}",
+        f"entry_price: {entry_price_text}",
         "─" * 30,
         f"first_hit_side: {event['first_hit_side']}",
         f"outcome_label: {event['outcome_label']}",
+        f"reaction_type: {event.get('reaction_type') or 'N/A'}",
         f"hit_price: {hit_price_text}",
         f"hit_time: {hit_ts_text}",
         f"hit_latency_seconds: {event['hit_latency_seconds'] if event['hit_latency_seconds'] is not None else 'N/A'}",
+        "─" * 30,
+        f"return_5m: {fmt_return(event.get('return_5m'))}",
+        f"return_15m: {fmt_return(event.get('return_15m'))}",
+        f"return_1h: {fmt_return(event.get('return_1h'))}",
         "─" * 30,
         f"flow_until_hit_buy: {format_number(event['flow_until_hit_buy'])}",
         f"flow_until_hit_sell: {format_number(event['flow_until_hit_sell'])}",
@@ -769,6 +925,43 @@ def on_message(ws, message):
 
                             detect_first_hit(current_event, price, trade_ts)
 
+                    # ── 新增：entry_price 追蹤 ──
+                    # 在觸發 K 棒結束前，持續更新 entry_price（最後一筆 = 收盤價）
+                    if not current_event.get("_entry_price_locked"):
+                        if trade_ts < current_event["entry_candle_close_ts"]:
+                            # 還在同一根 K 棒內，更新最新價
+                            current_event["entry_price"] = price
+                        else:
+                            # K 棒已收盤，鎖定 entry_price
+                            if current_event["entry_price"] is None:
+                                current_event["entry_price"] = price
+                            current_event["entry_time"] = datetime.fromtimestamp(
+                                current_event["entry_candle_close_ts"], tz_taipei
+                            ).strftime("%Y-%m-%d %H:%M:%S")
+                            current_event["_entry_price_locked"] = True
+
+                    # ── 新增：forward return 快照 ──
+                    # 當交易時間超過各快照時間點，記錄報酬率
+                    if current_event.get("_entry_price_locked") and current_event["entry_price"]:
+                        ep = current_event["entry_price"]
+                        ls = current_event["liquidity_side"]
+
+                        # 報酬率方向：BSL 做空 → 價格下跌為正；SSL 做多 → 價格上漲為正
+                        # 這裡統一用「若 sweep 後反轉的方向」為正報酬
+                        if ls == "buy":
+                            # BSL 預期反轉向下 → short → return = (entry - current) / entry * 100
+                            sign = -1.0
+                        else:
+                            # SSL 預期反轉向上 → long → return = (current - entry) / entry * 100
+                            sign = 1.0
+
+                        if current_event["return_5m"] is None and trade_ts >= current_event["_return_5m_ts"]:
+                            current_event["return_5m"] = round(sign * (price - ep) / ep * 100, 4)
+                        if current_event["return_15m"] is None and trade_ts >= current_event["_return_15m_ts"]:
+                            current_event["return_15m"] = round(sign * (price - ep) / ep * 100, 4)
+                        if current_event["return_1h"] is None and trade_ts >= current_event["_return_1h_ts"]:
+                            current_event["return_1h"] = round(sign * (price - ep) / ep * 100, 4)
+
         if not new_entries:
             return
 
@@ -930,6 +1123,9 @@ def tradingview_webhook():
         tv_time = str(data.get("time", "")).strip()
         symbol = str(data.get("symbol", "")).strip()
 
+        # 可選：被掃的前高/前低參考價（由 TradingView alert 提供）
+        sweep_ref_price = safe_float(data.get("sweep_ref_price", 0), 0.0) or None
+
         # 只接 BTC 事件
         if "BTC" not in symbol.upper():
             logger.warning("Ignored non-BTC TV event: %s", symbol)
@@ -943,7 +1139,8 @@ def tradingview_webhook():
             logger.warning("Ignored invalid trigger price: %s", price)
             return {"status": "ignored", "reason": "invalid price"}, 200
 
-        new_event = create_event(event, liquidity_side, price, symbol, tv_time)
+        new_event = create_event(event, liquidity_side, price, symbol, tv_time,
+                                 sweep_ref_price=sweep_ref_price)
 
         # 純事件追蹤（獨立於 current_event，支援多事件同時追蹤）
         tracker = outcome_tracker.register_event(event, liquidity_side, price, "BTC", tv_time)
