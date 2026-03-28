@@ -1246,9 +1246,6 @@ def generate_snapshot_report(uuid_prefix: str = None) -> str:
             if r.get("delta_value") is not None:
                 delta = float(r["delta_value"])
                 lines.append(f"  delta: {format_number(delta)} {'🟢' if delta > 0 else '🔴'}")
-            if r.get("cvd_change") is not None:
-                cvd = float(r["cvd_change"])
-                lines.append(f"  cvd_change: {format_number(cvd)}")
             if r.get("cvd_sign_flip") is not None:
                 lines.append(f"  cvd_flip: {'Yes ✅' if r['cvd_sign_flip'] else 'No ❌'}")
             if r.get("price_change_pct") is not None:
@@ -1266,7 +1263,7 @@ def generate_snapshot_report(uuid_prefix: str = None) -> str:
                 lines.append(f"  funding: {fr:+.4f}%")
             if r.get("liq_total_usd") is not None:
                 liq = float(r["liq_total_usd"])
-                if liq > 0:
+                if liq >= 100_000:
                     liq_buy = float(r.get("liq_buy_usd") or 0)
                     liq_sell = float(r.get("liq_sell_usd") or 0)
                     lines.append(f"  liq: ${liq/1e6:.1f}M (long-liq=${liq_sell/1e6:.1f}M short-liq=${liq_buy/1e6:.1f}M)")
