@@ -43,26 +43,46 @@ def get_pending_snapshots() -> list[dict]:
     Find (event, snapshot_type) pairs that need computing:
     1. Snapshots that don't exist yet (s.id IS NULL)
     2. Snapshots that exist but predate the current scorer (final_score IS NULL)
-
-    Category 2 ensures old snapshots are automatically re-scored after
-    a scorer upgrade. Once saved with final_score set, they won't be picked up again.
+       — falls back to (1) only if final_score column doesn't exist yet
     """
     now = int(time.time())
     results = []
 
+    # Try with final_score check first; fall back if column not yet migrated
+    sql_with_rescore = """
+    SELECT r.*
+    FROM event_registry r
+    LEFT JOIN event_feature_snapshots s
+        ON r.event_uuid = s.event_uuid AND s.snapshot_type = %s
+    WHERE (s.id IS NULL OR s.final_score IS NULL)
+      AND (r.trigger_ts + %s) <= %s
+    ORDER BY r.trigger_ts ASC
+    """
+    sql_basic = """
+    SELECT r.*
+    FROM event_registry r
+    LEFT JOIN event_feature_snapshots s
+        ON r.event_uuid = s.event_uuid AND s.snapshot_type = %s
+    WHERE s.id IS NULL
+      AND (r.trigger_ts + %s) <= %s
+    ORDER BY r.trigger_ts ASC
+    """
+
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
+            # Probe once whether final_score column exists
+            use_rescore = True
+            try:
+                cur.execute(
+                    "SELECT final_score FROM event_feature_snapshots LIMIT 0"
+                )
+            except Exception:
+                use_rescore = False
+
+            sql = sql_with_rescore if use_rescore else sql_basic
+
             for snap_type, offset_sec in SNAPSHOT_WINDOWS.items():
-                sql = """
-                SELECT r.*
-                FROM event_registry r
-                LEFT JOIN event_feature_snapshots s
-                    ON r.event_uuid = s.event_uuid AND s.snapshot_type = %s
-                WHERE (s.id IS NULL OR s.final_score IS NULL)
-                  AND (r.trigger_ts + %s) <= %s
-                ORDER BY r.trigger_ts ASC
-                """
                 cur.execute(sql, (snap_type, offset_sec, now))
                 rows = cur.fetchall()
                 for row in rows:
