@@ -42,7 +42,8 @@ def main():
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
         "migrations",
     )
-    for mig_file in ("001_market_data_tables.sql", "004_event_feature_snapshots.sql"):
+    for mig_file in ("001_market_data_tables.sql", "004_event_feature_snapshots.sql",
+                     "006_cleanup_legacy.sql"):
         mig_path = os.path.join(migrations_dir, mig_file)
         if os.path.exists(mig_path):
             try:
