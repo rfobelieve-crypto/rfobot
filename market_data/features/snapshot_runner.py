@@ -65,6 +65,20 @@ def _notify_telegram(features: dict):
             score_str,
         ]
 
+        delta = features.get("delta_value")
+        if delta is not None:
+            delta_m = float(delta) / 1e6
+            # Green if delta aligns with reversal direction
+            is_ssl = side.lower() == "sell"
+            delta_aligned = (is_ssl and delta_m > 0) or (not is_ssl and delta_m < 0)
+            delta_icon = "🟢" if delta_aligned else "🔴"
+            lines.append(f"delta: {delta_m:+.2f}M {delta_icon}")
+
+        cvd_flip = features.get("cvd_sign_flip")
+        if cvd_flip is not None:
+            flip_str = "Yes ✅" if cvd_flip else "No ❌"
+            lines.append(f"cvd_flip: {flip_str}")
+
         price_pct = features.get("price_change_pct")
         if price_pct is not None:
             lines.append(f"price: {price_pct:+.2f}%")
