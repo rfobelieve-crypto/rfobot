@@ -13,6 +13,7 @@ from flask import Flask, request
 from datetime import datetime, timedelta, timezone
 
 import outcome_tracker
+from market_data.query.flow_context import get_pre_sweep_context, get_event_flow_context, format_flow_context
 
 # =========================================================
 # 基本設定
@@ -1086,6 +1087,17 @@ def event_watchdog():
                 if sweep_report:
                     summary += "\n" + "─" * 30 + "\n" + sweep_report
 
+                # Attach event-period market flow context (OKX+Binance)
+                try:
+                    obs_minutes = finished_event["observation_seconds"] // 60
+                    event_ctx = get_event_flow_context(
+                        "BTC-USD", finished_event["trigger_ts"], obs_minutes
+                    )
+                    summary += "\n" + "─" * 30 + "\n"
+                    summary += format_flow_context(event_ctx, title=f"事件期間 {obs_minutes}m 市場流")
+                except Exception as flow_err:
+                    logger.warning("Failed to get event flow context: %s", flow_err)
+
                 send_message(CHAT_ID, summary)
                 logger.info("Event finished: %s", finished_event["event_uuid"])
 
@@ -1215,6 +1227,14 @@ def tradingview_webhook():
             msg_lines.append(f"  entry_price: {new_event['entry_price']:.2f}")
             msg_lines.append(f"  session: {new_event['session']}")
             msg_lines.append(f"  UUID: {new_event['event_uuid'][:8]}")
+
+        # Attach pre-sweep market flow context (OKX+Binance combined)
+        try:
+            pre_ctx = get_pre_sweep_context("BTC-USD", lookback_minutes=5)
+            msg_lines.append("─" * 30)
+            msg_lines.append(format_flow_context(pre_ctx, title="掃蕩前 5m 市場流"))
+        except Exception as flow_err:
+            logger.warning("Failed to get pre-sweep flow context: %s", flow_err)
 
         send_message(CHAT_ID, "\n".join(msg_lines))
 
