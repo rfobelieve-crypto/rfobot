@@ -22,3 +22,16 @@ Jumped to a "clever" solution without thinking about whether the intermediate st
 2. Only if no data, fallback to delta/volume ratio from flow_bars_1m
 
 **Rule:** When adding a fallback path, ask: "Does this intermediate step give me information I don't already have?" If not, skip it. Prefer the simplest query chain that solves the problem. Don't add queries that increase Railway DB usage without clear value.
+
+---
+
+## 2026-03-29: delta/volume ratio ≠ price change
+
+**What happened:**
+`_get_price_change()` fallback used `total_delta / total_vol * 100` when normalized_trades had no data. This produced values like +4.84% that looked like real price moves but were actually the **taker imbalance ratio** (what % of volume was net buy).
+
+**Root cause:**
+Confused two different metrics. delta/volume ratio measures buy-sell pressure, not price movement. The two are correlated but not interchangeable — especially on short windows where slippage is minimal.
+
+**Correct approach:**
+Return None when normalized_trades has no data. Don't fabricate price estimates from flow data.
