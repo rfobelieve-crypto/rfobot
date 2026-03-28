@@ -67,6 +67,19 @@ def ensure_extra_schema():
                         logger.debug("Column %s may already exist: %s", col_name, e)
             logger.info("event_feature_snapshots funding/liquidation columns ready")
 
+            # ── One-time reset: clear scores computed with bogus price fallback ──
+            cur.execute("""
+                UPDATE event_feature_snapshots
+                SET final_score = NULL,
+                    normalized_score = NULL,
+                    price_change_pct = NULL,
+                    reclaim_flag = NULL,
+                    break_again_flag = NULL
+                WHERE price_change_pct IS NOT NULL
+                  AND snapshot_ts < UNIX_TIMESTAMP('2026-03-29 12:00:00')
+            """)
+            logger.info("Reset stale snapshot scores (bogus price fallback cleared)")
+
     except Exception:
         logger.exception("ensure_extra_schema failed")
     finally:

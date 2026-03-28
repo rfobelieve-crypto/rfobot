@@ -1245,7 +1245,9 @@ def generate_snapshot_report(uuid_prefix: str = None) -> str:
 
             if r.get("delta_value") is not None:
                 delta = float(r["delta_value"])
-                lines.append(f"  delta: {format_number(delta)} {'🟢' if delta > 0 else '🔴'}")
+                is_ssl_snap = r.get("liquidity_side", "").lower() == "sell"
+                delta_aligned = (is_ssl_snap and delta > 0) or (not is_ssl_snap and delta < 0)
+                lines.append(f"  delta: {format_number(delta)} {'🟢' if delta_aligned else '🔴'}")
             if r.get("cvd_sign_flip") is not None:
                 lines.append(f"  cvd_flip: {'Yes ✅' if r['cvd_sign_flip'] else 'No ❌'}")
             if r.get("price_change_pct") is not None:
