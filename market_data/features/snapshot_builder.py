@@ -89,6 +89,12 @@ def build_snapshot(event: dict, snapshot_type: str, offset_sec: int) -> dict:
     # ── OI features ──
     oi = _compute_oi_features(canonical, trigger_ts, trigger_ts + offset_sec)
 
+    # ── Funding rate at trigger time ──
+    funding_rate = _get_funding_at(canonical, trigger_ts)
+
+    # ── Liquidation data in window ──
+    liq = _get_liquidation_window(canonical, trigger_ts, trigger_ts + offset_sec)
+
     return {
         "event_uuid": event["event_uuid"],
         "event_type": event.get("event_type"),
@@ -117,6 +123,15 @@ def build_snapshot(event: dict, snapshot_type: str, offset_sec: int) -> dict:
         "oi_change_binance_pct": oi.get("oi_change_binance_pct"),
         "oi_change_total": oi.get("oi_change_total"),
         "oi_change_total_pct": oi.get("oi_change_total_pct"),
+
+        # Funding rate
+        "funding_rate": funding_rate,
+
+        # Liquidations in window
+        "liq_buy_usd":   liq.get("liq_buy_usd"),
+        "liq_sell_usd":  liq.get("liq_sell_usd"),
+        "liq_total_usd": liq.get("liq_total_usd"),
+        "liq_count":     liq.get("liq_count"),
 
         "label": label,
     }
@@ -333,3 +348,66 @@ def _compute_oi_features(canonical: str, trigger_ts: int, snapshot_ts: int) -> d
         result["oi_change_total_pct"] = None
 
     return result
+
+
+def _get_funding_at(canonical: str, ts_unix: int) -> float | None:
+    """Get the most recent funding rate at or before a given unix timestamp."""
+    ts_ms = ts_unix * 1000
+    sql = """
+    SELECT funding_rate
+    FROM funding_rates
+    WHERE canonical_symbol = %s AND ts_exchange <= %s
+    ORDER BY ts_exchange DESC LIMIT 1
+    """
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (canonical, ts_ms))
+                row = cur.fetchone()
+                if row:
+                    return float(row["funding_rate"])
+        finally:
+            conn.close()
+    except Exception:
+        logger.debug("Funding rate lookup failed for %s @ %d", canonical, ts_unix)
+    return None
+
+
+def _get_liquidation_window(canonical: str, start_ts: int, end_ts: int) -> dict:
+    """Sum liquidation buckets in a time window (unix seconds)."""
+    start_ms = start_ts * 1000
+    end_ms   = end_ts   * 1000
+    sql = """
+    SELECT
+        COALESCE(SUM(liq_buy_usd),   0) AS liq_buy_usd,
+        COALESCE(SUM(liq_sell_usd),  0) AS liq_sell_usd,
+        COALESCE(SUM(liq_total_usd), 0) AS liq_total_usd,
+        COALESCE(SUM(liq_count),     0) AS liq_count
+    FROM liquidation_1m
+    WHERE canonical_symbol = %s
+      AND window_start >= %s AND window_start < %s
+    """
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (canonical, start_ms, end_ms))
+                row = cur.fetchone()
+                if row and float(row["liq_total_usd"]) > 0:
+                    return {
+                        "liq_buy_usd":   float(row["liq_buy_usd"]),
+                        "liq_sell_usd":  float(row["liq_sell_usd"]),
+                        "liq_total_usd": float(row["liq_total_usd"]),
+                        "liq_count":     int(row["liq_count"]),
+                    }
+        finally:
+            conn.close()
+    except Exception:
+        logger.debug("Liquidation window lookup failed for %s", canonical)
+    return {
+        "liq_buy_usd":   None,
+        "liq_sell_usd":  None,
+        "liq_total_usd": None,
+        "liq_count":     None,
+    }

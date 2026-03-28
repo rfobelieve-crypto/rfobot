@@ -22,6 +22,10 @@ from market_data.tasks.cleanup import cleanup_once
 from market_data.features.snapshot_runner import process_once as snapshot_process_once
 from market_data.adapters.oi_collector import collect_loop as oi_collect_loop
 from market_data.adapters.oi_schema import ensure_oi_schema
+from market_data.adapters.funding_collector import collect_loop as funding_collect_loop
+from market_data.adapters.funding_collector import collect_once as funding_collect_once
+from market_data.adapters.liquidation_collector import start_all as start_liquidation
+from market_data.adapters.extra_schema import ensure_extra_schema
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,9 +57,28 @@ def main():
     except Exception:
         logger.exception("OI schema setup failed (may already exist)")
 
+    # Ensure funding + liquidation schema
+    try:
+        ensure_extra_schema()
+    except Exception:
+        logger.exception("Extra schema setup failed (may already exist)")
+
     # Start OI collector in background (every 60s)
     threading.Thread(target=oi_collect_loop, daemon=True, name="oi-collector").start()
     logger.info("OI collector started (every 60s).")
+
+    # Start funding rate collector in background (every 60s)
+    # Collect once immediately so baseline is available for the first event
+    try:
+        funding_collect_once()
+    except Exception:
+        logger.exception("Initial funding collection failed")
+    threading.Thread(target=funding_collect_loop, daemon=True, name="funding-collector").start()
+    logger.info("Funding rate collector started (every 60s).")
+
+    # Start liquidation WS adapters + flusher
+    start_liquidation()
+    logger.info("Liquidation collectors started (OKX + Binance).")
 
     # Start flow bar flusher in background
     threading.Thread(target=flush_loop, daemon=True, name="flow-flusher").start()

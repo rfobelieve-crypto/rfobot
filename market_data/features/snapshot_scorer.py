@@ -17,15 +17,17 @@ def score_snapshot(features: dict) -> dict:
 
     # 模組分數
     order_flow = _score_order_flow(features, is_ssl, is_bsl, snap_type)
-    price = _score_price(features, is_ssl, is_bsl, snap_type)
-    oi = _score_oi_module(features, snap_type)
-    context = _score_context(features, snap_type)
+    price      = _score_price(features, is_ssl, is_bsl, snap_type)
+    oi         = _score_oi_module(features, snap_type)
+    funding_liq = _score_funding_liq(features, is_ssl, is_bsl, snap_type)
+    context    = _score_context(features, snap_type)
 
     # 合併
     rev = (
         order_flow["rev"] +
         price["rev"] +
         oi["rev"] +
+        funding_liq["rev"] +
         context["rev"]
     )
 
@@ -33,10 +35,11 @@ def score_snapshot(features: dict) -> dict:
         order_flow["cont"] +
         price["cont"] +
         oi["cont"] +
+        funding_liq["cont"] +
         context["cont"]
     )
 
-    return _finalize(rev, cont, order_flow, price, oi, context)
+    return _finalize(rev, cont, order_flow, price, oi, funding_liq, context)
 
 
 # ================================
@@ -141,7 +144,76 @@ def _score_oi_module(f, snap_type):
 
 
 # ================================
-# 模組 4：Context（目前保留）
+# 模組 4：Funding Rate + Liquidation
+# ================================
+def _score_funding_liq(f, is_ssl, is_bsl, snap_type):
+    rev, cont = 0.0, 0.0
+    multiplier = 1.0 if snap_type == "15m" else 1.5
+
+    # ── Funding Rate ──────────────────────────────────────────
+    # Positive funding = longs overcrowded; negative = shorts overcrowded.
+    # At SSL (sweep down): positive funding → longs still holding → reversal fuel
+    # At BSL (sweep up):   negative funding → shorts still holding → reversal fuel
+    # Opposite direction → continuation bias
+    funding = f.get("funding_rate")
+    if funding is not None:
+        funding = float(funding)
+        HIGH_THRESHOLD = 0.0005   # 0.05% per period — elevated
+        EXTREME_THRESHOLD = 0.001  # 0.1%  per period — extreme
+
+        if is_ssl:
+            if funding > EXTREME_THRESHOLD:
+                rev += 2 * multiplier   # extreme long overcrowding at SSL → reversal
+            elif funding > HIGH_THRESHOLD:
+                rev += 1 * multiplier
+            elif funding < -HIGH_THRESHOLD:
+                cont += 1 * multiplier  # shorts in control → continuation down
+        elif is_bsl:
+            if funding < -EXTREME_THRESHOLD:
+                rev += 2 * multiplier   # extreme short overcrowding at BSL → reversal
+            elif funding < -HIGH_THRESHOLD:
+                rev += 1 * multiplier
+            elif funding > HIGH_THRESHOLD:
+                cont += 1 * multiplier  # longs still in → continuation up
+
+    # ── Liquidations ──────────────────────────────────────────
+    # Large liquidations in sweep direction = fuel consumed = reversal likely.
+    # liq_sell_usd = liquidated longs (sell pressure from forced exits)
+    # liq_buy_usd  = liquidated shorts (buy pressure from forced exits)
+    liq_sell = f.get("liq_sell_usd")
+    liq_buy  = f.get("liq_buy_usd")
+
+    # Thresholds scale with observation window
+    med_threshold = {"15m": 2_000_000, "1h": 8_000_000, "4h": 30_000_000}.get(snap_type, 5_000_000)
+    high_threshold = {"15m": 10_000_000, "1h": 40_000_000, "4h": 150_000_000}.get(snap_type, 20_000_000)
+
+    if is_ssl and liq_sell is not None:
+        # Long liquidations during downward sweep → exhaustion → reversal
+        if liq_sell >= high_threshold:
+            rev += 2 * multiplier
+        elif liq_sell >= med_threshold:
+            rev += 1 * multiplier
+        # If short liquidations dominate → sell-side is strange → continuation signal
+        if liq_buy is not None and liq_buy is not None:
+            if float(liq_buy) > float(liq_sell) * 1.5:
+                cont += 1 * multiplier
+
+    elif is_bsl and liq_buy is not None:
+        # Short liquidations during upward sweep → exhaustion → reversal
+        if liq_buy >= high_threshold:
+            rev += 2 * multiplier
+        elif liq_buy >= med_threshold:
+            rev += 1 * multiplier
+        # If long liquidations dominate → unusual → continuation signal
+        if liq_sell is not None:
+            if float(liq_sell) > float(liq_buy) * 1.5:
+                cont += 1 * multiplier
+
+    return {"rev": rev, "cont": cont}
+
+
+# ================================
+# 模組 5：Context（目前保留）
 # ================================
 def _score_context(f, snap_type):
     rev, cont = 0.0, 0.0
@@ -155,7 +227,7 @@ def _score_context(f, snap_type):
 # ================================
 # Finalize（重點）
 # ================================
-def _finalize(rev, cont, order_flow, price, oi, context):
+def _finalize(rev, cont, order_flow, price, oi, funding_liq, context):
     total = rev + cont
 
     if total == 0:
@@ -166,10 +238,11 @@ def _finalize(rev, cont, order_flow, price, oi, context):
             "bias": "neutral",
             "final_score": 0.0,
             "modules": {
-                "order_flow": order_flow,
-                "price": price,
-                "oi": oi,
-                "context": context,
+                "order_flow":  order_flow,
+                "price":       price,
+                "oi":          oi,
+                "funding_liq": funding_liq,
+                "context":     context,
             },
         }
 
@@ -194,9 +267,10 @@ def _finalize(rev, cont, order_flow, price, oi, context):
 
         # ⭐ 這個超重要（之後做 dashboard / AI）
         "modules": {
-            "order_flow": order_flow,
-            "price": price,
-            "oi": oi,
-            "context": context,
+            "order_flow":  order_flow,
+            "price":       price,
+            "oi":          oi,
+            "funding_liq": funding_liq,
+            "context":     context,
         },
     }

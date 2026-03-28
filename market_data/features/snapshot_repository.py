@@ -85,7 +85,9 @@ def save_snapshot(snapshot: dict):
         oi_change_okx, oi_change_binance,
         oi_change_okx_pct, oi_change_binance_pct,
         oi_change_total, oi_change_total_pct,
-        reversal_score, continuation_score, confidence_score, bias, label
+        reversal_score, continuation_score, confidence_score, bias,
+        funding_rate, liq_buy_usd, liq_sell_usd, liq_total_usd, liq_count,
+        label
     ) VALUES (
         %s, %s, %s, %s,
         %s, %s, %s, %s,
@@ -96,7 +98,9 @@ def save_snapshot(snapshot: dict):
         %s, %s,
         %s, %s,
         %s, %s,
-        %s, %s, %s, %s, %s
+        %s, %s, %s, %s,
+        %s, %s, %s, %s, %s,
+        %s
     )
     ON DUPLICATE KEY UPDATE
         delta_value = VALUES(delta_value),
@@ -119,6 +123,11 @@ def save_snapshot(snapshot: dict):
         continuation_score = VALUES(continuation_score),
         confidence_score = VALUES(confidence_score),
         bias = VALUES(bias),
+        funding_rate = VALUES(funding_rate),
+        liq_buy_usd = VALUES(liq_buy_usd),
+        liq_sell_usd = VALUES(liq_sell_usd),
+        liq_total_usd = VALUES(liq_total_usd),
+        liq_count = VALUES(liq_count),
         label = VALUES(label)
     """
     s = snapshot
@@ -132,8 +141,10 @@ def save_snapshot(snapshot: dict):
         s.get("oi_change_okx"), s.get("oi_change_binance"),
         s.get("oi_change_okx_pct"), s.get("oi_change_binance_pct"),
         s.get("oi_change_total"), s.get("oi_change_total_pct"),
-        s["reversal_score"], s["continuation_score"], s["confidence_score"],
-        s["bias"], s.get("label"),
+        s["reversal_score"], s["continuation_score"], s["confidence_score"], s["bias"],
+        s.get("funding_rate"),
+        s.get("liq_buy_usd"), s.get("liq_sell_usd"), s.get("liq_total_usd"), s.get("liq_count"),
+        s.get("label"),
     )
 
     conn = get_db_conn()
