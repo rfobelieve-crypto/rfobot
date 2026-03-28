@@ -14,6 +14,10 @@ from datetime import datetime, timedelta, timezone
 
 import outcome_tracker
 from market_data.query.flow_context import get_pre_sweep_context, get_event_flow_context, format_flow_context
+from market_data.query.snapshot_query import (
+    get_latest_snapshots, get_snapshots_by_uuid,
+    get_latest_scores, get_event_history, get_pending_snapshot_count,
+)
 
 # =========================================================
 # 基本設定
@@ -1139,6 +1143,186 @@ def start_ws_forever():
 
 
 # =========================================================
+# Snapshot / Score / History 報告
+# =========================================================
+def _bias_emoji(bias):
+    if bias == "reversal":
+        return "🔄"
+    elif bias == "continuation":
+        return "➡️"
+    return "⚖️"
+
+
+def _ts_to_taipei(ts):
+    from datetime import datetime, timezone, timedelta
+    dt = datetime.fromtimestamp(int(ts), tz=timezone(timedelta(hours=8)))
+    return dt.strftime("%m/%d %H:%M")
+
+
+def generate_snapshot_report(uuid_prefix: str = None) -> str:
+    """Generate snapshot report. If uuid_prefix given, show that event; else latest."""
+    try:
+        if uuid_prefix:
+            rows = get_snapshots_by_uuid(uuid_prefix)
+            if not rows:
+                return f"找不到 UUID 開頭為 {uuid_prefix} 的事件快照"
+        else:
+            rows = get_latest_snapshots(limit=1)
+            if not rows:
+                return "目前沒有任何事件快照資料"
+
+        # Group by event
+        event_uuid = rows[0]["event_uuid"]
+        side = rows[0]["liquidity_side"]
+        price = rows[0]["trigger_price"]
+        ts = rows[0]["trigger_ts"]
+
+        lines = [
+            f"📸 事件快照 [{side.upper()}] @ {float(price):,.2f}",
+            f"時間: {_ts_to_taipei(ts)}",
+            f"UUID: {event_uuid[:8]}",
+            "─" * 36,
+        ]
+
+        for r in rows:
+            snap = r["snapshot_type"]
+            bias = r["bias"]
+            emoji = _bias_emoji(bias)
+            rev = float(r["reversal_score"])
+            cont = float(r["continuation_score"])
+            conf = float(r["confidence_score"])
+
+            lines.append(f"\n[{snap}] {emoji} {bias}")
+            lines.append(f"  rev={rev:.0f} cont={cont:.0f} conf={conf:.2f}")
+
+            if r.get("delta_value") is not None:
+                delta = float(r["delta_value"])
+                lines.append(f"  delta: {format_number(delta)} {'🟢' if delta > 0 else '🔴'}")
+            if r.get("cvd_change") is not None:
+                cvd = float(r["cvd_change"])
+                lines.append(f"  cvd_change: {format_number(cvd)}")
+            if r.get("cvd_sign_flip") is not None:
+                lines.append(f"  cvd_flip: {'Yes ✅' if r['cvd_sign_flip'] else 'No ❌'}")
+            if r.get("price_change_pct") is not None:
+                pct = float(r["price_change_pct"])
+                lines.append(f"  price: {pct:+.4f}% {'🟢' if pct > 0 else '🔴'}")
+            if r.get("reclaim_flag") is not None:
+                lines.append(f"  reclaim: {'Yes ✅' if r['reclaim_flag'] else 'No ❌'}")
+            if r.get("break_again_flag") is not None:
+                lines.append(f"  break_again: {'Yes ⚠️' if r['break_again_flag'] else 'No'}")
+            if r.get("label"):
+                lines.append(f"  label: {r['label']} 🏷️")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.exception("generate_snapshot_report error")
+        return f"快照查詢失敗: {e}"
+
+
+def generate_score_report() -> str:
+    """Show latest v2 scoring results."""
+    try:
+        rows = get_latest_scores(limit=5)
+        if not rows:
+            return "目前沒有 v2 評分資料"
+
+        lines = ["📊 最近事件評分 (v2)", "─" * 36]
+
+        for r in rows:
+            side = r["liquidity_side"]
+            price = float(r["entry_price"])
+            bias = r["bias"]
+            emoji = _bias_emoji(bias)
+            rev = float(r["reversal_score"])
+            cont = float(r["continuation_score"])
+            conf = float(r["confidence_score"])
+            label = r.get("label") or "-"
+
+            lines.append(
+                f"\n{emoji} [{side.upper()}] @ {price:,.2f}"
+                f"  {_ts_to_taipei(r['trigger_ts'])}"
+            )
+            lines.append(f"  bias={bias} rev={rev:.0f} cont={cont:.0f} conf={conf:.2f}")
+            lines.append(f"  label={label}  ver={r.get('scorer_version', '?')}")
+            lines.append(f"  UUID: {r['event_uuid'][:8]}")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.exception("generate_score_report error")
+        return f"評分查詢失敗: {e}"
+
+
+def generate_history_report() -> str:
+    """Show recent events with bias evolution across 15m → 1h → 4h."""
+    try:
+        rows = get_event_history(limit=5)
+        if not rows:
+            return "目前沒有事件歷史資料"
+
+        lines = ["📋 事件歷史（bias 演化）", "─" * 36]
+
+        for r in rows:
+            side = r["liquidity_side"]
+            price = float(r["entry_price"])
+            label = r.get("label") or "pending"
+
+            lines.append(
+                f"\n{'BSL' if side == 'buy' else 'SSL'} @ {price:,.2f}"
+                f"  {_ts_to_taipei(r['trigger_ts'])}"
+            )
+
+            # Show bias evolution: 15m → 1h → 4h
+            evolution = []
+            for window in ("15m", "1h", "4h"):
+                b = r.get(f"bias_{window}")
+                c = r.get(f"conf_{window}")
+                if b:
+                    emoji = _bias_emoji(b)
+                    conf_str = f"{float(c):.2f}" if c else "?"
+                    evolution.append(f"{window}:{emoji}{b[:4]}({conf_str})")
+                else:
+                    evolution.append(f"{window}:⏳")
+
+            lines.append(f"  {' → '.join(evolution)}")
+            lines.append(f"  final: {label} 🏷️  UUID: {r['event_uuid'][:8]}")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.exception("generate_history_report error")
+        return f"歷史查詢失敗: {e}"
+
+
+def generate_snapshot_status_report() -> str:
+    """Show snapshot runner status: pending counts."""
+    try:
+        counts = get_pending_snapshot_count()
+        total = sum(counts.values())
+
+        lines = [
+            "⚙️ Snapshot Runner 狀態",
+            "─" * 36,
+            f"待處理 15m: {counts.get('15m', 0)}",
+            f"待處理  1h: {counts.get('1h', 0)}",
+            f"待處理  4h: {counts.get('4h', 0)}",
+            f"總計: {total}",
+        ]
+
+        if total == 0:
+            lines.append("\n✅ 所有快照已完成")
+        else:
+            lines.append(f"\n⏳ {total} 筆快照等待計算")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.exception("generate_snapshot_status_report error")
+        return f"狀態查詢失敗: {e}"
+
+
+# =========================================================
 # Flask Routes
 # =========================================================
 @app.route("/", methods=["GET"])
@@ -1191,6 +1375,21 @@ def tradingview_webhook():
 
         # 純事件追蹤（獨立於 current_event，支援多事件同時追蹤）
         tracker = outcome_tracker.register_event(event, liquidity_side, price, "BTC", tv_time)
+
+        # 立刻寫入 event_registry，讓 snapshot runner 可以開始追蹤
+        try:
+            from market_data.features.snapshot_repository import register_event as _reg_event
+            _reg_event(
+                event_uuid=new_event["event_uuid"],
+                event_type=event,
+                symbol=symbol,
+                liquidity_side=liquidity_side,
+                entry_price=price,
+                trigger_ts=new_event["trigger_ts"],
+                sweep_ref_price=sweep_ref_price,
+            )
+        except Exception as reg_err:
+            logger.warning("Failed to register event to registry: %s", reg_err)
 
         with event_lock:
             event_skipped = False
@@ -1264,7 +1463,8 @@ def webhook():
 
         chat_id = str(chat.get("id", "")).strip()
         chat_type = str(chat.get("type", "")).strip().lower()
-        text = text.strip().lower().split("@")[0]
+        raw_text = text.strip().split("@")[0]  # preserve case for UUID args
+        cmd = raw_text.lower()
 
         if chat_type != "private":
             logger.warning("Rejected non-private chat: %s (%s)", chat_id, chat_type)
@@ -1274,32 +1474,55 @@ def webhook():
             logger.warning("Unauthorized access: %s", chat_id)
             return "ok"
 
-        logger.info("Telegram command received: %s from %s", text, chat_id)
+        logger.info("Telegram command received: %s from %s", cmd, chat_id)
 
-        if text == "/flow_futures_btc":
+        if cmd == "/flow_futures_btc":
             send_message(chat_id, generate_report("BTC"))
 
-        elif text == "/flow_futures_all":
+        elif cmd == "/flow_futures_all":
             send_message(chat_id, generate_all_report())
 
-        elif text == "/status":
+        elif cmd == "/status":
             send_message(chat_id, generate_status_report())
 
-        elif text == "/event_status":
+        elif cmd == "/event_status":
             send_message(chat_id, generate_current_event_report())
 
-        elif text == "/sweep_status":
+        elif cmd == "/sweep_status":
             send_message(chat_id, outcome_tracker.format_active_trackers_report())
 
-        elif text in ["/start", "/help"]:
+        elif cmd == "/snap" or cmd.startswith("/snap "):
+            # /snap → latest event; /snap abc123 → specific event
+            parts = raw_text.split(None, 1)
+            uuid_prefix = parts[1] if len(parts) > 1 else None
+            send_message(chat_id, generate_snapshot_report(uuid_prefix))
+
+        elif cmd == "/score":
+            send_message(chat_id, generate_score_report())
+
+        elif cmd == "/history":
+            send_message(chat_id, generate_history_report())
+
+        elif cmd == "/snap_status":
+            send_message(chat_id, generate_snapshot_status_report())
+
+        elif cmd in ["/start", "/help"]:
             help_msg = (
                 "📊 BTC 流動性結果監控機器人\n\n"
-                "支援指令：\n"
-                "/flow_futures_btc\n"
-                "/flow_futures_all\n"
-                "/status\n"
-                "/event_status\n"
-                "/sweep_status"
+                "指令一覽：\n"
+                "─── 即時監控 ───\n"
+                "/flow_futures_btc — BTC taker flow\n"
+                "/flow_futures_all — 全幣種 flow\n"
+                "/status — Bot 狀態\n"
+                "─── 事件追蹤 ───\n"
+                "/event_status — 進行中事件\n"
+                "/sweep_status — 掃蕩追蹤狀態\n"
+                "─── 快照 & 評分 ───\n"
+                "/snap — 最新事件快照 (15m/1h/4h)\n"
+                "/snap [uuid] — 指定事件快照\n"
+                "/score — 最近事件 v2 評分\n"
+                "/history — 事件歷史 (bias 演化)\n"
+                "/snap_status — 快照 runner 狀態"
             )
             send_message(chat_id, help_msg)
 

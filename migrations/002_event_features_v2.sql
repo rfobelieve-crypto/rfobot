@@ -52,6 +52,12 @@ CREATE TABLE IF NOT EXISTS event_features_v2 (
     delta_divergence_4h BOOLEAN DEFAULT NULL COMMENT 'price and delta move opposite directions',
     absorption_detected BOOLEAN DEFAULT NULL COMMENT 'large delta but small price move',
 
+    -- ── V2 scoring features ──
+    cvd_zscore_2h DECIMAL(10,4) DEFAULT NULL COMMENT 'z-score of post-2h CVD vs trailing 24h',
+    cvd_turned_reversal BOOLEAN DEFAULT NULL COMMENT 'CVD turned in reversal direction post-sweep',
+    reclaim_detected BOOLEAN DEFAULT NULL COMMENT 'price reclaimed sweep ref level within 4h',
+    rebreak_detected BOOLEAN DEFAULT NULL COMMENT 'price broke further past entry within 4h',
+
     -- ── Reserved: OI / Liquidation / Orderbook (Phase 3) ──
     oi_change_2h DECIMAL(30,10) DEFAULT NULL,
     oi_change_4h DECIMAL(30,10) DEFAULT NULL,

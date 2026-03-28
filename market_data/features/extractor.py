@@ -84,6 +84,22 @@ def extract_features(event: dict) -> dict:
         features.get("price_return_2h"), features.get("post_2h_delta_usd"),
         features.get("post_2h_volume_usd"))
 
+    # ── CVD z-score (relative to trailing 24h) ──
+    features["cvd_zscore_2h"] = _cvd_zscore(canonical, trigger_ts, features.get("post_2h_cvd_usd"))
+
+    # ── CVD turn direction (did CVD flip to reversal side?) ──
+    features["cvd_turned_reversal"] = _cvd_turned_reversal(
+        features.get("liquidity_side"), features.get("post_2h_cvd_usd"))
+
+    # ── Reclaim / Re-break detection ──
+    sweep_ref_price = float(event["sweep_ref_price"]) if event.get("sweep_ref_price") else None
+    features["reclaim_detected"] = _detect_reclaim(
+        features.get("liquidity_side"), entry_price, sweep_ref_price,
+        features.get("price_return_4h"))
+    features["rebreak_detected"] = _detect_rebreak(
+        features.get("liquidity_side"), entry_price, sweep_ref_price,
+        features.get("price_return_4h"))
+
     # ── Reserved fields (OI / liquidation / orderbook) ──
     for field in ("oi_change_2h", "oi_change_4h",
                   "liq_buy_usd_2h", "liq_sell_usd_2h",
@@ -250,3 +266,102 @@ def _detect_absorption(price_return: float | None, delta: float | None,
     imbalance = abs(delta / volume)
     # High imbalance (>0.3) but small price move (<0.3%)
     return imbalance > 0.3 and abs(price_return) < 0.3
+
+
+def _cvd_zscore(canonical: str, trigger_ts: int, post_cvd: float | None) -> float | None:
+    """Z-score of post-2h CVD relative to trailing 24h CVD distribution."""
+    if post_cvd is None:
+        return None
+
+    # Query trailing 24h of CVD values (1440 bars)
+    end_ms = trigger_ts * 1000
+    start_ms = end_ms - 24 * 3600 * 1000
+
+    sql = """
+    SELECT cvd_usd FROM flow_bars_1m
+    WHERE canonical_symbol = %s AND window_start >= %s AND window_start < %s
+      AND exchange_scope = 'all'
+    ORDER BY window_start
+    """
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (canonical, start_ms, end_ms))
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        logger.exception("Failed to query CVD history for z-score")
+        return None
+
+    if len(rows) < 30:  # not enough data
+        return None
+
+    values = [float(r["cvd_usd"]) for r in rows]
+    mean = sum(values) / len(values)
+    variance = sum((v - mean) ** 2 for v in values) / len(values)
+    std = variance ** 0.5
+    if std == 0:
+        return 0.0
+    return round((post_cvd - mean) / std, 4)
+
+
+def _cvd_turned_reversal(liquidity_side: str | None, post_cvd: float | None) -> bool | None:
+    """
+    Check if post-event CVD turned in the reversal direction.
+    SSL + CVD positive → reversal (buyers stepping in after low sweep)
+    BSL + CVD negative → reversal (sellers stepping in after high sweep)
+    """
+    if liquidity_side is None or post_cvd is None:
+        return None
+    side = liquidity_side.lower()
+    if side == "sell":
+        return post_cvd > 0
+    elif side == "buy":
+        return post_cvd < 0
+    return None
+
+
+def _detect_reclaim(liquidity_side: str | None, entry_price: float,
+                    sweep_ref_price: float | None,
+                    price_return_4h: float | None) -> bool | None:
+    """
+    Reclaim = price moves back past the sweep reference level (reversal direction).
+    SSL: price was swept below sweep_ref_price, then reclaims above it
+    BSL: price was swept above sweep_ref_price, then reclaims below it
+    """
+    if liquidity_side is None or sweep_ref_price is None or price_return_4h is None:
+        return None
+
+    price_4h = entry_price * (1 + price_return_4h / 100)
+    side = liquidity_side.lower()
+
+    if side == "sell":
+        # SSL: swept low, reclaim = price goes back above sweep_ref_price
+        return price_4h > sweep_ref_price
+    elif side == "buy":
+        # BSL: swept high, reclaim = price goes back below sweep_ref_price
+        return price_4h < sweep_ref_price
+    return None
+
+
+def _detect_rebreak(liquidity_side: str | None, entry_price: float,
+                    sweep_ref_price: float | None,
+                    price_return_4h: float | None) -> bool | None:
+    """
+    Re-break = price continues past the entry level (continuation direction).
+    SSL: price breaks even lower than entry
+    BSL: price breaks even higher than entry
+    """
+    if liquidity_side is None or price_return_4h is None:
+        return None
+
+    side = liquidity_side.lower()
+    if side == "sell":
+        # SSL continuation: price keeps falling
+        return price_return_4h < -0.1  # more than 0.1% further down
+    elif side == "buy":
+        # BSL continuation: price keeps rising
+        return price_return_4h > 0.1  # more than 0.1% further up
+    return None

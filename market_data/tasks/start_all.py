@@ -19,6 +19,7 @@ from market_data.storage.db import run_migration
 from market_data.tasks.run_trade_streams import main as start_streams
 from market_data.tasks.flush_flow_bars import flush_loop
 from market_data.tasks.cleanup import cleanup_once
+from market_data.features.snapshot_runner import process_once as snapshot_process_once
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,18 +31,19 @@ logger = logging.getLogger(__name__)
 def main():
     logger.info("=== Market Data Layer starting ===")
 
-    # Run migration
-    migration_path = os.path.join(
+    # Run migrations
+    migrations_dir = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
         "migrations",
-        "001_market_data_tables.sql",
     )
-    if os.path.exists(migration_path):
-        try:
-            run_migration(migration_path)
-            logger.info("Migration complete.")
-        except Exception:
-            logger.exception("Migration failed (tables may already exist)")
+    for mig_file in ("001_market_data_tables.sql", "004_event_feature_snapshots.sql"):
+        mig_path = os.path.join(migrations_dir, mig_file)
+        if os.path.exists(mig_path):
+            try:
+                run_migration(mig_path)
+            except Exception:
+                logger.exception("Migration %s failed (may already exist)", mig_file)
+    logger.info("Migrations complete.")
 
     # Start flow bar flusher in background
     threading.Thread(target=flush_loop, daemon=True, name="flow-flusher").start()
@@ -59,6 +61,19 @@ def main():
 
     threading.Thread(target=_cleanup_loop, daemon=True, name="cleanup").start()
     logger.info("Data cleanup started (trades: 3d, flow_bars: 90d).")
+
+    # Start snapshot runner in background (every 60s)
+    def _snapshot_loop():
+        import time
+        while True:
+            try:
+                snapshot_process_once()
+            except Exception:
+                logger.exception("Snapshot runner error")
+            time.sleep(60)
+
+    threading.Thread(target=_snapshot_loop, daemon=True, name="snapshot-runner").start()
+    logger.info("Snapshot runner started (every 60s).")
 
     # Start trade streams (blocking)
     start_streams()

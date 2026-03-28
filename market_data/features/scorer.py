@@ -1,198 +1,117 @@
 """
-Rule-based scoring engine for liquidity sweep events.
+Rule-based scoring engine v2 for liquidity sweep events.
 
 Produces:
-- reversal_score (0~100): likelihood of reversal
-- continuation_score (0~100): likelihood of continuation
-- confidence_score (0~1): data completeness
+- reversal_score (0~6): likelihood of reversal
+- continuation_score (0~6): likelihood of continuation
+- confidence_score (0~1): abs(rev - cont) / (rev + cont)
 - bias: "reversal" / "continuation" / "neutral"
 
-Scoring philosophy:
-- Each rule adds/subtracts points based on evidence strength
-- Rules are weighted by empirical importance
-- OI/liquidation/orderbook rules are defined but skip if data is NULL
-- bias = whichever score is higher (neutral if difference < threshold)
+Scoring rules (SSL example, BSL is mirrored):
+  Reversal: CVD turns positive +2, CVD strong (zscore>1) +1, 4h price up +1, reclaim success +2
+  Continuation: CVD doesn't turn positive +2, CVD breaks lower +1, 4h price down +1, re-break sweep low +2
 
-Scorer version: v1
+Scorer version: v2
 """
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-SCORER_VERSION = "v1"
-NEUTRAL_THRESHOLD = 10  # minimum score difference to declare a bias
+SCORER_VERSION = "v2"
 
 
 def score(features: dict) -> dict:
     """
-    Given extracted features dict, compute scores.
+    Given extracted features dict, compute scores using v2 additive rules.
 
     Returns dict with: reversal_score, continuation_score,
                        confidence_score, bias, scorer_version
     """
-    rev = 50.0  # start neutral
-    cont = 50.0
-    rules_total = 0
-    rules_fired = 0
+    rev = 0.0
+    cont = 0.0
 
-    side = features.get("liquidity_side", "").lower()
+    side = (features.get("liquidity_side") or "").lower()
     is_bsl = side == "buy"   # buy-side liquidity = swept highs
     is_ssl = side == "sell"  # sell-side liquidity = swept lows
 
     # ────────────────────────────────────────────
-    # Rule 1: Pre-sweep delta direction (weight: 15)
-    # BSL + pre-delta negative → smart money selling before sweep → reversal
-    # SSL + pre-delta positive → smart money buying before sweep → reversal
+    # Rule 1: CVD turn direction (+2)
+    # SSL: CVD turns positive → reversal; doesn't → continuation
+    # BSL: CVD turns negative → reversal; doesn't → continuation
     # ────────────────────────────────────────────
-    rules_total += 1
-    pre_delta = features.get("pre_delta_usd")
-    if pre_delta is not None:
-        rules_fired += 1
-        if is_bsl and pre_delta < 0:
-            rev += 15
-        elif is_bsl and pre_delta > 0:
-            cont += 10
-        elif is_ssl and pre_delta > 0:
-            rev += 15
-        elif is_ssl and pre_delta < 0:
-            cont += 10
-
-    # ────────────────────────────────────────────
-    # Rule 2: Post-2h delta imbalance (weight: 20)
-    # BSL + negative imbalance → sellers dominate → reversal
-    # SSL + positive imbalance → buyers dominate → reversal
-    # ────────────────────────────────────────────
-    rules_total += 1
-    imb_2h = features.get("delta_imbalance_2h")
-    if imb_2h is not None:
-        rules_fired += 1
-        if is_bsl:
-            if imb_2h < -0.15:
-                rev += 20
-            elif imb_2h < -0.05:
-                rev += 10
-            elif imb_2h > 0.15:
-                cont += 20
-            elif imb_2h > 0.05:
-                cont += 10
-        elif is_ssl:
-            if imb_2h > 0.15:
-                rev += 20
-            elif imb_2h > 0.05:
-                rev += 10
-            elif imb_2h < -0.15:
-                cont += 20
-            elif imb_2h < -0.05:
-                cont += 10
-
-    # ────────────────────────────────────────────
-    # Rule 3: CVD slope direction (weight: 15)
-    # BSL + negative CVD slope → selling pressure building → reversal
-    # SSL + positive CVD slope → buying pressure building → reversal
-    # ────────────────────────────────────────────
-    rules_total += 1
-    cvd_slope = features.get("cvd_slope_2h")
-    if cvd_slope is not None:
-        rules_fired += 1
-        if is_bsl:
-            if cvd_slope < 0:
-                rev += 15
-            else:
-                cont += 10
-        elif is_ssl:
-            if cvd_slope > 0:
-                rev += 15
-            else:
-                cont += 10
-
-    # ────────────────────────────────────────────
-    # Rule 4: Delta divergence (weight: 20)
-    # Divergence = strong reversal signal
-    # ────────────────────────────────────────────
-    rules_total += 1
-    div_2h = features.get("delta_divergence_2h")
-    if div_2h is not None:
-        rules_fired += 1
-        if div_2h:
-            rev += 20
+    cvd_turned = features.get("cvd_turned_reversal")
+    if cvd_turned is not None:
+        if cvd_turned:
+            rev += 2
         else:
-            cont += 5
+            cont += 2
 
     # ────────────────────────────────────────────
-    # Rule 5: Absorption (weight: 15)
-    # Absorption = price doesn't move despite order flow → reversal setup
+    # Rule 2: CVD strength via z-score (+1)
+    # SSL: zscore > 1 (strong positive CVD) → reversal
+    # BSL: zscore < -1 (strong negative CVD) → reversal
+    # Opposite direction → continuation
     # ────────────────────────────────────────────
-    rules_total += 1
-    absorption = features.get("absorption_detected")
-    if absorption is not None:
-        rules_fired += 1
-        if absorption:
-            rev += 15
+    zscore = features.get("cvd_zscore_2h")
+    if zscore is not None:
+        if is_ssl:
+            if zscore > 1:
+                rev += 1
+            elif zscore < -1:
+                cont += 1
+        elif is_bsl:
+            if zscore < -1:
+                rev += 1
+            elif zscore > 1:
+                cont += 1
 
     # ────────────────────────────────────────────
-    # Rule 6: Buy/sell ratio extreme (weight: 10)
+    # Rule 3: 4h price direction (+1)
+    # SSL: price up → reversal; price down → continuation
+    # BSL: price down → reversal; price up → continuation
     # ────────────────────────────────────────────
-    rules_total += 1
-    ratio_2h = features.get("post_2h_buy_sell_ratio")
-    if ratio_2h is not None:
-        rules_fired += 1
-        if is_bsl:
-            if ratio_2h < 0.8:  # sellers dominate after BSL → reversal
-                rev += 10
-            elif ratio_2h > 1.2:  # buyers still dominate → continuation
-                cont += 10
-        elif is_ssl:
-            if ratio_2h > 1.2:  # buyers dominate after SSL → reversal
-                rev += 10
-            elif ratio_2h < 0.8:  # sellers still dominate → continuation
-                cont += 10
+    ret_4h = features.get("price_return_4h")
+    if ret_4h is not None:
+        if is_ssl:
+            if ret_4h > 0:
+                rev += 1
+            elif ret_4h < 0:
+                cont += 1
+        elif is_bsl:
+            if ret_4h < 0:
+                rev += 1
+            elif ret_4h > 0:
+                cont += 1
 
     # ────────────────────────────────────────────
-    # Rule 7: Post-4h delta confirms 2h direction (weight: 10)
-    # If 4h delta agrees with 2h signal, reinforce
+    # Rule 4: Reclaim / Re-break structure (+2)
+    # Reclaim = price moves back past sweep level → reversal
+    # Re-break = price continues past entry → continuation
     # ────────────────────────────────────────────
-    rules_total += 1
-    imb_4h = features.get("delta_imbalance_4h")
-    if imb_4h is not None and imb_2h is not None:
-        rules_fired += 1
-        # Same direction = confirmation
-        if (imb_2h < 0 and imb_4h < 0) or (imb_2h > 0 and imb_4h > 0):
-            # Both point same way → whichever was stronger gets boost
-            if is_bsl and imb_4h < -0.1:
-                rev += 10
-            elif is_bsl and imb_4h > 0.1:
-                cont += 10
-            elif is_ssl and imb_4h > 0.1:
-                rev += 10
-            elif is_ssl and imb_4h < -0.1:
-                cont += 10
+    reclaim = features.get("reclaim_detected")
+    if reclaim is not None:
+        if reclaim:
+            rev += 2
+
+    rebreak = features.get("rebreak_detected")
+    if rebreak is not None:
+        if rebreak:
+            cont += 2
 
     # ────────────────────────────────────────────
-    # Rule 8-10: OI / Liquidation / Orderbook (reserved)
-    # These fire only when data becomes available
+    # Confidence and bias
     # ────────────────────────────────────────────
-    for reserved_field in ("oi_change_2h", "liq_buy_usd_2h", "orderbook_imbalance_2h"):
-        rules_total += 1
-        if features.get(reserved_field) is not None:
-            rules_fired += 1
-            # TODO: implement when data sources are connected
+    total = rev + cont
+    if total > 0:
+        confidence = round(abs(rev - cont) / total, 4)
+    else:
+        confidence = 0.0
 
-    # ────────────────────────────────────────────
-    # Normalize and determine bias
-    # ────────────────────────────────────────────
-    # Cap scores at 0-100
-    rev = max(0, min(100, rev))
-    cont = max(0, min(100, cont))
-
-    # Confidence = fraction of rules that had data to fire
-    confidence = round(rules_fired / rules_total, 4) if rules_total > 0 else 0
-
-    # Bias
     diff = rev - cont
-    if diff > NEUTRAL_THRESHOLD:
+    if diff > 0:
         bias = "reversal"
-    elif diff < -NEUTRAL_THRESHOLD:
+    elif diff < 0:
         bias = "continuation"
     else:
         bias = "neutral"

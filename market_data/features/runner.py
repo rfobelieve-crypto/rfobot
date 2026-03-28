@@ -62,6 +62,7 @@ def save_features(features: dict, scores: dict):
         price_return_2h, price_return_4h, price_return_6h,
         delta_divergence_2h, delta_divergence_4h,
         absorption_detected,
+        cvd_zscore_2h, cvd_turned_reversal, reclaim_detected, rebreak_detected,
         oi_change_2h, oi_change_4h,
         liq_buy_usd_2h, liq_sell_usd_2h, liq_buy_usd_4h, liq_sell_usd_4h,
         orderbook_imbalance_2h, orderbook_imbalance_4h,
@@ -78,6 +79,7 @@ def save_features(features: dict, scores: dict):
         %s, %s, %s,
         %s, %s,
         %s,
+        %s, %s, %s, %s,
         %s, %s,
         %s, %s, %s, %s,
         %s, %s,
@@ -85,6 +87,10 @@ def save_features(features: dict, scores: dict):
         %s
     )
     ON DUPLICATE KEY UPDATE
+        cvd_zscore_2h = VALUES(cvd_zscore_2h),
+        cvd_turned_reversal = VALUES(cvd_turned_reversal),
+        reclaim_detected = VALUES(reclaim_detected),
+        rebreak_detected = VALUES(rebreak_detected),
         reversal_score = VALUES(reversal_score),
         continuation_score = VALUES(continuation_score),
         confidence_score = VALUES(confidence_score),
@@ -113,6 +119,8 @@ def save_features(features: dict, scores: dict):
         f["price_return_2h"], f["price_return_4h"], f["price_return_6h"],
         f["delta_divergence_2h"], f["delta_divergence_4h"],
         f["absorption_detected"],
+        f["cvd_zscore_2h"], f["cvd_turned_reversal"],
+        f["reclaim_detected"], f["rebreak_detected"],
         f["oi_change_2h"], f["oi_change_4h"],
         f["liq_buy_usd_2h"], f["liq_sell_usd_2h"],
         f["liq_buy_usd_4h"], f["liq_sell_usd_4h"],
@@ -156,16 +164,18 @@ def process_once():
 
 
 def main():
-    # Run migration first
-    migration_path = os.path.join(
+    # Run migrations
+    migrations_dir = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "migrations", "002_event_features_v2.sql",
+        "migrations",
     )
-    if os.path.exists(migration_path):
-        try:
-            run_migration(migration_path)
-        except Exception:
-            logger.exception("Migration failed (table may already exist)")
+    for mig_file in ("002_event_features_v2.sql", "003_add_v2_scoring_columns.sql"):
+        mig_path = os.path.join(migrations_dir, mig_file)
+        if os.path.exists(mig_path):
+            try:
+                run_migration(mig_path)
+            except Exception:
+                logger.exception("Migration %s failed (may already be applied)", mig_file)
 
     loop_mode = "--loop" in sys.argv
 

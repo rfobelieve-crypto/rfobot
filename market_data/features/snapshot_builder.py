@@ -1,0 +1,214 @@
+"""
+Snapshot feature builder: extract features for a specific time window.
+
+For each (event, snapshot_type), queries flow_bars_1m to compute:
+- delta_value: net delta in the window
+- cvd_change: CVD change from trigger to window end
+- cvd_sign_flip: whether CVD flipped to reversal direction
+- price_change_pct: % price change from entry
+- reclaim_flag: price reclaimed sweep_ref level
+- break_again_flag: price broke further past entry
+"""
+
+import time
+import logging
+from shared.db import get_db_conn
+
+logger = logging.getLogger(__name__)
+
+
+def build_snapshot(event: dict, snapshot_type: str, offset_sec: int) -> dict:
+    """
+    Build feature snapshot for a given event and time window.
+
+    Args:
+        event: row from event_registry
+        snapshot_type: '15m', '1h', or '4h'
+        offset_sec: window duration in seconds (900, 3600, 14400)
+
+    Returns:
+        dict ready for snapshot_repository.save_snapshot()
+    """
+    trigger_ts = int(event["trigger_ts"])
+    entry_price = float(event["entry_price"])
+    symbol = event["symbol"]
+    liquidity_side = event["liquidity_side"].lower()
+    sweep_ref_price = float(event["sweep_ref_price"]) if event.get("sweep_ref_price") else None
+
+    # Map to canonical symbol
+    canonical = "BTC-USD" if "BTC" in symbol.upper() else "ETH-USD"
+
+    # Query flow_bars_1m for the window
+    start_ms = trigger_ts * 1000
+    end_ms = (trigger_ts + offset_sec) * 1000
+    flow = _query_flow_window(canonical, start_ms, end_ms)
+
+    # Delta value
+    delta_value = flow["delta_usd"] if flow else None
+
+    # CVD change: difference between last CVD in window and CVD at trigger
+    cvd_at_trigger = _get_cvd_at(canonical, start_ms)
+    cvd_at_end = _get_cvd_at(canonical, end_ms)
+    cvd_change = None
+    if cvd_at_trigger is not None and cvd_at_end is not None:
+        cvd_change = cvd_at_end - cvd_at_trigger
+
+    # CVD sign flip: did CVD change direction toward reversal?
+    cvd_sign_flip = None
+    if cvd_change is not None:
+        if liquidity_side == "sell":
+            cvd_sign_flip = cvd_change > 0  # SSL: positive CVD = reversal
+        elif liquidity_side == "buy":
+            cvd_sign_flip = cvd_change < 0  # BSL: negative CVD = reversal
+
+    # Price change %
+    price_change_pct = _get_price_change(canonical, trigger_ts, offset_sec, entry_price)
+
+    # Reclaim flag: price moved back past sweep_ref_price
+    reclaim_flag = None
+    if sweep_ref_price and price_change_pct is not None:
+        price_now = entry_price * (1 + price_change_pct / 100)
+        if liquidity_side == "sell":
+            reclaim_flag = price_now > sweep_ref_price
+        elif liquidity_side == "buy":
+            reclaim_flag = price_now < sweep_ref_price
+
+    # Break again flag: price continued past entry in sweep direction
+    break_again_flag = None
+    if price_change_pct is not None:
+        if liquidity_side == "sell":
+            break_again_flag = price_change_pct < -0.1  # further down
+        elif liquidity_side == "buy":
+            break_again_flag = price_change_pct > 0.1   # further up
+
+    # Label: only 4h gets ground truth from liquidity_events
+    label = None
+    if snapshot_type == "4h":
+        label = _get_label(event["event_uuid"])
+
+    return {
+        "event_uuid": event["event_uuid"],
+        "event_type": event.get("event_type"),
+        "canonical_symbol": canonical,
+        "liquidity_side": event["liquidity_side"],
+        "trigger_price": entry_price,
+        "trigger_ts": trigger_ts,
+        "snapshot_type": snapshot_type,
+        "snapshot_ts": int(time.time()),
+
+        "delta_value": delta_value,
+        "cvd_change": cvd_change,
+        "cvd_sign_flip": cvd_sign_flip,
+        "price_change_pct": price_change_pct,
+        "reclaim_flag": reclaim_flag,
+        "break_again_flag": break_again_flag,
+
+        "label": label,
+    }
+
+
+def _query_flow_window(canonical: str, start_ms: int, end_ms: int) -> dict | None:
+    """Aggregate flow_bars_1m for a time range."""
+    sql = """
+    SELECT
+        COALESCE(SUM(delta_usd), 0) AS delta_usd,
+        COALESCE(SUM(volume_usd), 0) AS volume_usd,
+        COALESCE(SUM(buy_notional_usd), 0) AS buy_usd,
+        COALESCE(SUM(sell_notional_usd), 0) AS sell_usd,
+        COUNT(*) AS bar_count
+    FROM flow_bars_1m
+    WHERE canonical_symbol = %s
+      AND window_start >= %s AND window_start < %s
+      AND exchange_scope = 'all'
+    """
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (canonical, start_ms, end_ms))
+                row = cur.fetchone()
+        finally:
+            conn.close()
+    except Exception:
+        logger.exception("Failed to query flow window")
+        return None
+
+    if not row or row["bar_count"] == 0:
+        return None
+
+    return {
+        "delta_usd": float(row["delta_usd"]),
+        "volume_usd": float(row["volume_usd"]),
+        "buy_usd": float(row["buy_usd"]),
+        "sell_usd": float(row["sell_usd"]),
+        "bar_count": row["bar_count"],
+    }
+
+
+def _get_cvd_at(canonical: str, target_ms: int) -> float | None:
+    """Get the CVD value at or just before a given timestamp."""
+    sql = """
+    SELECT cvd_usd FROM flow_bars_1m
+    WHERE canonical_symbol = %s AND window_start <= %s AND exchange_scope = 'all'
+    ORDER BY window_start DESC LIMIT 1
+    """
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (canonical, target_ms))
+                row = cur.fetchone()
+                return float(row["cvd_usd"]) if row else None
+        finally:
+            conn.close()
+    except Exception:
+        return None
+
+
+def _get_price_change(canonical: str, trigger_ts: int,
+                      offset_sec: int, entry_price: float) -> float | None:
+    """Get % price change at the end of the window."""
+    target_ms = (trigger_ts + offset_sec) * 1000
+    window_ms = 60_000  # 1 minute window
+
+    sql = """
+    SELECT AVG(price) AS avg_price
+    FROM normalized_trades
+    WHERE canonical_symbol = %s
+      AND ts_exchange >= %s AND ts_exchange < %s
+    """
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (canonical, target_ms - window_ms, target_ms + window_ms))
+                row = cur.fetchone()
+                if row and row["avg_price"] is not None:
+                    avg_price = float(row["avg_price"])
+                    return round((avg_price - entry_price) / entry_price * 100, 4)
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    return None
+
+
+def _get_label(event_uuid: str) -> str | None:
+    """Get ground truth label from liquidity_events (4h only)."""
+    sql = """
+    SELECT result_4h, result_1h FROM liquidity_events
+    WHERE event_uuid = %s LIMIT 1
+    """
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (event_uuid,))
+                row = cur.fetchone()
+                if row:
+                    return row.get("result_4h") or row.get("result_1h")
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    return None
