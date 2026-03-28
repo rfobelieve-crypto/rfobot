@@ -1667,6 +1667,43 @@ def webhook():
 # =========================================================
 # 主程式
 # =========================================================
+def _snapshot_loop():
+    """Background: compute pending snapshots every 60s."""
+    import time as _time
+    from market_data.features.snapshot_runner import process_once as _snap_once
+    _time.sleep(10)  # brief delay so DB is ready after startup
+    while True:
+        try:
+            _snap_once()
+        except Exception:
+            logger.exception("Snapshot runner error")
+        _time.sleep(60)
+
+
+def _oi_loop():
+    """Background: collect OI every 60s."""
+    import time as _time
+    from market_data.adapters.oi_collector import collect_once as _oi_once
+    while True:
+        try:
+            _oi_once()
+        except Exception:
+            logger.exception("OI collector error")
+        _time.sleep(60)
+
+
+def _funding_loop():
+    """Background: collect funding rates every 60s."""
+    import time as _time
+    from market_data.adapters.funding_collector import collect_once as _fr_once
+    while True:
+        try:
+            _fr_once()
+        except Exception:
+            logger.exception("Funding collector error")
+        _time.sleep(60)
+
+
 def start_background_threads():
     threading.Thread(target=start_ws_forever, daemon=True).start()
     threading.Thread(target=clean_old_data, daemon=True).start()
@@ -1684,6 +1721,18 @@ def start_background_threads():
         args=(send_message, CHAT_ID),
         daemon=True
     ).start()
+
+    # snapshot runner (每 60s 計算待處理快照)
+    threading.Thread(target=_snapshot_loop, daemon=True, name="snapshot-runner").start()
+    logger.info("Snapshot runner started.")
+
+    # OI collector (每 60s REST 抓取)
+    threading.Thread(target=_oi_loop, daemon=True, name="oi-collector").start()
+    logger.info("OI collector started.")
+
+    # Funding rate collector (每 60s REST 抓取)
+    threading.Thread(target=_funding_loop, daemon=True, name="funding-collector").start()
+    logger.info("Funding rate collector started.")
 
 
 if __name__ == "__main__":
@@ -1706,6 +1755,18 @@ if __name__ == "__main__":
         outcome_tracker.init_sweep_outcomes_table(get_db_conn)
     except Exception as e:
         logger.exception("❌ sweep_outcomes table init 失敗: %s", e)
+
+    try:
+        from market_data.adapters.oi_schema import ensure_oi_schema
+        ensure_oi_schema()
+    except Exception as e:
+        logger.exception("OI schema init failed: %s", e)
+
+    try:
+        from market_data.adapters.extra_schema import ensure_extra_schema
+        ensure_extra_schema()
+    except Exception as e:
+        logger.exception("Extra schema init failed: %s", e)
 
     # Snapshot / registry tables — create directly to avoid migration parser issues
     try:
