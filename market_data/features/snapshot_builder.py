@@ -86,6 +86,9 @@ def build_snapshot(event: dict, snapshot_type: str, offset_sec: int) -> dict:
     if snapshot_type == "4h":
         label = _get_label(event["event_uuid"])
 
+    # ── OI features ──
+    oi = _compute_oi_features(canonical, trigger_ts, trigger_ts + offset_sec)
+
     return {
         "event_uuid": event["event_uuid"],
         "event_type": event.get("event_type"),
@@ -102,6 +105,18 @@ def build_snapshot(event: dict, snapshot_type: str, offset_sec: int) -> dict:
         "price_change_pct": price_change_pct,
         "reclaim_flag": reclaim_flag,
         "break_again_flag": break_again_flag,
+
+        # OI
+        "oi_baseline_okx": oi.get("oi_baseline_okx"),
+        "oi_baseline_binance": oi.get("oi_baseline_binance"),
+        "oi_snapshot_okx": oi.get("oi_snapshot_okx"),
+        "oi_snapshot_binance": oi.get("oi_snapshot_binance"),
+        "oi_change_okx": oi.get("oi_change_okx"),
+        "oi_change_binance": oi.get("oi_change_binance"),
+        "oi_change_okx_pct": oi.get("oi_change_okx_pct"),
+        "oi_change_binance_pct": oi.get("oi_change_binance_pct"),
+        "oi_change_total": oi.get("oi_change_total"),
+        "oi_change_total_pct": oi.get("oi_change_total_pct"),
 
         "label": label,
     }
@@ -212,3 +227,77 @@ def _get_label(event_uuid: str) -> str | None:
     except Exception:
         pass
     return None
+
+
+def _get_oi_near(canonical: str, exchange: str, ts_unix: int) -> float | None:
+    """Get the closest OI notional_usd near a given unix timestamp."""
+    ts_ms = ts_unix * 1000
+    # Search within ±5 minutes
+    window_ms = 5 * 60 * 1000
+    sql = """
+    SELECT oi_notional_usd, ts_exchange,
+           ABS(ts_exchange - %s) AS dist
+    FROM oi_snapshots
+    WHERE canonical_symbol = %s AND exchange = %s
+      AND ts_exchange BETWEEN %s AND %s
+    ORDER BY dist ASC
+    LIMIT 1
+    """
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (ts_ms, canonical, exchange,
+                                  ts_ms - window_ms, ts_ms + window_ms))
+                row = cur.fetchone()
+                if row:
+                    return float(row["oi_notional_usd"])
+        finally:
+            conn.close()
+    except Exception:
+        logger.debug("OI lookup failed for %s %s @ %d", exchange, canonical, ts_unix)
+    return None
+
+
+def _compute_oi_features(canonical: str, trigger_ts: int, snapshot_ts: int) -> dict:
+    """
+    Compute OI baseline/snapshot/change for OKX + Binance.
+    Returns dict with all oi_* fields (None if data missing).
+    """
+    result = {}
+
+    total_baseline = 0.0
+    total_snapshot = 0.0
+    has_any = False
+
+    for exch in ("okx", "binance"):
+        baseline = _get_oi_near(canonical, exch, trigger_ts)
+        snapshot = _get_oi_near(canonical, exch, snapshot_ts)
+
+        result[f"oi_baseline_{exch}"] = baseline
+        result[f"oi_snapshot_{exch}"] = snapshot
+
+        if baseline is not None and snapshot is not None and baseline > 0:
+            change = snapshot - baseline
+            change_pct = round(change / baseline * 100, 4)
+            result[f"oi_change_{exch}"] = round(change, 4)
+            result[f"oi_change_{exch}_pct"] = change_pct
+            total_baseline += baseline
+            total_snapshot += snapshot
+            has_any = True
+        else:
+            result[f"oi_change_{exch}"] = None
+            result[f"oi_change_{exch}_pct"] = None
+            if baseline is None or snapshot is None:
+                logger.debug("OI missing for %s %s (baseline=%s, snapshot=%s)",
+                             exch, canonical, baseline, snapshot)
+
+    if has_any and total_baseline > 0:
+        total_change = total_snapshot - total_baseline
+        result["oi_change_total"] = round(total_change, 4)
+        result["oi_change_total_pct"] = round(total_change / total_baseline * 100, 4)
+    else:
+        result["oi_change_total"] = None
+        result["oi_change_total_pct"] = None
+
+    return result

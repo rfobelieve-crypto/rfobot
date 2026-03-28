@@ -20,6 +20,8 @@ from market_data.tasks.run_trade_streams import main as start_streams
 from market_data.tasks.flush_flow_bars import flush_loop
 from market_data.tasks.cleanup import cleanup_once
 from market_data.features.snapshot_runner import process_once as snapshot_process_once
+from market_data.adapters.oi_collector import collect_loop as oi_collect_loop
+from market_data.adapters.oi_schema import ensure_oi_schema
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,6 +46,16 @@ def main():
             except Exception:
                 logger.exception("Migration %s failed (may already exist)", mig_file)
     logger.info("Migrations complete.")
+
+    # Ensure OI schema (table + columns)
+    try:
+        ensure_oi_schema()
+    except Exception:
+        logger.exception("OI schema setup failed (may already exist)")
+
+    # Start OI collector in background (every 60s)
+    threading.Thread(target=oi_collect_loop, daemon=True, name="oi-collector").start()
+    logger.info("OI collector started (every 60s).")
 
     # Start flow bar flusher in background
     threading.Thread(target=flush_loop, daemon=True, name="flow-flusher").start()

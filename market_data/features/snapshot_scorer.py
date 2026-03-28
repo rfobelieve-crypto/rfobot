@@ -1,15 +1,21 @@
 """
 Window-specific scoring engine for event snapshots.
 
-15m scoring (max 3 each side):
-  Reversal:  cvd_sign_flip=true +1, delta>0 +1, reclaim=true +1
-  Continuation: cvd_sign_flip=false +1, delta<0 +1, break_again=true +1
+15m scoring (max 5 rev, 5 cont):
+  Reversal:  cvd_sign_flip=true +1, delta>0 +1, reclaim=true +1, OI down +1, OI down strong +1
+  Continuation: cvd_sign_flip=false +1, delta<0 +1, break_again=true +1, OI up +1, OI up strong +1
 
-1h scoring (max 6 each side):
-  Reversal:  cvd_sign_flip=true +2, delta>threshold +1, reclaim=true +2, price_up +1
-  Continuation: cvd_sign_flip=false +2, delta<-threshold +1, break_again=true +2, reclaim=false +1
+1h scoring (max 8 rev, 8 cont):
+  Reversal:  cvd_sign_flip=true +2, delta>threshold +1, reclaim=true +2, price_up +1, OI down +1, OI down strong +1
+  Continuation: cvd_sign_flip=false +2, delta<-threshold +1, break_again=true +2, reclaim=false +1, OI up +1, OI up strong +1
 
 4h scoring: same as 1h (final snapshot)
+
+OI rules (same for BSL/SSL):
+  OI down (oi_change_total_pct < 0) → reversal +1
+  OI down strong (oi_change_total_pct <= -1.5%) → reversal +1 more
+  OI up (oi_change_total_pct > 0) → continuation +1
+  OI up strong (oi_change_total_pct >= +2%) → continuation +1 more
 
 confidence = abs(rev - cont) / max(rev + cont, 1)
 """
@@ -45,7 +51,7 @@ def score_snapshot(features: dict) -> dict:
 
 
 def _score_15m(f: dict, is_ssl: bool, is_bsl: bool) -> dict:
-    """15m scoring: max 3 reversal, 3 continuation."""
+    """15m scoring: max 5 reversal, 5 continuation."""
     rev = 0.0
     cont = 0.0
 
@@ -60,8 +66,6 @@ def _score_15m(f: dict, is_ssl: bool, is_bsl: bool) -> dict:
     # Rule 2: Delta direction (+1)
     delta = f.get("delta_value")
     if delta is not None:
-        # SSL: positive delta = reversal (buyers stepping in)
-        # BSL: negative delta = reversal (sellers stepping in)
         if is_ssl:
             if delta > 0:
                 rev += 1
@@ -81,6 +85,9 @@ def _score_15m(f: dict, is_ssl: bool, is_bsl: bool) -> dict:
     break_again = f.get("break_again_flag")
     if break_again is not None and break_again:
         cont += 1
+
+    # Rule 4: OI change (+1/+2)
+    rev, cont = _score_oi(f, rev, cont)
 
     return _finalize(rev, cont)
 
@@ -138,7 +145,36 @@ def _score_1h_4h(f: dict, is_ssl: bool, is_bsl: bool) -> dict:
             elif price_pct > 0:
                 cont += 1
 
+    # Rule 5: OI change (+1/+2)
+    rev, cont = _score_oi(f, rev, cont)
+
     return _finalize(rev, cont)
+
+
+def _score_oi(f: dict, rev: float, cont: float) -> tuple[float, float]:
+    """
+    OI scoring rules (same for BSL and SSL):
+    - OI down (< 0%) → reversal +1
+    - OI down strong (<= -1.5%) → reversal +1 more
+    - OI up (> 0%) → continuation +1
+    - OI up strong (>= +2%) → continuation +1 more
+    If OI data missing, returns scores unchanged.
+    """
+    oi_pct = f.get("oi_change_total_pct")
+    if oi_pct is None:
+        return rev, cont
+
+    oi_pct = float(oi_pct)
+    if oi_pct < 0:
+        rev += 1
+        if oi_pct <= -1.5:
+            rev += 1
+    elif oi_pct > 0:
+        cont += 1
+        if oi_pct >= 2.0:
+            cont += 1
+
+    return rev, cont
 
 
 def _finalize(rev: float, cont: float) -> dict:
