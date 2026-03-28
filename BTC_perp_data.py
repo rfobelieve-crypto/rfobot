@@ -1770,6 +1770,36 @@ if __name__ == "__main__":
                 except Exception:
                     pass  # column already exists
 
+            # Add all extended columns to event_feature_snapshots (idempotent)
+            for col_name, col_def in [
+                # OI columns
+                ("oi_baseline_okx",      "DECIMAL(30,4) DEFAULT NULL"),
+                ("oi_baseline_binance",  "DECIMAL(30,4) DEFAULT NULL"),
+                ("oi_snapshot_okx",      "DECIMAL(30,4) DEFAULT NULL"),
+                ("oi_snapshot_binance",  "DECIMAL(30,4) DEFAULT NULL"),
+                ("oi_change_okx",        "DECIMAL(30,4) DEFAULT NULL"),
+                ("oi_change_binance",    "DECIMAL(30,4) DEFAULT NULL"),
+                ("oi_change_okx_pct",    "DECIMAL(10,4) DEFAULT NULL"),
+                ("oi_change_binance_pct","DECIMAL(10,4) DEFAULT NULL"),
+                ("oi_change_total",      "DECIMAL(30,4) DEFAULT NULL"),
+                ("oi_change_total_pct",  "DECIMAL(10,4) DEFAULT NULL"),
+                # Score columns
+                ("final_score",          "DECIMAL(10,4) DEFAULT NULL"),
+                ("normalized_score",     "DECIMAL(10,4) DEFAULT NULL"),
+                # Funding + liquidation columns
+                ("funding_rate",         "DECIMAL(20,8) DEFAULT NULL"),
+                ("liq_buy_usd",          "DECIMAL(30,4) DEFAULT NULL"),
+                ("liq_sell_usd",         "DECIMAL(30,4) DEFAULT NULL"),
+                ("liq_total_usd",        "DECIMAL(30,4) DEFAULT NULL"),
+                ("liq_count",            "INT DEFAULT NULL"),
+            ]:
+                try:
+                    _cur.execute(
+                        f"ALTER TABLE event_feature_snapshots ADD COLUMN {col_name} {col_def}"
+                    )
+                except Exception:
+                    pass  # column already exists
+
             logger.info("✅ event_registry + event_feature_snapshots tables ready")
         finally:
             _conn.close()
