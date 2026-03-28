@@ -29,6 +29,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Write individual trades to DB? Set False to save MySQL usage.
+# flow_bars_1m still works regardless — it aggregates in-memory.
+SAVE_RAW_TRADES = os.getenv("SAVE_RAW_TRADES", "false").lower() == "true"
+
 # Batch buffer for DB writes
 _batch_lock = threading.Lock()
 _trade_batch: list[dict] = []
@@ -45,17 +49,19 @@ def on_raw_trades(raw_trades: list[dict]):
             normalized.append(t)
             add_trade(t)
 
-    if normalized:
-        with _batch_lock:
-            _trade_batch.extend(normalized)
+    if not SAVE_RAW_TRADES or not normalized:
+        return
 
-            if len(_trade_batch) >= BATCH_SIZE:
-                to_flush = list(_trade_batch)
-                _trade_batch.clear()
+    with _batch_lock:
+        _trade_batch.extend(normalized)
 
-        # Flush outside lock if threshold hit
-        if len(normalized) >= BATCH_SIZE or _should_flush():
-            _flush_trades()
+        if len(_trade_batch) >= BATCH_SIZE:
+            to_flush = list(_trade_batch)
+            _trade_batch.clear()
+
+    # Flush outside lock if threshold hit
+    if len(normalized) >= BATCH_SIZE or _should_flush():
+        _flush_trades()
 
 
 def _should_flush() -> bool:
@@ -78,6 +84,8 @@ def _flush_trades():
 
 def batch_flush_loop():
     """Periodically flush trade batch to DB."""
+    if not SAVE_RAW_TRADES:
+        return  # Nothing to flush, exit thread
     while True:
         time.sleep(BATCH_FLUSH_INTERVAL)
         _flush_trades()
@@ -99,6 +107,7 @@ def health_check_loop():
 
 def main():
     logger.info("=== Market Data Trade Streams starting ===")
+    logger.info("SAVE_RAW_TRADES=%s (set env SAVE_RAW_TRADES=true to enable)", SAVE_RAW_TRADES)
 
     # Background: batch flush
     threading.Thread(target=batch_flush_loop, daemon=True).start()
