@@ -221,22 +221,6 @@ def _get_price_change(canonical: str, trigger_ts: int,
                     avg_price = float(row["avg_price"])
                     return round((avg_price - entry_price) / entry_price * 100, 4)
 
-                # 2) Fallback: estimate from flow_bars_1m delta/volume ratio
-                trigger_ms = trigger_ts * 1000
-                cur.execute("""
-                    SELECT COALESCE(SUM(delta_usd), 0) AS total_delta,
-                           COALESCE(SUM(volume_usd), 0) AS total_vol
-                    FROM flow_bars_1m
-                    WHERE canonical_symbol = %s
-                      AND exchange_scope = 'all'
-                      AND window_start >= %s AND window_start < %s
-                """, (canonical, trigger_ms, target_ms + 60_000))
-                delta_row = cur.fetchone()
-                if delta_row and float(delta_row["total_vol"] or 0) > 0:
-                    total_delta = float(delta_row["total_delta"])
-                    total_vol = float(delta_row["total_vol"])
-                    estimated_pct = round(total_delta / total_vol * 100, 4)
-                    return estimated_pct
         finally:
             conn.close()
     except Exception:
