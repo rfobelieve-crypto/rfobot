@@ -1579,15 +1579,58 @@ if __name__ == "__main__":
     except Exception as e:
         logger.exception("❌ sweep_outcomes table init 失敗: %s", e)
 
-    # Snapshot / registry tables
+    # Snapshot / registry tables — create directly to avoid migration parser issues
     try:
-        from market_data.storage.db import run_migration
-        mig_path = os.path.join(BASE_DIR, "migrations", "004_event_feature_snapshots.sql")
-        if os.path.exists(mig_path):
-            run_migration(mig_path)
+        _conn = get_db_conn()
+        try:
+            with _conn.cursor() as _cur:
+                _cur.execute("""
+                CREATE TABLE IF NOT EXISTS event_registry (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    event_uuid VARCHAR(64) NOT NULL,
+                    event_type VARCHAR(50) DEFAULT NULL,
+                    symbol VARCHAR(50) NOT NULL,
+                    liquidity_side VARCHAR(20) NOT NULL,
+                    entry_price DECIMAL(18,8) NOT NULL,
+                    trigger_ts INT NOT NULL,
+                    sweep_ref_price DECIMAL(18,8) DEFAULT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uk_event_uuid (event_uuid),
+                    INDEX idx_trigger_ts (trigger_ts)
+                )""")
+                _cur.execute("""
+                CREATE TABLE IF NOT EXISTS event_feature_snapshots (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    event_uuid VARCHAR(64) NOT NULL,
+                    event_type VARCHAR(50) DEFAULT NULL,
+                    canonical_symbol VARCHAR(20) NOT NULL,
+                    liquidity_side VARCHAR(20) NOT NULL,
+                    trigger_price DECIMAL(18,8) NOT NULL,
+                    trigger_ts INT NOT NULL,
+                    snapshot_type VARCHAR(10) NOT NULL,
+                    snapshot_ts INT NOT NULL,
+                    delta_value DECIMAL(30,10) DEFAULT NULL,
+                    cvd_change DECIMAL(30,10) DEFAULT NULL,
+                    cvd_sign_flip BOOLEAN DEFAULT NULL,
+                    price_change_pct DECIMAL(10,4) DEFAULT NULL,
+                    reclaim_flag BOOLEAN DEFAULT NULL,
+                    break_again_flag BOOLEAN DEFAULT NULL,
+                    reversal_score DECIMAL(10,4) NOT NULL DEFAULT 0,
+                    continuation_score DECIMAL(10,4) NOT NULL DEFAULT 0,
+                    confidence_score DECIMAL(10,4) NOT NULL DEFAULT 0,
+                    bias VARCHAR(20) NOT NULL DEFAULT 'neutral',
+                    label VARCHAR(20) DEFAULT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uk_event_snapshot (event_uuid, snapshot_type),
+                    INDEX idx_trigger_ts (trigger_ts),
+                    INDEX idx_snapshot_type (snapshot_type),
+                    INDEX idx_bias (bias)
+                )""")
             logger.info("✅ event_registry + event_feature_snapshots tables ready")
+        finally:
+            _conn.close()
     except Exception as e:
-        logger.exception("snapshot migration failed (may already exist): %s", e)
+        logger.exception("snapshot tables init failed (may already exist): %s", e)
 
     start_background_threads()
     app.run(host=HOST, port=PORT)

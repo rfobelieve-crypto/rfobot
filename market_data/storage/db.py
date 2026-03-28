@@ -20,21 +20,31 @@ def run_migration(sql_path: str):
     with open(sql_path, "r", encoding="utf-8") as f:
         sql = f.read()
 
+    # Strip comment-only lines before splitting
+    lines = []
+    for line in sql.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("--"):
+            continue
+        lines.append(line)
+    cleaned = "\n".join(lines)
+
     conn = get_conn()
     try:
         with conn.cursor() as cursor:
-            for statement in sql.split(";"):
+            for statement in cleaned.split(";"):
+                # Remove leading/trailing whitespace
                 statement = statement.strip()
-                if statement and not statement.startswith("--"):
-                    try:
-                        cursor.execute(statement)
-                    except Exception as e:
-                        # Skip "duplicate column" or "already exists" errors
-                        err_msg = str(e).lower()
-                        if "duplicate" in err_msg or "already exists" in err_msg:
-                            logger.debug("Skipping (already applied): %s", e)
-                        else:
-                            raise
+                if not statement:
+                    continue
+                try:
+                    cursor.execute(statement)
+                except Exception as e:
+                    err_msg = str(e).lower()
+                    if "duplicate" in err_msg or "already exists" in err_msg:
+                        logger.debug("Skipping (already applied): %s", e)
+                    else:
+                        raise
         logger.info("Migration applied: %s", sql_path)
     finally:
         conn.close()
