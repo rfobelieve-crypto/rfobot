@@ -1264,7 +1264,7 @@ def webhook():
 
         chat_id = str(chat.get("id", "")).strip()
         chat_type = str(chat.get("type", "")).strip().lower()
-        text = text.strip().lower()
+        text = text.strip().lower().split("@")[0]
 
         if chat_type != "private":
             logger.warning("Rejected non-private chat: %s (%s)", chat_id, chat_type)
