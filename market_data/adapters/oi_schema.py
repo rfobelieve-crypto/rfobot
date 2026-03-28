@@ -29,7 +29,24 @@ def ensure_oi_schema():
             )""")
             logger.info("oi_snapshots table ready")
 
-            # 2. Add OI columns to event_feature_snapshots
+            # 2. Add lifecycle columns to event_registry
+            lifecycle_columns = [
+                ("status", "VARCHAR(20) DEFAULT 'active'"),
+                ("result_1h", "VARCHAR(50) DEFAULT NULL"),
+                ("result_4h", "VARCHAR(50) DEFAULT NULL"),
+                ("return_1h", "DECIMAL(10,4) DEFAULT NULL"),
+                ("return_4h", "DECIMAL(10,4) DEFAULT NULL"),
+                ("finished_at", "DATETIME DEFAULT NULL"),
+            ]
+            for col_name, col_def in lifecycle_columns:
+                try:
+                    cur.execute(
+                        f"ALTER TABLE event_registry ADD COLUMN {col_name} {col_def}"
+                    )
+                except Exception:
+                    pass  # already exists
+
+            # 3. Add OI columns to event_feature_snapshots
             oi_columns = [
                 ("oi_baseline_okx", "DECIMAL(30,4) DEFAULT NULL"),
                 ("oi_baseline_binance", "DECIMAL(30,4) DEFAULT NULL"),

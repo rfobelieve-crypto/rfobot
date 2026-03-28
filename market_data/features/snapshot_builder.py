@@ -182,25 +182,46 @@ def _get_cvd_at(canonical: str, target_ms: int) -> float | None:
 
 def _get_price_change(canonical: str, trigger_ts: int,
                       offset_sec: int, entry_price: float) -> float | None:
-    """Get % price change at the end of the window."""
-    target_ms = (trigger_ts + offset_sec) * 1000
-    window_ms = 60_000  # 1 minute window
+    """Get % price change at the end of the window.
 
-    sql = """
-    SELECT AVG(price) AS avg_price
-    FROM normalized_trades
-    WHERE canonical_symbol = %s
-      AND ts_exchange >= %s AND ts_exchange < %s
+    Primary: normalized_trades (accurate, 3d retention).
+    Fallback: delta/volume ratio from flow_bars_1m (90d retention).
     """
+    target_ms = (trigger_ts + offset_sec) * 1000
+    window_ms = 60_000  # ±1 minute
+
     try:
         conn = get_db_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(sql, (canonical, target_ms - window_ms, target_ms + window_ms))
+                # 1) Try normalized_trades first (works for events < 3 days)
+                cur.execute("""
+                    SELECT AVG(price) AS avg_price
+                    FROM normalized_trades
+                    WHERE canonical_symbol = %s
+                      AND ts_exchange >= %s AND ts_exchange < %s
+                """, (canonical, target_ms - window_ms, target_ms + window_ms))
                 row = cur.fetchone()
                 if row and row["avg_price"] is not None:
                     avg_price = float(row["avg_price"])
                     return round((avg_price - entry_price) / entry_price * 100, 4)
+
+                # 2) Fallback: estimate from flow_bars_1m delta/volume ratio
+                trigger_ms = trigger_ts * 1000
+                cur.execute("""
+                    SELECT COALESCE(SUM(delta_usd), 0) AS total_delta,
+                           COALESCE(SUM(volume_usd), 0) AS total_vol
+                    FROM flow_bars_1m
+                    WHERE canonical_symbol = %s
+                      AND exchange_scope = 'all'
+                      AND window_start >= %s AND window_start < %s
+                """, (canonical, trigger_ms, target_ms + 60_000))
+                delta_row = cur.fetchone()
+                if delta_row and float(delta_row["total_vol"] or 0) > 0:
+                    total_delta = float(delta_row["total_delta"])
+                    total_vol = float(delta_row["total_vol"])
+                    estimated_pct = round(total_delta / total_vol * 100, 4)
+                    return estimated_pct
         finally:
             conn.close()
     except Exception:
@@ -209,16 +230,27 @@ def _get_price_change(canonical: str, trigger_ts: int,
 
 
 def _get_label(event_uuid: str) -> str | None:
-    """Get ground truth label from liquidity_events (4h only)."""
-    sql = """
-    SELECT result_4h, result_1h FROM liquidity_events
-    WHERE event_uuid = %s LIMIT 1
-    """
+    """Get ground truth label — check event_registry first, fallback to liquidity_events."""
     try:
         conn = get_db_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(sql, (event_uuid,))
+                # Prefer event_registry (unified lifecycle)
+                cur.execute(
+                    "SELECT result_4h, result_1h FROM event_registry WHERE event_uuid = %s LIMIT 1",
+                    (event_uuid,),
+                )
+                row = cur.fetchone()
+                if row:
+                    label = row.get("result_4h") or row.get("result_1h")
+                    if label:
+                        return label
+
+                # Fallback: liquidity_events (backward compat)
+                cur.execute(
+                    "SELECT result_4h, result_1h FROM liquidity_events WHERE event_uuid = %s LIMIT 1",
+                    (event_uuid,),
+                )
                 row = cur.fetchone()
                 if row:
                     return row.get("result_4h") or row.get("result_1h")

@@ -1,5 +1,5 @@
 """
-Shared MySQL connection helper.
+Shared MySQL connection helper with connection pooling.
 
 Resolution order:
 1. Environment variables (Railway / cloud deploy)
@@ -12,6 +12,8 @@ Used by both BTC_perp_data.py (main bot) and market_data layer.
 import os
 import json
 import logging
+import threading
+import queue
 
 import pymysql
 
@@ -148,14 +150,8 @@ def _check_config():
         )
 
 
-def get_db_conn():
-    """
-    Get a new MySQL connection.
-
-    Returns a pymysql connection with autocommit=True and DictCursor.
-    """
-    _check_config()
-
+def _create_conn():
+    """Create a fresh pymysql connection."""
     return pymysql.connect(
         host=_db_config["host"],
         port=_db_config["port"],
@@ -167,6 +163,96 @@ def get_db_conn():
         cursorclass=pymysql.cursors.DictCursor,
         ssl={"ssl": {}},
     )
+
+
+# ── Connection Pool ──────────────────────────────────────
+_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "5"))
+_pool: queue.Queue | None = None
+_pool_lock = threading.Lock()
+
+
+def _get_pool() -> queue.Queue:
+    """Lazy-init the connection pool."""
+    global _pool
+    if _pool is not None:
+        return _pool
+    with _pool_lock:
+        if _pool is not None:
+            return _pool
+        _check_config()
+        _pool = queue.Queue(maxsize=_POOL_SIZE)
+        # Pre-fill pool
+        for _ in range(_POOL_SIZE):
+            try:
+                _pool.put_nowait(_create_conn())
+            except Exception:
+                logger.debug("Pre-fill connection failed, will create on demand")
+        logger.info("DB pool initialized (size=%d, filled=%d)",
+                     _POOL_SIZE, _pool.qsize())
+        return _pool
+
+
+class PooledConnection:
+    """Wrapper that returns the connection to the pool on close()."""
+
+    def __init__(self, conn, pool: queue.Queue):
+        self._conn = conn
+        self._pool = pool
+
+    def cursor(self, *args, **kwargs):
+        return self._conn.cursor(*args, **kwargs)
+
+    def close(self):
+        """Return connection to pool instead of closing it."""
+        try:
+            self._conn.ping(reconnect=True)
+            self._pool.put_nowait(self._conn)
+        except (queue.Full, Exception):
+            # Pool full or connection broken — actually close
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+def get_db_conn():
+    """
+    Get a pooled MySQL connection.
+
+    Returns a PooledConnection with autocommit=True and DictCursor.
+    Call .close() to return it to the pool (don't forget finally blocks).
+    """
+    pool = _get_pool()
+
+    # Try to get from pool (non-blocking)
+    try:
+        conn = pool.get_nowait()
+        # Verify the connection is alive
+        try:
+            conn.ping(reconnect=True)
+            return PooledConnection(conn, pool)
+        except Exception:
+            # Dead connection, create new
+            try:
+                conn.close()
+            except Exception:
+                pass
+    except queue.Empty:
+        pass
+
+    # Pool empty or connection dead — create new
+    _check_config()
+    conn = _create_conn()
+    return PooledConnection(conn, pool)
 
 
 def get_db_info() -> dict:

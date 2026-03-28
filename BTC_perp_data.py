@@ -482,6 +482,36 @@ def init_db():
         conn.close()
 
 
+def update_event_registry(event: dict):
+    """Update event_registry with 4h results (unified lifecycle)."""
+    sql = """
+    UPDATE event_registry SET
+        status = %s,
+        result_1h = %s,
+        result_4h = %s,
+        return_1h = %s,
+        return_4h = %s,
+        finished_at = NOW()
+    WHERE event_uuid = %s
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (
+                "finished",
+                event.get("result_1h"),
+                event.get("result_4h"),
+                event.get("return_1h"),
+                event.get("return_4h"),
+                event["event_uuid"],
+            ))
+        logger.info("Updated event_registry for %s: status=finished", event["event_uuid"][:8])
+    except Exception:
+        logger.exception("Failed to update event_registry for %s", event["event_uuid"][:8])
+    finally:
+        conn.close()
+
+
 def save_event_to_db(event: dict):
     sql = """
     INSERT INTO liquidity_events (
@@ -1085,6 +1115,12 @@ def event_watchdog():
                 except Exception as db_error:
                     logger.exception("save_event_to_db error: %s", db_error)
 
+                # Update event_registry with 4h results (unified lifecycle)
+                try:
+                    update_event_registry(finished_event)
+                except Exception as reg_err:
+                    logger.exception("update_event_registry error: %s", reg_err)
+
                 # 合併 delta 結果 + sweep tracker 結果
                 summary = generate_event_summary(finished_event)
                 sweep_report = outcome_tracker.get_latest_finished_summary()
@@ -1436,6 +1472,18 @@ def tradingview_webhook():
         except Exception as reg_err:
             logger.warning("Failed to register event to registry: %s", reg_err)
 
+        # 立刻觸發 OI 採集，確保 baseline 精確（不等 60s 輪詢）
+        def _collect_oi_baseline():
+            try:
+                from market_data.adapters.oi_collector import collect_once as _oi_collect
+                n = _oi_collect()
+                logger.info("OI baseline collected on event arrival: %d sources", n)
+            except Exception as oi_err:
+                logger.warning("OI baseline collection failed: %s", oi_err)
+
+        threading.Thread(target=_collect_oi_baseline, daemon=True,
+                         name="oi-baseline").start()
+
         with event_lock:
             event_skipped = False
             if current_event and not current_event["finished"]:
@@ -1671,6 +1719,22 @@ if __name__ == "__main__":
                     INDEX idx_snapshot_type (snapshot_type),
                     INDEX idx_bias (bias)
                 )""")
+            # Add lifecycle columns to event_registry (idempotent)
+            for col_name, col_def in [
+                ("status", "VARCHAR(20) DEFAULT 'active'"),
+                ("result_1h", "VARCHAR(50) DEFAULT NULL"),
+                ("result_4h", "VARCHAR(50) DEFAULT NULL"),
+                ("return_1h", "DECIMAL(10,4) DEFAULT NULL"),
+                ("return_4h", "DECIMAL(10,4) DEFAULT NULL"),
+                ("finished_at", "DATETIME DEFAULT NULL"),
+            ]:
+                try:
+                    _cur.execute(
+                        f"ALTER TABLE event_registry ADD COLUMN {col_name} {col_def}"
+                    )
+                except Exception:
+                    pass  # column already exists
+
             logger.info("✅ event_registry + event_feature_snapshots tables ready")
         finally:
             _conn.close()

@@ -1,197 +1,202 @@
-"""
-Window-specific scoring engine for event snapshots.
-
-15m scoring (max 5 rev, 5 cont):
-  Reversal:  cvd_sign_flip=true +1, delta>0 +1, reclaim=true +1, OI down +1, OI down strong +1
-  Continuation: cvd_sign_flip=false +1, delta<0 +1, break_again=true +1, OI up +1, OI up strong +1
-
-1h scoring (max 8 rev, 8 cont):
-  Reversal:  cvd_sign_flip=true +2, delta>threshold +1, reclaim=true +2, price_up +1, OI down +1, OI down strong +1
-  Continuation: cvd_sign_flip=false +2, delta<-threshold +1, break_again=true +2, reclaim=false +1, OI up +1, OI up strong +1
-
-4h scoring: same as 1h (final snapshot)
-
-OI rules (same for BSL/SSL):
-  OI down (oi_change_total_pct < 0) → reversal +1
-  OI down strong (oi_change_total_pct <= -1.5%) → reversal +1 more
-  OI up (oi_change_total_pct > 0) → continuation +1
-  OI up strong (oi_change_total_pct >= +2%) → continuation +1 more
-
-confidence = abs(rev - cont) / max(rev + cont, 1)
-"""
-
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Delta threshold for 1h/4h rules (USD)
 DELTA_THRESHOLD = 0
 
 
+# ================================
+# 主入口
+# ================================
 def score_snapshot(features: dict) -> dict:
-    """
-    Score a snapshot based on its snapshot_type.
-
-    Args:
-        features: dict from snapshot_builder.build_snapshot()
-
-    Returns:
-        dict with reversal_score, continuation_score, confidence_score, bias
-    """
     snap_type = features.get("snapshot_type", "15m")
     side = (features.get("liquidity_side") or "").lower()
-    is_ssl = side == "sell"
-    is_bsl = side == "buy"
 
-    if snap_type == "15m":
-        return _score_15m(features, is_ssl, is_bsl)
-    else:
-        # 1h and 4h use the same rules
-        return _score_1h_4h(features, is_ssl, is_bsl)
+    is_ssl = side == "sell"   # 掃下方 → reversal up
+    is_bsl = side == "buy"    # 掃上方 → reversal down
+
+    # 模組分數
+    order_flow = _score_order_flow(features, is_ssl, is_bsl, snap_type)
+    price = _score_price(features, is_ssl, is_bsl, snap_type)
+    oi = _score_oi_module(features, snap_type)
+    context = _score_context(features, snap_type)
+
+    # 合併
+    rev = (
+        order_flow["rev"] +
+        price["rev"] +
+        oi["rev"] +
+        context["rev"]
+    )
+
+    cont = (
+        order_flow["cont"] +
+        price["cont"] +
+        oi["cont"] +
+        context["cont"]
+    )
+
+    return _finalize(rev, cont, order_flow, price, oi, context)
 
 
-def _score_15m(f: dict, is_ssl: bool, is_bsl: bool) -> dict:
-    """15m scoring: max 5 reversal, 5 continuation."""
-    rev = 0.0
-    cont = 0.0
+# ================================
+# 模組 1：Order Flow（最重要）
+# ================================
+def _score_order_flow(f, is_ssl, is_bsl, snap_type):
+    rev, cont = 0.0, 0.0
 
-    # Rule 1: CVD sign flip (+1)
+    # 權重（HTF > LTF）
+    cvd_weight = 3 if snap_type == "15m" else 5
+    delta_weight = 1.5 if snap_type == "15m" else 2
+
+    # CVD flip
     cvd_flip = f.get("cvd_sign_flip")
     if cvd_flip is not None:
         if cvd_flip:
-            rev += 1
+            rev += cvd_weight
         else:
-            cont += 1
+            cont += cvd_weight
 
-    # Rule 2: Delta direction (+1)
-    delta = f.get("delta_value")
-    if delta is not None:
-        if is_ssl:
-            if delta > 0:
-                rev += 1
-            elif delta < 0:
-                cont += 1
-        elif is_bsl:
-            if delta < 0:
-                rev += 1
-            elif delta > 0:
-                cont += 1
-
-    # Rule 3: Reclaim / Break again (+1)
-    reclaim = f.get("reclaim_flag")
-    if reclaim is not None and reclaim:
-        rev += 1
-
-    break_again = f.get("break_again_flag")
-    if break_again is not None and break_again:
-        cont += 1
-
-    # Rule 4: OI change (+1/+2)
-    rev, cont = _score_oi(f, rev, cont)
-
-    return _finalize(rev, cont)
-
-
-def _score_1h_4h(f: dict, is_ssl: bool, is_bsl: bool) -> dict:
-    """1h / 4h scoring: max 6 reversal, 6 continuation."""
-    rev = 0.0
-    cont = 0.0
-
-    # Rule 1: CVD sign flip (+2)
-    cvd_flip = f.get("cvd_sign_flip")
-    if cvd_flip is not None:
-        if cvd_flip:
-            rev += 2
-        else:
-            cont += 2
-
-    # Rule 2: Delta strength (+1)
+    # Delta
     delta = f.get("delta_value")
     if delta is not None:
         if is_ssl:
             if delta > DELTA_THRESHOLD:
-                rev += 1
+                rev += delta_weight
             elif delta < -DELTA_THRESHOLD:
-                cont += 1
+                cont += delta_weight
         elif is_bsl:
             if delta < -DELTA_THRESHOLD:
-                rev += 1
+                rev += delta_weight
             elif delta > DELTA_THRESHOLD:
-                cont += 1
+                cont += delta_weight
 
-    # Rule 3: Reclaim / Break again (+2)
+    return {"rev": rev, "cont": cont}
+
+
+# ================================
+# 模組 2：價格結構（第二重要）
+# ================================
+def _score_price(f, is_ssl, is_bsl, snap_type):
+    rev, cont = 0.0, 0.0
+
+    reclaim_w = 2 if snap_type == "15m" else 4
+    break_w = 2 if snap_type == "15m" else 4
+    price_w = 1 if snap_type == "15m" else 2
+
+    # reclaim
     reclaim = f.get("reclaim_flag")
     if reclaim is not None:
         if reclaim:
-            rev += 2
+            rev += reclaim_w
         else:
-            cont += 1  # reclaim=false → continuation signal
+            cont += reclaim_w * 0.5  # 沒 reclaim → 偏 continuation
 
+    # break again
     break_again = f.get("break_again_flag")
-    if break_again is not None and break_again:
-        cont += 2
+    if break_again:
+        cont += break_w
 
-    # Rule 4: Price direction (+1)
+    # price direction
     price_pct = f.get("price_change_pct")
     if price_pct is not None:
         if is_ssl:
             if price_pct > 0:
-                rev += 1
+                rev += price_w
             elif price_pct < 0:
-                cont += 1
+                cont += price_w
         elif is_bsl:
             if price_pct < 0:
-                rev += 1
+                rev += price_w
             elif price_pct > 0:
-                cont += 1
+                cont += price_w
 
-    # Rule 5: OI change (+1/+2)
-    rev, cont = _score_oi(f, rev, cont)
-
-    return _finalize(rev, cont)
+    return {"rev": rev, "cont": cont}
 
 
-def _score_oi(f: dict, rev: float, cont: float) -> tuple[float, float]:
-    """
-    OI scoring rules (same for BSL and SSL):
-    - OI down (< 0%) → reversal +1
-    - OI down strong (<= -1.5%) → reversal +1 more
-    - OI up (> 0%) → continuation +1
-    - OI up strong (>= +2%) → continuation +1 more
-    If OI data missing, returns scores unchanged.
-    """
+# ================================
+# 模組 3：OI（輔助）
+# ================================
+def _score_oi_module(f, snap_type):
+    rev, cont = 0.0, 0.0
+
+    multiplier = 1.0 if snap_type == "15m" else 2.0
+
     oi_pct = f.get("oi_change_total_pct")
     if oi_pct is None:
-        return rev, cont
+        return {"rev": rev, "cont": cont}
 
     oi_pct = float(oi_pct)
+
     if oi_pct < 0:
-        rev += 1
+        rev += 1 * multiplier
         if oi_pct <= -1.5:
-            rev += 1
+            rev += 1 * multiplier
     elif oi_pct > 0:
-        cont += 1
+        cont += 1 * multiplier
         if oi_pct >= 2.0:
-            cont += 1
+            cont += 1 * multiplier
 
-    return rev, cont
+    return {"rev": rev, "cont": cont}
 
 
-def _finalize(rev: float, cont: float) -> dict:
-    """Compute confidence and bias from raw scores."""
+# ================================
+# 模組 4：Context（目前保留）
+# ================================
+def _score_context(f, snap_type):
+    rev, cont = 0.0, 0.0
+
+    # 你之後可以加：
+    # session, HTF trend, volatility regime
+
+    return {"rev": rev, "cont": cont}
+
+
+# ================================
+# Finalize（重點）
+# ================================
+def _finalize(rev, cont, order_flow, price, oi, context):
     total = rev + cont
-    confidence = round(abs(rev - cont) / max(total, 1), 4)
 
-    if rev > cont:
-        bias = "reversal"
-    elif cont > rev:
-        bias = "continuation"
-    else:
-        bias = "neutral"
+    if total == 0:
+        return {
+            "reversal_score": 0.0,
+            "continuation_score": 0.0,
+            "confidence_score": 0.0,
+            "bias": "neutral",
+            "final_score": 0.0,
+            "modules": {
+                "order_flow": order_flow,
+                "price": price,
+                "oi": oi,
+                "context": context,
+            },
+        }
+
+    bias = "reversal" if rev > cont else "continuation"
+    confidence = abs(rev - cont) / total
+
+    # normalized（粗略上限）
+    max_raw = 20.0
+    normalized = (max(rev, cont) / max_raw) * 100
+
+    # 不再用乘法砍分 → 改加分
+    clarity_bonus = confidence * 10
+    final_score = min(100.0, round(normalized + clarity_bonus, 2))
 
     return {
-        "reversal_score": round(rev, 4),
-        "continuation_score": round(cont, 4),
-        "confidence_score": confidence,
+        "reversal_score": round(rev, 2),
+        "continuation_score": round(cont, 2),
+        "confidence_score": round(confidence, 4),
         "bias": bias,
+        "normalized_score": round(normalized, 2),
+        "final_score": final_score,
+
+        # ⭐ 這個超重要（之後做 dashboard / AI）
+        "modules": {
+            "order_flow": order_flow,
+            "price": price,
+            "oi": oi,
+            "context": context,
+        },
     }
