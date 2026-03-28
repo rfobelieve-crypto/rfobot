@@ -1579,5 +1579,15 @@ if __name__ == "__main__":
     except Exception as e:
         logger.exception("❌ sweep_outcomes table init 失敗: %s", e)
 
+    # Snapshot / registry tables
+    try:
+        from market_data.storage.db import run_migration
+        mig_path = os.path.join(BASE_DIR, "migrations", "004_event_feature_snapshots.sql")
+        if os.path.exists(mig_path):
+            run_migration(mig_path)
+            logger.info("✅ event_registry + event_feature_snapshots tables ready")
+    except Exception as e:
+        logger.exception("snapshot migration failed (may already exist): %s", e)
+
     start_background_threads()
     app.run(host=HOST, port=PORT)
