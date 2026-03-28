@@ -83,6 +83,9 @@ ALLOWED_USERS = config["allowed_users"]
 
 TV_WEBHOOK_SECRET = os.getenv("TV_WEBHOOK_SECRET", "")
 
+# MySQL: use shared DB helper (supports env / .env / config.json)
+from shared.db import get_db_conn as _shared_get_db_conn, get_db_info as _shared_get_db_info
+
 MYSQL_HOST = os.getenv("MYSQL_HOST", "")
 MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
 MYSQL_USER = os.getenv("MYSQL_USER", "")
@@ -333,20 +336,7 @@ def outcome_label_from_hit(liquidity_side: str, first_hit_side: str) -> str:
 # MySQL
 # =========================================================
 def get_db_conn():
-    if not MYSQL_HOST or not MYSQL_USER or not MYSQL_DB:
-        raise ValueError("MySQL 環境變數未完整設定")
-
-    return pymysql.connect(
-        host=MYSQL_HOST,
-        port=MYSQL_PORT,
-        user=MYSQL_USER,
-        password=MYSQL_PASSWORD,
-        database=MYSQL_DB,
-        charset="utf8mb4",
-        autocommit=True,
-        cursorclass=pymysql.cursors.DictCursor,
-        ssl={"ssl": {}}
-    )
+    return _shared_get_db_conn()
 
 
 def column_exists(conn, table_name: str, column_name: str) -> bool:
@@ -859,7 +849,8 @@ def generate_status_report() -> str:
     with event_lock:
         event_status = "有進行中事件" if current_event and not current_event["finished"] else "無進行中事件"
 
-    mysql_status = "已設定" if MYSQL_HOST and MYSQL_USER and MYSQL_DB else "未設定完整"
+    db_info = _shared_get_db_info()
+    mysql_status = f"已設定 (via {db_info['source']})" if db_info["host"] != "NOT SET" else "未設定完整"
 
     return (
         f"🤖 Bot 狀態報告\n"
