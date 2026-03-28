@@ -1734,6 +1734,14 @@ def start_background_threads():
     threading.Thread(target=_funding_loop, daemon=True, name="funding-collector").start()
     logger.info("Funding rate collector started.")
 
+    # Liquidation collector (OKX + Binance WebSocket)
+    try:
+        from market_data.adapters.liquidation_collector import start_all as _liq_start
+        _liq_start()
+        logger.info("Liquidation collector started.")
+    except Exception:
+        logger.exception("Liquidation collector failed to start")
+
 
 if __name__ == "__main__":
     logger.info("✅ BTC 流動性結果監控機器人啟動中... (v2)")
