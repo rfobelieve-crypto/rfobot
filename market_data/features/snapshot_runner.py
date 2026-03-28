@@ -52,25 +52,35 @@ def _notify_telegram(features: dict):
 
         bias_icon = {"reversal": "🔄", "continuation": "➡️", "neutral": "⚖️"}.get(bias, "❓")
 
-        lines = [
-            f"📸 快照完成: {snap_type}",
-            f"事件: {uuid_short} ({side.upper()})",
-            f"幣種: {symbol}",
-            f"─────────────",
-            f"bias: {bias_icon} {bias}",
-            f"reversal: {rev:.0f}  continuation: {cont:.0f}",
-            f"confidence: {confidence:.2f}",
-        ]
+        final = features.get("final_score")
+        score_str = f"rev:{rev:.0f} cont:{cont:.0f} conf:{confidence:.2f}"
+        if final is not None:
+            score_str += f" score:{float(final):.1f}"
 
-        # OI info if available
-        oi_pct = features.get("oi_change_total_pct")
-        if oi_pct is not None:
-            oi_dir = "📈" if float(oi_pct) > 0 else "📉"
-            lines.append(f"OI change: {oi_dir} {oi_pct:+.2f}%")
+        lines = [
+            f"📸 快照完成 [{snap_type}]",
+            f"事件: {uuid_short} ({side.upper()}) {symbol}",
+            f"─────────────",
+            f"{bias_icon} {bias}",
+            score_str,
+        ]
 
         price_pct = features.get("price_change_pct")
         if price_pct is not None:
-            lines.append(f"price change: {price_pct:+.2f}%")
+            lines.append(f"price: {price_pct:+.2f}%")
+
+        oi_pct = features.get("oi_change_total_pct")
+        if oi_pct is not None:
+            oi_dir = "📈" if float(oi_pct) > 0 else "📉"
+            lines.append(f"OI: {oi_dir} {oi_pct:+.2f}%")
+
+        fr = features.get("funding_rate")
+        if fr is not None:
+            lines.append(f"funding: {float(fr)*100:+.4f}%")
+
+        liq = features.get("liq_total_usd")
+        if liq is not None and float(liq) > 0:
+            lines.append(f"liq: ${float(liq)/1e6:.1f}M")
 
         text = "\n".join(lines)
         _requests.post(
@@ -102,10 +112,12 @@ def process_once() -> int:
             scores = score_snapshot(features)
 
             # Merge scores into snapshot dict
-            features["reversal_score"] = scores["reversal_score"]
+            features["reversal_score"]    = scores["reversal_score"]
             features["continuation_score"] = scores["continuation_score"]
-            features["confidence_score"] = scores["confidence_score"]
-            features["bias"] = scores["bias"]
+            features["confidence_score"]  = scores["confidence_score"]
+            features["bias"]              = scores["bias"]
+            features["final_score"]       = scores.get("final_score")
+            features["normalized_score"]  = scores.get("normalized_score")
 
             save_snapshot(features)
             _notify_telegram(features)

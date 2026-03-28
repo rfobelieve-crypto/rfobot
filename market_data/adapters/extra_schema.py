@@ -47,11 +47,13 @@ def ensure_extra_schema():
 
             # ── New columns on event_feature_snapshots ─────────────────────
             new_columns = [
-                ("funding_rate",  "DECIMAL(20, 8) DEFAULT NULL"),
-                ("liq_buy_usd",   "DECIMAL(30, 4) DEFAULT NULL"),
-                ("liq_sell_usd",  "DECIMAL(30, 4) DEFAULT NULL"),
-                ("liq_total_usd", "DECIMAL(30, 4) DEFAULT NULL"),
-                ("liq_count",     "INT DEFAULT NULL"),
+                ("final_score",      "DECIMAL(10, 4) DEFAULT NULL"),
+                ("normalized_score", "DECIMAL(10, 4) DEFAULT NULL"),
+                ("funding_rate",     "DECIMAL(20, 8) DEFAULT NULL"),
+                ("liq_buy_usd",      "DECIMAL(30, 4) DEFAULT NULL"),
+                ("liq_sell_usd",     "DECIMAL(30, 4) DEFAULT NULL"),
+                ("liq_total_usd",    "DECIMAL(30, 4) DEFAULT NULL"),
+                ("liq_count",        "INT DEFAULT NULL"),
             ]
             for col_name, col_def in new_columns:
                 try:

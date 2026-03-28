@@ -60,21 +60,49 @@ def get_snapshots_by_uuid(uuid_prefix: str) -> list[dict]:
         conn.close()
 
 
-def get_latest_scores(limit: int = 3) -> list[dict]:
-    """Get the latest scored events from event_features_v2."""
+def get_latest_scores(limit: int = 5) -> list[dict]:
+    """
+    Get the latest scored events from event_feature_snapshots.
+    Returns one representative row per event (prefers 1h, falls back to 15m).
+    """
     sql = """
-    SELECT event_uuid, symbol, liquidity_side, entry_price, trigger_ts,
-           reversal_score, continuation_score, confidence_score, bias, label,
-           scorer_version, computed_at
-    FROM event_features_v2
-    ORDER BY trigger_ts DESC
+    SELECT
+        s.event_uuid,
+        r.symbol,
+        s.liquidity_side,
+        s.trigger_price AS entry_price,
+        s.trigger_ts,
+        s.snapshot_type,
+        s.reversal_score,
+        s.continuation_score,
+        s.confidence_score,
+        s.bias,
+        s.final_score,
+        s.oi_change_total_pct,
+        s.funding_rate,
+        s.liq_total_usd,
+        s.label
+    FROM event_feature_snapshots s
+    LEFT JOIN event_registry r ON s.event_uuid = r.event_uuid
+    WHERE s.snapshot_type IN ('1h', '15m')
+    ORDER BY s.trigger_ts DESC, FIELD(s.snapshot_type, '1h', '15m')
     LIMIT %s
     """
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, (limit,))
-            return cur.fetchall()
+            cur.execute(sql, (limit * 2,))
+            rows = cur.fetchall()
+            # Deduplicate: keep first (best) row per event_uuid
+            seen = set()
+            result = []
+            for r in rows:
+                if r["event_uuid"] not in seen:
+                    seen.add(r["event_uuid"])
+                    result.append(r)
+                    if len(result) >= limit:
+                        break
+            return result
     finally:
         conn.close()
 

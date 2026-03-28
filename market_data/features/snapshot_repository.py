@@ -86,6 +86,7 @@ def save_snapshot(snapshot: dict):
         oi_change_okx_pct, oi_change_binance_pct,
         oi_change_total, oi_change_total_pct,
         reversal_score, continuation_score, confidence_score, bias,
+        final_score, normalized_score,
         funding_rate, liq_buy_usd, liq_sell_usd, liq_total_usd, liq_count,
         label
     ) VALUES (
@@ -99,6 +100,7 @@ def save_snapshot(snapshot: dict):
         %s, %s,
         %s, %s,
         %s, %s, %s, %s,
+        %s, %s,
         %s, %s, %s, %s, %s,
         %s
     )
@@ -123,6 +125,8 @@ def save_snapshot(snapshot: dict):
         continuation_score = VALUES(continuation_score),
         confidence_score = VALUES(confidence_score),
         bias = VALUES(bias),
+        final_score = VALUES(final_score),
+        normalized_score = VALUES(normalized_score),
         funding_rate = VALUES(funding_rate),
         liq_buy_usd = VALUES(liq_buy_usd),
         liq_sell_usd = VALUES(liq_sell_usd),
@@ -142,6 +146,7 @@ def save_snapshot(snapshot: dict):
         s.get("oi_change_okx_pct"), s.get("oi_change_binance_pct"),
         s.get("oi_change_total"), s.get("oi_change_total_pct"),
         s["reversal_score"], s["continuation_score"], s["confidence_score"], s["bias"],
+        s.get("final_score"), s.get("normalized_score"),
         s.get("funding_rate"),
         s.get("liq_buy_usd"), s.get("liq_sell_usd"), s.get("liq_total_usd"), s.get("liq_count"),
         s.get("label"),

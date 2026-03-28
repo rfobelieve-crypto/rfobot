@@ -1235,9 +1235,13 @@ def generate_snapshot_report(uuid_prefix: str = None) -> str:
             rev = float(r["reversal_score"])
             cont = float(r["continuation_score"])
             conf = float(r["confidence_score"])
+            final = r.get("final_score")
 
+            score_str = f"  rev={rev:.0f} cont={cont:.0f} conf={conf:.2f}"
+            if final is not None:
+                score_str += f"  score={float(final):.1f}"
             lines.append(f"\n[{snap_type}] {emoji} {bias}")
-            lines.append(f"  rev={rev:.0f} cont={cont:.0f} conf={conf:.2f}")
+            lines.append(score_str)
 
             if r.get("delta_value") is not None:
                 delta = float(r["delta_value"])
@@ -1254,6 +1258,18 @@ def generate_snapshot_report(uuid_prefix: str = None) -> str:
                 lines.append(f"  reclaim: {'Yes ✅' if r['reclaim_flag'] else 'No ❌'}")
             if r.get("break_again_flag") is not None:
                 lines.append(f"  break_again: {'Yes ⚠️' if r['break_again_flag'] else 'No'}")
+            if r.get("oi_change_total_pct") is not None:
+                oi_pct = float(r["oi_change_total_pct"])
+                lines.append(f"  OI: {oi_pct:+.2f}% {'📉' if oi_pct < 0 else '📈'}")
+            if r.get("funding_rate") is not None:
+                fr = float(r["funding_rate"]) * 100
+                lines.append(f"  funding: {fr:+.4f}%")
+            if r.get("liq_total_usd") is not None:
+                liq = float(r["liq_total_usd"])
+                if liq > 0:
+                    liq_buy = float(r.get("liq_buy_usd") or 0)
+                    liq_sell = float(r.get("liq_sell_usd") or 0)
+                    lines.append(f"  liq: ${liq/1e6:.1f}M (long-liq=${liq_sell/1e6:.1f}M short-liq=${liq_buy/1e6:.1f}M)")
             if r.get("label"):
                 lines.append(f"  label: {r['label']} 🏷️")
 
@@ -1302,13 +1318,13 @@ def _snapshot_from_registry(uuid_prefix: str = None) -> str:
 
 
 def generate_score_report() -> str:
-    """Show latest v2 scoring results."""
+    """Show latest scoring results from event_feature_snapshots."""
     try:
         rows = get_latest_scores(limit=5)
         if not rows:
-            return "目前沒有 v2 評分資料"
+            return "目前沒有評分資料（等待第一個 15m 快照完成）"
 
-        lines = ["📊 最近事件評分 (v2)", "─" * 36]
+        lines = ["📊 最近事件評分", "─" * 36]
 
         for r in rows:
             side = r["liquidity_side"]
@@ -1318,15 +1334,34 @@ def generate_score_report() -> str:
             rev = float(r["reversal_score"])
             cont = float(r["continuation_score"])
             conf = float(r["confidence_score"])
+            final = r.get("final_score")
+            snap_type = r.get("snapshot_type", "?")
             label = r.get("label") or "-"
+
+            score_str = f"  rev={rev:.0f} cont={cont:.0f} conf={conf:.2f}"
+            if final is not None:
+                score_str += f"  score={float(final):.1f}"
 
             lines.append(
                 f"\n{emoji} [{side.upper()}] @ {price:,.2f}"
-                f"  {_ts_to_taipei(r['trigger_ts'])}"
+                f"  {_ts_to_taipei(r['trigger_ts'])} [{snap_type}]"
             )
-            lines.append(f"  bias={bias} rev={rev:.0f} cont={cont:.0f} conf={conf:.2f}")
-            lines.append(f"  label={label}  ver={r.get('scorer_version', '?')}")
-            lines.append(f"  UUID: {r['event_uuid'][:8]}")
+            lines.append(score_str)
+
+            extras = []
+            if r.get("oi_change_total_pct") is not None:
+                oi_pct = float(r["oi_change_total_pct"])
+                extras.append(f"OI:{oi_pct:+.2f}%")
+            if r.get("funding_rate") is not None:
+                fr = float(r["funding_rate"]) * 100
+                extras.append(f"FR:{fr:+.4f}%")
+            if r.get("liq_total_usd") is not None and float(r["liq_total_usd"]) > 0:
+                liq = float(r["liq_total_usd"])
+                extras.append(f"liq:${liq/1e6:.1f}M")
+            if extras:
+                lines.append(f"  {' | '.join(extras)}")
+
+            lines.append(f"  label={label}  UUID:{r['event_uuid'][:8]}")
 
         return "\n".join(lines)
 
