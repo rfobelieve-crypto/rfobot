@@ -40,9 +40,12 @@ SNAPSHOT_WINDOWS = {
 
 def get_pending_snapshots() -> list[dict]:
     """
-    Find (event, snapshot_type) pairs that are due but not yet written.
+    Find (event, snapshot_type) pairs that need computing:
+    1. Snapshots that don't exist yet (s.id IS NULL)
+    2. Snapshots that exist but predate the current scorer (final_score IS NULL)
 
-    Returns list of dicts with event info + snapshot_type.
+    Category 2 ensures old snapshots are automatically re-scored after
+    a scorer upgrade. Once saved with final_score set, they won't be picked up again.
     """
     now = int(time.time())
     results = []
@@ -56,7 +59,7 @@ def get_pending_snapshots() -> list[dict]:
                 FROM event_registry r
                 LEFT JOIN event_feature_snapshots s
                     ON r.event_uuid = s.event_uuid AND s.snapshot_type = %s
-                WHERE s.id IS NULL
+                WHERE (s.id IS NULL OR s.final_score IS NULL)
                   AND (r.trigger_ts + %s) <= %s
                 ORDER BY r.trigger_ts ASC
                 """
