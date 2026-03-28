@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from market_data.storage.db import run_migration
 from market_data.tasks.run_trade_streams import main as start_streams
 from market_data.tasks.flush_flow_bars import flush_loop
+from market_data.tasks.cleanup import cleanup_once
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,6 +46,19 @@ def main():
     # Start flow bar flusher in background
     threading.Thread(target=flush_loop, daemon=True, name="flow-flusher").start()
     logger.info("Flow bar flusher started.")
+
+    # Start data cleanup in background (every hour)
+    def _cleanup_loop():
+        import time
+        while True:
+            try:
+                cleanup_once()
+            except Exception:
+                logger.exception("Cleanup error")
+            time.sleep(3600)
+
+    threading.Thread(target=_cleanup_loop, daemon=True, name="cleanup").start()
+    logger.info("Data cleanup started (trades: 3d, flow_bars: 90d).")
 
     # Start trade streams (blocking)
     start_streams()
