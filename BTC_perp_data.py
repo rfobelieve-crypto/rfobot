@@ -1164,18 +1164,21 @@ def generate_snapshot_report(uuid_prefix: str = None) -> str:
     try:
         if uuid_prefix:
             rows = get_snapshots_by_uuid(uuid_prefix)
-            if not rows:
-                return f"找不到 UUID 開頭為 {uuid_prefix} 的事件快照"
         else:
             rows = get_latest_snapshots(limit=1)
-            if not rows:
-                return "目前沒有任何事件快照資料"
+
+        # If no snapshots yet, try showing latest event from registry
+        if not rows:
+            return _snapshot_from_registry(uuid_prefix)
 
         # Group by event
         event_uuid = rows[0]["event_uuid"]
         side = rows[0]["liquidity_side"]
         price = rows[0]["trigger_price"]
         ts = rows[0]["trigger_ts"]
+
+        # Build set of existing snapshot types
+        existing = {r["snapshot_type"] for r in rows}
 
         lines = [
             f"📸 事件快照 [{side.upper()}] @ {float(price):,.2f}",
@@ -1184,15 +1187,20 @@ def generate_snapshot_report(uuid_prefix: str = None) -> str:
             "─" * 36,
         ]
 
-        for r in rows:
-            snap = r["snapshot_type"]
+        for snap_type in ("15m", "1h", "4h"):
+            matched = [r for r in rows if r["snapshot_type"] == snap_type]
+            if not matched:
+                lines.append(f"\n[{snap_type}] ⏳ pending")
+                continue
+
+            r = matched[0]
             bias = r["bias"]
             emoji = _bias_emoji(bias)
             rev = float(r["reversal_score"])
             cont = float(r["continuation_score"])
             conf = float(r["confidence_score"])
 
-            lines.append(f"\n[{snap}] {emoji} {bias}")
+            lines.append(f"\n[{snap_type}] {emoji} {bias}")
             lines.append(f"  rev={rev:.0f} cont={cont:.0f} conf={conf:.2f}")
 
             if r.get("delta_value") is not None:
@@ -1218,6 +1226,43 @@ def generate_snapshot_report(uuid_prefix: str = None) -> str:
     except Exception as e:
         logger.exception("generate_snapshot_report error")
         return f"快照查詢失敗: {e}"
+
+
+def _snapshot_from_registry(uuid_prefix: str = None) -> str:
+    """Fallback: show event from registry when no snapshots exist yet."""
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                if uuid_prefix:
+                    cur.execute(
+                        "SELECT * FROM event_registry WHERE event_uuid LIKE %s LIMIT 1",
+                        (uuid_prefix + "%",))
+                else:
+                    cur.execute(
+                        "SELECT * FROM event_registry ORDER BY trigger_ts DESC LIMIT 1")
+                ev = cur.fetchone()
+        finally:
+            conn.close()
+
+        if not ev:
+            if uuid_prefix:
+                return f"找不到 UUID 開頭為 {uuid_prefix} 的事件"
+            return "目前沒有任何事件資料"
+
+        lines = [
+            f"📸 事件快照 [{ev['liquidity_side'].upper()}] @ {float(ev['entry_price']):,.2f}",
+            f"時間: {_ts_to_taipei(ev['trigger_ts'])}",
+            f"UUID: {ev['event_uuid'][:8]}",
+            "─" * 36,
+            "\n[15m] ⏳ pending",
+            "\n[1h] ⏳ pending",
+            "\n[4h] ⏳ pending",
+        ]
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"查詢失敗: {e}"
 
 
 def generate_score_report() -> str:

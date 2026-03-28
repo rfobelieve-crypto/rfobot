@@ -14,21 +14,31 @@ def get_latest_snapshots(limit: int = 1) -> list[dict]:
     Get snapshots for the most recent event(s).
     Returns all snapshot rows (15m/1h/4h) for the latest N events.
     """
-    sql = """
-    SELECT s.*
-    FROM event_feature_snapshots s
-    INNER JOIN (
-        SELECT DISTINCT event_uuid
-        FROM event_feature_snapshots
-        ORDER BY trigger_ts DESC
-        LIMIT %s
-    ) latest ON s.event_uuid = latest.event_uuid
-    ORDER BY s.trigger_ts DESC, FIELD(s.snapshot_type, '15m', '1h', '4h')
-    """
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, (limit,))
+            # Step 1: find latest event UUIDs
+            cur.execute("""
+                SELECT event_uuid, MAX(trigger_ts) AS latest_ts
+                FROM event_feature_snapshots
+                GROUP BY event_uuid
+                ORDER BY latest_ts DESC
+                LIMIT %s
+            """, (limit,))
+            uuids = [r["event_uuid"] for r in cur.fetchall()]
+            if not uuids:
+                return []
+
+            # Step 2: get all snapshots for those events
+            placeholders = ",".join(["%s"] * len(uuids))
+            cur.execute(f"""
+                SELECT * FROM event_feature_snapshots
+                WHERE event_uuid IN ({placeholders})
+                ORDER BY trigger_ts DESC,
+                    CASE snapshot_type
+                        WHEN '15m' THEN 1 WHEN '1h' THEN 2 WHEN '4h' THEN 3 ELSE 99
+                    END
+            """, uuids)
             return cur.fetchall()
     finally:
         conn.close()
