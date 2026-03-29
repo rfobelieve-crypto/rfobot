@@ -3,3 +3,7 @@ requests
 websocket-client
 gunicorn
 pymysql
+pandas
+numpy
+plotly
+kaleido

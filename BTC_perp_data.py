@@ -229,6 +229,22 @@ def format_duration_minutes(seconds: int) -> str:
     return f"{seconds // 60} 分鐘"
 
 
+def send_photo(chat_id: str, image_bytes: bytes, caption: str = "") -> None:
+    if not chat_id:
+        return
+    try:
+        resp = requests.post(
+            f"{API_URL}/sendPhoto",
+            data={"chat_id": chat_id, "caption": caption},
+            files={"photo": ("chart.png", image_bytes, "image/png")},
+            timeout=30
+        )
+        if resp.status_code != 200:
+            logger.error("Telegram sendPhoto failed: %s - %s", resp.status_code, resp.text)
+    except Exception as e:
+        logger.exception("send_photo error: %s", e)
+
+
 def send_message(chat_id: str, text: str) -> None:
     if not chat_id:
         logger.warning("send_message skipped: chat_id is empty")
@@ -1633,6 +1649,33 @@ def webhook():
         elif cmd == "/snap_status":
             send_message(chat_id, generate_snapshot_status_report())
 
+        elif cmd == "/chart" or cmd.startswith("/chart "):
+            # /chart → BTC-USD 1h 7d
+            # /chart 4h → BTC-USD 4h 7d
+            # /chart 4h 14 → BTC-USD 4h 14d
+            parts = raw_text.split()
+            tf  = parts[1] if len(parts) > 1 else "1h"
+            days = int(parts[2]) if len(parts) > 2 else 7
+            send_message(chat_id, f"⏳ 產生圖表中 ({tf} {days}d)...")
+
+            def _send_chart(cid, timeframe, lookback):
+                try:
+                    from research.storage.schema import ensure_schema
+                    from research.bar_generator.runner import run_once
+                    from research.viz.chart_builder import load_and_build
+                    from research.config.settings import ChartConfig
+                    ensure_schema()
+                    run_once("BTC-USD", timeframe, lookback_days=lookback)
+                    config = ChartConfig(symbol="BTC-USD", timeframe=timeframe, lookback_days=lookback)
+                    fig = load_and_build("BTC-USD", timeframe, lookback_days=lookback, config=config)
+                    img = fig.to_image(format="png", width=1600, height=900, scale=1.5)
+                    send_photo(cid, img, caption=f"BTC-USD {timeframe} {lookback}d")
+                except Exception as e:
+                    logger.exception("chart command error: %s", e)
+                    send_message(cid, f"❌ 圖表產生失敗: {e}")
+
+            threading.Thread(target=_send_chart, args=(chat_id, tf, days), daemon=True).start()
+
         elif cmd in ["/start", "/help"]:
             help_msg = (
                 "📊 BTC 流動性結果監控機器人\n\n"
@@ -1649,7 +1692,11 @@ def webhook():
                 "/snap [uuid] — 指定事件快照\n"
                 "/score — 最近事件 v2 評分\n"
                 "/history — 事件歷史 (bias 演化)\n"
-                "/snap_status — 快照 runner 狀態"
+                "/snap_status — 快照 runner 狀態\n"
+                "─── 圖表 ───\n"
+                "/chart — BTC 1h 7d 圖表\n"
+                "/chart 4h — 指定週期\n"
+                "/chart 4h 14 — 指定週期 + 天數"
             )
             send_message(chat_id, help_msg)
 
