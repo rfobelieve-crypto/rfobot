@@ -44,9 +44,14 @@ HORIZON_BARS = 16  # 4h = 16 x 15m
 TARGET       = "y_return_4h"
 N_FOLDS      = 5
 
+# ── Unified feature set: Coinglass + Binance klines only ─────────────────
+# Same as indicator/feature_config.py — ensures local = Railway
+from indicator.feature_config import ALL_FEATURES as API_FEATURES
+
 # Never use as features
 EXCLUDE = {
     "ts_open", "open", "high", "low", "close", "volume",
+    "taker_buy_vol", "taker_buy_quote", "trade_count",
     "y_return_1h", "y_return_4h",
     "future_high_4h", "future_low_4h",
     "up_move_4h", "down_move_4h", "vol_4h_proxy",
@@ -103,8 +108,8 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
     df = df.iloc[:-HORIZON_BARS].copy()
     df = df.dropna(subset=[TARGET])
 
-    # Feature columns
-    feat_cols = [c for c in df.columns if c not in EXCLUDE]
+    # Feature columns — only Coinglass + klines derived (API-compatible)
+    feat_cols = [c for c in API_FEATURES if c in df.columns and c not in EXCLUDE]
     df[feat_cols] = df[feat_cols].ffill()
 
     # Drop high-NaN features
