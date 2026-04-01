@@ -6,7 +6,10 @@ Routes:
     GET /health  → JSON health check
     GET /json    → latest prediction JSON
 
-Auto-updates every 15 minutes via APScheduler.
+Architecture:
+    - Loads pre-computed indicator history (from local walk-forward pipeline)
+    - Every 15 min: fetches new data, predicts ONLY new bars, appends to history
+    - Chart shows historical (identical to local) + live tail
 """
 from __future__ import annotations
 
@@ -14,7 +17,9 @@ import os
 import logging
 import threading
 from datetime import datetime, timezone
+from pathlib import Path
 
+import pandas as pd
 from flask import Flask, Response, jsonify
 
 logging.basicConfig(
@@ -25,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+ARTIFACT_DIR = Path(__file__).parent / "model_artifacts"
+HISTORY_PATH = ARTIFACT_DIR / "indicator_history.parquet"
+
 # ── State ────────────────────────────────────────────────────────────────────
 _state = {
     "chart_png": b"",
@@ -32,58 +40,96 @@ _state = {
     "last_prediction": None,
     "status": "initializing",
     "error": None,
+    "indicator_df": None,  # full indicator DataFrame (history + live)
 }
 _lock = threading.Lock()
+_engine = None
+
+
+def _load_history() -> pd.DataFrame:
+    """Load pre-computed indicator history from local pipeline."""
+    if HISTORY_PATH.exists():
+        df = pd.read_parquet(HISTORY_PATH)
+        logger.info("Loaded indicator history: %d bars, %s ~ %s",
+                     len(df), df.index[0], df.index[-1])
+        return df
+    logger.warning("No indicator history found at %s", HISTORY_PATH)
+    return pd.DataFrame()
 
 
 def update_cycle():
-    """Fetch data, build features, predict, render chart."""
+    """Fetch new data, predict only new bars, append to history."""
     from indicator.data_fetcher import fetch_binance_klines, fetch_coinglass
     from indicator.feature_builder_live import build_live_features
     from indicator.inference import IndicatorEngine
     from indicator.chart_renderer import render_chart
 
     global _engine
-    if "_engine" not in globals() or _engine is None:
-        _engine = IndicatorEngine()
 
     try:
         logger.info("Update cycle starting...")
 
-        # 1. Fetch data
+        # Initialize engine on first run
+        if _engine is None:
+            _engine = IndicatorEngine()
+
+        # Load or get existing indicator data
+        with _lock:
+            indicator_df = _state["indicator_df"]
+        if indicator_df is None:
+            indicator_df = _load_history()
+
+        # 1. Fetch live data
         klines = fetch_binance_klines(limit=500)
         cg_data = fetch_coinglass(interval="30m", limit=500)
 
-        # 2. Build features
+        # 2. Build features for ALL fetched bars
         features = build_live_features(klines, cg_data)
 
-        # 3. Predict
-        predictions = _engine.predict(features)
+        # 3. Find new bars (after history ends)
+        if not indicator_df.empty:
+            last_hist_time = indicator_df.index[-1]
+            new_features = features[features.index > last_hist_time]
+        else:
+            new_features = features
 
-        # 4. Render chart
-        png = render_chart(predictions, last_n=100)
+        # 4. Predict only new bars
+        if len(new_features) > 0:
+            new_predictions = _engine.predict(new_features)
+            # Append to history
+            indicator_df = pd.concat([indicator_df, new_predictions])
+            # Remove duplicates (keep latest)
+            indicator_df = indicator_df[~indicator_df.index.duplicated(keep="last")]
+            indicator_df = indicator_df.sort_index()
+            logger.info("Appended %d new bars. Total: %d", len(new_predictions), len(indicator_df))
+        else:
+            logger.info("No new bars to predict")
 
-        # 5. Update state
-        last_row = predictions.iloc[-1]
+        # 5. Render chart (last 200 bars)
+        png = render_chart(indicator_df, last_n=200)
+
+        # 6. Update state
+        last_row = indicator_df.iloc[-1]
         with _lock:
+            _state["indicator_df"] = indicator_df
             _state["chart_png"] = png
             _state["last_update"] = datetime.now(timezone.utc).isoformat()
             _state["last_prediction"] = {
-                "time": str(predictions.index[-1]),
-                "direction": str(last_row["pred_direction"]),
-                "confidence": float(last_row["confidence_score"]) if not _is_nan(last_row["confidence_score"]) else 0,
-                "strength": str(last_row["strength_score"]),
-                "pred_return_4h": float(last_row["pred_return_4h"]),
-                "bull_bear_power": float(last_row["bull_bear_power"]),
-                "close": float(last_row["close"]),
+                "time": str(indicator_df.index[-1]),
+                "direction": str(last_row.get("pred_direction", "NEUTRAL")),
+                "confidence": float(last_row["confidence_score"]) if not _is_nan(last_row.get("confidence_score")) else 0,
+                "strength": str(last_row.get("strength_score", "Weak")),
+                "pred_return_4h": float(last_row.get("pred_return_4h", 0)),
+                "bull_bear_power": float(last_row.get("bull_bear_power", 0)),
+                "close": float(last_row["close"]) if "close" in last_row.index else 0,
             }
             _state["status"] = "healthy"
             _state["error"] = None
 
         logger.info("Update complete: %s conf=%.0f %s",
-                     last_row["pred_direction"],
-                     last_row["confidence_score"] if not _is_nan(last_row["confidence_score"]) else 0,
-                     last_row["strength_score"])
+                     last_row.get("pred_direction", "?"),
+                     last_row.get("confidence_score", 0) if not _is_nan(last_row.get("confidence_score")) else 0,
+                     last_row.get("strength_score", "?"))
 
     except Exception as e:
         logger.exception("Update cycle failed")
@@ -95,7 +141,7 @@ def update_cycle():
 def _is_nan(v):
     try:
         import math
-        return math.isnan(v)
+        return v is None or math.isnan(v)
     except (TypeError, ValueError):
         return False
 
@@ -134,14 +180,10 @@ def prediction_json():
 
 # ── Scheduler ────────────────────────────────────────────────────────────────
 
-_engine = None
-
-
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
     scheduler = BackgroundScheduler()
-    # Run at :01, :16, :31, :46 (1 min after 15m bar close)
     scheduler.add_job(update_cycle, "cron", minute="1,16,31,46", misfire_grace_time=300)
     scheduler.start()
     logger.info("Scheduler started: updates at :01, :16, :31, :46")
