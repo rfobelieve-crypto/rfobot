@@ -86,27 +86,41 @@ def update_cycle():
         # 2. Build features for ALL fetched bars
         features = build_live_features(klines, cg_data)
 
-        # 3. Find new bars (after history ends)
+        # 3. Backfill OHLC into history from klines (history only has 'close')
+        for col in ["open", "high", "low"]:
+            if col in klines.columns and (col not in indicator_df.columns or indicator_df[col].isna().all()):
+                indicator_df[col] = klines[col].reindex(indicator_df.index)
+        # Update close from klines for better accuracy
+        if "close" in klines.columns:
+            kline_close = klines["close"].reindex(indicator_df.index)
+            mask = kline_close.notna()
+            indicator_df.loc[mask, "close"] = kline_close[mask]
+            for col in ["open", "high", "low"]:
+                if col in klines.columns:
+                    kline_col = klines[col].reindex(indicator_df.index)
+                    m = kline_col.notna()
+                    indicator_df.loc[m, col] = kline_col[m]
+
+        # 4. Find new bars (after history ends)
         if not indicator_df.empty:
             last_hist_time = indicator_df.index[-1]
             new_features = features[features.index > last_hist_time]
         else:
             new_features = features
 
-        # 4. Predict only new bars
+        # 5. Predict only new bars
         if len(new_features) > 0:
             new_predictions = _engine.predict(new_features)
-            # Append to history
             indicator_df = pd.concat([indicator_df, new_predictions])
-            # Remove duplicates (keep latest)
             indicator_df = indicator_df[~indicator_df.index.duplicated(keep="last")]
             indicator_df = indicator_df.sort_index()
             logger.info("Appended %d new bars. Total: %d", len(new_predictions), len(indicator_df))
         else:
             logger.info("No new bars to predict")
 
-        # 5. Render chart (last 200 bars)
-        png = render_chart(indicator_df, last_n=200)
+        # 6. Render chart (last 200 bars that have OHLC data)
+        chart_df = indicator_df.dropna(subset=["open", "high", "low", "close"])
+        png = render_chart(chart_df, last_n=200)
 
         # 6. Update state
         last_row = indicator_df.iloc[-1]
