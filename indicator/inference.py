@@ -53,9 +53,10 @@ class IndicatorEngine:
         # Align features
         missing = [c for c in self.feature_cols if c not in features.columns]
         if missing:
-            logger.warning("Missing features (filled 0): %s", missing)
+            logger.warning("Missing features (forward-filled): %s", missing)
             for c in missing:
-                features[c] = 0
+                features[c] = np.nan
+            features = features.ffill()
 
         X = features[self.feature_cols].fillna(0).values
 

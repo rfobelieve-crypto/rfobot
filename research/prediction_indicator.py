@@ -51,11 +51,10 @@ N_FOLDS      = 5
 # Same as indicator/feature_config.py — ensures local = Railway
 from indicator.feature_config import ALL_FEATURES as API_FEATURES
 
-# Never use as features
-EXCLUDE = {
-    "ts_open", "open", "high", "low", "close", "volume",
-    "taker_buy_vol", "taker_buy_quote", "trade_count",
-    "y_return_1h", "y_return_4h",
+# Single source of truth for EXCLUDE — extends feature_config.EXCLUDE
+from indicator.feature_config import EXCLUDE as _BASE_EXCLUDE
+EXCLUDE = _BASE_EXCLUDE | {
+    "y_return_1h",
     "future_high_4h", "future_low_4h",
     "up_move_4h", "down_move_4h", "vol_4h_proxy",
     "up_move_vol_adj", "down_move_vol_adj",
@@ -63,8 +62,6 @@ EXCLUDE = {
     "future_return_5m", "future_return_15m", "future_return_1h",
     "label_5m", "label_15m", "label_1h",
     "regime", "regime_name", "bull_bear_score",
-    # IC-tested but degraded walk-forward ICIR (2.37→0.71)
-    "vol_acceleration", "vol_kurtosis", "vol_entropy", "squeeze_proxy",
 }
 
 # ── XGBoost params ───────────────────────────────────────────────────────────
