@@ -14,3 +14,13 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Large data — never commit
+market_data/raw_data/
+research/ml_data/
+research/eda_charts/
+.claude/worktrees/
+
+# Local scripts with secrets
+market_data/backfill/daily_collect.bat
+market_data/backfill/setup_schedule.ps1

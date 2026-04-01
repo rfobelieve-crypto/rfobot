@@ -1,0 +1,191 @@
+"""
+Chart renderer — generates indicator PNG from prediction DataFrame.
+Adapted from research/indicator_chart.py for in-memory rendering.
+"""
+from __future__ import annotations
+
+import io
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+
+logger = logging.getLogger(__name__)
+
+CHART_PATH = Path("/tmp/indicator_chart.png")
+
+
+def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
+    """
+    Render indicator chart and return PNG bytes.
+    Also saves to /tmp/indicator_chart.png.
+
+    ind must have: open, high, low, close, pred_direction, confidence_score,
+                   strength_score, pred_return_4h, bull_bear_power, regime
+    """
+    sig = ind.tail(last_n).copy()
+    sig = sig.dropna(subset=["open", "high", "low", "close"])
+
+    n = len(sig)
+    if n == 0:
+        return b""
+
+    x = np.arange(n)
+    dates = sig.index
+
+    fig = plt.figure(figsize=(20, 11), facecolor="white")
+    gs = gridspec.GridSpec(3, 1, height_ratios=[0.8, 8, 3], hspace=0.05)
+
+    # ── Panel 1: Confidence heatmap ──────────────────────────────────────
+    ax_conf = fig.add_subplot(gs[0])
+    conf = sig["confidence_score"].fillna(0).values
+    conf_norm = np.clip(conf / 100.0, 0, 1)
+
+    colors = []
+    for i in range(n):
+        d = sig.iloc[i]["pred_direction"]
+        c = conf_norm[i]
+        if d == "UP":
+            colors.append(plt.cm.Greens(0.2 + 0.8 * c))
+        elif d == "DOWN":
+            colors.append(plt.cm.Reds(0.2 + 0.8 * c))
+        else:
+            colors.append((0.88, 0.88, 0.88, 1.0))
+
+    ax_conf.bar(x, np.ones(n), width=1.0, color=colors, edgecolor="none")
+    ax_conf.set_xlim(-0.5, n - 0.5)
+    ax_conf.set_ylim(0, 1)
+    ax_conf.set_yticks([])
+    ax_conf.set_xticks([])
+
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    ax_conf.set_title(
+        f"BTC Market Intelligence Indicator  (4h prediction)  |  Updated: {now_str}",
+        fontsize=14, fontweight="bold", loc="left"
+    )
+    ax_conf.text(n + 1, 0.5, "Confidence", fontsize=8, va="center",
+                 transform=ax_conf.transData)
+
+    # ── Panel 2: Candlestick + triangles ─────────────────────────────────
+    ax_price = fig.add_subplot(gs[1])
+
+    opens = sig["open"].values.astype(float)
+    highs = sig["high"].values.astype(float)
+    lows = sig["low"].values.astype(float)
+    closes = sig["close"].values.astype(float)
+
+    up = closes >= opens
+    down = ~up
+    body_width = 0.6
+
+    ax_price.bar(x[up], closes[up] - opens[up], bottom=opens[up],
+                 width=body_width, color="#26a69a", edgecolor="#26a69a", linewidth=0.5)
+    ax_price.bar(x[down], opens[down] - closes[down], bottom=closes[down],
+                 width=body_width, color="#ef5350", edgecolor="#ef5350", linewidth=0.5)
+    ax_price.vlines(x[up], lows[up], highs[up], color="#26a69a", linewidth=0.5)
+    ax_price.vlines(x[down], lows[down], highs[down], color="#ef5350", linewidth=0.5)
+
+    # Direction triangles (confidence >= 40 only)
+    price_range = highs.max() - lows.min()
+    offset = price_range * 0.02
+
+    for i in range(n):
+        d = sig.iloc[i]["pred_direction"]
+        c = sig.iloc[i]["confidence_score"]
+        s = sig.iloc[i]["strength_score"]
+
+        if d == "NEUTRAL" or pd.isna(c) or c < 40:
+            continue
+
+        msize = 12 if s == "Strong" else 7
+        alpha = max(0.3, min(c / 100, 1.0))
+
+        if d == "UP":
+            y_pos = lows[i] - offset
+            marker = "^"
+            color = "#004d40" if s == "Strong" else "#26a69a"
+        else:
+            y_pos = highs[i] + offset
+            marker = "v"
+            color = "#b71c1c" if s == "Strong" else "#ef5350"
+
+        ax_price.scatter(i, y_pos, marker=marker, s=msize**2,
+                         color=color, alpha=alpha, edgecolors="none", zorder=5)
+
+    ax_price.set_ylabel("Price (USD)", fontsize=10)
+    ax_price.grid(True, alpha=0.15)
+    ax_price.set_xlim(-0.5, n - 0.5)
+
+    # Date labels on price panel
+    tick_pos = np.linspace(0, n - 1, min(12, n)).astype(int)
+    ax_price.set_xticks(tick_pos)
+    ax_price.set_xticklabels(
+        [dates[i].strftime("%m/%d %H:%M") for i in tick_pos],
+        fontsize=7, rotation=30, ha="right"
+    )
+
+    # Legend
+    legend_elements = [
+        plt.scatter([], [], marker="^", color="#004d40", s=144, label="Strong UP"),
+        plt.scatter([], [], marker="^", color="#26a69a", s=49, label="UP"),
+        plt.scatter([], [], marker="v", color="#b71c1c", s=144, label="Strong DOWN"),
+        plt.scatter([], [], marker="v", color="#ef5350", s=49, label="DOWN"),
+    ]
+    ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
+                    framealpha=0.8, ncol=4)
+
+    # Latest prediction annotation
+    strong_sigs = sig[(sig["pred_direction"] != "NEUTRAL") & (sig["strength_score"] == "Strong")]
+    last_active = strong_sigs.iloc[-1] if len(strong_sigs) > 0 else None
+    if last_active is not None:
+        d = last_active["pred_direction"]
+        ret = last_active["pred_return_4h"] * 100
+        conf_val = last_active["confidence_score"]
+        strength = last_active["strength_score"]
+        regime = last_active["regime"]
+        txt = (f"4h forecast: {d}  |  pred: {ret:+.2f}%  |  "
+               f"confidence: {conf_val:.0f}  |  {strength}  |  {regime}")
+        ax_price.text(0.98, 0.02, txt, transform=ax_price.transAxes,
+                      fontsize=8, ha="right", va="bottom",
+                      bbox=dict(boxstyle="round,pad=0.3", facecolor="wheat", alpha=0.8))
+
+    # ── Panel 3: Bull/Bear Power ─────────────────────────────────────────
+    ax_bbp = fig.add_subplot(gs[2])
+    bbp = sig["bull_bear_power"].fillna(0).values
+    bbp_colors = ["#26a69a" if v > 0 else "#ef5350" for v in bbp]
+
+    ax_bbp.bar(x, bbp, width=0.8, color=bbp_colors, alpha=0.7, edgecolor="none")
+    ax_bbp.axhline(0, color="black", linewidth=0.5)
+    ax_bbp.set_ylabel("Bull/Bear\nPower", fontsize=9)
+    ax_bbp.set_ylim(-1, 1)
+    ax_bbp.set_xlim(-0.5, n - 0.5)
+    ax_bbp.grid(True, alpha=0.15)
+
+    ax_bbp.set_xticks(tick_pos)
+    ax_bbp.set_xticklabels(
+        [dates[i].strftime("%m/%d %H:%M") for i in tick_pos],
+        fontsize=7, rotation=30, ha="right"
+    )
+
+    plt.tight_layout()
+
+    # Save to bytes
+    buf = io.BytesIO()
+    fig.savefig(buf, dpi=150, bbox_inches="tight", format="png")
+    plt.close(fig)
+    buf.seek(0)
+    png_bytes = buf.read()
+
+    # Also save to disk
+    CHART_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(CHART_PATH, "wb") as f:
+        f.write(png_bytes)
+
+    logger.info("Chart rendered: %d bars, %.1f KB", n, len(png_bytes) / 1024)
+    return png_bytes

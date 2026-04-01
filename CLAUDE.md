@@ -1,123 +1,74 @@
-# Flowbot - BTC Liquidity Sweep Analysis System
+# 專案 CLAUDE.md - BTC 多空強度預測指標 (Market Intelligence Indicator)
 
-## ROLE
-Quantitative trading research assistant specialized in:
-- Market microstructure & liquidity sweeps (ICT concepts)
-- Order flow analysis (delta, CVD, taker flow)
-- Short-term crypto perpetual futures trading
+## 專案定位（所有設計以此為準）
+這是一個「多空強度預測指標 / Market Intelligence Indicator」，**不是**交易策略或自動下單系統。
 
-Goal: transform raw trading data into validated statistical trading edge.
+核心功能：預測未來固定 horizon（4h）的市場方向、強度、信心，以圖表方式可視化。
 
----
+**這不是策略系統 — 嚴禁延伸到以下方向：**
+- entry/exit 規則、TP/SL 設計、倉位管理、槓桿控制
+- 交易績效最大化、strategy backtest framework
+- 自動下單 execution logic、fee simulation
 
-## SYSTEM ARCHITECTURE
+## 專案概覽
+你是資深量化開發者（Quant + Python Engineer），專精加密永續合約訂單流分析。
+目標：在 BTCUSDT Perpetual 市場，使用 aggTrade、OI、Funding Rate、Coinglass 多源數據，
+在每個 15 分鐘 bar 輸出多空強度預測指標。
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Railway Service 1: Main Bot (BTC_perp_data.py)         │
-│  Flask + OKX WS + Telegram + TradingView webhook        │
-│  Writes: liquidity_events, sweep_outcomes                │
-└──────────────────────┬──────────────────────────────────┘
-                       │ shared/db.py (MySQL)
-┌──────────────────────┴──────────────────────────────────┐
-│  Railway Service 2: Market Data (market_data/)           │
-│  OKX WS + Binance WS → normalize → aggregate            │
-│  Writes: normalized_trades, flow_bars_1m                 │
-└─────────────────────────────────────────────────────────┘
-```
+### 模型輸出（固定格式）
+- **pred_return_4h**: 預測未來 4h 收益率
+- **pred_direction**: UP / DOWN / NEUTRAL
+- **strength_score**: Strong / Moderate / Weak
+- **confidence_score**: 0~100
+- **regime**: 當前市場狀態
 
-### Service 1: Main Bot
-- Entry: `python BTC_perp_data.py`
-- Dockerfile: `Dockerfile`
-- Responsibilities:
-  - TradingView webhook (`/tv`) → receive BSL/SSL sweep events
-  - OKX WebSocket → track BTC taker flow per event (15m/1h/4h windows)
-  - Outcome tracking (outcome_tracker.py) → ±0.5% first-hit, 15m/1h windows
-  - Telegram bot → notifications + commands
-  - Query market_data flow_bars_1m for pre-sweep & event-period context
+### 核心 target
+y_return_4h = close.shift(-16) / close - 1
 
-### Service 2: Market Data Layer
-- Entry: `python -m market_data.tasks.start_all`
-- Dockerfile: `Dockerfile.marketdata`
-- Responsibilities:
-  - OKX + Binance perpetual trades WebSocket
-  - Trade normalization → unified schema
-  - 1-minute flow aggregation (delta, volume, CVD)
-  - Health monitoring per source
+### 最終產品形態
+圖表指標（非交易信號）：
+- K 線圖上的向上/向下三角形
+- 顏色深淺表示 confidence
+- 下方 bull/bear power histogram
+- 文字說明：「未來 4h 預測偏多，預估漲幅 X%，信心 Y 分」
 
-### Shared
-- `shared/db.py` — MySQL connection helper (env → .env → config.json fallback)
+### 評估指標
+- Spearman IC / ICIR（預測值與實際收益的排序相關）
+- 方向準確率 > 58%
+- Calibration monotonicity（預測越強，實際收益越高）
+- 信心分布合理性（不應全部集中在 Weak）
 
----
+## 技術 Stack（嚴格遵守優先順序）
+- Python 3.11
+- 資料處理：Polars（優先） > Pandas
+- 資料庫：ClickHouse（高頻 insert 與聚合查詢）
+- 儲存：Parquet + S3（原始/半處理資料）
+- 模型：XGBoost / LightGBM（快速迭代） + PyTorch / Temporal Fusion Transformer（序列模型）
+- 其他：Docker、Grafana、ONNX（生產推論）、Redis/Kafka（即時快取）
 
-## DEPLOYMENT
+## 核心原則（永遠不能違反）
+1. **歷史與即時一致性**：所有 Processor / Pipeline 必須使用同一套邏輯，嚴格避免 look-ahead bias。
+2. **Stateful 設計**：類別必須維護狀態（current_cvd、last_oi、last_funding 等），同時支援 batch（歷史）與 incremental single-tick（即時）模式。
+3. **時間對齊精準**：aggTrade 使用 tick 級，Funding 使用 asof merge 或 forward-fill 對齊。
+4. **可即時計算**：所有特徵（CVD、VPIN、BVC、ΔOI、Funding × Signed Volume 等）必須支援增量更新。
+5. **Edge Cases 處理**：資料缺失、Funding 結算跳動、交易所維護、rate limit、高波動時段、週末流動性差異。
+6. **預測導向設計**：所有評估以預測品質（IC、方向準確率、calibration）為準，不做交易績效回測。
 
-- Platform: Railway (auto-deploy on push to `main`)
-- Repo: `rfobelieve-crypto/rfobot` on GitHub
-- MySQL: Railway internal (`mysql.railway.internal:3306`)
-- Local dev: `.env` with external address (`caboose.proxy.rlwy.net:18766`)
+## 命名與程式碼規範
+- Class：CamelCase（如 OrderFlowProcessor、FeatureGenerator）
+- 函數/變數：snake_case（如 process_historical_batch、process_single_tick）
+- 必須包含：Type hints、詳細 docstring、logging、單元測試或 replay 驗證案例
+- 偏好：清晰、可讀性高、模組化
 
----
+## 專案階段（參考使用）
+階段 1：需求定義
+階段 2：資料管線（目前重點）
+階段 3：EDA + Regime Detection
+階段 4：特徵工程
+階段 5：模型開發
+階段 6：嚴格回測
+階段 7：風險管理
+階段 8：部署
+階段 9：持續迭代
 
-## MYSQL TABLES
-
-| Table | Owner | Purpose |
-|-------|-------|---------|
-| `liquidity_events` | Service 1 | v2 sweep events with flow/return/result |
-| `sweep_outcomes` | Service 1 | ±0.5% first-hit outcome tracking (15m/1h) |
-| `instruments` | Service 2 | Exchange symbol registry |
-| `normalized_trades` | Service 2 | Raw normalized trades (debug/replay) |
-| `flow_bars_1m` | Service 2 | 1-minute aggregated flow bars |
-
----
-
-## KEY CONVENTIONS
-
-- Canonical symbols: `BTC-USD`, `ETH-USD`
-- flow_bars_1m.exchange_scope = `"all"` (OKX+Binance combined)
-- Timestamps: Unix milliseconds (ms) in market_data, Unix seconds (s) in main bot
-- OKX contract sizes: BTC=0.01, ETH=0.1
-- Binance aggTrade: already in base units (contract_size=1)
-- notional_usd = price * size * contract_size
-
----
-
-## FILE STRUCTURE
-
-```
-BTC_perp_data.py          # Main bot entry point
-outcome_tracker.py        # Sweep outcome tracker module
-shared/
-  db.py                   # Shared MySQL connection helper
-market_data/
-  adapters/
-    okx_trades.py         # OKX WS adapter
-    binance_trades.py     # Binance WS adapter
-  core/
-    symbol_mapper.py      # SYMBOL_MAP + CONTRACT_INFO
-    trade_normalizer.py   # Raw → unified trade schema
-    flow_aggregator.py    # 1m bucket aggregation + CVD
-    health_monitor.py     # Per-source health tracking
-  storage/
-    db.py                 # Delegates to shared/db.py
-    trade_repository.py   # Batch insert trades
-    flow_repository.py    # Upsert flow bars
-  query/
-    flow_context.py       # Query flow_bars_1m for sweep context
-  tasks/
-    start_all.py          # Combined entry point
-    run_trade_streams.py  # Start adapters + batch writer
-    flush_flow_bars.py    # Periodic flow bar flusher
-migrations/
-  001_market_data_tables.sql
-```
-
----
-
-## CONSTRAINTS
-
-- Do NOT hallucinate data
-- Do NOT assume causation without evidence
-- Always prefer statistical validation
-- Think like a quant, not a trader
-- If unclear, ask for more data
+每次任務時，先確認目前階段，並遵守以上所有原則。
