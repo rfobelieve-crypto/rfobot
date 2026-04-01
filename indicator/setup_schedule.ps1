@@ -3,7 +3,7 @@ $batPath = "C:\Users\rfo\Desktop\flowbot\資金機器人\indicator\auto_update.b
 
 $action = New-ScheduledTaskAction -Execute $batPath
 # Every 1 hour (bars are 1h)
-$trigger = New-ScheduledTaskTrigger -Once -At "00:05" -RepetitionInterval (New-TimeSpan -Hours 1) -RepetitionDuration (New-TimeSpan -Days 365)
+$trigger = New-ScheduledTaskTrigger -Once -At "00:00" -RepetitionInterval (New-TimeSpan -Hours 1) -RepetitionDuration (New-TimeSpan -Days 365)
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopIfGoingOnBatteries -AllowStartIfOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
 
 # Remove existing

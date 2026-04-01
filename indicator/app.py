@@ -198,9 +198,9 @@ def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
     scheduler = BackgroundScheduler()
-    scheduler.add_job(update_cycle, "cron", minute="5", misfire_grace_time=300)
+    scheduler.add_job(update_cycle, "cron", minute="0", misfire_grace_time=300)
     scheduler.start()
-    logger.info("Scheduler started: updates at :05 every hour")
+    logger.info("Scheduler started: updates at :00 every hour")
 
     # Run first update immediately
     threading.Thread(target=update_cycle, daemon=True).start()
