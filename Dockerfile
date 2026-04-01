@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN plotly_get_chrome
+RUN echo "y" | plotly_get_chrome
 
 COPY . .
 
