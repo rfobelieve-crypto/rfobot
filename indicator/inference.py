@@ -21,18 +21,16 @@ ARTIFACT_DIR = Path(__file__).parent / "model_artifacts"
 DEADZONE_Z = 0.1
 STRONG_THRESHOLD = 70
 MODERATE_THRESHOLD = 40
-ROLLING_WINDOW = 96
+ROLLING_WINDOW = 48  # 2 days of 1h bars
 
 
 class IndicatorEngine:
     """Stateful prediction engine with rolling z-score."""
 
     def __init__(self):
-        # Load models
+        # Load XGBoost model (Ridge removed — negative IC on 1h data)
         self.xgb_model = xgb.XGBRegressor()
         self.xgb_model.load_model(str(ARTIFACT_DIR / "xgb_model.json"))
-        self.ridge_model = joblib.load(ARTIFACT_DIR / "ridge_model.pkl")
-        self.scaler = joblib.load(ARTIFACT_DIR / "scaler.pkl")
 
         with open(ARTIFACT_DIR / "feature_cols.json") as f:
             self.feature_cols = json.load(f)
@@ -61,18 +59,9 @@ class IndicatorEngine:
 
         X = features[self.feature_cols].fillna(0).values
 
-        # Predict
-        pred_xgb = self.xgb_model.predict(X)
-        X_s = self.scaler.transform(X)
-        pred_ridge = self.ridge_model.predict(X_s)
-        pred_raw = 0.5 * pred_xgb + 0.5 * pred_ridge
-
-        # Agreement
-        same_sign = (np.sign(pred_xgb) == np.sign(pred_ridge)).astype(float)
-        max_abs = np.maximum(np.abs(pred_xgb), np.abs(pred_ridge))
-        max_abs = np.where(max_abs < 1e-8, 1e-8, max_abs)
-        mag_sim = 1.0 - np.abs(pred_xgb - pred_ridge) / (max_abs * 2)
-        agreement = np.clip(same_sign * mag_sim, 0, 1)
+        # Predict (XGBoost only — Ridge was negative IC on 1h data)
+        pred_raw = self.xgb_model.predict(X)
+        agreement = np.ones(len(pred_raw))  # no ensemble → always 1.0
 
         # Rolling z-score using history
         pred_z = np.full(len(pred_raw), np.nan)
@@ -139,6 +128,8 @@ class IndicatorEngine:
             components.append(df["cg_taker_delta_zscore"].clip(-3, 3) / 3)
         if "cg_ls_ratio_zscore" in df.columns:
             components.append(-df["cg_ls_ratio_zscore"].clip(-3, 3) / 3)
+        if "cg_ls_divergence_zscore" in df.columns:
+            components.append(df["cg_ls_divergence_zscore"].clip(-3, 3) / 3)
 
         if not components:
             return np.zeros(len(df))

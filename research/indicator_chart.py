@@ -36,11 +36,14 @@ def load_indicator() -> pd.DataFrame:
 
 
 def load_ohlc() -> pd.DataFrame:
-    path = ROOT / "ml_data" / "BTC_USD_15m_enhanced.parquet"
+    path = ROOT / "ml_data" / "BTC_USD_1h_enhanced.parquet"
     df = pd.read_parquet(path)
-    if "dt" not in df.columns:
-        df["dt"] = pd.to_datetime(df["ts_open"], unit="ms", utc=True)
-    df = df.set_index("dt")
+    if not isinstance(df.index, pd.DatetimeIndex):
+        if "dt" in df.columns:
+            df = df.set_index("dt")
+        elif "ts_open" in df.columns:
+            df["dt"] = pd.to_datetime(df["ts_open"], unit="ms", utc=True)
+            df = df.set_index("dt")
     return df[["open", "high", "low", "close"]]
 
 
@@ -68,14 +71,8 @@ def plot_indicator_chart(ind: pd.DataFrame, ohlc: pd.DataFrame,
 
     colors = []
     for i in range(n):
-        d = sig.iloc[i]["pred_direction"]
         c = conf_norm[i]
-        if d == "UP":
-            colors.append(plt.cm.Greens(0.2 + 0.8 * c))
-        elif d == "DOWN":
-            colors.append(plt.cm.Reds(0.2 + 0.8 * c))
-        else:
-            colors.append((0.88, 0.88, 0.88, 1.0))
+        colors.append(plt.cm.Purples(0.15 + 0.85 * c))
 
     ax_conf.bar(x, np.ones(n), width=1.0, color=colors, edgecolor="none")
     ax_conf.set_xlim(-0.5, n - 0.5)

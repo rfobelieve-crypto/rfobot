@@ -8,7 +8,7 @@ Routes:
 
 Architecture:
     - Loads pre-computed indicator history (from local walk-forward pipeline)
-    - Every 15 min: fetches new data, predicts ONLY new bars, appends to history
+    - Every 1h: fetches new data, predicts ONLY new bars, appends to history
     - Chart shows historical (identical to local) + live tail
 """
 from __future__ import annotations
@@ -81,7 +81,7 @@ def update_cycle():
 
         # 1. Fetch live data
         klines = fetch_binance_klines(limit=500)
-        cg_data = fetch_coinglass(interval="30m", limit=500)
+        cg_data = fetch_coinglass(interval="1h", limit=500)
 
         # 2. Build features for ALL fetched bars
         features = build_live_features(klines, cg_data)
@@ -198,9 +198,9 @@ def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
     scheduler = BackgroundScheduler()
-    scheduler.add_job(update_cycle, "cron", minute="1,16,31,46", misfire_grace_time=300)
+    scheduler.add_job(update_cycle, "cron", minute="5", misfire_grace_time=300)
     scheduler.start()
-    logger.info("Scheduler started: updates at :01, :16, :31, :46")
+    logger.info("Scheduler started: updates at :05 every hour")
 
     # Run first update immediately
     threading.Thread(target=update_cycle, daemon=True).start()

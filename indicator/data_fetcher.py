@@ -22,12 +22,13 @@ CG_ENDPOINTS = {
     "oi_agg":      ("/futures/open-interest/aggregated-history", None, "BTC"),
     "liquidation": ("/futures/liquidation/history", "Binance", "BTCUSDT"),
     "long_short":  ("/futures/top-long-short-account-ratio/history", "Binance", "BTCUSDT"),
+    "global_ls":   ("/futures/global-long-short-account-ratio/history", "Binance", "BTCUSDT"),
     "funding":     ("/futures/funding-rate/history", "Binance", "BTCUSDT"),
     "taker":       ("/futures/taker-buy-sell-volume/history", "Binance", "BTCUSDT"),
 }
 
 
-def fetch_binance_klines(symbol: str = "BTCUSDT", interval: str = "15m",
+def fetch_binance_klines(symbol: str = "BTCUSDT", interval: str = "1h",
                          limit: int = 500) -> pd.DataFrame:
     """Fetch klines from Binance Futures REST API."""
     resp = requests.get(BINANCE_KLINES_URL, params={
@@ -98,7 +99,7 @@ def _cg_fetch(path: str, exchange: str | None, symbol: str,
     return df
 
 
-def fetch_coinglass(interval: str = "30m", limit: int = 500) -> dict[str, pd.DataFrame]:
+def fetch_coinglass(interval: str = "1h", limit: int = 500) -> dict[str, pd.DataFrame]:
     """Fetch all Coinglass endpoints. Returns dict of DataFrames."""
     result = {}
     for name, (path, exchange, symbol) in CG_ENDPOINTS.items():

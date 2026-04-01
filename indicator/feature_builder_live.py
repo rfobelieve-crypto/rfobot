@@ -1,8 +1,8 @@
 """
-Build features from live API data (Binance klines + Coinglass).
+Build features from live API data (Binance 1h klines + Coinglass 1h).
 
-Replicates the formulas from enhanced_features.py and inject_coinglass.py,
-but operates on live DataFrames instead of parquet files.
+Replicates the formulas from ic_scan_1h.py but operates on live DataFrames.
+All Coinglass data is native 1h — no forward-fill needed.
 """
 from __future__ import annotations
 
@@ -10,13 +10,21 @@ import logging
 
 import numpy as np
 import pandas as pd
+from scipy.stats import entropy as sp_entropy
 
 logger = logging.getLogger(__name__)
 
-ZSCORE_WIN = 96   # 24h
-SHORT_WIN = 4     # 1h
-MED_WIN = 16      # 4h
-LONG_WIN = 96     # 24h
+
+def _entropy_10bin(x):
+    """Entropy of a series binned into 10 buckets."""
+    counts, _ = np.histogram(x, bins=10)
+    counts = counts + 1e-10
+    probs = counts / counts.sum()
+    return sp_entropy(probs)
+
+ZSCORE_WIN = 24   # 24h
+SHORT_WIN = 4     # 4h
+LONG_WIN = 24     # 24h
 
 
 def _zscore(s: pd.Series, win: int = ZSCORE_WIN) -> pd.Series:
@@ -28,11 +36,11 @@ def _zscore(s: pd.Series, win: int = ZSCORE_WIN) -> pd.Series:
 def build_live_features(klines: pd.DataFrame,
                         cg_data: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
-    Build feature DataFrame from live API data.
+    Build feature DataFrame from live 1h API data.
 
     Parameters:
-        klines: Binance 15m klines (OHLCV + taker_buy_vol + trade_count)
-        cg_data: dict from fetch_coinglass() (30m data, will be forward-filled to 15m)
+        klines: Binance 1h klines (OHLCV + taker_buy_vol + trade_count)
+        cg_data: dict from fetch_coinglass() (native 1h data)
 
     Returns:
         DataFrame indexed by datetime with all features.
@@ -44,8 +52,8 @@ def build_live_features(klines: pd.DataFrame,
     df["log_return"] = np.log(df["close"] / df["close"].shift(1))
     df["price_change_pct"] = df["close"].pct_change()
     df["realized_vol_20b"] = df["log_return"].rolling(20, min_periods=4).std()
-    df["return_skew"] = df["log_return"].rolling(LONG_WIN, min_periods=20).skew()
-    df["return_kurtosis"] = df["log_return"].rolling(LONG_WIN, min_periods=20).apply(
+    df["return_skew"] = df["log_return"].rolling(LONG_WIN, min_periods=10).skew()
+    df["return_kurtosis"] = df["log_return"].rolling(LONG_WIN, min_periods=10).apply(
         lambda x: x.kurtosis(), raw=False
     )
 
@@ -54,30 +62,82 @@ def build_live_features(klines: pd.DataFrame,
     taker_delta = df["taker_buy_vol"] - taker_sell
     df["taker_delta_ratio"] = taker_delta / df["volume"].replace(0, np.nan)
 
-    df["taker_delta_ma_4h"] = taker_delta.rolling(MED_WIN, min_periods=4).mean()
-    df["taker_delta_std_4h"] = taker_delta.rolling(MED_WIN, min_periods=4).std()
-    df["taker_delta_ma_24h"] = taker_delta.rolling(LONG_WIN, min_periods=4).mean()
-    df["taker_delta_std_24h"] = taker_delta.rolling(LONG_WIN, min_periods=4).std()
+    df["taker_delta_ma_4h"] = taker_delta.rolling(SHORT_WIN, min_periods=2).mean()
+    df["taker_delta_std_4h"] = taker_delta.rolling(SHORT_WIN, min_periods=2).std()
+    df["taker_delta_ma_24h"] = taker_delta.rolling(LONG_WIN, min_periods=2).mean()
+    df["taker_delta_std_24h"] = taker_delta.rolling(LONG_WIN, min_periods=2).std()
 
-    df["volume_ma_4h"] = df["volume"].rolling(MED_WIN, min_periods=4).mean()
-    df["volume_ma_24h"] = df["volume"].rolling(LONG_WIN, min_periods=4).mean()
+    df["volume_ma_4h"] = df["volume"].rolling(SHORT_WIN, min_periods=2).mean()
+    df["volume_ma_24h"] = df["volume"].rolling(LONG_WIN, min_periods=2).mean()
 
     # Return lags
     for lag in range(1, 11):
         df[f"return_lag_{lag}"] = df["log_return"].shift(lag)
 
-    # ── Coinglass features ──────────────────────────────────────────────────
+    # ── Coinglass features (native 1h — no forward-fill needed) ────────────
     _inject_coinglass(df, cg_data)
+
+    # ── Momentum / slope / divergence features ─────────────────────────────
+    for col in ["cg_oi_delta", "cg_taker_delta", "cg_funding_close"]:
+        if col in df.columns:
+            df[f"{col}_slope_4h"] = df[col].rolling(4, min_periods=2).apply(
+                lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) >= 2 else 0,
+                raw=False,
+            )
+            df[f"{col}_mom_1h"] = df[col] - df[col].shift(1)
+
+    if "cg_oi_delta_zscore" in df.columns:
+        ret_cum = df["log_return"].rolling(4, min_periods=2).sum()
+        ret_z = _zscore(ret_cum)
+        df["oi_price_divergence"] = df["cg_oi_delta_zscore"] - ret_z
+
+    if "cg_funding_close_zscore" in df.columns and "cg_taker_delta_zscore" in df.columns:
+        df["funding_taker_align"] = (
+            df["cg_funding_close_zscore"] * df["cg_taker_delta_zscore"]
+        )
+
+    df["vol_regime"] = df["realized_vol_20b"] / df[
+        "realized_vol_20b"
+    ].rolling(LONG_WIN, min_periods=10).mean().replace(0, np.nan)
+
+    # ── Volume dynamics (IC-validated new features) ─────────────────────────
+    vol_ma_4h = df["volume"].rolling(SHORT_WIN, min_periods=2).mean()
+    vol_ma_24h = df["volume"].rolling(LONG_WIN, min_periods=4).mean()
+    df["vol_acceleration"] = vol_ma_4h / vol_ma_24h.replace(0, np.nan)
+    df["vol_kurtosis"] = df["volume"].rolling(LONG_WIN, min_periods=10).apply(
+        lambda x: x.kurtosis(), raw=False
+    )
+    df["vol_entropy"] = df["volume"].rolling(LONG_WIN, min_periods=10).apply(
+        lambda x: _entropy_10bin(x), raw=False
+    )
+
+    # Squeeze proxy (extreme funding + high OI change + CVD reversal)
+    if all(c in df.columns for c in [
+        "cg_funding_close_zscore", "cg_oi_delta_zscore"
+    ]):
+        cvd_delta_z = _zscore(taker_delta.diff())
+        df["squeeze_proxy"] = (
+            df["cg_funding_close_zscore"].abs() *
+            df["cg_oi_delta_zscore"].abs() *
+            np.sign(-df["cg_funding_close_zscore"] * cvd_delta_z)
+        )
+
+    # ── Time-of-day features (cyclical encoding) ───────────────────────────
+    hour = df.index.hour
+    df["hour_sin"] = np.sin(2 * np.pi * hour / 24)
+    df["hour_cos"] = np.cos(2 * np.pi * hour / 24)
+    weekday = df.index.dayofweek
+    df["weekday_sin"] = np.sin(2 * np.pi * weekday / 7)
+    df["weekday_cos"] = np.cos(2 * np.pi * weekday / 7)
 
     logger.info("Live features: %d bars x %d columns", len(df), len(df.columns))
     return df
 
 
 def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
-    """Inject Coinglass features into df (in-place), forward-filling 30m to 15m."""
+    """Inject Coinglass features into df (in-place). Native 1h, use merge_asof."""
 
     def _merge_cg(cg_df: pd.DataFrame, cols: dict[str, str]):
-        """Merge Coinglass df into main df using merge_asof + ffill."""
         if cg_df.empty:
             for target in cols.values():
                 df[target] = np.nan
@@ -87,53 +147,81 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
                 merged = pd.merge_asof(
                     df[["close"]].reset_index(),
                     cg_df[[src]].reset_index().rename(columns={src: target}),
-                    left_on="dt", right_on="dt", direction="backward"
+                    left_on="dt", right_on="dt", direction="backward",
                 ).set_index("dt")
-                df[target] = merged[target].ffill(limit=4)
+                df[target] = merged[target]
             else:
                 df[target] = np.nan
 
     # OI (per-exchange)
     oi = cg_data.get("oi", pd.DataFrame())
-    _merge_cg(oi, {"c": "cg_oi_close"})
+    _merge_cg(oi, {"close": "cg_oi_close"})
     if "cg_oi_close" in df.columns:
         df["cg_oi_delta"] = df["cg_oi_close"].diff()
         df["cg_oi_accel"] = df["cg_oi_delta"].diff()
 
     # OI aggregated
     oi_agg = cg_data.get("oi_agg", pd.DataFrame())
-    _merge_cg(oi_agg, {"c": "cg_oi_agg_close"})
+    _merge_cg(oi_agg, {"close": "cg_oi_agg_close"})
     if "cg_oi_agg_close" in df.columns:
         df["cg_oi_agg_delta"] = df["cg_oi_agg_close"].diff()
     if "cg_oi_close" in df.columns and "cg_oi_agg_close" in df.columns:
-        df["cg_oi_binance_share"] = df["cg_oi_close"] / df["cg_oi_agg_close"].replace(0, np.nan)
+        df["cg_oi_binance_share"] = (
+            df["cg_oi_close"] / df["cg_oi_agg_close"].replace(0, np.nan)
+        )
 
     # Liquidation
     liq = cg_data.get("liquidation", pd.DataFrame())
     liq_cols = {}
-    for src, tgt in [("longVolUsd", "cg_liq_long"), ("shortVolUsd", "cg_liq_short"),
-                     ("volUsd", "cg_liq_total")]:
+    for src, tgt in [
+        ("longVolUsd", "cg_liq_long"), ("long_liquidation_usd", "cg_liq_long"),
+        ("shortVolUsd", "cg_liq_short"), ("short_liquidation_usd", "cg_liq_short"),
+        ("volUsd", "cg_liq_total"),
+    ]:
         liq_cols[src] = tgt
     _merge_cg(liq, liq_cols)
     if "cg_liq_long" in df.columns and "cg_liq_short" in df.columns:
         total = (df["cg_liq_long"] + df["cg_liq_short"]).replace(0, np.nan)
+        if "cg_liq_total" not in df.columns or df["cg_liq_total"].isna().all():
+            df["cg_liq_total"] = total
         df["cg_liq_ratio"] = df["cg_liq_long"] / total
         df["cg_liq_imbalance"] = (df["cg_liq_long"] - df["cg_liq_short"]) / total
 
-    # Long/Short ratio
+    # Long/Short ratio (top trader)
     ls = cg_data.get("long_short", pd.DataFrame())
     ls_cols = {}
-    for src, tgt in [("longRatio", "cg_ls_long_pct"), ("shortRatio", "cg_ls_short_pct")]:
+    for src, tgt in [
+        ("longRatio", "cg_ls_long_pct"), ("top_account_long_percent", "cg_ls_long_pct"),
+        ("shortRatio", "cg_ls_short_pct"), ("top_account_short_percent", "cg_ls_short_pct"),
+    ]:
         ls_cols[src] = tgt
     _merge_cg(ls, ls_cols)
     if "cg_ls_long_pct" in df.columns and "cg_ls_short_pct" in df.columns:
-        df["cg_ls_ratio"] = df["cg_ls_long_pct"] / df["cg_ls_short_pct"].replace(0, np.nan)
+        df["cg_ls_ratio"] = (
+            df["cg_ls_long_pct"] / df["cg_ls_short_pct"].replace(0, np.nan)
+        )
+
+    # Global Long/Short ratio (new endpoint)
+    gls = cg_data.get("global_ls", pd.DataFrame())
+    gls_cols = {}
+    for src, tgt in [
+        ("longRatio", "cg_gls_long_pct"), ("global_account_long_percent", "cg_gls_long_pct"),
+        ("shortRatio", "cg_gls_short_pct"), ("global_account_short_percent", "cg_gls_short_pct"),
+    ]:
+        gls_cols[src] = tgt
+    _merge_cg(gls, gls_cols)
+    if "cg_gls_long_pct" in df.columns and "cg_gls_short_pct" in df.columns:
+        df["cg_gls_ratio"] = (
+            df["cg_gls_long_pct"] / df["cg_gls_short_pct"].replace(0, np.nan)
+        )
+    if "cg_ls_ratio" in df.columns and "cg_gls_ratio" in df.columns:
+        df["cg_ls_divergence"] = df["cg_ls_ratio"] - df["cg_gls_ratio"]
 
     # Funding rate
     funding = cg_data.get("funding", pd.DataFrame())
-    _merge_cg(funding, {"c": "cg_funding_close"})
-    if "h" in (funding.columns if not funding.empty else []) and "l" in (funding.columns if not funding.empty else []):
-        _merge_cg(funding, {"h": "_fh", "l": "_fl"})
+    _merge_cg(funding, {"close": "cg_funding_close"})
+    if not funding.empty and "high" in funding.columns and "low" in funding.columns:
+        _merge_cg(funding, {"high": "_fh", "low": "_fl"})
         df["cg_funding_range"] = df.get("_fh", 0) - df.get("_fl", 0)
         df.drop(columns=["_fh", "_fl"], errors="ignore", inplace=True)
     else:
@@ -142,7 +230,10 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
     # Taker buy/sell
     taker = cg_data.get("taker", pd.DataFrame())
     taker_cols = {}
-    for src, tgt in [("buyVolUsd", "cg_taker_buy"), ("sellVolUsd", "cg_taker_sell")]:
+    for src, tgt in [
+        ("buyVolUsd", "cg_taker_buy"), ("taker_buy_volume_usd", "cg_taker_buy"),
+        ("sellVolUsd", "cg_taker_sell"), ("taker_sell_volume_usd", "cg_taker_sell"),
+    ]:
         taker_cols[src] = tgt
     _merge_cg(taker, taker_cols)
     if "cg_taker_buy" in df.columns and "cg_taker_sell" in df.columns:
@@ -151,8 +242,11 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
         df["cg_taker_ratio"] = df["cg_taker_buy"] / total
 
     # Z-scores
-    for col in ["cg_oi_delta", "cg_oi_agg_delta", "cg_liq_imbalance",
-                "cg_ls_ratio", "cg_taker_delta", "cg_funding_close"]:
+    for col in [
+        "cg_oi_delta", "cg_oi_agg_delta", "cg_liq_imbalance",
+        "cg_ls_ratio", "cg_taker_delta", "cg_funding_close",
+        "cg_oi_close", "cg_liq_total", "cg_gls_ratio", "cg_ls_divergence",
+    ]:
         if col in df.columns:
             df[f"{col}_zscore"] = _zscore(df[col])
 

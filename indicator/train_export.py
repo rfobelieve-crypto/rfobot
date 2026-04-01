@@ -13,31 +13,30 @@ import json
 import warnings
 from pathlib import Path
 
+import json as json_mod
 import joblib
 import numpy as np
 import pandas as pd
 import xgboost as xgb
 from scipy.stats import spearmanr
-from sklearn.linear_model import Ridge
-from sklearn.preprocessing import StandardScaler
 
 from indicator.feature_config import ALL_FEATURES, EXCLUDE
 
 warnings.filterwarnings("ignore")
 
 ROOT = Path(__file__).parent.parent
-PARQUET = ROOT / "research" / "ml_data" / "BTC_USD_15m_enhanced.parquet"
+PARQUET = ROOT / "research" / "ml_data" / "BTC_USD_1h_enhanced.parquet"
 ARTIFACT_DIR = Path(__file__).parent / "model_artifacts"
 
-HORIZON_BARS = 16
+HORIZON_BARS = 4  # 4h = 4 × 1h
 TARGET = "y_return_4h"
 N_FOLDS = 5
 
 XGB_PARAMS = dict(
-    n_estimators=400, max_depth=4, learning_rate=0.03,
-    subsample=0.75, colsample_bytree=0.5,
-    min_child_weight=5, reg_alpha=0.1, reg_lambda=1.0,
-    random_state=42, verbosity=0, early_stopping_rounds=30,
+    n_estimators=500, max_depth=5, learning_rate=0.02,
+    subsample=0.8, colsample_bytree=0.6,
+    min_child_weight=3, reg_alpha=0.05, reg_lambda=0.5,
+    random_state=42, verbosity=0, early_stopping_rounds=40,
 )
 
 
@@ -56,8 +55,9 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
     df = df.iloc[:-HORIZON_BARS].copy()
     df = df.dropna(subset=[TARGET])
 
-    # Use only API-compatible features that exist in the data
-    feat_cols = [c for c in ALL_FEATURES if c in df.columns and c not in EXCLUDE]
+    # All features are already computed in the 1h enhanced parquet
+    feat_cols = [c for c in df.columns
+                 if c not in EXCLUDE and df[c].dtype in ("float64", "float32", "int64")]
     df[feat_cols] = df[feat_cols].ffill()
 
     nan_rate = df[feat_cols].isnull().mean()
@@ -96,14 +96,12 @@ def select_features(df: pd.DataFrame, feat_cols: list[str],
 
 
 def train_and_export(df: pd.DataFrame, feat_cols: list[str]):
-    """Walk-forward train, evaluate, export final fold's model."""
+    """Walk-forward train, evaluate, export final fold's XGBoost model."""
     n = len(df)
     fold = n // (N_FOLDS + 1)
     oos = np.full(n, np.nan)
 
     final_xgb = None
-    final_ridge = None
-    final_scaler = None
 
     for k in range(1, N_FOLDS + 1):
         tr_end = fold * k
@@ -116,20 +114,9 @@ def train_and_export(df: pd.DataFrame, feat_cols: list[str]):
         X_te = df[feat_cols].fillna(0).values[tr_end:te_end]
         y_te = df[TARGET].values[tr_end:te_end]
 
-        # XGBoost
         m_xgb = xgb.XGBRegressor(**XGB_PARAMS)
         m_xgb.fit(X_tr, y_tr, eval_set=[(X_te, y_te)], verbose=False)
-        pred_xgb = m_xgb.predict(X_te)
-
-        # Ridge
-        scaler = StandardScaler()
-        X_tr_s = scaler.fit_transform(X_tr)
-        X_te_s = scaler.transform(X_te)
-        m_ridge = Ridge(alpha=10.0)
-        m_ridge.fit(X_tr_s, y_tr)
-        pred_ridge = m_ridge.predict(X_te_s)
-
-        pred = 0.5 * pred_xgb + 0.5 * pred_ridge
+        pred = m_xgb.predict(X_te)
         oos[tr_end:te_end] = pred
 
         ic, _ = spearmanr(y_te, pred)
@@ -137,8 +124,6 @@ def train_and_export(df: pd.DataFrame, feat_cols: list[str]):
         print(f"  fold {k}/{N_FOLDS}  IC={ic:+.4f}  dir={dir_acc:.1%}  n={len(y_te)}")
 
         final_xgb = m_xgb
-        final_ridge = m_ridge
-        final_scaler = scaler
 
     # Overall OOS evaluation
     valid = ~np.isnan(oos)
@@ -150,11 +135,9 @@ def train_and_export(df: pd.DataFrame, feat_cols: list[str]):
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 
     final_xgb.save_model(str(ARTIFACT_DIR / "xgb_model.json"))
-    joblib.dump(final_ridge, ARTIFACT_DIR / "ridge_model.pkl")
-    joblib.dump(final_scaler, ARTIFACT_DIR / "scaler.pkl")
 
     with open(ARTIFACT_DIR / "feature_cols.json", "w") as f:
-        json.dump(feat_cols, f, indent=2)
+        json_mod.dump(feat_cols, f, indent=2)
 
     # Save rolling stats for z-score warmup (last 200 bars of OOS predictions)
     last_200 = oos[valid][-200:]
@@ -164,10 +147,10 @@ def train_and_export(df: pd.DataFrame, feat_cols: list[str]):
         "pred_history": [float(x) for x in last_200],
     }
     with open(ARTIFACT_DIR / "training_stats.json", "w") as f:
-        json.dump(stats, f, indent=2)
+        json_mod.dump(stats, f, indent=2)
 
     print(f"\nArtifacts saved to {ARTIFACT_DIR}/")
-    print(f"  xgb_model.json, ridge_model.pkl, scaler.pkl")
+    print(f"  xgb_model.json")
     print(f"  feature_cols.json ({len(feat_cols)} features)")
     print(f"  training_stats.json (warmup: {len(last_200)} bars)")
 

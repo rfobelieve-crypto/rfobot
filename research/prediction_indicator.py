@@ -2,7 +2,7 @@
 BTC 多空強度預測指標 — Market Intelligence Indicator.
 
 產品定位：預測型指標，非交易策略。
-每個 15m bar 輸出：
+每個 1h bar 輸出：
   - pred_return_4h:    預測未來 4h 收益率
   - pred_direction:    UP / DOWN / NEUTRAL
   - confidence_score:  0~100（預測值在歷史分佈中的百分位）
@@ -10,18 +10,21 @@ BTC 多空強度預測指標 — Market Intelligence Indicator.
   - bull_bear_power:   -1.0 ~ +1.0（rule-based composite）
   - regime:            當前市場狀態
 
+Data: 1h bars from Binance klines + Coinglass API (native 1h, no forward-fill).
+      166 days of history (2025-10-17 ~ present).
+
 Architecture:
-  1. XGBRegressor → pred_return_4h (walk-forward, no lookahead)
-  2. pred_direction = sign(pred_return_4h) with deadzone
-  3. confidence_score = expanding percentile rank of |pred_return_4h|
+  1. XGBRegressor + Ridge → pred_return_4h (walk-forward, no lookahead)
+  2. pred_direction = sign(rolling_zscore(pred)) with deadzone
+  3. confidence_score = z-score percentile × agreement × regime × BBP alignment
   4. strength_score = discretize(confidence_score)
-  5. bull_bear_power = rule-based from order flow components
+  5. bull_bear_power = rule-based from Coinglass z-scores
 
 Evaluation: IC, direction accuracy, calibration monotonicity.
 
 Usage:
-    python research/prediction_indicator.py
-    python research/prediction_indicator.py --save
+    python -m research.prediction_indicator
+    python -m research.prediction_indicator --save
 """
 from __future__ import annotations
 
@@ -37,10 +40,10 @@ from scipy.stats import spearmanr
 warnings.filterwarnings("ignore")
 
 ROOT    = Path(__file__).parent
-PARQUET = ROOT / "ml_data" / "BTC_USD_15m_enhanced.parquet"
+PARQUET = ROOT / "ml_data" / "BTC_USD_1h_enhanced.parquet"
 OUT_DIR = ROOT / "ml_data"
 
-HORIZON_BARS = 16  # 4h = 16 x 15m
+HORIZON_BARS = 4   # 4h = 4 x 1h
 TARGET       = "y_return_4h"
 N_FOLDS      = 5
 
@@ -60,21 +63,23 @@ EXCLUDE = {
     "future_return_5m", "future_return_15m", "future_return_1h",
     "label_5m", "label_15m", "label_1h",
     "regime", "regime_name", "bull_bear_score",
+    # IC-tested but degraded walk-forward ICIR (2.37→0.71)
+    "vol_acceleration", "vol_kurtosis", "vol_entropy", "squeeze_proxy",
 }
 
 # ── XGBoost params ───────────────────────────────────────────────────────────
 XGB_PARAMS = dict(
-    n_estimators      = 400,
-    max_depth         = 4,
-    learning_rate     = 0.03,
-    subsample         = 0.75,
-    colsample_bytree  = 0.5,
-    min_child_weight  = 5,
-    reg_alpha         = 0.1,
-    reg_lambda        = 1.0,
+    n_estimators      = 500,
+    max_depth         = 5,
+    learning_rate     = 0.02,
+    subsample         = 0.8,
+    colsample_bytree  = 0.6,
+    min_child_weight  = 3,
+    reg_alpha         = 0.05,
+    reg_lambda        = 0.5,
     random_state      = 42,
     verbosity         = 0,
-    early_stopping_rounds = 30,
+    early_stopping_rounds = 40,
 )
 
 # ── Direction deadzone ───────────────────────────────────────────────────────
@@ -108,8 +113,9 @@ def load_data() -> tuple[pd.DataFrame, list[str]]:
     df = df.iloc[:-HORIZON_BARS].copy()
     df = df.dropna(subset=[TARGET])
 
-    # Feature columns — only Coinglass + klines derived (API-compatible)
-    feat_cols = [c for c in API_FEATURES if c in df.columns and c not in EXCLUDE]
+    # Feature columns — all numeric features except excluded
+    feat_cols = [c for c in df.columns
+                 if c not in EXCLUDE and df[c].dtype in ("float64", "float32", "int64")]
     df[feat_cols] = df[feat_cols].ffill()
 
     # Drop high-NaN features
@@ -163,20 +169,19 @@ def select_features(df: pd.DataFrame, feat_cols: list[str],
 def walk_forward_predict(df: pd.DataFrame, feat_cols: list[str]) \
         -> tuple[np.ndarray, np.ndarray]:
     """
-    Walk-forward OOS prediction using XGB + Ridge ensemble.
+    Walk-forward OOS prediction using XGBoost only.
+
+    Ridge was tested but consistently negative IC on 1h data.
+    XGB alone: avg fold IC ~+0.08.
 
     Returns:
-      pred:      ensemble prediction (avg of XGB + Ridge)
-      agreement: model agreement score (0~1). High = both models agree on
-                 direction & magnitude. Used to modulate confidence.
+      pred:      XGBoost prediction
+      agreement: placeholder (ones) — kept for API compatibility
     """
-    from sklearn.linear_model import Ridge
-    from sklearn.preprocessing import StandardScaler
-
     n    = len(df)
     fold = n // (N_FOLDS + 1)
     oos       = np.full(n, np.nan)
-    oos_agree = np.full(n, np.nan)
+    oos_agree = np.full(n, 1.0)  # no ensemble → agreement always 1.0
 
     for k in range(1, N_FOLDS + 1):
         tr_end = fold * k
@@ -192,38 +197,13 @@ def walk_forward_predict(df: pd.DataFrame, feat_cols: list[str]) \
         # XGBoost
         m_xgb = xgb.XGBRegressor(**XGB_PARAMS)
         m_xgb.fit(X_tr, y_tr, eval_set=[(X_te, y_te)], verbose=False)
-        pred_xgb = m_xgb.predict(X_te)
+        pred = m_xgb.predict(X_te)
 
-        # Ridge (standardized)
-        scaler = StandardScaler()
-        X_tr_s = scaler.fit_transform(X_tr)
-        X_te_s = scaler.transform(X_te)
-        m_ridge = Ridge(alpha=10.0)
-        m_ridge.fit(X_tr_s, y_tr)
-        pred_ridge = m_ridge.predict(X_te_s)
-
-        # Ensemble
-        pred = 0.5 * pred_xgb + 0.5 * pred_ridge
         oos[tr_end:te_end] = pred
 
-        # Agreement: 1.0 when both models predict same sign with similar magnitude
-        # 0.0 when they disagree on direction
-        same_sign = (np.sign(pred_xgb) == np.sign(pred_ridge)).astype(float)
-        # Magnitude similarity: 1 - normalized difference
-        max_abs = np.maximum(np.abs(pred_xgb), np.abs(pred_ridge))
-        max_abs = np.where(max_abs < 1e-8, 1e-8, max_abs)
-        mag_sim = 1.0 - np.abs(pred_xgb - pred_ridge) / (max_abs * 2)
-        mag_sim = np.clip(mag_sim, 0, 1)
-        agreement = same_sign * mag_sim
-        oos_agree[tr_end:te_end] = agreement
-
-        ic_x, _ = spearmanr(y_te, pred_xgb)
-        ic_r, _ = spearmanr(y_te, pred_ridge)
-        ic_e, _ = spearmanr(y_te, pred)
+        ic, _ = spearmanr(y_te, pred)
         dir_acc = (np.sign(pred) == np.sign(y_te)).mean()
-        agree_pct = same_sign.mean()
-        print(f"  fold {k}/{N_FOLDS}  IC: xgb={ic_x:+.4f} ridge={ic_r:+.4f} "
-              f"ens={ic_e:+.4f}  dir={dir_acc:.1%}  agree={agree_pct:.1%}  n={len(y_te)}")
+        print(f"  fold {k}/{N_FOLDS}  IC={ic:+.4f}  dir={dir_acc:.1%}  n={len(y_te)}")
 
     return oos, oos_agree
 
@@ -232,7 +212,10 @@ def walk_forward_predict(df: pd.DataFrame, feat_cols: list[str]) \
 # Confidence Calibration
 # ═════════════════════════════════════════════════════════════════════════════
 
-def calibrate_confidence(pred_z: np.ndarray, agreement: np.ndarray) -> np.ndarray:
+def calibrate_confidence(pred_z: np.ndarray, agreement: np.ndarray,
+                         regime: np.ndarray | None = None,
+                         bbp: np.ndarray | None = None,
+                         direction: np.ndarray | None = None) -> np.ndarray:
     """
     Confidence = z-score_percentile * agreement_weight.
 
@@ -262,7 +245,27 @@ def calibrate_confidence(pred_z: np.ndarray, agreement: np.ndarray) -> np.ndarra
         agree = agreement[i] if not np.isnan(agreement[i]) else 0.5
         agree_weight = 0.5 + 0.5 * agree
 
-        confidence[i] = min(mag_pct * agree_weight, 100)
+        raw_conf = mag_pct * agree_weight
+
+        # Component 3: regime dampening (CHOPPY → 0.6x confidence)
+        if regime is not None and i < len(regime):
+            r = regime[i] if isinstance(regime[i], str) else str(regime[i])
+            if "CHOPPY" in r:
+                raw_conf *= 0.6
+
+        # Component 4: BBP alignment bonus/penalty
+        # If BBP direction agrees with prediction → slight boost
+        # If BBP direction opposes prediction → cap at Moderate
+        if bbp is not None and direction is not None and i < len(bbp) and i < len(direction):
+            b = bbp[i]
+            d = direction[i]
+            if not np.isnan(b):
+                if (d == "UP" and b > 0.1) or (d == "DOWN" and b < -0.1):
+                    raw_conf *= 1.1  # aligned: 10% boost
+                elif (d == "UP" and b < -0.1) or (d == "DOWN" and b > 0.1):
+                    raw_conf = min(raw_conf, 65)  # opposed: cap below Strong
+
+        confidence[i] = min(raw_conf, 100)
 
     return confidence
 
@@ -271,13 +274,13 @@ def calibrate_confidence(pred_z: np.ndarray, agreement: np.ndarray) -> np.ndarra
 # Direction & Strength
 # ═════════════════════════════════════════════════════════════════════════════
 
-def rolling_zscore(pred: np.ndarray, window: int = 192,
-                   min_obs: int = 50) -> np.ndarray:
+def rolling_zscore(pred: np.ndarray, window: int = 48,
+                   min_obs: int = 20) -> np.ndarray:
     """
     Rolling z-score of predictions.
 
-    Compares each prediction to its recent rolling window (default 192 bars =
-    2 days of 15m). This adapts quickly to regime shifts, breaking long streaks
+    Compares each prediction to its recent rolling window (default 48 bars =
+    2 days of 1h). This adapts quickly to regime shifts, breaking long streaks
     of identical direction caused by slow-changing features.
 
     pred_z[i] = (pred[i] - mean(pred[i-window:i])) / std(pred[i-window:i])
@@ -330,37 +333,25 @@ def compute_bull_bear_power(df: pd.DataFrame) -> pd.Series:
     """
     components = []
 
-    # 1. BVC delta ratio
-    if "bvc_delta_ratio" in df.columns:
-        c = df["bvc_delta_ratio"].rolling(96, min_periods=4).apply(
-            lambda x: (x.iloc[-1] - x.mean()) / max(x.std(), 1e-9), raw=False
-        ).clip(-3, 3) / 3
-        components.append(c)
-
-    # 2. OI delta
-    if "oi_delta_zscore" in df.columns:
-        components.append(df["oi_delta_zscore"].clip(-3, 3) / 3)
-    elif "cg_oi_delta_zscore" in df.columns:
+    # 1. OI delta
+    if "cg_oi_delta_zscore" in df.columns:
         components.append(df["cg_oi_delta_zscore"].clip(-3, 3) / 3)
 
-    # 3. Funding (inverted: high positive funding = bearish pressure)
-    if "funding_zscore" in df.columns:
-        components.append(-df["funding_zscore"].clip(-3, 3) / 3)
-    elif "cg_funding_close_zscore" in df.columns:
+    # 2. Funding (inverted: high positive funding = bearish pressure)
+    if "cg_funding_close_zscore" in df.columns:
         components.append(-df["cg_funding_close_zscore"].clip(-3, 3) / 3)
 
-    # 4. CG Taker delta
+    # 3. CG Taker delta
     if "cg_taker_delta_zscore" in df.columns:
         components.append(df["cg_taker_delta_zscore"].clip(-3, 3) / 3)
-    elif "taker_delta_ratio" in df.columns:
-        c = df["taker_delta_ratio"].rolling(96, min_periods=4).apply(
-            lambda x: (x.iloc[-1] - x.mean()) / max(x.std(), 1e-9), raw=False
-        ).clip(-3, 3) / 3
-        components.append(c)
 
-    # 5. L/S ratio deviation (inverted: extreme long = bearish)
+    # 4. L/S ratio deviation (inverted: extreme long = bearish)
     if "cg_ls_ratio_zscore" in df.columns:
         components.append(-df["cg_ls_ratio_zscore"].clip(-3, 3) / 3)
+
+    # 5. Top vs Global L/S divergence (new)
+    if "cg_ls_divergence_zscore" in df.columns:
+        components.append(df["cg_ls_divergence_zscore"].clip(-3, 3) / 3)
 
     if not components:
         return pd.Series(0, index=df.index)
@@ -479,7 +470,7 @@ def evaluate(df: pd.DataFrame, pred: np.ndarray, confidence: np.ndarray,
 # Main
 # ═════════════════════════════════════════════════════════════════════════════
 
-def run(save: bool = False, top_k: int = 60):
+def run(save: bool = False, top_k: int = 40):
     print("=" * 60)
     print("BTC Market Intelligence Indicator — 4h Horizon")
     print("=" * 60)
@@ -498,8 +489,8 @@ def run(save: bool = False, top_k: int = 60):
     pred, agreement = walk_forward_predict(df, feat_cols)
 
     # Rolling z-score normalization
-    # Breaks long same-direction streaks by comparing to rolling 1-day window
-    pred_z = rolling_zscore(pred, window=96, min_obs=30)
+    # Breaks long same-direction streaks by comparing to rolling 2-day window
+    pred_z = rolling_zscore(pred, window=48, min_obs=20)
 
     valid_z = ~np.isnan(pred_z)
     print(f"\n  Z-score stats: mean={pred_z[valid_z].mean():.3f}  "
@@ -507,15 +498,19 @@ def run(save: bool = False, top_k: int = 60):
           f"positive={( pred_z[valid_z] > 0).mean():.1%}  "
           f"negative={( pred_z[valid_z] < 0).mean():.1%}")
 
-    # Confidence calibration (using z-scored predictions)
-    confidence = calibrate_confidence(pred_z, agreement)
-
-    # Direction & strength (from z-scored predictions)
+    # Direction first (needed for confidence calibration with BBP alignment)
     direction = assign_direction(pred_z)
-    strength  = assign_strength(confidence)
 
     # Bull/Bear Power
     bbp = compute_bull_bear_power(df)
+
+    # Confidence calibration (using z-scored predictions + regime + BBP alignment)
+    regime_arr = df["regime_name"].fillna("UNKNOWN").values if "regime_name" in df.columns else None
+    confidence = calibrate_confidence(pred_z, agreement, regime=regime_arr,
+                                      bbp=bbp.values, direction=direction)
+
+    # Strength (from confidence)
+    strength = assign_strength(confidence)
 
     # Evaluate
     evaluate(df, pred, confidence, direction)
@@ -570,7 +565,7 @@ def run(save: bool = False, top_k: int = 60):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--save", action="store_true")
-    ap.add_argument("--top-k", type=int, default=60)
+    ap.add_argument("--top-k", type=int, default=40)
     args = ap.parse_args()
     run(save=args.save, top_k=args.top_k)
 

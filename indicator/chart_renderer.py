@@ -49,14 +49,8 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
 
     colors = []
     for i in range(n):
-        d = sig.iloc[i]["pred_direction"]
         c = conf_norm[i]
-        if d == "UP":
-            colors.append(plt.cm.Greens(0.2 + 0.8 * c))
-        elif d == "DOWN":
-            colors.append(plt.cm.Reds(0.2 + 0.8 * c))
-        else:
-            colors.append((0.88, 0.88, 0.88, 1.0))
+        colors.append(plt.cm.Purples(0.15 + 0.85 * c))
 
     ax_conf.bar(x, np.ones(n), width=1.0, color=colors, edgecolor="none")
     ax_conf.set_xlim(-0.5, n - 0.5)

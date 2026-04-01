@@ -11,9 +11,8 @@ Data Collector — 收集所有回測所需資料並備份到 D 槽。
   │   ├── metrics/                   ← Binance futures metrics
   │   └── funding_rate/              ← Funding rate CSV
   ├── processed/
-  │   ├── BTC_USD_15m_tabular.parquet
-  │   ├── BTC_USD_15m_tick_features.parquet
-  │   ├── BTC_USD_15m_enhanced.parquet
+  │   ├── BTC_USD_1h_enhanced.parquet
+  │   ├── BTC_USD_indicator_4h.parquet
   │   └── BTC_USD_signals_*.parquet
   └── manifest.json                  ← 收集記錄 (時間、檔案數、大小)
 
