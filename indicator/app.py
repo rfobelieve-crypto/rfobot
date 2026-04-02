@@ -56,6 +56,17 @@ ALLOWED_CHAT_IDS = set(
 )
 
 
+def _make_reply_markup():
+    """Inline keyboard with quick action buttons."""
+    import json
+    return json.dumps({"inline_keyboard": [
+        [
+            {"text": "\U0001f4ca Chart", "callback_data": "chart"},
+            {"text": "\U0001f4cb Status", "callback_data": "status"},
+        ],
+    ]})
+
+
 def _send_telegram_photo(png: bytes, caption: str):
     """Send chart PNG to Telegram."""
     if not BOT_TOKEN or not CHAT_ID:
@@ -66,6 +77,7 @@ def _send_telegram_photo(png: bytes, caption: str):
         resp = requests.post(url, data={
             "chat_id": CHAT_ID,
             "caption": caption,
+            "reply_markup": _make_reply_markup(),
         }, files={
             "photo": ("indicator.png", png, "image/png"),
         }, timeout=30)
@@ -315,8 +327,28 @@ def test_telegram():
 
 @app.route("/webhook", methods=["POST"])
 def telegram_webhook():
-    """Handle Telegram bot commands."""
+    """Handle Telegram bot commands and inline button callbacks."""
     data = request.get_json(silent=True) or {}
+
+    # Handle inline button callback
+    callback = data.get("callback_query")
+    if callback:
+        cb_data = callback.get("data", "")
+        cb_chat_id = str(callback.get("message", {}).get("chat", {}).get("id", ""))
+        cb_id = callback.get("id", "")
+        # Answer callback to remove loading spinner
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery",
+                data={"callback_query_id": cb_id}, timeout=5,
+            )
+        except Exception:
+            pass
+        # Route to same logic as text commands
+        text = f"/{cb_data}"
+        chat_id = cb_chat_id
+        return _handle_command(text, chat_id)
+
     msg = data.get("message", {})
     text = msg.get("text", "").strip()
     chat_id = str(msg.get("chat", {}).get("id", ""))
@@ -324,11 +356,16 @@ def telegram_webhook():
     if not text or not chat_id:
         return "ok"
 
+    return _handle_command(text, chat_id)
+
+
+def _handle_command(text: str, chat_id: str):
+    """Process a bot command (from text message or inline button)."""
     if ALLOWED_CHAT_IDS and chat_id not in ALLOWED_CHAT_IDS:
         logger.warning("Unauthorized chat_id: %s (allowed: %s)", chat_id, ALLOWED_CHAT_IDS)
         return "ok"
 
-    cmd = text.split()[0].lower().split("@")[0]  # handle /chart@botname
+    cmd = text.split()[0].lower().split("@")[0]
     logger.info("Webhook command: %s from chat_id=%s", cmd, chat_id)
 
     if cmd == "/chart":
@@ -375,9 +412,10 @@ def telegram_webhook():
     elif cmd == "/help":
         _send_telegram_text(
             "<b>BTC Indicator Bot</b>\n\n"
-            "/chart - Latest indicator chart\n"
-            "/status - Current prediction status\n"
-            "/help - Show this message",
+            "/chart - 最新指標圖表\n"
+            "/status - 當前預測狀態\n"
+            "/help - 使用說明\n\n"
+            "也可以點訊息下方的按鈕快速操作",
             chat_id,
         )
 
@@ -457,18 +495,31 @@ def diagnostics():
 # ── Scheduler ────────────────────────────────────────────────────────────────
 
 def _register_webhook():
-    """Register Telegram webhook to receive bot commands."""
+    """Register Telegram webhook and bot command menu."""
     public_url = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
     if not public_url or not BOT_TOKEN:
         logger.warning("Skipping webhook registration (no RAILWAY_PUBLIC_DOMAIN or BOT_TOKEN)")
         return
     webhook_url = f"https://{public_url}/webhook"
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook"
+    base = f"https://api.telegram.org/bot{BOT_TOKEN}"
     try:
-        resp = requests.post(url, data={"url": webhook_url}, timeout=15)
+        resp = requests.post(f"{base}/setWebhook", data={"url": webhook_url}, timeout=15)
         logger.info("Webhook registered: %s → %s", webhook_url, resp.json())
     except Exception as e:
         logger.error("Webhook registration failed: %s", e)
+
+    # Set bot command menu
+    import json
+    commands = json.dumps([
+        {"command": "chart", "description": "最新指標圖表"},
+        {"command": "status", "description": "當前預測狀態"},
+        {"command": "help", "description": "使用說明"},
+    ])
+    try:
+        requests.post(f"{base}/setMyCommands", data={"commands": commands}, timeout=10)
+        logger.info("Bot command menu set")
+    except Exception:
+        pass
 
 
 def start_scheduler():
