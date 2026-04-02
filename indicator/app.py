@@ -257,6 +257,22 @@ def health():
         })
 
 
+@app.route("/test-telegram")
+def test_telegram():
+    """Send a test message to verify Telegram integration."""
+    has_token = bool(BOT_TOKEN)
+    has_chat = bool(CHAT_ID)
+    if not has_token or not has_chat:
+        return jsonify({"error": "Missing credentials",
+                        "has_token": has_token, "has_chat": has_chat}), 500
+    _send_telegram_text("Test from Railway indicator service.")
+    with _lock:
+        png = _state["chart_png"]
+    if png:
+        _send_telegram_photo(png, "Test chart from Railway")
+    return jsonify({"status": "sent", "chat_id": CHAT_ID[:4] + "****"})
+
+
 @app.route("/json")
 def prediction_json():
     with _lock:
