@@ -21,7 +21,7 @@ from pathlib import Path
 
 import requests
 import pandas as pd
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, request
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -74,19 +74,36 @@ def _send_telegram_photo(png: bytes, caption: str):
         logger.error("Telegram photo send failed: %s", e)
 
 
-def _send_telegram_text(message: str):
+def _send_telegram_text(message: str, chat_id: str = ""):
     """Send HTML text alert to Telegram."""
-    if not BOT_TOKEN or not CHAT_ID:
+    cid = chat_id or CHAT_ID
+    if not BOT_TOKEN or not cid:
         return
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
         requests.post(url, data={
-            "chat_id": CHAT_ID,
+            "chat_id": cid,
             "text": message,
             "parse_mode": "HTML",
         }, timeout=15)
     except Exception as e:
         logger.error("Telegram text send failed: %s", e)
+
+
+def _send_telegram_photo_to(chat_id: str, png: bytes, caption: str):
+    """Send chart PNG to a specific chat."""
+    if not BOT_TOKEN or not chat_id:
+        return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+    try:
+        requests.post(url, data={
+            "chat_id": chat_id,
+            "caption": caption,
+        }, files={
+            "photo": ("indicator.png", png, "image/png"),
+        }, timeout=30)
+    except Exception as e:
+        logger.error("Telegram photo send failed: %s", e)
 
 
 def _load_history() -> pd.DataFrame:
@@ -277,6 +294,72 @@ def test_telegram():
     return jsonify({"status": "sent", "env_keys_found": tg_vars})
 
 
+@app.route("/webhook", methods=["POST"])
+def telegram_webhook():
+    """Handle Telegram bot commands."""
+    data = request.get_json(silent=True) or {}
+    msg = data.get("message", {})
+    text = msg.get("text", "").strip()
+    chat_id = str(msg.get("chat", {}).get("id", ""))
+
+    if not text or not chat_id:
+        return "ok"
+
+    cmd = text.split()[0].lower().split("@")[0]  # handle /chart@botname
+
+    if cmd == "/chart":
+        with _lock:
+            png = _state["chart_png"]
+            pred = _state["last_prediction"]
+        if not png:
+            _send_telegram_text("Chart not ready yet.", chat_id)
+            return "ok"
+        direction = pred.get("direction", "?")
+        conf = pred.get("confidence", 0)
+        strength = pred.get("strength", "?")
+        pred_ret = pred.get("pred_return_4h", 0) * 100
+        bbp = pred.get("bull_bear_power", 0)
+        price = pred.get("close", 0)
+        arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
+        caption = (
+            f"{arrow} BTC 4h Indicator\n"
+            f"Price: ${price:,.0f}\n"
+            f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
+            f"Pred: {pred_ret:+.2f}% | BBP: {bbp:+.2f}\n"
+            f"Updated: {_state['last_update'] or '?'}"
+        )
+        _send_telegram_photo_to(chat_id, png, caption)
+
+    elif cmd == "/status":
+        with _lock:
+            status = _state["status"]
+            last_update = _state["last_update"]
+            pred = _state["last_prediction"]
+            error = _state["error"]
+        lines = [
+            f"<b>Status:</b> {status}",
+            f"<b>Last update:</b> {last_update or 'N/A'}",
+        ]
+        if pred:
+            lines.append(f"<b>Direction:</b> {pred['direction']} ({pred['strength']})")
+            lines.append(f"<b>Confidence:</b> {pred['confidence']:.0f}")
+            lines.append(f"<b>Price:</b> ${pred['close']:,.0f}")
+        if error:
+            lines.append(f"<b>Error:</b> {error}")
+        _send_telegram_text("\n".join(lines), chat_id)
+
+    elif cmd == "/help":
+        _send_telegram_text(
+            "<b>BTC Indicator Bot</b>\n\n"
+            "/chart - Latest indicator chart\n"
+            "/status - Current prediction status\n"
+            "/help - Show this message",
+            chat_id,
+        )
+
+    return "ok"
+
+
 @app.route("/json")
 def prediction_json():
     with _lock:
@@ -288,6 +371,21 @@ def prediction_json():
 
 # ── Scheduler ────────────────────────────────────────────────────────────────
 
+def _register_webhook():
+    """Register Telegram webhook to receive bot commands."""
+    public_url = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+    if not public_url or not BOT_TOKEN:
+        logger.warning("Skipping webhook registration (no RAILWAY_PUBLIC_DOMAIN or BOT_TOKEN)")
+        return
+    webhook_url = f"https://{public_url}/webhook"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook"
+    try:
+        resp = requests.post(url, data={"url": webhook_url}, timeout=15)
+        logger.info("Webhook registered: %s → %s", webhook_url, resp.json())
+    except Exception as e:
+        logger.error("Webhook registration failed: %s", e)
+
+
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -295,6 +393,9 @@ def start_scheduler():
     scheduler.add_job(update_cycle, "cron", minute="0", misfire_grace_time=300)
     scheduler.start()
     logger.info("Scheduler started: updates at :00 every hour")
+
+    # Register Telegram webhook
+    _register_webhook()
 
     # Run first update immediately
     threading.Thread(target=update_cycle, daemon=True).start()
