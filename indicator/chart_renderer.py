@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import io
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -36,6 +36,10 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     if n == 0:
         return b""
 
+    # Convert to UTC+8 for display
+    TZ_UTC8 = timezone(timedelta(hours=8))
+    sig.index = sig.index.tz_convert(TZ_UTC8)
+
     x = np.arange(n)
     dates = sig.index
 
@@ -58,7 +62,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_conf.set_yticks([])
     ax_conf.set_xticks([])
 
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now_str = datetime.now(TZ_UTC8).strftime("%Y-%m-%d %H:%M UTC+8")
     ax_conf.set_title(
         f"BTC Market Intelligence Indicator  (4h prediction)  |  Updated: {now_str}",
         fontsize=14, fontweight="bold", loc="left"
