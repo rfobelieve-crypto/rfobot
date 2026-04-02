@@ -10,3 +10,4 @@ apscheduler
 joblib
 scipy
 python-dotenv
+pyarrow
