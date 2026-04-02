@@ -106,13 +106,14 @@ def _send_telegram_text(message: str, chat_id: str = ""):
 
 
 def _send_telegram_photo_to(chat_id: str, png: bytes, caption: str):
-    """Send chart PNG to a specific chat."""
+    """Send chart PNG to a specific chat with inline buttons."""
     if not BOT_TOKEN or not chat_id:
         return
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
     try:
         requests.post(url, data={
             "chat_id": chat_id,
+            "reply_markup": _make_reply_markup(),
             "caption": caption,
         }, files={
             "photo": ("indicator.png", png, "image/png"),
