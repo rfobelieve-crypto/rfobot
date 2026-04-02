@@ -260,17 +260,21 @@ def health():
 @app.route("/test-telegram")
 def test_telegram():
     """Send a test message to verify Telegram integration."""
-    has_token = bool(BOT_TOKEN)
-    has_chat = bool(CHAT_ID)
-    if not has_token or not has_chat:
+    # Debug: show all TELEGRAM* env vars (masked)
+    tg_vars = {k: v[:6] + "****" for k, v in os.environ.items()
+                if "TELEGRAM" in k.upper() or "TG" in k.upper() or "BOT" in k.upper()}
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat:
         return jsonify({"error": "Missing credentials",
-                        "has_token": has_token, "has_chat": has_chat}), 500
-    _send_telegram_text("Test from Railway indicator service.")
+                        "has_token": bool(token), "has_chat": bool(chat),
+                        "env_keys_found": tg_vars}), 500
+    _send_telegram_text("\u2705 Test from Railway indicator service.")
     with _lock:
         png = _state["chart_png"]
     if png:
         _send_telegram_photo(png, "Test chart from Railway")
-    return jsonify({"status": "sent", "chat_id": CHAT_ID[:4] + "****"})
+    return jsonify({"status": "sent", "env_keys_found": tg_vars})
 
 
 @app.route("/json")
