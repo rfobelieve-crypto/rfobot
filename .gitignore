@@ -24,3 +24,10 @@ research/eda_charts/
 # Local scripts with secrets
 market_data/backfill/daily_collect.bat
 market_data/backfill/setup_schedule.ps1
+
+# Data cache and backups
+indicator/model_artifacts/.data_cache/
+indicator/model_artifacts/*_backup.parquet
+
+# Local only
+.claude/settings.local.json

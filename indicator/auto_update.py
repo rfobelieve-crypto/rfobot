@@ -55,6 +55,51 @@ def save_history(df: pd.DataFrame):
     df.to_parquet(HISTORY_PATH, index=True)
 
 
+def check_data_freshness(klines: pd.DataFrame, cg_data: dict) -> list[str]:
+    """Check if data sources are fresh. Returns list of warning messages."""
+    warnings = []
+    now = datetime.now(timezone.utc)
+    max_age_hours = 3  # alert if data is older than 3 hours
+
+    # Check Binance klines
+    if klines.empty:
+        warnings.append("Binance klines: NO DATA")
+    else:
+        age = (now - klines.index[-1].to_pydatetime()).total_seconds() / 3600
+        if age > max_age_hours:
+            warnings.append(f"Binance klines: stale ({age:.1f}h old)")
+
+    # Check each Coinglass endpoint
+    for name, df in cg_data.items():
+        if df.empty:
+            warnings.append(f"CG {name}: NO DATA")
+        elif hasattr(df.index, 'max'):
+            try:
+                last_ts = df.index.max().to_pydatetime()
+                age = (now - last_ts).total_seconds() / 3600
+                if age > max_age_hours:
+                    warnings.append(f"CG {name}: stale ({age:.1f}h old)")
+            except Exception:
+                pass
+
+    return warnings
+
+
+def send_telegram_alert(message: str):
+    """Send plain text alert to Telegram."""
+    if not BOT_TOKEN or not CHAT_ID:
+        return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    try:
+        requests.post(url, data={
+            "chat_id": CHAT_ID,
+            "text": message,
+            "parse_mode": "HTML",
+        }, timeout=15)
+    except Exception as e:
+        logger.error("Alert send failed: %s", e)
+
+
 def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
     """Fetch new data, predict, render chart. Returns (updated_df, png_bytes)."""
     from indicator.data_fetcher import fetch_binance_klines, fetch_coinglass
@@ -65,6 +110,14 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
     # Fetch live data
     klines = fetch_binance_klines(limit=500)
     cg_data = fetch_coinglass(interval="1h", limit=500)
+
+    # Data freshness check
+    freshness_warnings = check_data_freshness(klines, cg_data)
+    if freshness_warnings:
+        alert = "<b>Data Freshness Alert</b>\n" + "\n".join(f"- {w}" for w in freshness_warnings)
+        logger.warning("Data freshness issues: %s", freshness_warnings)
+        send_telegram_alert(alert)
+
     features = build_live_features(klines, cg_data)
 
     # Backfill OHLC from klines into history
@@ -146,6 +199,23 @@ def run_once(indicator_df: pd.DataFrame) -> pd.DataFrame:
     )
 
     send_telegram(png, caption)
+
+    # Strong signal alert
+    if strength == "Strong" and direction in ("UP", "DOWN"):
+        arrow_big = "\U0001f7e2" if direction == "UP" else "\U0001f534"
+        alert = (
+            f"{arrow_big} <b>STRONG {direction} SIGNAL</b>\n"
+            f"\n"
+            f"BTC ${price:,.0f}\n"
+            f"Pred: {pred_ret:+.2f}% (4h)\n"
+            f"Confidence: {conf:.0f}\n"
+            f"Regime: {last.get('regime', '?')}\n"
+            f"\n"
+            f"{now}"
+        )
+        send_telegram_alert(alert)
+        logger.info("Strong signal alert sent: %s", direction)
+
     save_history(indicator_df)
     return indicator_df
 

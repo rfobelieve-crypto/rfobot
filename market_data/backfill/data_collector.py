@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 ROOT     = Path(__file__).resolve().parents[2]
 SRC_RAW  = ROOT / "market_data" / "raw_data"
 SRC_ML   = ROOT / "research" / "ml_data"
-DEST_ROOT = Path("D:/flowbot_data")
+DEST_ROOT = Path(os.environ.get("FLOWBOT_BACKUP_DIR", "D:/flowbot_data"))
 
 
 def _ensure_dirs():

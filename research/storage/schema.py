@@ -34,9 +34,13 @@ CREATE TABLE IF NOT EXISTS market_state_bars (
     confidence          DECIMAL(10,4)  DEFAULT NULL,
     final_bias          VARCHAR(20)    DEFAULT NULL,
     risk_adj_score      DECIMAL(10,4)  DEFAULT NULL,
-    signal              TINYINT        NOT NULL DEFAULT 0,
+    `signal`            TINYINT        NOT NULL DEFAULT 0,
     score_model         VARCHAR(30)    DEFAULT NULL,
     event_count         INT            NOT NULL DEFAULT 0,
+    bar_open            DECIMAL(20,2)  DEFAULT NULL,
+    bar_high            DECIMAL(20,2)  DEFAULT NULL,
+    bar_low             DECIMAL(20,2)  DEFAULT NULL,
+    bar_close           DECIMAL(20,2)  DEFAULT NULL,
     computed_at         BIGINT         DEFAULT NULL,
     UNIQUE KEY uk_bar (symbol, timeframe, window_start),
     INDEX idx_lookup (symbol, timeframe, window_start)
@@ -44,12 +48,30 @@ CREATE TABLE IF NOT EXISTS market_state_bars (
 """
 
 
+_OHLC_COLUMNS = [
+    ("bar_open",  "DECIMAL(20,2) DEFAULT NULL"),
+    ("bar_high",  "DECIMAL(20,2) DEFAULT NULL"),
+    ("bar_low",   "DECIMAL(20,2) DEFAULT NULL"),
+    ("bar_close", "DECIMAL(20,2) DEFAULT NULL"),
+]
+
+
 def ensure_schema():
-    """Create market_state_bars if it does not exist."""
+    """Create market_state_bars if it does not exist, and add OHLC columns if missing."""
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(_DDL)
+        # ALTER TABLE to add OHLC columns if the table already existed without them
+        with conn.cursor() as cur:
+            cur.execute("SHOW COLUMNS FROM market_state_bars LIKE 'bar_open'")
+            if not cur.fetchone():
+                for col, definition in _OHLC_COLUMNS:
+                    with conn.cursor() as alter_cur:
+                        alter_cur.execute(
+                            f"ALTER TABLE market_state_bars ADD COLUMN {col} {definition}"
+                        )
+                logger.info("market_state_bars: added OHLC columns")
         logger.info("market_state_bars schema ready")
     except Exception:
         logger.exception("ensure_schema failed")

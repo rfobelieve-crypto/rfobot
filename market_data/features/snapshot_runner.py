@@ -21,7 +21,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from market_data.storage.db import run_migration
 from market_data.features.snapshot_repository import get_pending_snapshots, save_snapshot
 from market_data.features.snapshot_builder import build_snapshot
-from market_data.features.snapshot_scorer import score_snapshot
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,26 +42,13 @@ def _notify_telegram(features: dict):
     try:
         snap_type = features.get("snapshot_type", "?")
         uuid_short = features.get("event_uuid", "")[:8]
-        bias = features.get("bias", "?")
-        confidence = features.get("confidence_score", 0)
-        rev = features.get("reversal_score", 0)
-        cont = features.get("continuation_score", 0)
         side = features.get("liquidity_side", "?")
         symbol = features.get("canonical_symbol", "?")
-
-        bias_icon = {"reversal": "🔄", "continuation": "➡️", "neutral": "⚖️"}.get(bias, "❓")
-
-        final = features.get("final_score")
-        score_str = f"rev:{rev:.0f} cont:{cont:.0f} conf:{confidence:.2f}"
-        if final is not None:
-            score_str += f" score:{float(final):.1f}"
 
         lines = [
             f"📸 快照完成 [{snap_type}]",
             f"事件: {uuid_short} ({side.upper()}) {symbol}",
             f"─────────────",
-            f"{bias_icon} {bias}",
-            score_str,
         ]
 
         delta = features.get("delta_value")
@@ -123,15 +109,8 @@ def process_once() -> int:
 
         try:
             features = build_snapshot(item, snap_type, offset_sec)
-            scores = score_snapshot(features)
-
-            # Merge scores into snapshot dict
-            features["reversal_score"]    = scores["reversal_score"]
-            features["continuation_score"] = scores["continuation_score"]
-            features["confidence_score"]  = scores["confidence_score"]
-            features["bias"]              = scores["bias"]
-            features["final_score"]       = scores.get("final_score")
-            features["normalized_score"]  = scores.get("normalized_score")
+            features["final_score"]      = None
+            features["normalized_score"] = None
 
             save_snapshot(features)
             _notify_telegram(features)

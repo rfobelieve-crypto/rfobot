@@ -46,7 +46,7 @@ class ChartConfig:
     band_n_sigma: float       = 2.0
     show_oi:      bool        = False
     show_cvd:     bool        = False
-    annotation:   str         = "Data Source: @Orderflow_dao"
+    annotation:   str         = "Source: @rfo"
     colors:       ColorConfig = field(default_factory=ColorConfig)
 
 
@@ -57,6 +57,5 @@ class RunnerConfig:
     timeframes:       List[str] = field(default_factory=lambda: ["1h", "4h"])
     lookback_days:    int       = 7
     interval_seconds: int       = 60
-    score_model:      str       = "rule_based"
     band_window:      int       = 20
     band_n_sigma:     float     = 2.0

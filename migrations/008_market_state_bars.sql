@@ -36,10 +36,14 @@ CREATE TABLE IF NOT EXISTS market_state_bars (
     confidence          DECIMAL(10,4)  DEFAULT NULL,
     final_bias          VARCHAR(20)    DEFAULT NULL,
     risk_adj_score      DECIMAL(10,4)  DEFAULT NULL,
-    signal              TINYINT        NOT NULL DEFAULT 0,
+    `signal`            TINYINT        NOT NULL DEFAULT 0,
     score_model         VARCHAR(30)    DEFAULT NULL,
     -- Event overlay (event is a feature, not a condition for bar existence)
     event_count         INT            NOT NULL DEFAULT 0,
+    bar_open            DECIMAL(20,2)  DEFAULT NULL,
+    bar_high            DECIMAL(20,2)  DEFAULT NULL,
+    bar_low             DECIMAL(20,2)  DEFAULT NULL,
+    bar_close           DECIMAL(20,2)  DEFAULT NULL,
     computed_at         BIGINT         DEFAULT NULL,
     UNIQUE KEY uk_bar (symbol, timeframe, window_start),
     INDEX idx_lookup (symbol, timeframe, window_start)

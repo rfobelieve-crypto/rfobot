@@ -1,47 +1,95 @@
 """
-Model inference — load exported artifacts and predict.
+Model inference — regime-conditional multi-target prediction.
+
+v3: Uses up_move + down_move dual-model architecture.
+    Direction derived from (up_pred - down_pred) asymmetry.
+    Regime routing selects global or regime-specific model.
+    Falls back to legacy single model if regime_models/ not found.
 """
 from __future__ import annotations
 
 import json
 import logging
-import pickle
 from collections import deque
 from pathlib import Path
 
-import joblib
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+from scipy.stats import spearmanr
 
 logger = logging.getLogger(__name__)
 
 ARTIFACT_DIR = Path(__file__).parent / "model_artifacts"
+REGIME_DIR = ARTIFACT_DIR / "regime_models"
 
-DEADZONE_Z = 0.1
-STRONG_THRESHOLD = 70
-MODERATE_THRESHOLD = 40
-ROLLING_WINDOW = 48  # 2 days of 1h bars
+# ── Parameters ────────────────────────────────────────────────────────────
+STRENGTH_DEADZONE = 0.15     # |up_pred - down_pred| below this → NEUTRAL
+STRONG_THRESHOLD = 90.0      # confidence percentile for Strong
+MODERATE_THRESHOLD = 65.0    # confidence percentile for Moderate
+HORIZON_BARS = 4             # 4h prediction horizon (4 x 1h bars)
+MIN_MAG_HISTORY = 30         # minimum bars before mag_score is valid
+MIN_REGIME_IC_HISTORY = 50   # minimum bars per regime before IC is meaningful
+REGIME_BLEND_WEIGHT = 0.35   # weight for regime-specific model (vs global)
+
+# Regime models to use (skip strength_vol_adj — no signal)
+ACTIVE_TARGETS = ["up_move_vol_adj", "down_move_vol_adj"]
 
 
 class IndicatorEngine:
-    """Stateful prediction engine with rolling z-score."""
+    """Stateful prediction engine with regime-conditional dual-target models."""
 
     def __init__(self):
-        # Load XGBoost model (Ridge removed — negative IC on 1h data)
-        self.xgb_model = xgb.XGBRegressor()
-        self.xgb_model.load_model(str(ARTIFACT_DIR / "xgb_model.json"))
+        if REGIME_DIR.exists():
+            self._load_regime_models()
+        else:
+            self._load_legacy_model()
+
+        # Regime IC tracking (persists across calls)
+        self.regime_history: dict[str, list[tuple[float, float]]] = {}
+
+    def _load_regime_models(self):
+        """Load multi-target regime-conditional models."""
+        self.mode = "regime"
+
+        with open(REGIME_DIR / "feature_cols.json") as f:
+            self.feature_cols = json.load(f)
+
+        with open(REGIME_DIR / "training_stats.json") as f:
+            stats = json.load(f)
+        self.pred_history = deque(stats.get("pred_history", []), maxlen=500)
+
+        # Load models: {target: {regime: XGBRegressor}}
+        self.models: dict[str, dict[str, xgb.XGBRegressor]] = {}
+        for target in ACTIVE_TARGETS:
+            tdir = REGIME_DIR / target
+            self.models[target] = {}
+            for fname in tdir.glob("*_xgb.json"):
+                regime_key = fname.stem.replace("_xgb", "").upper()
+                if regime_key == "GLOBAL":
+                    regime_key = "global"
+                m = xgb.XGBRegressor()
+                m.load_model(str(fname))
+                self.models[target][regime_key] = m
+
+        model_count = sum(len(v) for v in self.models.values())
+        logger.info("IndicatorEngine v3 loaded: %d features, %d models, %d warmup bars",
+                     len(self.feature_cols), model_count, len(self.pred_history))
+
+    def _load_legacy_model(self):
+        """Fallback: load single model (v2 compatibility)."""
+        self.mode = "legacy"
+        self.legacy_model = xgb.XGBRegressor()
+        self.legacy_model.load_model(str(ARTIFACT_DIR / "xgb_model.json"))
 
         with open(ARTIFACT_DIR / "feature_cols.json") as f:
             self.feature_cols = json.load(f)
 
-        # Load warmup history for z-score
         with open(ARTIFACT_DIR / "training_stats.json") as f:
             stats = json.load(f)
         self.pred_history = deque(stats.get("pred_history", []), maxlen=500)
 
-        logger.info("IndicatorEngine loaded: %d features, %d warmup bars",
-                     len(self.feature_cols), len(self.pred_history))
+        logger.info("IndicatorEngine legacy loaded: %d features", len(self.feature_cols))
 
     def predict(self, features: pd.DataFrame) -> pd.DataFrame:
         """
@@ -53,53 +101,124 @@ class IndicatorEngine:
         # Align features
         missing = [c for c in self.feature_cols if c not in features.columns]
         if missing:
-            logger.warning("Missing features (forward-filled): %s", missing)
+            logger.warning("Missing features (zero-filled): %s", missing)
             for c in missing:
                 features[c] = np.nan
-            features = features.ffill()
 
         X = features[self.feature_cols].fillna(0).values
 
-        # Predict (XGBoost only — Ridge was negative IC on 1h data)
-        pred_raw = self.xgb_model.predict(X)
-        agreement = np.ones(len(pred_raw))  # no ensemble → always 1.0
+        # Regime detection (trailing-only)
+        regime = self._assign_regime(features)
 
-        # Rolling z-score using history
-        pred_z = np.full(len(pred_raw), np.nan)
-        confidence = np.full(len(pred_raw), np.nan)
+        if self.mode == "regime":
+            return self._predict_regime(features, X, regime)
+        else:
+            return self._predict_legacy(features, X, regime)
 
-        for i in range(len(pred_raw)):
-            self.pred_history.append(float(pred_raw[i]))
+    # ── Regime-conditional prediction ─────────────────────────────────────
 
-            if len(self.pred_history) < 50:
-                continue
+    def _predict_regime(self, features: pd.DataFrame,
+                        X: np.ndarray, regime: np.ndarray) -> pd.DataFrame:
+        n = len(X)
 
-            hist = list(self.pred_history)
-            window = hist[-ROLLING_WINDOW:] if len(hist) >= ROLLING_WINDOW else hist
-            mu = np.mean(window)
-            sigma = np.std(window)
-            if sigma < 1e-10:
-                pred_z[i] = 0.0
-            else:
-                pred_z[i] = (pred_raw[i] - mu) / sigma
+        # Predict up_move and down_move per bar
+        up_pred = np.zeros(n)
+        down_pred = np.zeros(n)
 
-            # Confidence from z-score percentile
-            abs_z_hist = np.abs(np.array(window) - mu) / max(sigma, 1e-10)
-            mag_pct = (abs_z_hist < abs(pred_z[i])).sum() / len(abs_z_hist) * 100
-            agree_w = 0.5 + 0.5 * agreement[i]
-            confidence[i] = min(mag_pct * agree_w, 100)
+        for i in range(n):
+            r = regime[i]
+            x_i = X[i:i+1]  # shape (1, n_features)
 
-        # Direction & strength
-        direction = np.where(pred_z > DEADZONE_Z, "UP",
-                    np.where(pred_z < -DEADZONE_Z, "DOWN", "NEUTRAL"))
-        direction[np.isnan(pred_z)] = "NEUTRAL"
+            for target, arr in [("up_move_vol_adj", up_pred),
+                                ("down_move_vol_adj", down_pred)]:
+                models = self.models[target]
+                global_model = models.get("global")
+                regime_model = models.get(r)
 
-        strength = np.full(len(pred_z), "Weak", dtype=object)
+                if global_model is None:
+                    continue
+
+                global_pred = float(global_model.predict(x_i)[0])
+
+                if regime_model is not None and r != "WARMUP":
+                    regime_pred = float(regime_model.predict(x_i)[0])
+                    arr[i] = ((1 - REGIME_BLEND_WEIGHT) * global_pred +
+                              REGIME_BLEND_WEIGHT * regime_pred)
+                else:
+                    arr[i] = global_pred
+
+        # Ensure non-negative (up/down moves are always >= 0)
+        up_pred = np.maximum(up_pred, 0)
+        down_pred = np.maximum(down_pred, 0)
+
+        # Strength = up - down (positive = bullish asymmetry)
+        strength = up_pred - down_pred
+
+        # Direction from strength asymmetry
+        direction = np.where(strength > STRENGTH_DEADZONE, "UP",
+                    np.where(strength < -STRENGTH_DEADZONE, "DOWN", "NEUTRAL"))
+
+        # Synthetic pred_return_4h (for chart compatibility)
+        # Scale strength to approximate return scale
+        pred_return = strength * 0.003  # rough scaling factor
+
+        # Mag score (expanding percentile of |strength|)
+        mag_score = self._compute_mag_score(strength)
+
+        # Actual returns for regime IC
+        y_actual = self._compute_actual_returns(features)
+
+        # Regime score (trailing IC)
+        regime_score = self._compute_regime_score(strength, y_actual, regime)
+
+        # Composite confidence
+        confidence = np.clip(mag_score * regime_score, 0, 100)
+
+        # Strength tiers
+        strength_tier = np.full(n, "Weak", dtype=object)
+        strength_tier[confidence >= MODERATE_THRESHOLD] = "Moderate"
+        strength_tier[confidence >= STRONG_THRESHOLD] = "Strong"
+        strength_tier[np.isnan(confidence)] = "Weak"
+
+        # Bull/Bear Power
+        bbp = self._compute_bbp(features)
+
+        out = pd.DataFrame(index=features.index)
+        out["pred_return_4h"] = pred_return
+        out["pred_direction"] = direction
+        out["confidence_score"] = confidence
+        out["strength_score"] = strength_tier
+        out["bull_bear_power"] = bbp
+        out["regime"] = regime
+        out["up_pred"] = up_pred
+        out["down_pred"] = down_pred
+        out["strength_raw"] = strength
+
+        for c in ["open", "high", "low", "close"]:
+            if c in features.columns:
+                out[c] = features[c].values
+
+        return out
+
+    # ── Legacy prediction (v2 fallback) ───────────────────────────────────
+
+    def _predict_legacy(self, features: pd.DataFrame,
+                        X: np.ndarray, regime: np.ndarray) -> pd.DataFrame:
+        pred_raw = self.legacy_model.predict(X)
+
+        direction = np.where(pred_raw > 0.0006, "UP",
+                    np.where(pred_raw < -0.0006, "DOWN", "NEUTRAL"))
+
+        y_actual = self._compute_actual_returns(features)
+        mag_score = self._compute_mag_score(pred_raw)
+        regime_score = self._compute_regime_score(pred_raw, y_actual, regime)
+        confidence = np.clip(mag_score * regime_score, 0, 100)
+
+        strength = np.full(len(pred_raw), "Weak", dtype=object)
         strength[confidence >= MODERATE_THRESHOLD] = "Moderate"
         strength[confidence >= STRONG_THRESHOLD] = "Strong"
         strength[np.isnan(confidence)] = "Weak"
 
-        # Bull/Bear Power
         bbp = self._compute_bbp(features)
 
         out = pd.DataFrame(index=features.index)
@@ -108,16 +227,104 @@ class IndicatorEngine:
         out["confidence_score"] = confidence
         out["strength_score"] = strength
         out["bull_bear_power"] = bbp
-        out["regime"] = "LIVE"
+        out["regime"] = regime
 
-        # Add OHLCV for chart
         for c in ["open", "high", "low", "close"]:
             if c in features.columns:
                 out[c] = features[c].values
 
         return out
 
-    def _compute_bbp(self, df: pd.DataFrame) -> np.ndarray:
+    # ── Regime detection (same logic as research) ─────────────────────────
+
+    @staticmethod
+    def _assign_regime(df: pd.DataFrame) -> np.ndarray:
+        """Trailing-only regime classification from close prices."""
+        close = df["close"]
+        log_ret = np.log(close / close.shift(1))
+
+        ret_24h = close.pct_change(24)
+        vol_24h = log_ret.rolling(24).std()
+        vol_pct = vol_24h.expanding(min_periods=168).rank(pct=True)
+
+        regime = np.full(len(df), "CHOPPY", dtype=object)
+        regime[(vol_pct > 0.6).values & (ret_24h > 0.005).values] = "TRENDING_BULL"
+        regime[(vol_pct > 0.6).values & (ret_24h < -0.005).values] = "TRENDING_BEAR"
+        regime[:168] = "WARMUP"
+
+        return regime
+
+    # ── Actual returns for regime IC ──────────────────────────────────────
+
+    @staticmethod
+    def _compute_actual_returns(df: pd.DataFrame) -> np.ndarray:
+        close = df["close"].values.astype(float)
+        y = np.full(len(close), np.nan)
+        for i in range(len(close) - HORIZON_BARS):
+            y[i] = close[i + HORIZON_BARS] / close[i] - 1
+        return y
+
+    # ── Mag score (expanding percentile) ──────────────────────────────────
+
+    def _compute_mag_score(self, pred: np.ndarray) -> np.ndarray:
+        """Percentile of |pred| in expanding history. Range: 0-100."""
+        abs_pred = np.abs(pred)
+        mag_score = np.full(len(pred), np.nan)
+
+        for i in range(len(pred)):
+            if np.isnan(pred[i]):
+                continue
+            self.pred_history.append(float(abs_pred[i]))
+
+            if len(self.pred_history) < MIN_MAG_HISTORY:
+                continue
+
+            hist_arr = np.array(list(self.pred_history)[:-1])
+            mag_score[i] = (hist_arr < abs_pred[i]).sum() / len(hist_arr) * 100
+
+        return mag_score
+
+    # ── Regime score (trailing IC) ────────────────────────────────────────
+
+    def _compute_regime_score(self, pred: np.ndarray, y: np.ndarray,
+                              regime: np.ndarray) -> np.ndarray:
+        regime_score = np.full(len(pred), np.nan)
+
+        for i in range(len(pred)):
+            if np.isnan(pred[i]):
+                continue
+
+            r = regime[i]
+            if r == "WARMUP":
+                regime_score[i] = 0.6
+                continue
+
+            if r in self.regime_history and len(self.regime_history[r]) >= MIN_REGIME_IC_HISTORY:
+                hist = self.regime_history[r]
+                preds = np.array([h[0] for h in hist])
+                actuals = np.array([h[1] for h in hist])
+                ic, _ = spearmanr(preds, actuals)
+
+                if ic > 0.03:
+                    regime_score[i] = 1.0
+                elif ic > 0:
+                    regime_score[i] = 0.6
+                else:
+                    regime_score[i] = 0.0
+            else:
+                regime_score[i] = 0.6
+
+            if not np.isnan(y[i]):
+                if r not in self.regime_history:
+                    self.regime_history[r] = []
+                self.regime_history[r].append((float(pred[i]), float(y[i])))
+
+        return regime_score
+
+    # ── Bull/Bear Power ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _compute_bbp(df: pd.DataFrame) -> np.ndarray:
         """Bull/Bear Power from available Coinglass z-scores."""
         components = []
 

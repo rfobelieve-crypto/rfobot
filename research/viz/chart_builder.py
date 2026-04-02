@@ -119,6 +119,8 @@ def load_and_build(
 
     if callable(ohlc_source):
         ohlc_df = ohlc_source(symbol, start_ms, now_ms)
+    elif ohlc_source == "trades":
+        ohlc_df = _ohlc_from_score_df(score_df)
     else:
         ohlc_df = _load_ohlc_from_trades(symbol, timeframe, start_ms, now_ms)
 
@@ -149,10 +151,7 @@ def _apply_layout(fig: go.Figure, config: ChartConfig, n_rows: int):
     c = config.colors
     fig.update_layout(
         title=dict(
-            text=(
-                f"{config.symbol} — Risk-Adjusted Reversal  "
-                f"(Dynamic Bands: {config.band_n_sigma}σ)"
-            ),
+            text="BTC-Liquidity Microstructure Research Engine",
             font=dict(size=16, color=c.text_color),
         ),
         template="plotly_dark",
@@ -189,6 +188,28 @@ def _apply_layout(fig: go.Figure, config: ChartConfig, n_rows: int):
         linecolor=c.grid_color,
         showgrid=True,
     )
+
+
+def _ohlc_from_score_df(score_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Extract OHLC from market_state_bars (bar_open/high/low/close columns).
+    Returns DataFrame with [timestamp, open, high, low, close], dropping bars
+    where price data is NULL (bars computed before the OHLC columns were added).
+    """
+    needed = ["timestamp", "bar_open", "bar_high", "bar_low", "bar_close"]
+    if not all(c in score_df.columns for c in needed):
+        return pd.DataFrame()
+    df = score_df[needed].dropna(subset=["bar_open", "bar_close"]).copy()
+    if df.empty:
+        return pd.DataFrame()
+    for col in ["bar_open", "bar_high", "bar_low", "bar_close"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df.rename(columns={
+        "bar_open":  "open",
+        "bar_high":  "high",
+        "bar_low":   "low",
+        "bar_close": "close",
+    })
 
 
 def _load_ohlc_from_trades(
@@ -234,6 +255,10 @@ def _load_ohlc_from_trades(
         if not rows:
             return pd.DataFrame()
         df = pd.DataFrame(rows)
+        df["bar_start_ms"] = pd.to_numeric(df["bar_start_ms"])
+        for col in ["open", "high", "low", "close"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col])
         df["timestamp"] = (
             pd.to_datetime(df["bar_start_ms"], unit="ms", utc=True)
             .dt.tz_convert("Asia/Taipei")

@@ -35,3 +35,25 @@ Confused two different metrics. delta/volume ratio measures buy-sell pressure, n
 
 **Correct approach:**
 Return None when normalized_trades has no data. Don't fabricate price estimates from flow data.
+
+---
+
+## 2026-04-01: 把 MACD / EMA 放進訂單流研究的特徵集
+
+**What happened:**
+`feature_builder_v2.py` 計算了 `ema_9`, `ema_21`, `macd`, `macd_signal` 並寫入 features 表。這些欄位出現在 feature validation 結果中，ICIR 看起來很高（-0.85~-0.91），但這根本不該存在。
+
+**Root cause:**
+誤把傳統技術指標混入訂單流研究。這個專案的研究範疇是純訂單流（CVD、delta_ratio、aggTrade flow、funding rate、OI），不包含 price-derived 的技術指標如 MACD / EMA / RSI 等。
+
+**Correct approach:**
+feature_builder_v2.py 只能包含以下來源的特徵：
+- aggTrade flow（CVD、delta_ratio、buy/sell vol、large order）
+- Funding rate（rate、deviation、zscore）
+- OI（未來補充）
+- Cross-exchange divergence
+- 純統計衍生（realized vol、return lags）— 可接受，因為是 price behavior 而非 pattern indicator
+
+MACD / EMA / Bollinger 等技術指標一律不加。
+
+**Rule:** 每次加新特徵前先問：「這是訂單流資料還是技術指標？」技術指標一律排除。

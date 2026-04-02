@@ -32,13 +32,6 @@ def make_candle_trace(ohlc_df: pd.DataFrame, config: ChartConfig) -> go.Candlest
         decreasing_fillcolor=c.candle_down,
         name=config.symbol,
         showlegend=True,
-        hovertemplate=(
-            "<b>%{x}</b><br>"
-            "O: %{open:,.2f}<br>"
-            "H: %{high:,.2f}<br>"
-            "L: %{low:,.2f}<br>"
-            "C: %{close:,.2f}<extra></extra>"
-        ),
     )
 
 

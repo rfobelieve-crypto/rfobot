@@ -94,11 +94,11 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         c = sig.iloc[i]["confidence_score"]
         s = sig.iloc[i]["strength_score"]
 
-        if d == "NEUTRAL" or pd.isna(c) or c < 40:
+        if d == "NEUTRAL" or pd.isna(c) or s != "Strong":
             continue
 
-        msize = 12 if s == "Strong" else 7
-        alpha = max(0.3, min(c / 100, 1.0))
+        msize = 12
+        alpha = max(0.5, min(c / 100, 1.0))
 
         if d == "UP":
             y_pos = lows[i] - offset
@@ -127,12 +127,10 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     # Legend
     legend_elements = [
         plt.scatter([], [], marker="^", color="#004d40", s=144, label="Strong UP"),
-        plt.scatter([], [], marker="^", color="#26a69a", s=49, label="UP"),
         plt.scatter([], [], marker="v", color="#b71c1c", s=144, label="Strong DOWN"),
-        plt.scatter([], [], marker="v", color="#ef5350", s=49, label="DOWN"),
     ]
     ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
-                    framealpha=0.8, ncol=4)
+                    framealpha=0.8, ncol=2)
 
     # Latest prediction annotation
     strong_sigs = sig[(sig["pred_direction"] != "NEUTRAL") & (sig["strength_score"] == "Strong")]

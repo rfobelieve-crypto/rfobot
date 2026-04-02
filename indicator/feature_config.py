@@ -80,19 +80,16 @@ TIME_FEATURES = [
 ]
 
 # ── All feature columns (used for training and inference) ─────────────────
-# Note: VOLUME_DYNAMICS tested but degraded walk-forward ICIR (2.37→0.71).
-# Single-feature IC was positive but caused instability in fold 3.
-# Kept as computed features but NOT included in model training.
+# v3 regime models use all features including VOLUME_DYNAMICS.
 ALL_FEATURES = (KLINE_DERIVED + COINGLASS_RAW + COINGLASS_ZSCORE
-                + COINGLASS_CROSS + TIME_FEATURES + MOMENTUM_FEATURES)
+                + COINGLASS_CROSS + TIME_FEATURES + MOMENTUM_FEATURES
+                + VOLUME_DYNAMICS)
 
 # ── Columns never used as features ────────────────────────────────────────
 EXCLUDE = {
     "ts_open", "open", "high", "low", "close", "volume",
     "taker_buy_vol", "taker_buy_quote", "trade_count",
     "y_return_4h", "actual_return_4h",
-    # IC-tested but degraded walk-forward ICIR (2.37→0.71)
-    "vol_acceleration", "vol_kurtosis", "vol_entropy", "squeeze_proxy",
 }
 
 # ── Bull/Bear Power components (rule-based, not model features) ───────────

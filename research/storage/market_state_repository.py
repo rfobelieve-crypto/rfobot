@@ -20,12 +20,14 @@ INSERT INTO market_state_bars (
     funding_rate, liq_total_usd,
     rolling_mean, rolling_std, upper_band, lower_band, z_score,
     reversal_score, continuation_score, confidence,
-    final_bias, risk_adj_score, signal, score_model,
-    event_count, computed_at
+    final_bias, risk_adj_score, `signal`, score_model,
+    event_count, computed_at,
+    bar_open, bar_high, bar_low, bar_close
 ) VALUES (
     %s,%s,%s,%s, %s,%s,%s, %s,%s, %s,%s,%s,
     %s,%s, %s,%s, %s,%s,%s,%s,%s,
-    %s,%s,%s, %s,%s,%s,%s, %s,%s
+    %s,%s,%s, %s,%s,%s,%s, %s,%s,
+    %s,%s,%s,%s
 )
 ON DUPLICATE KEY UPDATE
     delta_usd=VALUES(delta_usd), delta_ratio=VALUES(delta_ratio),
@@ -41,9 +43,13 @@ ON DUPLICATE KEY UPDATE
     reversal_score=VALUES(reversal_score),
     continuation_score=VALUES(continuation_score),
     confidence=VALUES(confidence), final_bias=VALUES(final_bias),
-    risk_adj_score=VALUES(risk_adj_score), signal=VALUES(signal),
+    risk_adj_score=VALUES(risk_adj_score), `signal`=VALUES(`signal`),
     score_model=VALUES(score_model),
-    event_count=VALUES(event_count), computed_at=VALUES(computed_at)
+    event_count=VALUES(event_count), computed_at=VALUES(computed_at),
+    bar_open=COALESCE(VALUES(bar_open), bar_open),
+    bar_high=COALESCE(VALUES(bar_high), bar_high),
+    bar_low=COALESCE(VALUES(bar_low), bar_low),
+    bar_close=COALESCE(VALUES(bar_close), bar_close)
 """
 
 
@@ -62,6 +68,8 @@ def upsert_bar(row: dict):
         row.get("final_bias"), row.get("risk_adj_score"),
         row.get("signal", 0), row.get("score_model"),
         row.get("event_count", 0), int(time.time()),
+        row.get("bar_open"), row.get("bar_high"),
+        row.get("bar_low"), row.get("bar_close"),
     )
     conn = get_db_conn()
     try:
@@ -99,6 +107,13 @@ def query_bars(
         if not rows:
             return pd.DataFrame()
         df = pd.DataFrame(rows)
+        # pymysql returns DECIMAL columns as decimal.Decimal;
+        # convert all object columns to numeric so float arithmetic works.
+        for col in df.columns:
+            if df[col].dtype == object:
+                converted = pd.to_numeric(df[col], errors="coerce")
+                if converted.notna().any():
+                    df[col] = converted
         df["timestamp"] = (
             pd.to_datetime(df["window_start"], unit="ms", utc=True)
             .dt.tz_convert("Asia/Taipei")

@@ -51,6 +51,7 @@ def assemble_features(
     funding      = _query_funding(symbol, window_start_ms)
     liq_total    = _query_liq(symbol, window_start_ms, window_end_ms)
     ev_count     = count_events(symbol, window_start_ms, window_end_ms)
+    ohlc         = _query_ohlc(symbol, window_start_ms, window_end_ms)
 
     # ── Features ────────────────────────────────────────────────────────────
     delta_f  = compute_delta(flow_df)
@@ -77,6 +78,8 @@ def assemble_features(
         "liq_total_usd": liq_total,
         # event overlay
         "event_count":   ev_count,
+        # OHLC
+        **ohlc,
     }
 
 
@@ -101,7 +104,12 @@ def _query_flow_bars(
         with conn.cursor() as cur:
             cur.execute(sql, (symbol, start_ms, end_ms))
             rows = cur.fetchall()
-            return pd.DataFrame(rows) if rows else None
+        if not rows:
+            return None
+        df = pd.DataFrame(rows)
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df
     except Exception:
         logger.exception("_query_flow_bars failed")
         return None
@@ -139,7 +147,12 @@ def _query_lookback_flow(
         with conn.cursor() as cur:
             cur.execute(sql, (tf_ms, tf_ms, symbol, lookback_start, before_ms))
             rows = cur.fetchall()
-            return pd.DataFrame(rows) if rows else None
+        if not rows:
+            return None
+        df = pd.DataFrame(rows)
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df
     except Exception:
         return None
     finally:
@@ -197,6 +210,57 @@ def _query_funding(symbol: str, ts_ms: int) -> Optional[float]:
             return float(row["funding_rate"]) if row else None
     except Exception:
         return None
+    finally:
+        conn.close()
+
+
+def _query_ohlc(symbol: str, start_ms: int, end_ms: int) -> dict:
+    """
+    OHLC prices from normalized_trades for the bar window.
+    Returns empty dict if no data (bar will have NULL prices).
+    Uses separate open/close queries to avoid duplicate-row issues
+    when multiple trades share the same ts_exchange.
+    """
+    from shared.db import get_db_conn
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT MIN(price) AS bar_low, MAX(price) AS bar_high, "
+                "MIN(ts_exchange) AS first_ts, MAX(ts_exchange) AS last_ts "
+                "FROM normalized_trades "
+                "WHERE canonical_symbol=%s AND ts_exchange>=%s AND ts_exchange<%s",
+                (symbol, start_ms, end_ms),
+            )
+            mm = cur.fetchone()
+        if not mm or mm["bar_low"] is None:
+            return {}
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT price FROM normalized_trades "
+                "WHERE canonical_symbol=%s AND ts_exchange=%s LIMIT 1",
+                (symbol, mm["first_ts"]),
+            )
+            open_row = cur.fetchone()
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT price FROM normalized_trades "
+                "WHERE canonical_symbol=%s AND ts_exchange=%s LIMIT 1",
+                (symbol, mm["last_ts"]),
+            )
+            close_row = cur.fetchone()
+
+        return {
+            "bar_open":  float(open_row["price"]) if open_row else None,
+            "bar_high":  float(mm["bar_high"]),
+            "bar_low":   float(mm["bar_low"]),
+            "bar_close": float(close_row["price"]) if close_row else None,
+        }
+    except Exception:
+        logger.exception("_query_ohlc failed @ %d", start_ms)
+        return {}
     finally:
         conn.close()
 
