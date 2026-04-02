@@ -19,8 +19,12 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+import requests
 import pandas as pd
 from flask import Flask, Response, jsonify
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,6 +48,45 @@ _state = {
 }
 _lock = threading.Lock()
 _engine = None
+
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+
+
+def _send_telegram_photo(png: bytes, caption: str):
+    """Send chart PNG to Telegram."""
+    if not BOT_TOKEN or not CHAT_ID:
+        logger.warning("Telegram credentials not set, skipping photo send")
+        return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+    try:
+        resp = requests.post(url, data={
+            "chat_id": CHAT_ID,
+            "caption": caption,
+        }, files={
+            "photo": ("indicator.png", png, "image/png"),
+        }, timeout=30)
+        if resp.ok:
+            logger.info("Telegram photo sent OK")
+        else:
+            logger.error("Telegram photo failed: %s %s", resp.status_code, resp.text[:200])
+    except Exception as e:
+        logger.error("Telegram photo send failed: %s", e)
+
+
+def _send_telegram_text(message: str):
+    """Send HTML text alert to Telegram."""
+    if not BOT_TOKEN or not CHAT_ID:
+        return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    try:
+        requests.post(url, data={
+            "chat_id": CHAT_ID,
+            "text": message,
+            "parse_mode": "HTML",
+        }, timeout=15)
+    except Exception as e:
+        logger.error("Telegram text send failed: %s", e)
 
 
 def _load_history() -> pd.DataFrame:
@@ -140,10 +183,41 @@ def update_cycle():
             _state["status"] = "healthy"
             _state["error"] = None
 
+        # 7. Send to Telegram
+        direction = str(last_row.get("pred_direction", "?"))
+        conf = float(last_row["confidence_score"]) if not _is_nan(last_row.get("confidence_score")) else 0
+        strength = str(last_row.get("strength_score", "Weak"))
+        pred_ret = float(last_row.get("pred_return_4h", 0)) * 100
+        bbp = float(last_row.get("bull_bear_power", 0))
+        price = float(last_row["close"]) if "close" in last_row.index else 0
+        now_str = datetime.now(timezone.utc).strftime("%m/%d %H:%M UTC")
+
+        arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
+        caption = (
+            f"{arrow} BTC 4h Indicator | {now_str}\n"
+            f"Price: ${price:,.0f}\n"
+            f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
+            f"Pred: {pred_ret:+.2f}% | BBP: {bbp:+.2f}"
+        )
+        _send_telegram_photo(png, caption)
+
+        # Strong signal alert
+        if strength == "Strong" and direction in ("UP", "DOWN"):
+            regime = str(last_row.get("regime", "?"))
+            icon = "\U0001f7e2" if direction == "UP" else "\U0001f534"
+            alert = (
+                f"{icon} <b>STRONG {direction} SIGNAL</b>\n\n"
+                f"BTC ${price:,.0f}\n"
+                f"Pred: {pred_ret:+.2f}% (4h)\n"
+                f"Confidence: {conf:.0f}\n"
+                f"Regime: {regime}\n\n"
+                f"{now_str}"
+            )
+            _send_telegram_text(alert)
+            logger.info("Strong signal alert sent: %s", direction)
+
         logger.info("Update complete: %s conf=%.0f %s",
-                     last_row.get("pred_direction", "?"),
-                     last_row.get("confidence_score", 0) if not _is_nan(last_row.get("confidence_score")) else 0,
-                     last_row.get("strength_score", "?"))
+                     direction, conf, strength)
 
     except Exception as e:
         logger.exception("Update cycle failed")
