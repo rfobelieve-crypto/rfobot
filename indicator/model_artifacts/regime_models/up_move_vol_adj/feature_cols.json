@@ -36,7 +36,6 @@
   "cg_oi_delta_mom_1h",
   "cg_oi_delta_slope_4h",
   "cg_oi_delta_zscore",
-  "cg_oi_range_pct",
   "cg_oi_range_zscore",
   "cg_taker_buy",
   "cg_taker_delta",

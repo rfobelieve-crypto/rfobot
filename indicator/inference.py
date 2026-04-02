@@ -49,9 +49,10 @@ class IndicatorEngine:
         self.regime_history: dict[str, list[tuple[float, float]]] = {}
 
     def _load_regime_models(self):
-        """Load multi-target regime-conditional models."""
+        """Load multi-target regime-conditional models with per-target features."""
         self.mode = "regime"
 
+        # Superset feature_cols (for missing-feature warnings)
         with open(REGIME_DIR / "feature_cols.json") as f:
             self.feature_cols = json.load(f)
 
@@ -59,12 +60,25 @@ class IndicatorEngine:
             stats = json.load(f)
         self.pred_history = deque(stats.get("pred_history", []), maxlen=500)
 
+        # Per-target feature cols (v4: target-specific feature selection)
+        self.target_feature_cols: dict[str, list[str]] = {}
+        for target in ACTIVE_TARGETS:
+            target_fc_path = REGIME_DIR / target / "feature_cols.json"
+            if target_fc_path.exists():
+                with open(target_fc_path) as f:
+                    self.target_feature_cols[target] = json.load(f)
+            else:
+                # Fallback: use shared feature_cols (backward compatible)
+                self.target_feature_cols[target] = self.feature_cols
+
         # Load models: {target: {regime: XGBRegressor}}
         self.models: dict[str, dict[str, xgb.XGBRegressor]] = {}
         for target in ACTIVE_TARGETS:
             tdir = REGIME_DIR / target
             self.models[target] = {}
             for fname in tdir.glob("*_xgb.json"):
+                if fname.name == "feature_cols.json":
+                    continue
                 regime_key = fname.stem.replace("_xgb", "").upper()
                 if regime_key == "GLOBAL":
                     regime_key = "global"
@@ -73,8 +87,10 @@ class IndicatorEngine:
                 self.models[target][regime_key] = m
 
         model_count = sum(len(v) for v in self.models.values())
-        logger.info("IndicatorEngine v3 loaded: %d features, %d models, %d warmup bars",
-                     len(self.feature_cols), model_count, len(self.pred_history))
+        for t, fc in self.target_feature_cols.items():
+            logger.info("  %s: %d features", t, len(fc))
+        logger.info("IndicatorEngine v4 loaded: %d models, %d warmup bars",
+                     model_count, len(self.pred_history))
 
     def _load_legacy_model(self):
         """Fallback: load single model (v2 compatibility)."""
@@ -98,28 +114,33 @@ class IndicatorEngine:
         Returns DataFrame with: pred_return_4h, pred_direction,
         confidence_score, strength_score, bull_bear_power, regime
         """
-        # Align features
+        # Align features (check superset — individual targets may need subsets)
         missing = [c for c in self.feature_cols if c not in features.columns]
         if missing:
             logger.warning("Missing features (zero-filled): %s", missing)
             for c in missing:
                 features[c] = np.nan
 
-        X = features[self.feature_cols].fillna(0).values
-
         # Regime detection (trailing-only)
         regime = self._assign_regime(features)
 
         if self.mode == "regime":
-            return self._predict_regime(features, X, regime)
+            return self._predict_regime(features, None, regime)
         else:
+            X = features[self.feature_cols].fillna(0).values
             return self._predict_legacy(features, X, regime)
 
     # ── Regime-conditional prediction ─────────────────────────────────────
 
     def _predict_regime(self, features: pd.DataFrame,
                         X: np.ndarray, regime: np.ndarray) -> pd.DataFrame:
-        n = len(X)
+        n = len(features)
+
+        # Build per-target X matrices (may differ in feature count)
+        target_X: dict[str, np.ndarray] = {}
+        for target in ACTIVE_TARGETS:
+            tc = self.target_feature_cols.get(target, self.feature_cols)
+            target_X[target] = features[tc].fillna(0).values
 
         # Predict up_move and down_move per bar
         up_pred = np.zeros(n)
@@ -127,10 +148,10 @@ class IndicatorEngine:
 
         for i in range(n):
             r = regime[i]
-            x_i = X[i:i+1]  # shape (1, n_features)
 
             for target, arr in [("up_move_vol_adj", up_pred),
                                 ("down_move_vol_adj", down_pred)]:
+                x_i = target_X[target][i:i+1]
                 models = self.models[target]
                 global_model = models.get("global")
                 regime_model = models.get(r)

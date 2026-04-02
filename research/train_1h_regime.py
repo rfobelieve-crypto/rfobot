@@ -41,6 +41,26 @@ HORIZON = 4  # 4h = 4 × 1h bars
 
 TARGETS = ["up_move_vol_adj", "down_move_vol_adj", "strength_vol_adj"]
 
+# ── Per-target feature selection (validated by target_feature_selection.py) ──
+# Only add features that IMPROVE the specific target's ICIR across all folds.
+# up_move:  +pctchg_8h (ΔICIR +1.65) +oi_range_zscore (ΔICIR +1.63)  → combo ICIR 4.04
+# down_move: +oi_range_pct only (ΔICIR +0.15) — all others HARMFUL
+# strength:  NO new features — all 11 candidates HARMFUL
+NEW_FEATURES = {
+    "cg_oi_close_pctchg_4h", "cg_oi_close_pctchg_8h",
+    "cg_oi_close_pctchg_12h", "cg_oi_close_pctchg_24h",
+    "cg_oi_range", "cg_oi_range_zscore", "cg_oi_range_pct",
+    "cg_oi_upper_shadow",
+    "cg_oi_binance_share_zscore",
+    "quote_vol_zscore", "quote_vol_ratio",
+}
+
+TARGET_EXTRA_FEATURES: dict[str, list[str]] = {
+    "up_move_vol_adj":   ["cg_oi_close_pctchg_8h", "cg_oi_range_zscore"],
+    "down_move_vol_adj": ["cg_oi_range_pct"],
+    "strength_vol_adj":  [],  # baseline only — all new features harmful
+}
+
 # Features to exclude (targets, OHLC, intermediate columns)
 EXCLUDE = {
     "open", "high", "low", "close",
@@ -125,27 +145,38 @@ def load_and_prepare() -> tuple[pd.DataFrame, list[str]]:
     df["regime_name"] = regime
 
     # ── Feature columns ───────────────────────────────────────────────────
-    feat_cols = sorted([c for c in df.columns if c not in EXCLUDE])
+    all_cols = sorted([c for c in df.columns if c not in EXCLUDE])
     df = df.dropna(subset=TARGETS)
 
     # Drop features with >10% NaN
-    nan_rate = df[feat_cols].isnull().mean()
+    nan_rate = df[all_cols].isnull().mean()
     drop = list(nan_rate[nan_rate > 0.10].index)
     if drop:
         print(f"  Dropping high-NaN features: {drop}")
-        feat_cols = [c for c in feat_cols if c not in drop]
+        all_cols = [c for c in all_cols if c not in drop]
 
-    df = df.dropna(subset=feat_cols)
+    df = df.dropna(subset=all_cols)
     df = df[df["regime_name"] != "WARMUP"]  # don't train on warmup
 
-    print(f"  Data: {len(df)} rows × {len(feat_cols)} features")
+    # Build per-target feature sets: base (no new features) + target-specific extras
+    base_cols = sorted([c for c in all_cols if c not in NEW_FEATURES])
+    target_feat_cols: dict[str, list[str]] = {}
+    for target in TARGETS:
+        extras = [f for f in TARGET_EXTRA_FEATURES.get(target, []) if f in all_cols]
+        target_feat_cols[target] = sorted(base_cols + extras)
+
+    print(f"  Data: {len(df)} rows")
+    print(f"  Base features: {len(base_cols)}")
+    for t in TARGETS:
+        extras = TARGET_EXTRA_FEATURES.get(t, [])
+        print(f"  {t}: {len(target_feat_cols[t])} features (+{len(extras)}: {extras})")
     print(f"  Regime distribution:")
     print(f"    {df['regime_name'].value_counts().to_string()}")
     print(f"  Target stats:")
     for t in TARGETS:
         print(f"    {t}: mean={df[t].mean():.4f}, std={df[t].std():.4f}")
 
-    return df, feat_cols
+    return df, target_feat_cols
 
 
 # ─── Metrics ──────────────────────────────────────────────────────────────────
@@ -229,7 +260,8 @@ def train_final(X: np.ndarray, y: np.ndarray) -> xgb.XGBRegressor:
 
 # ─── Run one target ───────────────────────────────────────────────────────────
 
-def run_target(df: pd.DataFrame, feat_cols: list[str], target: str) -> dict:
+def run_target(df: pd.DataFrame, feat_cols: list[str], target: str,
+               target_name: str = "") -> dict:
     X_all = df[feat_cols].fillna(0).values
     y_all = df[target].values
     results = {}
@@ -253,18 +285,19 @@ def run_target(df: pd.DataFrame, feat_cols: list[str], target: str) -> dict:
 
 # ─── Save models ──────────────────────────────────────────────────────────────
 
-def save_models(df: pd.DataFrame, feat_cols: list[str]):
-    """Save all regime-conditional models + metadata."""
+def save_models(df: pd.DataFrame, target_feat_cols: dict[str, list[str]]):
+    """Save all regime-conditional models + per-target feature_cols."""
     out_dir = ARTIFACT_DIR / "regime_models"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    model_manifest = {"targets": {}, "feature_cols": feat_cols}
+    model_manifest = {"targets": {}}
 
     for target in TARGETS:
+        feat_cols = target_feat_cols[target]
         tdir = out_dir / target
         tdir.mkdir(parents=True, exist_ok=True)
 
-        target_info = {"models": {}}
+        target_info = {"models": {}, "n_features": len(feat_cols)}
 
         # Global model
         X_all = df[feat_cols].fillna(0).values
@@ -272,7 +305,7 @@ def save_models(df: pd.DataFrame, feat_cols: list[str]):
         m = train_final(X_all, y_all)
         m.save_model(str(tdir / "global_xgb.json"))
         target_info["models"]["global"] = "global_xgb.json"
-        print(f"  [{target}] saved global_xgb.json")
+        print(f"  [{target}] saved global_xgb.json ({len(feat_cols)} features)")
 
         # Regime models
         for regime in ["TRENDING_BULL", "TRENDING_BEAR", "CHOPPY"]:
@@ -287,20 +320,30 @@ def save_models(df: pd.DataFrame, feat_cols: list[str]):
             target_info["models"][regime] = fname
             print(f"  [{target}] saved {fname}")
 
+        # Per-target feature_cols
+        with open(tdir / "feature_cols.json", "w") as f:
+            json.dump(feat_cols, f, indent=2)
+        print(f"  [{target}] saved feature_cols.json ({len(feat_cols)} cols)")
+
         model_manifest["targets"][target] = target_info
 
-    # Save feature cols and manifest
+    # Save superset feature_cols (union of all targets — for feature builder)
+    all_feats = sorted(set().union(*(target_feat_cols[t] for t in TARGETS)))
     with open(out_dir / "feature_cols.json", "w") as f:
-        json.dump(feat_cols, f, indent=2)
+        json.dump(all_feats, f, indent=2)
 
     with open(out_dir / "manifest.json", "w") as f:
         json.dump(model_manifest, f, indent=2)
 
     # Save training stats for confidence warmup
-    # Collect OOS predictions from strength_vol_adj global model
-    X_all = df[feat_cols].fillna(0).values
-    y_str = df["strength_vol_adj"].values
-    n = len(X_all)
+    # Use up_move - down_move OOS predictions (synthetic strength)
+    up_cols = target_feat_cols["up_move_vol_adj"]
+    down_cols = target_feat_cols["down_move_vol_adj"]
+    X_up = df[up_cols].fillna(0).values
+    X_down = df[down_cols].fillna(0).values
+    y_up = df["up_move_vol_adj"].values
+    y_down = df["down_move_vol_adj"].values
+    n = len(df)
     fold = n // (N_FOLDS + 1)
     warmup_preds = []
     for k in range(1, N_FOLDS + 1):
@@ -308,11 +351,16 @@ def save_models(df: pd.DataFrame, feat_cols: list[str]):
         te_end = min(fold * (k + 1), n)
         if te_end <= tr_end:
             break
-        X_tr, y_tr = X_all[:tr_end], y_str[:tr_end]
-        X_te = X_all[tr_end:te_end]
-        model = xgb.XGBRegressor(**XGB_PARAMS)
-        model.fit(X_tr, y_tr, eval_set=[(X_te, y_str[tr_end:te_end])], verbose=False)
-        warmup_preds.extend(model.predict(X_te).tolist())
+        m_up = xgb.XGBRegressor(**XGB_PARAMS)
+        m_up.fit(X_up[:tr_end], y_up[:tr_end],
+                 eval_set=[(X_up[tr_end:te_end], y_up[tr_end:te_end])], verbose=False)
+        m_down = xgb.XGBRegressor(**XGB_PARAMS)
+        m_down.fit(X_down[:tr_end], y_down[:tr_end],
+                   eval_set=[(X_down[tr_end:te_end], y_down[tr_end:te_end])], verbose=False)
+        up_p = m_up.predict(X_up[tr_end:te_end])
+        down_p = m_down.predict(X_down[tr_end:te_end])
+        strength = np.maximum(up_p, 0) - np.maximum(down_p, 0)
+        warmup_preds.extend(strength.tolist())
 
     stats = {
         "pred_mean": float(np.mean(warmup_preds)),
@@ -357,13 +405,15 @@ def main():
     args = ap.parse_args()
 
     print("Loading 1h enhanced data...")
-    df, feat_cols = load_and_prepare()
+    df, target_feat_cols = load_and_prepare()
 
     all_results: dict[str, dict] = {}
 
     for target in TARGETS:
+        feat_cols = target_feat_cols[target]
+        extras = TARGET_EXTRA_FEATURES.get(target, [])
         print(f"\n{'='*65}")
-        print(f"TARGET: {target}")
+        print(f"TARGET: {target}  ({len(feat_cols)} features, +{extras})")
         print(f"{'='*65}")
         results = run_target(df, feat_cols, target)
         all_results[target] = results
@@ -372,7 +422,7 @@ def main():
 
     if args.save:
         print("\nSaving models...")
-        save_models(df, feat_cols)
+        save_models(df, target_feat_cols)
 
     print("\nDone.")
 
