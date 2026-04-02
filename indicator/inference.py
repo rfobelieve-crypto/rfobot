@@ -24,13 +24,22 @@ ARTIFACT_DIR = Path(__file__).parent / "model_artifacts"
 REGIME_DIR = ARTIFACT_DIR / "regime_models"
 
 # ── Parameters ────────────────────────────────────────────────────────────
-STRENGTH_DEADZONE = 0.50     # |up_pred - down_pred| below this → NEUTRAL
+STRENGTH_DEADZONE = 0.50     # base |up_pred - down_pred| below this → NEUTRAL
 STRONG_THRESHOLD = 80.0      # confidence percentile for Strong
 MODERATE_THRESHOLD = 65.0    # confidence percentile for Moderate
 HORIZON_BARS = 4             # 4h prediction horizon (4 x 1h bars)
 MIN_MAG_HISTORY = 30         # minimum bars before mag_score is valid
 MIN_REGIME_IC_HISTORY = 50   # minimum bars per regime before IC is meaningful
 REGIME_BLEND_WEIGHT = 0.35   # weight for regime-specific model (vs global)
+
+# Dynamic deadzone parameters
+CHOPPY_DEADZONE_MULT = 1.20  # CHOPPY regime: widen deadzone (more conservative)
+TREND_DEADZONE_MULT = 0.90   # TRENDING: slightly tighter (momentum is real)
+VOL_DEADZONE_SCALE = 0.80    # how much vol ratio affects deadzone (0 = off, 1 = full)
+
+# BBP confirmation gate
+BBP_CONFIRM_THRESHOLD = 0.15 # |BBP| must exceed this to confirm direction
+BBP_CONFIRM_ENABLED = True   # master switch for BBP confirmation
 
 # Regime models to use (skip strength_vol_adj — no signal)
 ACTIVE_TARGETS = ["up_move_vol_adj", "down_move_vol_adj"]
@@ -175,9 +184,28 @@ class IndicatorEngine:
         # Strength = up - down (positive = bullish asymmetry)
         strength = up_pred - down_pred
 
-        # Direction from strength asymmetry
-        direction = np.where(strength > STRENGTH_DEADZONE, "UP",
-                    np.where(strength < -STRENGTH_DEADZONE, "DOWN", "NEUTRAL"))
+        # Bull/Bear Power (compute early — needed for confirmation gate)
+        bbp = self._compute_bbp(features)
+
+        # ── Dynamic deadzone ──────────────────────────────────────────
+        # Scale deadzone by realized vol ratio and regime
+        dynamic_dz = self._compute_dynamic_deadzone(features, regime)
+
+        # Direction from strength asymmetry (dynamic deadzone)
+        direction = np.where(strength > dynamic_dz, "UP",
+                    np.where(strength < -dynamic_dz, "DOWN", "NEUTRAL"))
+
+        # ── BBP confirmation gate ─────────────────────────────────────
+        # If BBP disagrees with strength direction, demote to NEUTRAL
+        if BBP_CONFIRM_ENABLED:
+            for i in range(n):
+                if direction[i] == "NEUTRAL":
+                    continue
+                # BBP must agree with direction and be above threshold
+                if direction[i] == "UP" and bbp[i] < -BBP_CONFIRM_THRESHOLD:
+                    direction[i] = "NEUTRAL"  # model says UP but BBP says bearish
+                elif direction[i] == "DOWN" and bbp[i] > BBP_CONFIRM_THRESHOLD:
+                    direction[i] = "NEUTRAL"  # model says DOWN but BBP says bullish
 
         # Synthetic pred_return_4h (for chart compatibility)
         # Scale strength to approximate return scale
@@ -197,9 +225,6 @@ class IndicatorEngine:
         strength_tier[confidence >= STRONG_THRESHOLD] = "Strong"
         strength_tier[np.isnan(confidence)] = "Weak"
 
-        # Bull/Bear Power
-        bbp = self._compute_bbp(features)
-
         out = pd.DataFrame(index=features.index)
         out["pred_return_4h"] = pred_return
         out["pred_direction"] = direction
@@ -210,6 +235,7 @@ class IndicatorEngine:
         out["up_pred"] = up_pred
         out["down_pred"] = down_pred
         out["strength_raw"] = strength
+        out["dynamic_deadzone"] = dynamic_dz
 
         for c in ["open", "high", "low", "close"]:
             if c in features.columns:
@@ -249,6 +275,46 @@ class IndicatorEngine:
                 out[c] = features[c].values
 
         return out
+
+    # ── Dynamic deadzone ────────────────────────────────────────────────
+
+    @staticmethod
+    def _compute_dynamic_deadzone(features: pd.DataFrame,
+                                  regime: np.ndarray) -> np.ndarray:
+        """
+        Compute per-bar dynamic deadzone based on:
+        1. Realized vol ratio (high vol → wider deadzone)
+        2. Regime (CHOPPY → wider, TRENDING → tighter)
+        """
+        n = len(features)
+        dz = np.full(n, STRENGTH_DEADZONE)
+
+        # Vol-based scaling: realized_vol_24h / expanding median
+        if "realized_vol_20b" in features.columns:
+            vol = features["realized_vol_20b"].values.astype(float)
+            # Expanding median of vol (robust reference)
+            vol_series = pd.Series(vol)
+            vol_median = vol_series.expanding(min_periods=24).median().values
+
+            for i in range(n):
+                if np.isnan(vol[i]) or np.isnan(vol_median[i]) or vol_median[i] <= 0:
+                    continue
+                vol_ratio = vol[i] / vol_median[i]
+                # Scale: ratio=1 → no change, ratio=2 → deadzone × (1 + 0.8)
+                vol_factor = 1.0 + (vol_ratio - 1.0) * VOL_DEADZONE_SCALE
+                vol_factor = np.clip(vol_factor, 0.5, 2.5)  # guard rails
+                dz[i] *= vol_factor
+
+        # Regime-based scaling
+        for i in range(n):
+            r = regime[i]
+            if r == "CHOPPY":
+                dz[i] *= CHOPPY_DEADZONE_MULT
+            elif r in ("TRENDING_BULL", "TRENDING_BEAR"):
+                dz[i] *= TREND_DEADZONE_MULT
+            # WARMUP: keep base deadzone
+
+        return dz
 
     # ── Regime detection (same logic as research) ─────────────────────────
 
