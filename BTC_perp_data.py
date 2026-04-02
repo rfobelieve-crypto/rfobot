@@ -1590,11 +1590,72 @@ def tradingview_webhook():
         return {"status": "error", "message": str(e)}, 200
 
 
+INDICATOR_SERVICE_URL = os.getenv("INDICATOR_SERVICE_URL", "")
+
+
+def _handle_indicator_chart(chat_id: str):
+    """Fetch indicator chart from Indicator service and send to user."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        import base64
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/indicator-chart", timeout=30)
+        if resp.status_code != 200:
+            send_message(chat_id, f"❌ Indicator 服務未就緒 ({resp.status_code})")
+            return
+        data = resp.json()
+        png = base64.b64decode(data["png_base64"])
+        send_photo(chat_id, png, caption=data.get("caption", "BTC 4h Indicator"))
+    except Exception as e:
+        logger.exception("indicator chart fetch error: %s", e)
+        send_message(chat_id, f"❌ 取得指標圖表失敗: {e}")
+
+
+def _handle_indicator_status(chat_id: str):
+    """Fetch indicator status from Indicator service and send to user."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/indicator-status", timeout=15)
+        if resp.status_code != 200:
+            send_message(chat_id, f"❌ Indicator 服務未就緒 ({resp.status_code})")
+            return
+        data = resp.json()
+        send_message(chat_id, f"📊 <b>Indicator Status</b>\n\n{data.get('text', 'N/A')}")
+    except Exception as e:
+        logger.exception("indicator status fetch error: %s", e)
+        send_message(chat_id, f"❌ 取得指標狀態失敗: {e}")
+
+
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     try:
         data = request.get_json(silent=True)
         if not data:
+            return "ok"
+
+        # Handle inline button callback (from Indicator chart buttons)
+        callback = data.get("callback_query")
+        if callback:
+            cb_data = callback.get("data", "")
+            cb_chat_id = str(callback.get("message", {}).get("chat", {}).get("id", ""))
+            cb_id = callback.get("id", "")
+            # Answer callback to remove loading spinner
+            try:
+                requests.post(
+                    f"{API_URL}/answerCallbackQuery",
+                    data={"callback_query_id": cb_id}, timeout=5,
+                )
+            except Exception:
+                pass
+            if ALLOWED_USERS and cb_chat_id not in ALLOWED_USERS:
+                return "ok"
+            if cb_data == "chart":
+                threading.Thread(target=_handle_indicator_chart, args=(cb_chat_id,), daemon=True).start()
+            elif cb_data == "status":
+                threading.Thread(target=_handle_indicator_status, args=(cb_chat_id,), daemon=True).start()
             return "ok"
 
         message = data.get("message", {})
@@ -1649,10 +1710,15 @@ def webhook():
         elif cmd == "/snap_status":
             send_message(chat_id, generate_snapshot_status_report())
 
-        elif cmd == "/chart" or cmd.startswith("/chart "):
-            # /chart → BTC-USD 1h 7d
-            # /chart 4h → BTC-USD 4h 7d
-            # /chart 4h 14 → BTC-USD 4h 14d
+        elif cmd == "/chart":
+            # /chart → 4h indicator chart (core)
+            threading.Thread(target=_handle_indicator_chart, args=(chat_id,), daemon=True).start()
+
+        elif cmd == "/ind_status":
+            threading.Thread(target=_handle_indicator_status, args=(chat_id,), daemon=True).start()
+
+        elif cmd == "/flow_chart" or cmd.startswith("/flow_chart "):
+            # /flow_chart → BTC-USD 1h 7d (legacy flow chart)
             parts = raw_text.split()
             tf  = parts[1] if len(parts) > 1 else "1h"
             days = int(parts[2]) if len(parts) > 2 else 7
@@ -1678,9 +1744,11 @@ def webhook():
 
         elif cmd in ["/start", "/help"]:
             help_msg = (
-                "📊 BTC 流動性結果監控機器人\n\n"
-                "指令一覽：\n"
-                "─── 即時監控 ───\n"
+                "📊 BTC Market Intelligence\n\n"
+                "─── 核心指標 ───\n"
+                "/chart — 4h 多空預測指標圖\n"
+                "/ind_status — 指標系統狀態\n"
+                "─── 流動性監控 ───\n"
                 "/flow_futures_btc — BTC taker flow\n"
                 "/flow_futures_all — 全幣種 flow\n"
                 "/status — Bot 狀態\n"
@@ -1688,15 +1756,12 @@ def webhook():
                 "/event_status — 進行中事件\n"
                 "/sweep_status — 掃蕩追蹤狀態\n"
                 "─── 快照 & 評分 ───\n"
-                "/snap — 最新事件快照 (15m/1h/4h)\n"
-                "/snap [uuid] — 指定事件快照\n"
-                "/score — 最近事件 v2 評分\n"
-                "/history — 事件歷史 (bias 演化)\n"
-                "/snap_status — 快照 runner 狀態\n"
-                "─── 圖表 ───\n"
-                "/chart — BTC 1h 7d 圖表\n"
-                "/chart 4h — 指定週期\n"
-                "/chart 4h 14 — 指定週期 + 天數"
+                "/snap — 最新事件快照\n"
+                "/score — 最近事件評分\n"
+                "/history — 事件歷史\n"
+                "─── 其他 ───\n"
+                "/flow_chart — 訂單流圖表\n"
+                "/flow_chart 4h 14 — 指定週期+天數"
             )
             send_message(chat_id, help_msg)
 

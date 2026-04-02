@@ -51,9 +51,6 @@ _engine = None
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-ALLOWED_CHAT_IDS = set(
-    cid.strip() for cid in os.environ.get("ALLOWED_CHAT_IDS", CHAT_ID).split(",") if cid.strip()
-)
 
 
 def _make_reply_markup():
@@ -326,101 +323,36 @@ def test_telegram():
     return jsonify({"status": "sent", "env_keys_found": tg_vars})
 
 
-@app.route("/webhook", methods=["POST"])
-def telegram_webhook():
-    """Handle Telegram bot commands and inline button callbacks."""
-    data = request.get_json(silent=True) or {}
+@app.route("/indicator-chart", methods=["GET"])
+def indicator_chart_api():
+    """API for main bot to fetch indicator chart + caption."""
+    with _lock:
+        png = _state["chart_png"]
+        pred = _state["last_prediction"]
+        last_update = _state["last_update"]
+    if not png or not pred:
+        return jsonify({"error": "Chart not ready"}), 503
 
-    # Handle inline button callback
-    callback = data.get("callback_query")
-    if callback:
-        cb_data = callback.get("data", "")
-        cb_chat_id = str(callback.get("message", {}).get("chat", {}).get("id", ""))
-        cb_id = callback.get("id", "")
-        # Answer callback to remove loading spinner
-        try:
-            requests.post(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery",
-                data={"callback_query_id": cb_id}, timeout=5,
-            )
-        except Exception:
-            pass
-        # Route to same logic as text commands
-        text = f"/{cb_data}"
-        chat_id = cb_chat_id
-        return _handle_command(text, chat_id)
-
-    msg = data.get("message", {})
-    text = msg.get("text", "").strip()
-    chat_id = str(msg.get("chat", {}).get("id", ""))
-
-    if not text or not chat_id:
-        return "ok"
-
-    return _handle_command(text, chat_id)
-
-
-def _handle_command(text: str, chat_id: str):
-    """Process a bot command (from text message or inline button)."""
-    if ALLOWED_CHAT_IDS and chat_id not in ALLOWED_CHAT_IDS:
-        logger.warning("Unauthorized chat_id: %s (allowed: %s)", chat_id, ALLOWED_CHAT_IDS)
-        return "ok"
-
-    cmd = text.split()[0].lower().split("@")[0]
-    logger.info("Webhook command: %s from chat_id=%s", cmd, chat_id)
-
-    if cmd == "/chart":
-        with _lock:
-            png = _state["chart_png"]
-            pred = _state["last_prediction"]
-        if not png:
-            _send_telegram_text("Chart not ready yet.", chat_id)
-            return "ok"
-        direction = pred.get("direction", "?")
-        conf = pred.get("confidence", 0)
-        strength = pred.get("strength", "?")
-        pred_ret = pred.get("pred_return_4h", 0) * 100
-        bbp = pred.get("bull_bear_power", 0)
-        price = pred.get("close", 0)
-        arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
-        caption = (
-            f"{arrow} BTC 4h Indicator\n"
-            f"Price: ${price:,.0f}\n"
-            f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
-            f"Pred: {pred_ret:+.2f}% | BBP: {bbp:+.2f}\n"
-            f"Updated: {_state['last_update'] or '?'}"
-        )
-        _send_telegram_photo_to(chat_id, png, caption)
-
-    elif cmd == "/status":
-        with _lock:
-            status = _state["status"]
-            last_update = _state["last_update"]
-            pred = _state["last_prediction"]
-            error = _state["error"]
-        lines = [
-            f"<b>Status:</b> {status}",
-            f"<b>Last update:</b> {last_update or 'N/A'}",
-        ]
-        if pred:
-            lines.append(f"<b>Direction:</b> {pred['direction']} ({pred['strength']})")
-            lines.append(f"<b>Confidence:</b> {pred['confidence']:.0f}")
-            lines.append(f"<b>Price:</b> ${pred['close']:,.0f}")
-        if error:
-            lines.append(f"<b>Error:</b> {error}")
-        _send_telegram_text("\n".join(lines), chat_id)
-
-    elif cmd == "/help":
-        _send_telegram_text(
-            "<b>BTC Indicator Bot</b>\n\n"
-            "/chart - 最新指標圖表\n"
-            "/status - 當前預測狀態\n"
-            "/help - 使用說明\n\n"
-            "也可以點訊息下方的按鈕快速操作",
-            chat_id,
-        )
-
-    return "ok"
+    direction = pred.get("direction", "?")
+    conf = pred.get("confidence", 0)
+    strength = pred.get("strength", "?")
+    pred_ret = pred.get("pred_return_4h", 0) * 100
+    bbp = pred.get("bull_bear_power", 0)
+    price = pred.get("close", 0)
+    arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
+    caption = (
+        f"{arrow} BTC 4h Indicator\n"
+        f"Price: ${price:,.0f}\n"
+        f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
+        f"Pred: {pred_ret:+.2f}% | BBP: {bbp:+.2f}\n"
+        f"Updated: {last_update or '?'}"
+    )
+    import base64
+    return jsonify({
+        "caption": caption,
+        "png_base64": base64.b64encode(png).decode(),
+        "prediction": pred,
+    })
 
 
 @app.route("/json")
@@ -432,31 +364,25 @@ def prediction_json():
     return jsonify(pred)
 
 
-@app.route("/check-webhook")
-def check_webhook():
-    """Check current Telegram webhook status."""
-    if not BOT_TOKEN:
-        return jsonify({"error": "No BOT_TOKEN"})
-    try:
-        resp = requests.get(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/getWebhookInfo",
-            timeout=10,
-        )
-        info = resp.json().get("result", {})
-        public_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
-        expected = f"https://{public_domain}/webhook" if public_domain else "unknown"
-        return jsonify({
-            "current_webhook_url": info.get("url", ""),
-            "expected_webhook_url": expected,
-            "match": info.get("url", "") == expected,
-            "pending_update_count": info.get("pending_update_count", 0),
-            "last_error": info.get("last_error_message", ""),
-            "last_error_date": info.get("last_error_date", ""),
-            "allowed_chat_ids": list(ALLOWED_CHAT_IDS),
-            "telegram_chat_id": CHAT_ID,
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)})
+@app.route("/indicator-status", methods=["GET"])
+def indicator_status_api():
+    """API for main bot to fetch indicator status text."""
+    with _lock:
+        status = _state["status"]
+        last_update = _state["last_update"]
+        pred = _state["last_prediction"]
+        error = _state["error"]
+    lines = [
+        f"Status: {status}",
+        f"Last update: {last_update or 'N/A'}",
+    ]
+    if pred:
+        lines.append(f"Direction: {pred['direction']} ({pred['strength']})")
+        lines.append(f"Confidence: {pred['confidence']:.0f}")
+        lines.append(f"Price: ${pred['close']:,.0f}")
+    if error:
+        lines.append(f"Error: {error}")
+    return jsonify({"text": "\n".join(lines)})
 
 
 @app.route("/diag")
@@ -495,34 +421,6 @@ def diagnostics():
 
 # ── Scheduler ────────────────────────────────────────────────────────────────
 
-def _register_webhook():
-    """Register Telegram webhook and bot command menu."""
-    public_url = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
-    if not public_url or not BOT_TOKEN:
-        logger.warning("Skipping webhook registration (no RAILWAY_PUBLIC_DOMAIN or BOT_TOKEN)")
-        return
-    webhook_url = f"https://{public_url}/webhook"
-    base = f"https://api.telegram.org/bot{BOT_TOKEN}"
-    try:
-        resp = requests.post(f"{base}/setWebhook", data={"url": webhook_url}, timeout=15)
-        logger.info("Webhook registered: %s → %s", webhook_url, resp.json())
-    except Exception as e:
-        logger.error("Webhook registration failed: %s", e)
-
-    # Set bot command menu
-    import json
-    commands = json.dumps([
-        {"command": "chart", "description": "最新指標圖表"},
-        {"command": "status", "description": "當前預測狀態"},
-        {"command": "help", "description": "使用說明"},
-    ])
-    try:
-        requests.post(f"{base}/setMyCommands", data={"commands": commands}, timeout=10)
-        logger.info("Bot command menu set")
-    except Exception:
-        pass
-
-
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -530,9 +428,6 @@ def start_scheduler():
     scheduler.add_job(update_cycle, "cron", minute="2", misfire_grace_time=300)
     scheduler.start()
     logger.info("Scheduler started: updates at :02 every hour")
-
-    # Register Telegram webhook
-    _register_webhook()
 
     # Run first update immediately
     threading.Thread(target=update_cycle, daemon=True).start()

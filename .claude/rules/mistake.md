@@ -57,3 +57,18 @@ feature_builder_v2.py 只能包含以下來源的特徵：
 MACD / EMA / Bollinger 等技術指標一律不加。
 
 **Rule:** 每次加新特徵前先問：「這是訂單流資料還是技術指標？」技術指標一律排除。
+
+---
+
+## 2026-04-02: 加 log 行導致 webhook 500 crash
+
+**What happened:**
+在 `indicator/app.py` 的 `/webhook` handler 中加了一行 `logger.info("Webhook command: %s", cmd, chat_id)`，但放在 `cmd = text.split()[0]...` 定義**之前**。導致每次收到 Telegram 指令都觸發 `NameError`，回傳 500，用戶的 `/chart` 指令完全無反應。
+
+**Root cause:**
+加 debug log 時沒注意變數的定義順序。修改生產環境的 request handler 後沒有做基本的 code review（變數是否已定義）。
+
+**Correct approach:**
+新增的 log 行必須放在所有引用變數的定義之後。修改 webhook/route handler 這類每個請求都會跑的代碼時，要特別小心：一個 crash 會影響所有用戶。
+
+**Rule:** 在生產 handler 中加 log 或任何代碼後，立刻檢查：所有引用的變數是否已定義？是否在 try/except 內？不要假設「只是加一行 log」就不會出錯。
