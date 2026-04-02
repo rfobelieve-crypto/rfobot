@@ -392,6 +392,31 @@ def prediction_json():
     return jsonify(pred)
 
 
+@app.route("/check-webhook")
+def check_webhook():
+    """Check current Telegram webhook status."""
+    if not BOT_TOKEN:
+        return jsonify({"error": "No BOT_TOKEN"})
+    try:
+        resp = requests.get(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/getWebhookInfo",
+            timeout=10,
+        )
+        info = resp.json().get("result", {})
+        public_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+        expected = f"https://{public_domain}/webhook" if public_domain else "unknown"
+        return jsonify({
+            "current_webhook_url": info.get("url", ""),
+            "expected_webhook_url": expected,
+            "match": info.get("url", "") == expected,
+            "pending_update_count": info.get("pending_update_count", 0),
+            "last_error": info.get("last_error_message", ""),
+            "last_error_date": info.get("last_error_date", ""),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
 @app.route("/diag")
 def diagnostics():
     """Live diagnostics — check Coinglass API and BBP pipeline."""
