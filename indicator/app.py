@@ -51,6 +51,9 @@ _engine = None
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+ALLOWED_CHAT_IDS = set(
+    cid.strip() for cid in os.environ.get("ALLOWED_CHAT_IDS", CHAT_ID).split(",") if cid.strip()
+)
 
 
 def _send_telegram_photo(png: bytes, caption: str):
@@ -303,6 +306,10 @@ def telegram_webhook():
     chat_id = str(msg.get("chat", {}).get("id", ""))
 
     if not text or not chat_id:
+        return "ok"
+
+    if ALLOWED_CHAT_IDS and chat_id not in ALLOWED_CHAT_IDS:
+        logger.warning("Unauthorized chat_id: %s", chat_id)
         return "ok"
 
     cmd = text.split()[0].lower().split("@")[0]  # handle /chart@botname
