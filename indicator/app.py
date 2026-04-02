@@ -397,15 +397,13 @@ def diagnostics():
     """Live diagnostics — check Coinglass API and BBP pipeline."""
     import math
 
-    # Show all env vars that might be the CG key (name only, value masked)
-    cg_env_vars = {
-        k: v[:4] + "****" if len(v) > 4 else "****"
-        for k, v in os.environ.items()
-        if any(kw in k.upper() for kw in ["COINGLASS", "CG_", "CG-", "GLASS", "API_KEY"])
-    }
+    # List ALL env var names in this container (no values, just names)
+    all_env_names = sorted(os.environ.keys())
+    cg_key_raw = os.environ.get("COINGLASS_API_KEY", "")
     diag = {
-        "coinglass_api_key_set": bool(os.environ.get("COINGLASS_API_KEY")),
-        "coinglass_env_vars_found": cg_env_vars if cg_env_vars else "NONE — check Railway Variables",
+        "coinglass_api_key_set": bool(cg_key_raw),
+        "coinglass_api_key_len": len(cg_key_raw),
+        "all_env_var_names": all_env_names,
         "cg_status": _state.get("cg_status", "no update yet"),
     }
 
