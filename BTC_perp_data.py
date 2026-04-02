@@ -1593,6 +1593,33 @@ def tradingview_webhook():
 INDICATOR_SERVICE_URL = os.getenv("INDICATOR_SERVICE_URL", "")
 
 
+_INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
+    [
+        {"text": "\U0001f4ca Chart", "callback_data": "chart"},
+        {"text": "\U0001f4cb Status", "callback_data": "status"},
+    ],
+]})
+
+
+def _send_photo_with_buttons(chat_id: str, png: bytes, caption: str):
+    """Send photo with inline keyboard buttons."""
+    try:
+        resp = requests.post(
+            f"{API_URL}/sendPhoto",
+            data={
+                "chat_id": chat_id,
+                "caption": caption,
+                "reply_markup": _INDICATOR_BUTTONS,
+            },
+            files={"photo": ("indicator.png", png, "image/png")},
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            logger.error("sendPhoto with buttons failed: %s %s", resp.status_code, resp.text)
+    except Exception as e:
+        logger.exception("send_photo_with_buttons error: %s", e)
+
+
 def _handle_indicator_chart(chat_id: str):
     """Fetch indicator chart from Indicator service and send to user."""
     if not INDICATOR_SERVICE_URL:
@@ -1606,7 +1633,7 @@ def _handle_indicator_chart(chat_id: str):
             return
         data = resp.json()
         png = base64.b64decode(data["png_base64"])
-        send_photo(chat_id, png, caption=data.get("caption", "BTC 4h Indicator"))
+        _send_photo_with_buttons(chat_id, png, data.get("caption", "BTC 4h Indicator"))
     except Exception as e:
         logger.exception("indicator chart fetch error: %s", e)
         send_message(chat_id, f"❌ 取得指標圖表失敗: {e}")
