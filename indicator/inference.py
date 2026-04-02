@@ -25,7 +25,7 @@ REGIME_DIR = ARTIFACT_DIR / "regime_models"
 
 # ── Parameters ────────────────────────────────────────────────────────────
 STRENGTH_DEADZONE = 0.15     # |up_pred - down_pred| below this → NEUTRAL
-STRONG_THRESHOLD = 80.0      # confidence percentile for Strong
+STRONG_THRESHOLD = 90.0      # confidence percentile for Strong
 MODERATE_THRESHOLD = 65.0    # confidence percentile for Moderate
 HORIZON_BARS = 4             # 4h prediction horizon (4 x 1h bars)
 MIN_MAG_HISTORY = 30         # minimum bars before mag_score is valid
