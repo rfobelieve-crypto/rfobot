@@ -25,7 +25,7 @@ REGIME_DIR = ARTIFACT_DIR / "regime_models"
 
 # ── Parameters ────────────────────────────────────────────────────────────
 STRENGTH_DEADZONE = 0.15     # |up_pred - down_pred| below this → NEUTRAL
-STRONG_THRESHOLD = 90.0      # confidence percentile for Strong
+STRONG_THRESHOLD = 80.0      # confidence percentile for Strong
 MODERATE_THRESHOLD = 65.0    # confidence percentile for Moderate
 HORIZON_BARS = 4             # 4h prediction horizon (4 x 1h bars)
 MIN_MAG_HISTORY = 30         # minimum bars before mag_score is valid
@@ -258,8 +258,11 @@ class IndicatorEngine:
 
     @staticmethod
     def _compute_actual_returns(df: pd.DataFrame) -> np.ndarray:
+        """Compute realized 4h returns — only for bars where outcome is known.
+        Last HORIZON_BARS entries are NaN (no future data used)."""
         close = df["close"].values.astype(float)
         y = np.full(len(close), np.nan)
+        # Only compute for bars where the 4h outcome has already occurred
         for i in range(len(close) - HORIZON_BARS):
             y[i] = close[i + HORIZON_BARS] / close[i] - 1
         return y
