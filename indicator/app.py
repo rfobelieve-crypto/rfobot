@@ -265,6 +265,13 @@ def update_cycle():
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
 
+        # Run signal quality monitor (lightweight, won't block)
+        try:
+            from indicator.monitor_icir import run_monitor
+            run_monitor()
+        except Exception as mon_err:
+            logger.warning("Monitor check failed (non-critical): %s", mon_err)
+
     except Exception as e:
         logger.exception("Update cycle failed")
         with _lock:

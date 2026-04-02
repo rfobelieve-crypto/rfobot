@@ -41,6 +41,9 @@ VOL_DEADZONE_SCALE = 0.80    # how much vol ratio affects deadzone (0 = off, 1 =
 BBP_CONFIRM_THRESHOLD = 0.15 # |BBP| must exceed this to confirm direction
 BBP_CONFIRM_ENABLED = True   # master switch for BBP confirmation
 
+# Hysteresis: require stronger signal to FLIP direction vs maintain
+HYSTERESIS_MULT = 1.40       # to flip UP→DOWN, need strength < -(dz * 1.4)
+
 # Regime models to use (skip strength_vol_adj — no signal)
 ACTIVE_TARGETS = ["up_move_vol_adj", "down_move_vol_adj"]
 
@@ -191,9 +194,41 @@ class IndicatorEngine:
         # Scale deadzone by realized vol ratio and regime
         dynamic_dz = self._compute_dynamic_deadzone(features, regime)
 
-        # Direction from strength asymmetry (dynamic deadzone)
-        direction = np.where(strength > dynamic_dz, "UP",
-                    np.where(strength < -dynamic_dz, "DOWN", "NEUTRAL"))
+        # ── Direction with hysteresis ─────────────────────────────────
+        # Initial direction from strength vs deadzone
+        direction = np.full(n, "NEUTRAL", dtype=object)
+        prev_dir = "NEUTRAL"
+
+        for i in range(n):
+            dz = dynamic_dz[i]
+            s = strength[i]
+
+            if prev_dir == "NEUTRAL":
+                # From NEUTRAL: standard deadzone to enter
+                if s > dz:
+                    direction[i] = "UP"
+                elif s < -dz:
+                    direction[i] = "DOWN"
+                else:
+                    direction[i] = "NEUTRAL"
+            elif prev_dir == "UP":
+                # Currently UP: need stronger signal to flip to DOWN
+                if s < -(dz * HYSTERESIS_MULT):
+                    direction[i] = "DOWN"    # strong reversal → flip
+                elif s > dz * 0.5:
+                    direction[i] = "UP"      # still above half-dz → hold
+                else:
+                    direction[i] = "NEUTRAL" # weakened → neutral first
+            elif prev_dir == "DOWN":
+                # Currently DOWN: need stronger signal to flip to UP
+                if s > dz * HYSTERESIS_MULT:
+                    direction[i] = "UP"      # strong reversal → flip
+                elif s < -dz * 0.5:
+                    direction[i] = "DOWN"    # still below half-dz → hold
+                else:
+                    direction[i] = "NEUTRAL" # weakened → neutral first
+
+            prev_dir = direction[i]
 
         # ── BBP confirmation gate ─────────────────────────────────────
         # If BBP disagrees with strength direction, demote to NEUTRAL
@@ -201,11 +236,10 @@ class IndicatorEngine:
             for i in range(n):
                 if direction[i] == "NEUTRAL":
                     continue
-                # BBP must agree with direction and be above threshold
                 if direction[i] == "UP" and bbp[i] < -BBP_CONFIRM_THRESHOLD:
-                    direction[i] = "NEUTRAL"  # model says UP but BBP says bearish
+                    direction[i] = "NEUTRAL"
                 elif direction[i] == "DOWN" and bbp[i] > BBP_CONFIRM_THRESHOLD:
-                    direction[i] = "NEUTRAL"  # model says DOWN but BBP says bullish
+                    direction[i] = "NEUTRAL"
 
         # Synthetic pred_return_4h (for chart compatibility)
         # Scale strength to approximate return scale
