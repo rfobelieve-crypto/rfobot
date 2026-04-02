@@ -325,8 +325,10 @@ def telegram_webhook():
         return "ok"
 
     if ALLOWED_CHAT_IDS and chat_id not in ALLOWED_CHAT_IDS:
-        logger.warning("Unauthorized chat_id: %s", chat_id)
+        logger.warning("Unauthorized chat_id: %s (allowed: %s)", chat_id, ALLOWED_CHAT_IDS)
         return "ok"
+
+    logger.info("Webhook command: %s from chat_id=%s", cmd, chat_id)
 
     cmd = text.split()[0].lower().split("@")[0]  # handle /chart@botname
 
@@ -412,6 +414,8 @@ def check_webhook():
             "pending_update_count": info.get("pending_update_count", 0),
             "last_error": info.get("last_error_message", ""),
             "last_error_date": info.get("last_error_date", ""),
+            "allowed_chat_ids": list(ALLOWED_CHAT_IDS),
+            "telegram_chat_id": CHAT_ID,
         })
     except Exception as e:
         return jsonify({"error": str(e)})
