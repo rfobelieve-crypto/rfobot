@@ -299,7 +299,7 @@ class IndicatorEngine:
 
             r = regime[i]
             if r == "WARMUP":
-                regime_score[i] = 0.6
+                regime_score[i] = 0.8
                 continue
 
             if r in self.regime_history and len(self.regime_history[r]) >= MIN_REGIME_IC_HISTORY:
@@ -315,7 +315,8 @@ class IndicatorEngine:
                 else:
                     regime_score[i] = 0.0
             else:
-                regime_score[i] = 0.6
+                # Cold-start: trust the model until IC data accumulates
+                regime_score[i] = 1.0
 
             if not np.isnan(y[i]):
                 if r not in self.regime_history:
