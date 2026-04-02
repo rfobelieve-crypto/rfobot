@@ -328,9 +328,8 @@ def telegram_webhook():
         logger.warning("Unauthorized chat_id: %s (allowed: %s)", chat_id, ALLOWED_CHAT_IDS)
         return "ok"
 
-    logger.info("Webhook command: %s from chat_id=%s", cmd, chat_id)
-
     cmd = text.split()[0].lower().split("@")[0]  # handle /chart@botname
+    logger.info("Webhook command: %s from chat_id=%s", cmd, chat_id)
 
     if cmd == "/chart":
         with _lock:
