@@ -133,20 +133,6 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
                     framealpha=0.8, ncol=2)
 
     # Latest prediction annotation
-    strong_sigs = sig[(sig["pred_direction"] != "NEUTRAL") & (sig["strength_score"] == "Strong")]
-    last_active = strong_sigs.iloc[-1] if len(strong_sigs) > 0 else None
-    if last_active is not None:
-        d = last_active["pred_direction"]
-        ret = last_active["pred_return_4h"] * 100
-        conf_val = last_active["confidence_score"]
-        strength = last_active["strength_score"]
-        regime = last_active["regime"]
-        txt = (f"4h forecast: {d}  |  pred: {ret:+.2f}%  |  "
-               f"confidence: {conf_val:.0f}  |  {strength}  |  {regime}")
-        ax_price.text(0.98, 0.02, txt, transform=ax_price.transAxes,
-                      fontsize=8, ha="right", va="bottom",
-                      bbox=dict(boxstyle="round,pad=0.3", facecolor="wheat", alpha=0.8))
-
     # ── Panel 3: Bull/Bear Power ─────────────────────────────────────────
     ax_bbp = fig.add_subplot(gs[2])
     bbp = sig["bull_bear_power"].fillna(0).values
