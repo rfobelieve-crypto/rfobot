@@ -19,7 +19,7 @@ import time
 import logging
 import argparse
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import requests
 import pandas as pd
@@ -188,7 +188,8 @@ def run_once(indicator_df: pd.DataFrame) -> pd.DataFrame:
     pred_ret = last.get("pred_return_4h", 0) * 100
     bbp = last.get("bull_bear_power", 0)
     price = last.get("close", 0)
-    now = datetime.now(timezone.utc).strftime("%m/%d %H:%M UTC")
+    TZ_TPE = timezone(timedelta(hours=8))
+    now = datetime.now(TZ_TPE).strftime("%m/%d %H:%M UTC+8")
 
     arrow = "🔼" if direction == "UP" else "🔽" if direction == "DOWN" else "➖"
     caption = (
@@ -211,7 +212,7 @@ def run_once(indicator_df: pd.DataFrame) -> pd.DataFrame:
             f"Confidence: {conf:.0f}\n"
             f"Regime: {last.get('regime', '?')}\n"
             f"\n"
-            f"{now}"
+            f"⏰ {now}"
         )
         send_telegram_alert(alert)
         logger.info("Strong signal alert sent: %s", direction)

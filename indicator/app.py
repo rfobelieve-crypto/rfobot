@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import requests
@@ -235,7 +235,8 @@ def update_cycle():
         pred_ret = float(last_row.get("pred_return_4h", 0)) * 100
         bbp = float(last_row.get("bull_bear_power", 0))
         price = float(last_row["close"]) if "close" in last_row.index else 0
-        now_str = datetime.now(timezone.utc).strftime("%m/%d %H:%M UTC")
+        TZ_TPE = timezone(timedelta(hours=8))
+        now_str = datetime.now(TZ_TPE).strftime("%m/%d %H:%M UTC+8")
 
         arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
         caption = (
@@ -256,7 +257,7 @@ def update_cycle():
                 f"Pred: {pred_ret:+.2f}% (4h)\n"
                 f"Confidence: {conf:.0f}\n"
                 f"Regime: {regime}\n\n"
-                f"{now_str}"
+                f"⏰ {now_str}"
             )
             _send_telegram_text(alert)
             logger.info("Strong signal alert sent: %s", direction)
