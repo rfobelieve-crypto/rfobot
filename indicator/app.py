@@ -146,6 +146,21 @@ def update_cycle():
         klines = fetch_binance_klines(limit=500)
         cg_data = fetch_coinglass(interval="1h", limit=500)
 
+        # Diagnose Coinglass data quality
+        cg_status = {}
+        for name, df in cg_data.items():
+            cg_status[name] = {"rows": len(df), "empty": df.empty}
+        cg_ok = sum(1 for v in cg_status.values() if not v["empty"])
+        cg_fail = sum(1 for v in cg_status.values() if v["empty"])
+        logger.info("Coinglass status: %d/%d endpoints OK, failed: %s",
+                     cg_ok, len(cg_status),
+                     [k for k, v in cg_status.items() if v["empty"]] or "none")
+        with _lock:
+            _state["cg_status"] = cg_status
+
+        if cg_fail == len(cg_status):
+            logger.error("ALL Coinglass endpoints failed — BBP will be zero")
+
         # 2. Build features for ALL fetched bars
         features = build_live_features(klines, cg_data)
 
@@ -274,6 +289,7 @@ def health():
             "last_update": _state["last_update"],
             "last_prediction": _state["last_prediction"],
             "error": _state["error"],
+            "cg_status": _state.get("cg_status"),
         })
 
 
@@ -374,6 +390,35 @@ def prediction_json():
     if not pred:
         return jsonify({"error": "No prediction yet"}), 503
     return jsonify(pred)
+
+
+@app.route("/diag")
+def diagnostics():
+    """Live diagnostics — check Coinglass API and BBP pipeline."""
+    import math
+
+    diag = {
+        "coinglass_api_key_set": bool(os.environ.get("COINGLASS_API_KEY")),
+        "cg_status": _state.get("cg_status", "no update yet"),
+    }
+
+    with _lock:
+        indicator_df = _state.get("indicator_df")
+    if indicator_df is not None and not indicator_df.empty:
+        last10 = indicator_df.tail(10)
+        bbp_vals = last10["bull_bear_power"].tolist()
+        diag["last_10_bbp"] = [
+            round(v, 4) if not (isinstance(v, float) and math.isnan(v)) else None
+            for v in bbp_vals
+        ]
+        diag["last_10_times"] = [str(t) for t in last10.index]
+        diag["bbp_all_zero"] = all(v == 0 for v in bbp_vals if not (isinstance(v, float) and math.isnan(v)))
+        diag["total_bars"] = len(indicator_df)
+        diag["history_range"] = f"{indicator_df.index[0]} ~ {indicator_df.index[-1]}"
+    else:
+        diag["indicator_df"] = "not loaded yet"
+
+    return jsonify(diag)
 
 
 # ── Scheduler ────────────────────────────────────────────────────────────────

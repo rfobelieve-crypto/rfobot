@@ -166,6 +166,9 @@ def _cg_fetch(path: str, exchange: str | None, symbol: str,
 
 def fetch_coinglass(interval: str = "1h", limit: int = 500) -> dict[str, pd.DataFrame]:
     """Fetch all Coinglass endpoints with retry and cache fallback."""
+    if not CG_API_KEY:
+        logger.error("COINGLASS_API_KEY is not set — all CG data will be empty!")
+
     result = {}
     failed = []
 
