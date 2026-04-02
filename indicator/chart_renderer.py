@@ -165,6 +165,10 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         fontsize=7, rotation=30, ha="right"
     )
 
+    # Watermark
+    fig.text(0.98, 0.01, "source@rfo", fontsize=9, color="gray",
+             alpha=0.5, ha="right", va="bottom")
+
     plt.tight_layout()
 
     # Save to bytes
