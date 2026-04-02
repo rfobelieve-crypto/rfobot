@@ -48,6 +48,12 @@ def build_live_features(klines: pd.DataFrame,
     df = klines[["open", "high", "low", "close", "volume",
                  "taker_buy_vol", "taker_buy_quote", "trade_count"]].copy()
 
+    # ── Binance quote volume (NEW) ─────────────────────────────────────────
+    if "quote_vol" in klines.columns:
+        qv = pd.to_numeric(klines["quote_vol"], errors="coerce")
+        df["quote_vol_zscore"] = _zscore(qv)
+        df["quote_vol_ratio"] = qv / qv.rolling(LONG_WIN, min_periods=4).mean().replace(0, np.nan)
+
     # ── Kline-derived features ──────────────────────────────────────────────
     df["log_return"] = np.log(df["close"] / df["close"].shift(1))
     df["price_change_pct"] = df["close"].pct_change()
@@ -153,12 +159,35 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
             else:
                 df[target] = np.nan
 
-    # OI (per-exchange)
+    # OI (per-exchange) — with OHLC for range/shadow features
     oi = cg_data.get("oi", pd.DataFrame())
     _merge_cg(oi, {"close": "cg_oi_close"})
+    # Also merge open/high/low for OI range features
+    oi_ohlc = {}
+    for col in ["open", "high", "low"]:
+        if not oi.empty and col in oi.columns:
+            oi_ohlc[col] = f"_oi_{col}"
+    if oi_ohlc:
+        _merge_cg(oi, oi_ohlc)
+
     if "cg_oi_close" in df.columns:
         df["cg_oi_delta"] = df["cg_oi_close"].diff()
         df["cg_oi_accel"] = df["cg_oi_delta"].diff()
+
+        # NEW: OI multi-window pct change (IC -0.078 at 8h)
+        for w in [4, 8, 12, 24]:
+            df[f"cg_oi_close_pctchg_{w}h"] = df["cg_oi_close"].pct_change(w)
+
+        # NEW: OI intra-bar range and shadow
+        if "_oi_high" in df.columns and "_oi_low" in df.columns:
+            oi_range = df["_oi_high"] - df["_oi_low"]
+            df["cg_oi_range_zscore"] = _zscore(oi_range)
+            df["cg_oi_range_pct"] = oi_range / df["cg_oi_close"].replace(0, np.nan)
+            if "_oi_open" in df.columns:
+                df["cg_oi_upper_shadow"] = (
+                    df["_oi_high"] - np.maximum(df["_oi_open"], df["cg_oi_close"])
+                )
+        df.drop(columns=["_oi_open", "_oi_high", "_oi_low"], errors="ignore", inplace=True)
 
     # OI aggregated
     oi_agg = cg_data.get("oi_agg", pd.DataFrame())
@@ -169,6 +198,8 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
         df["cg_oi_binance_share"] = (
             df["cg_oi_close"] / df["cg_oi_agg_close"].replace(0, np.nan)
         )
+        # NEW: Binance share z-score (IC -0.060)
+        df["cg_oi_binance_share_zscore"] = _zscore(df["cg_oi_binance_share"])
 
     # Liquidation
     liq = cg_data.get("liquidation", pd.DataFrame())

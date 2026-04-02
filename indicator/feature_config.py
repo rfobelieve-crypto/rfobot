@@ -28,6 +28,8 @@ KLINE_DERIVED = [
     "return_lag_1", "return_lag_2", "return_lag_3", "return_lag_4",
     "return_lag_5", "return_lag_6", "return_lag_7", "return_lag_8",
     "return_lag_9", "return_lag_10",
+    "quote_vol_zscore",        # Binance quote volume z-score (IC +0.043)
+    "quote_vol_ratio",         # quote vol vs 24h mean
 ]
 
 # ── Features from Coinglass API v4 (7 endpoints, native 1h) ──────────────
@@ -35,6 +37,14 @@ COINGLASS_RAW = [
     "cg_oi_close", "cg_oi_delta", "cg_oi_accel",
     "cg_oi_agg_close", "cg_oi_agg_delta",
     "cg_oi_binance_share",
+    # NEW: OI multi-window momentum (IC -0.078 ~ -0.046)
+    "cg_oi_close_pctchg_4h", "cg_oi_close_pctchg_8h",
+    "cg_oi_close_pctchg_12h", "cg_oi_close_pctchg_24h",
+    # NEW: OI intra-bar volatility (IC +0.047)
+    "cg_oi_range_zscore", "cg_oi_range_pct",
+    "cg_oi_upper_shadow",
+    # NEW: Binance share z-score (IC -0.060)
+    "cg_oi_binance_share_zscore",
     "cg_liq_long", "cg_liq_short", "cg_liq_total",
     "cg_liq_ratio", "cg_liq_imbalance",
     "cg_ls_long_pct", "cg_ls_short_pct", "cg_ls_ratio",

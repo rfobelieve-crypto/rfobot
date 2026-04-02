@@ -99,7 +99,7 @@ def fetch_binance_klines(symbol: str = "BTCUSDT", interval: str = "1h",
             "taker_buy_quote", "ignore",
         ])
         for c in ["open", "high", "low", "close", "volume",
-                   "taker_buy_vol", "taker_buy_quote"]:
+                   "taker_buy_vol", "taker_buy_quote", "quote_vol"]:
             df[c] = pd.to_numeric(df[c], errors="coerce")
         df["trade_count"] = pd.to_numeric(df["trade_count"], errors="coerce")
         df["ts_open"] = pd.to_numeric(df["ts_open"])
