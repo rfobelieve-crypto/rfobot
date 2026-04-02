@@ -25,7 +25,7 @@ REGIME_DIR = ARTIFACT_DIR / "regime_models"
 
 # ── Parameters ────────────────────────────────────────────────────────────
 STRENGTH_DEADZONE = 0.15     # |up_pred - down_pred| below this → NEUTRAL
-STRONG_THRESHOLD = 90.0      # confidence percentile for Strong
+STRONG_THRESHOLD = 80.0      # confidence percentile for Strong
 MODERATE_THRESHOLD = 65.0    # confidence percentile for Moderate
 HORIZON_BARS = 4             # 4h prediction horizon (4 x 1h bars)
 MIN_MAG_HISTORY = 30         # minimum bars before mag_score is valid
@@ -186,14 +186,10 @@ class IndicatorEngine:
         # Mag score (expanding percentile of |strength|)
         mag_score = self._compute_mag_score(strength)
 
-        # Actual returns for regime IC
-        y_actual = self._compute_actual_returns(features)
-
-        # Regime score (trailing IC)
-        regime_score = self._compute_regime_score(strength, y_actual, regime)
-
-        # Composite confidence
-        confidence = np.clip(mag_score * regime_score, 0, 100)
+        # Confidence = mag_score only (regime_score removed —
+        # trailing IC is unreliable: inflated during cold-start from
+        # in-sample overlap, then collapses to ~0 on true OOS data)
+        confidence = np.clip(mag_score, 0, 100)
 
         # Strength tiers
         strength_tier = np.full(n, "Weak", dtype=object)
@@ -230,10 +226,8 @@ class IndicatorEngine:
         direction = np.where(pred_raw > 0.0006, "UP",
                     np.where(pred_raw < -0.0006, "DOWN", "NEUTRAL"))
 
-        y_actual = self._compute_actual_returns(features)
         mag_score = self._compute_mag_score(pred_raw)
-        regime_score = self._compute_regime_score(pred_raw, y_actual, regime)
-        confidence = np.clip(mag_score * regime_score, 0, 100)
+        confidence = np.clip(mag_score, 0, 100)
 
         strength = np.full(len(pred_raw), "Weak", dtype=object)
         strength[confidence >= MODERATE_THRESHOLD] = "Moderate"
@@ -336,8 +330,8 @@ class IndicatorEngine:
                 else:
                     regime_score[i] = 0.0
             else:
-                # Cold-start: trust the model until IC data accumulates
-                regime_score[i] = 1.0
+                # Cold-start: conservative until IC data accumulates
+                regime_score[i] = 0.6
 
             if not np.isnan(y[i]):
                 if r not in self.regime_history:
