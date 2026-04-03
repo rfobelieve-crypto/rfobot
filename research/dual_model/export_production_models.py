@@ -1,0 +1,240 @@
+"""
+Export dual-model artifacts for production deployment.
+
+Trains direction (key_4_only) and magnitude (expanded) models on
+ALL available data, then exports to indicator/model_artifacts/dual_model/.
+
+Usage:
+    python -m research.dual_model.export_production_models
+    python -m research.dual_model.export_production_models --refresh
+"""
+from __future__ import annotations
+
+import sys
+import json
+import logging
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import xgboost as xgb
+from scipy.stats import spearmanr
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from research.dual_model.shared_data import (
+    load_and_cache_data, RESULTS_DIR, ensure_dirs,
+)
+from research.dual_model.build_direction_labels import build_direction_labels
+from research.dual_model.build_magnitude_labels import build_magnitude_labels
+from research.dual_model.direction_features_v2 import (
+    ABLATION_GROUPS, filter_available,
+)
+from research.dual_model.magnitude_features_v2 import MAGNITUDE_GROUPS
+
+logger = logging.getLogger(__name__)
+
+EXPORT_DIR = PROJECT_ROOT / "indicator" / "model_artifacts" / "dual_model"
+
+# Best feature sets from experiment results
+DIRECTION_FEATURE_SET = "+ key_4_only"   # AUC 0.6004 (best)
+MAGNITUDE_FEATURE_SET = "expanded"     # IC 0.3904, ICIR 1.098
+
+# XGBoost params (same as research)
+DIR_PARAMS = {
+    "objective": "binary:logistic",
+    "eval_metric": "auc",
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "n_estimators": 300,
+    "subsample": 0.8,
+    "colsample_bytree": 0.7,
+    "min_child_weight": 10,
+    "reg_alpha": 0.1,
+    "reg_lambda": 1.0,
+    "random_state": 42,
+    "verbosity": 0,
+}
+
+MAG_PARAMS = {
+    "objective": "reg:squarederror",
+    "eval_metric": "mae",
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "n_estimators": 300,
+    "subsample": 0.8,
+    "colsample_bytree": 0.7,
+    "min_child_weight": 10,
+    "reg_alpha": 0.1,
+    "reg_lambda": 1.0,
+    "random_state": 42,
+    "verbosity": 0,
+}
+
+
+def export_direction_model(df: pd.DataFrame):
+    """Train direction model on full data and export."""
+    logger.info("=== Exporting Direction Model ===")
+
+    feature_names = ABLATION_GROUPS[DIRECTION_FEATURE_SET]
+    features = filter_available(feature_names, list(df.columns))
+
+    labels = build_direction_labels(df, k=0.5)
+    df = df.copy()
+    df["y_dir"] = labels["y_dir"]
+
+    mask = df["y_dir"].notna()
+    X = df.loc[mask, features].fillna(0)
+    y = df.loc[mask, "y_dir"].values.astype(int)
+
+    logger.info("Direction: %d samples, %d features, UP rate=%.1f%%",
+                len(y), len(features), y.mean() * 100)
+
+    # Handle class imbalance
+    up_rate = y.mean()
+    scale = (1 - up_rate) / up_rate if up_rate > 0 else 1.0
+
+    params = DIR_PARAMS.copy()
+    params["scale_pos_weight"] = scale
+
+    model = xgb.XGBClassifier(**params)
+    model.fit(X, y, verbose=False)
+
+    # Export
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    model.save_model(str(EXPORT_DIR / "direction_xgb.json"))
+
+    with open(EXPORT_DIR / "direction_feature_cols.json", "w") as f:
+        json.dump(features, f, indent=2)
+
+    # Feature importance
+    imp = pd.Series(model.feature_importances_, index=features)
+    imp = imp.sort_values(ascending=False)
+    imp.to_csv(EXPORT_DIR / "direction_importance.csv")
+
+    # Config
+    config = {
+        "feature_set": DIRECTION_FEATURE_SET,
+        "n_features": len(features),
+        "n_samples": len(y),
+        "up_rate": float(up_rate),
+        "scale_pos_weight": float(scale),
+        "params": DIR_PARAMS,
+    }
+    with open(EXPORT_DIR / "direction_config.json", "w") as f:
+        json.dump(config, f, indent=2)
+
+    logger.info("Direction model exported: %d features → %s",
+                len(features), EXPORT_DIR / "direction_xgb.json")
+    return model, features
+
+
+def export_magnitude_model(df: pd.DataFrame):
+    """Train magnitude model on full data and export."""
+    logger.info("=== Exporting Magnitude Model ===")
+
+    feature_names = MAGNITUDE_GROUPS[MAGNITUDE_FEATURE_SET]
+    features = filter_available(feature_names, list(df.columns))
+
+    labels = build_magnitude_labels(df)
+    df = df.copy()
+    for col in labels.columns:
+        df[col] = labels[col]
+
+    target = "y_abs_return"
+    mask = df[target].notna()
+    X = df.loc[mask, features].fillna(0)
+    y = df.loc[mask, target].values
+
+    logger.info("Magnitude: %d samples, %d features, y_mean=%.6f",
+                len(y), len(features), y.mean())
+
+    model = xgb.XGBRegressor(**MAG_PARAMS)
+    model.fit(X, y, verbose=False)
+
+    # Export
+    model.save_model(str(EXPORT_DIR / "magnitude_xgb.json"))
+
+    with open(EXPORT_DIR / "magnitude_feature_cols.json", "w") as f:
+        json.dump(features, f, indent=2)
+
+    # Feature importance
+    imp = pd.Series(model.feature_importances_, index=features)
+    imp = imp.sort_values(ascending=False)
+    imp.to_csv(EXPORT_DIR / "magnitude_importance.csv")
+
+    # Config
+    config = {
+        "feature_set": MAGNITUDE_FEATURE_SET,
+        "n_features": len(features),
+        "n_samples": len(y),
+        "y_mean": float(y.mean()),
+        "y_std": float(y.std()),
+        "params": MAG_PARAMS,
+    }
+    with open(EXPORT_DIR / "magnitude_config.json", "w") as f:
+        json.dump(config, f, indent=2)
+
+    logger.info("Magnitude model exported: %d features → %s",
+                len(features), EXPORT_DIR / "magnitude_xgb.json")
+    return model, features
+
+
+def build_pred_history(df: pd.DataFrame, dir_model, dir_features,
+                       mag_model, mag_features):
+    """Build prediction history for mag_score warmup."""
+    labels = build_direction_labels(df, k=0.5)
+    mag_labels = build_magnitude_labels(df)
+
+    X_dir = df[dir_features].fillna(0)
+    X_mag = df[mag_features].fillna(0)
+
+    dir_prob = dir_model.predict_proba(X_dir)[:, 1]
+    mag_pred = mag_model.predict(X_mag)
+
+    # Save last 300 bars of |mag_pred| for expanding percentile warmup
+    history = [float(abs(m)) for m in mag_pred[-300:] if not np.isnan(m)]
+
+    stats = {
+        "pred_history": history,
+        "n_bars": len(df),
+        "date_range": f"{df.index[0]} ~ {df.index[-1]}",
+    }
+    with open(EXPORT_DIR / "training_stats.json", "w") as f:
+        json.dump(stats, f, indent=2)
+
+    logger.info("Pred history saved: %d bars for warmup", len(history))
+
+
+def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--refresh", action="store_true")
+    args = parser.parse_args()
+
+    ensure_dirs()
+    df = load_and_cache_data(force_refresh=args.refresh)
+
+    print(f"\nData: {len(df)} bars x {len(df.columns)} cols")
+    print(f"Range: {df.index[0]} → {df.index[-1]}")
+
+    dir_model, dir_features = export_direction_model(df)
+    mag_model, mag_features = export_magnitude_model(df)
+    build_pred_history(df, dir_model, dir_features, mag_model, mag_features)
+
+    print(f"\n{'=' * 60}")
+    print(f"  DUAL-MODEL ARTIFACTS EXPORTED")
+    print(f"  Directory: {EXPORT_DIR}")
+    print(f"  Direction: {DIRECTION_FEATURE_SET} ({len(dir_features)} features)")
+    print(f"  Magnitude: {MAGNITUDE_FEATURE_SET} ({len(mag_features)} features)")
+    print(f"{'=' * 60}")
+
+
+if __name__ == "__main__":
+    main()

@@ -85,6 +85,7 @@ def load_history() -> pd.DataFrame:
                     "strength_raw": r.get("strength_raw", 0),
                     "dynamic_deadzone": r.get("dynamic_deadzone", 0),
                     "dir_prob_up": r.get("dir_prob_up", 0.5),
+                    "mag_pred": r.get("mag_pred", 0),
                 })
             mysql_df = pd.DataFrame(records).set_index("dt").sort_index()
             if df.empty:
@@ -295,7 +296,8 @@ def run_once(indicator_df: pd.DataFrame) -> pd.DataFrame:
     direction = last.get("pred_direction", "?")
     conf = last.get("confidence_score", 0)
     strength = last.get("strength_score", "?")
-    pred_ret = last.get("pred_return_4h", 0) * 100
+    dir_prob = last.get("dir_prob_up", 0.5)
+    mag = last.get("mag_pred", 0)
     bbp = last.get("bull_bear_power", 0)
     price = last.get("close", 0)
     TZ_TPE = timezone(timedelta(hours=8))
@@ -306,7 +308,7 @@ def run_once(indicator_df: pd.DataFrame) -> pd.DataFrame:
         f"{arrow} BTC 4h Indicator | {now}\n"
         f"Price: ${price:,.0f}\n"
         f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
-        f"Pred: {pred_ret:+.2f}% | BBP: {bbp:+.2f}"
+        f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%} | BBP: {bbp:+.2f}"
     )
 
     send_telegram(png, caption)
@@ -318,7 +320,7 @@ def run_once(indicator_df: pd.DataFrame) -> pd.DataFrame:
             f"{arrow_big} <b>STRONG {direction} SIGNAL</b>\n"
             f"\n"
             f"BTC ${price:,.0f}\n"
-            f"Pred: {pred_ret:+.2f}% (4h)\n"
+            f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%}\n"
             f"Confidence: {conf:.0f}\n"
             f"Regime: {last.get('regime', '?')}\n"
             f"\n"

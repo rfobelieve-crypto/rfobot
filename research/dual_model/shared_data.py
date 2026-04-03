@@ -29,13 +29,73 @@ def ensure_dirs():
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def load_and_cache_data(limit: int = 500, force_refresh: bool = False) -> pd.DataFrame:
+def _fetch_klines_paginated(total: int, symbol: str = "BTCUSDT",
+                             interval: str = "1h") -> pd.DataFrame:
+    """Fetch Binance klines with pagination (API max 1500 per request)."""
+    from indicator.data_fetcher import fetch_binance_klines
+    import time
+
+    if total <= 1500:
+        return fetch_binance_klines(symbol=symbol, interval=interval, limit=total)
+
+    # Paginate: fetch chunks backwards from now
+    all_dfs = []
+    end_time = None
+    remaining = total
+
+    while remaining > 0:
+        batch = min(remaining, 1500)
+        params = {"symbol": symbol, "interval": interval, "limit": batch}
+        if end_time is not None:
+            params["endTime"] = end_time
+
+        import requests
+        resp = requests.get("https://fapi.binance.com/fapi/v1/klines", params=params)
+        rows = resp.json()
+        if not isinstance(rows, list) or len(rows) == 0:
+            break
+
+        df = pd.DataFrame(rows, columns=[
+            "ts_open", "open", "high", "low", "close", "volume",
+            "close_time", "quote_vol", "trade_count", "taker_buy_vol",
+            "taker_buy_quote", "ignore",
+        ])
+        for c in ["open", "high", "low", "close", "volume",
+                   "taker_buy_vol", "taker_buy_quote", "quote_vol"]:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+        df["trade_count"] = pd.to_numeric(df["trade_count"], errors="coerce")
+        df["ts_open"] = pd.to_numeric(df["ts_open"])
+        df["dt"] = pd.to_datetime(df["ts_open"], unit="ms", utc=True)
+        df = df.set_index("dt").sort_index()
+
+        all_dfs.append(df)
+        end_time = int(df["ts_open"].iloc[0]) - 1  # before first bar of this batch
+        remaining -= len(df)
+        logger.info("Klines pagination: fetched %d bars, remaining %d", len(df), remaining)
+
+        if len(df) < batch:
+            break
+        time.sleep(0.5)
+
+    if not all_dfs:
+        return fetch_binance_klines(symbol=symbol, interval=interval, limit=1500)
+
+    combined = pd.concat(all_dfs).sort_index()
+    combined = combined[~combined.index.duplicated(keep="last")]
+    # Drop incomplete current bar
+    combined = combined.iloc[:-1]
+    logger.info("Klines total: %d bars, %s ~ %s",
+                len(combined), combined.index[0], combined.index[-1])
+    return combined
+
+
+def load_and_cache_data(limit: int = 4000, force_refresh: bool = False) -> pd.DataFrame:
     """
     Fetch klines + CG data, build all features, cache to parquet.
 
     Parameters
     ----------
-    limit : Number of 1h bars to fetch (max ~500 for CG endpoints).
+    limit : Number of 1h bars to fetch (CG endpoints support up to ~4000).
     force_refresh : If True, re-fetch even if cache exists.
 
     Returns
@@ -56,7 +116,7 @@ def load_and_cache_data(limit: int = 500, force_refresh: bool = False) -> pd.Dat
     from indicator.data_fetcher import fetch_binance_klines, fetch_coinglass
     from indicator.feature_builder_live import build_live_features
 
-    klines = fetch_binance_klines(limit=limit)
+    klines = _fetch_klines_paginated(limit)
     cg_data = fetch_coinglass(interval="1h", limit=limit)
 
     features = build_live_features(klines, cg_data)

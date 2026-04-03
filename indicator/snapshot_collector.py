@@ -266,7 +266,7 @@ def save_indicator_history(df: pd.DataFrame):
         "pred_return_4h", "pred_direction_code", "confidence_score",
         "strength_code", "bull_bear_power", "regime_code",
         "up_pred", "down_pred", "strength_raw", "dynamic_deadzone",
-        "dir_prob_up",
+        "dir_prob_up", "mag_pred",
     ]
 
     _ensure_indicator_history_table(table)
@@ -298,6 +298,7 @@ def save_indicator_history(df: pd.DataFrame):
         float(last.get("strength_raw", 0) or 0),
         float(last.get("dynamic_deadzone", 0) or 0),
         float(last.get("dir_prob_up", 0.5) or 0.5),
+        float(last.get("mag_pred", 0) or 0),
     ]
 
     col_list = ", ".join(f"`{c}`" for c in ["dt"] + columns)
@@ -342,6 +343,7 @@ def _ensure_indicator_history_table(table: str):
         `strength_raw` DOUBLE DEFAULT 0,
         `dynamic_deadzone` DOUBLE DEFAULT 0,
         `dir_prob_up` DOUBLE DEFAULT 0.5,
+        `mag_pred` DOUBLE DEFAULT 0,
         PRIMARY KEY (`dt`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """
@@ -349,6 +351,14 @@ def _ensure_indicator_history_table(table: str):
     try:
         with conn.cursor() as cur:
             cur.execute(sql)
+            # Add mag_pred column if missing (existing tables won't have it)
+            try:
+                cur.execute(
+                    f"ALTER TABLE `{table}` ADD COLUMN `mag_pred` DOUBLE DEFAULT 0"
+                )
+                logger.info("Added mag_pred column to %s", table)
+            except Exception:
+                pass  # column already exists
         _tables_ensured.add(table)
         logger.info("Table ensured: %s", table)
     except Exception as e:

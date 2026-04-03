@@ -1,0 +1,21 @@
+{
+  "feature_set": "expanded",
+  "n_features": 76,
+  "n_samples": 3995,
+  "y_mean": 0.007215410160416589,
+  "y_std": 0.007882523137989303,
+  "params": {
+    "objective": "reg:squarederror",
+    "eval_metric": "mae",
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "n_estimators": 300,
+    "subsample": 0.8,
+    "colsample_bytree": 0.7,
+    "min_child_weight": 10,
+    "reg_alpha": 0.1,
+    "reg_lambda": 1.0,
+    "random_state": 42,
+    "verbosity": 0
+  }
+}

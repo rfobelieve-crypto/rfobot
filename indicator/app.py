@@ -183,6 +183,7 @@ def _backfill_from_mysql(df: pd.DataFrame) -> pd.DataFrame:
             "strength_raw": r.get("strength_raw", 0),
             "dynamic_deadzone": r.get("dynamic_deadzone", 0),
             "dir_prob_up": r.get("dir_prob_up", 0.5),
+            "mag_pred": r.get("mag_pred", 0),
         })
 
     mysql_df = pd.DataFrame(records).set_index("dt").sort_index()
@@ -348,6 +349,8 @@ def update_cycle():
                 "pred_return_4h": float(last_row.get("pred_return_4h", 0)),
                 "bull_bear_power": float(last_row.get("bull_bear_power", 0)),
                 "close": float(last_row["close"]) if "close" in last_row.index else 0,
+                "dir_prob_up": float(last_row.get("dir_prob_up", 0.5)),
+                "mag_pred": float(last_row.get("mag_pred", 0)),
             }
             _state["status"] = "healthy"
             _state["error"] = None
@@ -362,12 +365,15 @@ def update_cycle():
         TZ_TPE = timezone(timedelta(hours=8))
         now_str = datetime.now(TZ_TPE).strftime("%m/%d %H:%M UTC+8")
 
+        dir_prob = float(last_row.get("dir_prob_up", 0.5))
+        mag = float(last_row.get("mag_pred", 0))
+
         arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
         caption = (
             f"{arrow} BTC 4h Indicator | {now_str}\n"
             f"Price: ${price:,.0f}\n"
             f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
-            f"Pred: {pred_ret:+.2f}% | BBP: {bbp:+.2f}"
+            f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%} | BBP: {bbp:+.2f}"
         )
         _send_telegram_photo(png, caption)
 
@@ -378,7 +384,7 @@ def update_cycle():
             alert = (
                 f"{icon} <b>STRONG {direction} SIGNAL</b>\n\n"
                 f"BTC ${price:,.0f}\n"
-                f"Pred: {pred_ret:+.2f}% (4h)\n"
+                f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%}\n"
                 f"Confidence: {conf:.0f}\n"
                 f"Regime: {regime}\n\n"
                 f"⏰ {now_str}"
@@ -483,7 +489,8 @@ def indicator_chart_api():
     direction = pred.get("direction", "?")
     conf = pred.get("confidence", 0)
     strength = pred.get("strength", "?")
-    pred_ret = pred.get("pred_return_4h", 0) * 100
+    dir_prob = pred.get("dir_prob_up", 0.5)
+    mag = pred.get("mag_pred", 0)
     bbp = pred.get("bull_bear_power", 0)
     price = pred.get("close", 0)
     arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
@@ -491,7 +498,7 @@ def indicator_chart_api():
         f"{arrow} BTC 4h Indicator\n"
         f"Price: ${price:,.0f}\n"
         f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
-        f"Pred: {pred_ret:+.2f}% | BBP: {bbp:+.2f}\n"
+        f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%} | BBP: {bbp:+.2f}\n"
         f"Updated: {last_update or '?'}"
     )
     import base64
@@ -631,7 +638,8 @@ def indicator_performance():
             # Get predictions that are old enough to have 4h outcomes (> 4h ago)
             cur.execute("""
                 SELECT dt, `close`, pred_return_4h, pred_direction_code,
-                       confidence_score, dir_prob_up
+                       confidence_score, dir_prob_up,
+                       COALESCE(mag_pred, 0) as mag_pred
                 FROM indicator_history
                 ORDER BY dt DESC
                 LIMIT 200
@@ -688,19 +696,31 @@ def indicator_performance():
         else:
             strong_acc = 0
 
+        # Magnitude model IC (if available)
+        mag_active = eval_df[eval_df["mag_pred"] > 0]
+        if len(mag_active) >= 5:
+            mag_ic, _ = spearmanr(mag_active["mag_pred"], mag_active["actual_4h"].abs())
+            mag_ic_str = f"{mag_ic:.3f}"
+        else:
+            mag_ic_str = "N/A"
+
         lines = [
             "<b>📊 模型表現 (Live)</b>\n",
             f"評估期間: {len(eval_df)} 筆 ({str(eval_df['dt'].iloc[0])[:10]} ~ {str(eval_df['dt'].iloc[-1])[:10]})",
             f"\n<b>方向準確率</b>",
             f"  全部信號: {dir_acc:.1f}% ({len(active)} 筆)",
             f"  Strong 信號: {strong_acc:.1f}% ({len(strong)} 筆)",
-            f"\n<b>Direction Model (高信心)</b>",
-            f"  準確率: {dm_acc:.1f}% ({dm_count} 筆觸發)",
-            f"\n<b>Spearman IC</b>: {ic:.3f}",
+            f"\n<b>Direction Model (P(UP))</b>",
+            f"  高信心準確率: {dm_acc:.1f}% ({dm_count} 筆觸發)",
+            f"\n<b>IC</b>",
+            f"  Direction IC: {ic:.3f}",
+            f"  Magnitude IC: {mag_ic_str}",
             f"\n<b>最新預測</b>",
             f"  Price: ${df.iloc[-1]['close']:,.0f}",
-            f"  Dir prob: {df.iloc[-1]['dir_prob_up']:.2f}",
+            f"  P(UP): {df.iloc[-1]['dir_prob_up']:.2f}",
+            f"  Mag: {df.iloc[-1]['mag_pred']:.4f}" if df.iloc[-1]['mag_pred'] > 0 else "",
         ]
+        lines = [l for l in lines if l]  # remove empty
         return jsonify({"text": "\n".join(lines)})
     except Exception as e:
         logger.exception("Performance calc failed")

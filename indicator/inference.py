@@ -1,10 +1,11 @@
 """
 Model inference — regime-conditional multi-target prediction.
 
-v6: Adds dedicated direction classifier (XGB binary) as high-confidence
-    override for the magnitude-derived direction signal.
-    Direction model only fires when P(up) > 0.65 or P(up) < 0.35 (top ~10%).
-    Otherwise falls back to magnitude-based direction (up_pred - down_pred).
+v7: Dual-model architecture — direction (XGBClassifier) and magnitude
+    (XGBRegressor) are fully independent pipelines with separate feature sets.
+    Direction outputs P(UP); magnitude predicts |return_4h|.
+    Combined: pred_return_4h = sign(direction) × magnitude.
+    Falls back to v6 regime models if dual_model/ artifacts are not present.
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 ARTIFACT_DIR = Path(__file__).parent / "model_artifacts"
 REGIME_DIR = ARTIFACT_DIR / "regime_models"
 DIRECTION_DIR = ARTIFACT_DIR / "direction_models"
+DUAL_MODEL_DIR = ARTIFACT_DIR / "dual_model"
 
 # ── Parameters ────────────────────────────────────────────────────────────
 STRENGTH_DEADZONE = 0.50     # base |up_pred - down_pred| below this → NEUTRAL
@@ -68,16 +70,18 @@ class IndicatorEngine:
     """Stateful prediction engine with regime-conditional dual-target models."""
 
     def __init__(self):
-        if REGIME_DIR.exists():
+        # Try dual-model first (v7), fall back to regime (v5/v6) or legacy
+        if DUAL_MODEL_DIR.exists() and (DUAL_MODEL_DIR / "direction_xgb.json").exists():
+            self._load_dual_model()
+        elif REGIME_DIR.exists():
             self._load_regime_models()
+            # Direction classifier (optional — enhances direction signal)
+            self.dir_model = None
+            self.dir_feature_cols: list[str] = []
+            if DIR_MODEL_ENABLED:
+                self._load_direction_model()
         else:
             self._load_legacy_model()
-
-        # Direction classifier (optional — enhances direction signal)
-        self.dir_model = None
-        self.dir_feature_cols: list[str] = []
-        if DIR_MODEL_ENABLED:
-            self._load_direction_model()
 
         # Regime IC tracking (persists across calls)
         self.regime_history: dict[str, list[tuple[float, float]]] = {}
@@ -171,6 +175,39 @@ class IndicatorEngine:
             logger.warning("Failed to load direction model: %s", e)
             self.dir_model = None
 
+    def _load_dual_model(self):
+        """Load dual-model artifacts (direction classifier + magnitude regressor)."""
+        self.mode = "dual"
+
+        # Direction model (XGBClassifier)
+        self.dual_dir_model = xgb.XGBClassifier()
+        self.dual_dir_model.load_model(str(DUAL_MODEL_DIR / "direction_xgb.json"))
+        with open(DUAL_MODEL_DIR / "direction_feature_cols.json") as f:
+            self.dual_dir_features = json.load(f)
+
+        # Magnitude model (XGBRegressor)
+        self.dual_mag_model = xgb.XGBRegressor()
+        self.dual_mag_model.load_model(str(DUAL_MODEL_DIR / "magnitude_xgb.json"))
+        with open(DUAL_MODEL_DIR / "magnitude_feature_cols.json") as f:
+            self.dual_mag_features = json.load(f)
+
+        # Shared feature superset (for missing-feature warnings)
+        self.feature_cols = sorted(set(self.dual_dir_features + self.dual_mag_features))
+
+        # Pred history for mag_score warmup
+        stats_path = DUAL_MODEL_DIR / "training_stats.json"
+        if stats_path.exists():
+            with open(stats_path) as f:
+                stats = json.load(f)
+            self.pred_history = deque(stats.get("pred_history", []), maxlen=500)
+        else:
+            self.pred_history = deque(maxlen=500)
+
+        logger.info("IndicatorEngine v7 (dual-model) loaded: "
+                     "direction=%d features, magnitude=%d features, %d warmup bars",
+                     len(self.dual_dir_features), len(self.dual_mag_features),
+                     len(self.pred_history))
+
     def predict(self, features: pd.DataFrame) -> pd.DataFrame:
         """
         Run prediction on feature DataFrame.
@@ -188,11 +225,100 @@ class IndicatorEngine:
         # Regime detection (trailing-only)
         regime = self._assign_regime(features)
 
-        if self.mode == "regime":
+        if self.mode == "dual":
+            return self._predict_dual(features, regime)
+        elif self.mode == "regime":
             return self._predict_regime(features, None, regime)
         else:
             X = features[self.feature_cols].fillna(0).values
             return self._predict_legacy(features, X, regime)
+
+    # ── Dual-model prediction (v7) ──────────────────────────────────────
+
+    def _predict_dual(self, features: pd.DataFrame,
+                      regime: np.ndarray) -> pd.DataFrame:
+        """
+        Dual-model inference: independent direction + magnitude pipelines.
+
+        Direction: P(UP) from XGBClassifier → direction + confidence
+        Magnitude: |return_4h| from XGBRegressor → expected move size
+        Combined: pred_return_4h = sign × magnitude
+        """
+        n = len(features)
+
+        # ── Direction model ──
+        dir_missing = [c for c in self.dual_dir_features if c not in features.columns]
+        if dir_missing:
+            for c in dir_missing:
+                features[c] = np.nan
+        X_dir = features[self.dual_dir_features].fillna(0).values
+        dir_prob = self.dual_dir_model.predict_proba(X_dir)[:, 1]  # P(UP)
+
+        # ── Magnitude model ──
+        mag_missing = [c for c in self.dual_mag_features if c not in features.columns]
+        if mag_missing:
+            for c in mag_missing:
+                features[c] = np.nan
+        X_mag = features[self.dual_mag_features].fillna(0).values
+        mag_pred = self.dual_mag_model.predict(X_mag)
+        mag_pred = np.maximum(mag_pred, 0)  # magnitude ≥ 0
+
+        # ── Direction decision ──
+        direction = np.full(n, "NEUTRAL", dtype=object)
+        for i in range(n):
+            if dir_prob[i] > 0.60:
+                direction[i] = "UP"
+            elif dir_prob[i] < 0.40:
+                direction[i] = "DOWN"
+
+        # ── Synthetic pred_return_4h ──
+        # sign(direction) × magnitude
+        pred_return = np.zeros(n)
+        for i in range(n):
+            if direction[i] == "UP":
+                pred_return[i] = mag_pred[i]
+            elif direction[i] == "DOWN":
+                pred_return[i] = -mag_pred[i]
+
+        # ── Confidence = magnitude percentile ──
+        mag_score = self._compute_mag_score(mag_pred)
+
+        # Boost confidence when direction is strong
+        confidence = np.full(n, np.nan)
+        for i in range(n):
+            base = mag_score[i] if not np.isnan(mag_score[i]) else 50.0
+            # Scale by direction conviction (how far from 0.5)
+            dir_conviction = abs(dir_prob[i] - 0.5) * 2  # 0~1
+            confidence[i] = np.clip(base * (0.7 + 0.3 * dir_conviction), 0, 100)
+
+        # ── Strength tiers ──
+        strength_tier = np.full(n, "Weak", dtype=object)
+        strength_tier[confidence >= MODERATE_THRESHOLD] = "Moderate"
+        strength_tier[confidence >= STRONG_THRESHOLD] = "Strong"
+
+        # ── Bull/Bear Power (unchanged) ──
+        bbp = self._compute_bbp(features)
+
+        # ── Output ──
+        out = pd.DataFrame(index=features.index)
+        out["pred_return_4h"] = pred_return
+        out["pred_direction"] = direction
+        out["confidence_score"] = confidence
+        out["strength_score"] = strength_tier
+        out["bull_bear_power"] = bbp
+        out["regime"] = regime
+        out["up_pred"] = mag_pred       # magnitude prediction
+        out["down_pred"] = mag_pred     # same (symmetric)
+        out["strength_raw"] = dir_prob - 0.5  # direction strength
+        out["dynamic_deadzone"] = np.full(n, 0.1)
+        out["dir_prob_up"] = dir_prob
+        out["mag_pred"] = mag_pred      # new: raw magnitude prediction
+
+        for c in ["open", "high", "low", "close"]:
+            if c in features.columns:
+                out[c] = features[c].values
+
+        return out
 
     # ── Regime-conditional prediction ─────────────────────────────────────
 

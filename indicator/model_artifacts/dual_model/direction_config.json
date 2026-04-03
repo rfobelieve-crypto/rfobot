@@ -1,0 +1,21 @@
+{
+  "feature_set": "+ key_4_only",
+  "n_features": 88,
+  "n_samples": 2953,
+  "up_rate": 0.49610565526583134,
+  "scale_pos_weight": 1.0156996587030716,
+  "params": {
+    "objective": "binary:logistic",
+    "eval_metric": "auc",
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "n_estimators": 300,
+    "subsample": 0.8,
+    "colsample_bytree": 0.7,
+    "min_child_weight": 10,
+    "reg_alpha": 0.1,
+    "reg_lambda": 1.0,
+    "random_state": 42,
+    "verbosity": 0
+  }
+}
