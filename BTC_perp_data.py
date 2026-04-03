@@ -1704,7 +1704,15 @@ def _handle_force_update(chat_id: str):
         resp = requests.get(f"{INDICATOR_SERVICE_URL}/force-update?sync=1", timeout=120)
         data = resp.json()
         if resp.status_code == 200 and data.get("status") == "ok":
-            send_message(chat_id, "✅ Update complete — chart sent.")
+            detail = data.get("detail", {})
+            tg = detail.get("telegram_send", "?")
+            bars = detail.get("bars_predicted", "?")
+            chart_kb = detail.get("chart_bytes", 0) // 1024
+            direction = detail.get("direction", "?")
+            send_message(chat_id,
+                f"✅ Update complete\n"
+                f"Direction: {direction} | Bars: {bars}\n"
+                f"Chart: {chart_kb}KB | TG send: {tg}")
         else:
             err = data.get("error", f"HTTP {resp.status_code}")
             send_message(chat_id, f"❌ Update failed: {err}")

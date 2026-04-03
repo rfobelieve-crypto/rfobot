@@ -75,11 +75,14 @@ def _make_reply_markup():
     ]})
 
 
-def _send_telegram_photo(png: bytes, caption: str):
-    """Send chart PNG to Telegram."""
+def _send_telegram_photo(png: bytes, caption: str) -> str:
+    """Send chart PNG to Telegram. Returns status string for diagnostics."""
     if not BOT_TOKEN or not CHAT_ID:
         logger.warning("Telegram credentials not set, skipping photo send")
-        return
+        return f"skipped: token={'set' if BOT_TOKEN else 'MISSING'}, chat={'set' if CHAT_ID else 'MISSING'}"
+    if not png or len(png) < 100:
+        logger.error("Chart PNG is empty or too small (%d bytes)", len(png) if png else 0)
+        return f"skipped: png_empty ({len(png) if png else 0} bytes)"
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
     try:
         resp = requests.post(url, data={
@@ -91,10 +94,13 @@ def _send_telegram_photo(png: bytes, caption: str):
         }, timeout=30)
         if resp.ok:
             logger.info("Telegram photo sent OK")
+            return "ok"
         else:
             logger.error("Telegram photo failed: %s %s", resp.status_code, resp.text[:200])
+            return f"failed: {resp.status_code} {resp.text[:100]}"
     except Exception as e:
         logger.error("Telegram photo send failed: %s", e)
+        return f"error: {e}"
 
 
 def _send_telegram_text(message: str, chat_id: str = ""):
@@ -210,8 +216,8 @@ def _backfill_from_mysql(df: pd.DataFrame) -> pd.DataFrame:
     return combined
 
 
-def update_cycle():
-    """Fetch new data, predict only new bars, append to history."""
+def update_cycle() -> dict:
+    """Fetch new data, predict only new bars, append to history. Returns diagnostic info."""
     from indicator.data_fetcher import (
         fetch_binance_klines, fetch_coinglass,
         fetch_binance_depth, fetch_binance_aggtrades,
@@ -386,7 +392,7 @@ def update_cycle():
             f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
             f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%} | BBP: {bbp:+.2f}"
         )
-        _send_telegram_photo(png, caption)
+        tg_result = _send_telegram_photo(png, caption)
 
         # Strong signal alert
         if strength == "Strong" and direction in ("UP", "DOWN"):
@@ -428,11 +434,20 @@ def update_cycle():
         except Exception as mon_err:
             logger.warning("Monitor check failed (non-critical): %s", mon_err)
 
+        return {
+            "bars_predicted": len(new_features) if 'new_features' in dir() else 0,
+            "total_bars": len(indicator_df),
+            "chart_bytes": len(png),
+            "direction": direction,
+            "telegram_send": tg_result,
+        }
+
     except Exception as e:
         logger.exception("Update cycle failed")
         with _lock:
             _state["status"] = "error"
             _state["error"] = str(e)
+        raise
 
 
 def _is_nan(v):
@@ -748,8 +763,8 @@ def force_update():
     sync = request.args.get("sync", "0") == "1"
     if sync:
         try:
-            update_cycle()
-            return jsonify({"status": "ok", "error": None})
+            result = update_cycle()
+            return jsonify({"status": "ok", "error": None, "detail": result})
         except Exception as e:
             return jsonify({"status": "error", "error": str(e)}), 500
     else:
