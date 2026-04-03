@@ -262,9 +262,13 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
             return
         for src, target in cols.items():
             if src in cg_df.columns:
+                left = df[["close"]].reset_index()
+                right = cg_df[[src]].reset_index().rename(columns={src: target})
+                # Unify datetime precision to avoid merge_asof type mismatch
+                left["dt"] = pd.to_datetime(left["dt"], utc=True)
+                right["dt"] = pd.to_datetime(right["dt"], utc=True)
                 merged = pd.merge_asof(
-                    df[["close"]].reset_index(),
-                    cg_df[[src]].reset_index().rename(columns={src: target}),
+                    left, right,
                     left_on="dt", right_on="dt", direction="backward",
                 ).set_index("dt")
                 df[target] = merged[target]
