@@ -738,6 +738,13 @@ def indicator_performance():
         return jsonify({"text": f"❌ 表現計算失敗: {e}"}), 500
 
 
+@app.route("/force-update", methods=["POST", "GET"])
+def force_update():
+    """Manually trigger an update cycle (for testing)."""
+    threading.Thread(target=update_cycle, daemon=True).start()
+    return jsonify({"status": "update_triggered"})
+
+
 # ── Scheduler ────────────────────────────────────────────────────────────────
 
 def start_scheduler():

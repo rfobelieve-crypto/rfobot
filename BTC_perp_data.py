@@ -1694,6 +1694,23 @@ def _handle_indicator_perf(chat_id: str):
         send_message(chat_id, f"❌ 取得模型表現失敗: {e}")
 
 
+def _handle_force_update(chat_id: str):
+    """Trigger manual indicator update cycle."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "INDICATOR_SERVICE_URL not set")
+        return
+    try:
+        send_message(chat_id, "Manual update triggered...")
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/force-update", timeout=60)
+        if resp.status_code == 200:
+            send_message(chat_id, "Update started. New chart will arrive shortly.")
+        else:
+            send_message(chat_id, f"Trigger failed ({resp.status_code})")
+    except Exception as e:
+        logger.exception("force update error: %s", e)
+        send_message(chat_id, f"Update failed: {e}")
+
+
 def _send_help(chat_id: str):
     """Send help message with inline keyboard."""
     import json as json_mod
@@ -1854,6 +1871,9 @@ def webhook():
 
         elif cmd == "/perf":
             threading.Thread(target=_handle_indicator_perf, args=(chat_id,), daemon=True).start()
+
+        elif cmd == "/update":
+            threading.Thread(target=_handle_force_update, args=(chat_id,), daemon=True).start()
 
         elif cmd == "/flow_chart" or cmd.startswith("/flow_chart "):
             # /flow_chart → BTC-USD 1h 7d (legacy flow chart)
