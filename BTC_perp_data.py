@@ -1598,6 +1598,10 @@ _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
         {"text": "\U0001f4ca Chart", "callback_data": "chart"},
         {"text": "\U0001f4cb Status", "callback_data": "status"},
     ],
+    [
+        {"text": "\U0001f4c8 Perf", "callback_data": "perf"},
+        {"text": "\U0001f4e6 DB", "callback_data": "db"},
+    ],
 ]})
 
 
@@ -1656,6 +1660,40 @@ def _handle_indicator_status(chat_id: str):
         send_message(chat_id, f"❌ 取得指標狀態失敗: {e}")
 
 
+def _handle_indicator_db(chat_id: str):
+    """Fetch DB stats from Indicator service."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/indicator-db-stats", timeout=15)
+        if resp.status_code != 200:
+            send_message(chat_id, f"❌ Indicator 服務未就緒 ({resp.status_code})")
+            return
+        data = resp.json()
+        send_message(chat_id, data.get("text", "N/A"))
+    except Exception as e:
+        logger.exception("indicator db stats error: %s", e)
+        send_message(chat_id, f"❌ 取得資料庫狀態失敗: {e}")
+
+
+def _handle_indicator_perf(chat_id: str):
+    """Fetch model performance from Indicator service."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/indicator-perf", timeout=30)
+        if resp.status_code != 200:
+            send_message(chat_id, f"❌ Indicator 服務未就緒 ({resp.status_code})")
+            return
+        data = resp.json()
+        send_message(chat_id, data.get("text", "N/A"))
+    except Exception as e:
+        logger.exception("indicator perf error: %s", e)
+        send_message(chat_id, f"❌ 取得模型表現失敗: {e}")
+
+
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     try:
@@ -1683,6 +1721,10 @@ def webhook():
                 threading.Thread(target=_handle_indicator_chart, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "status":
                 threading.Thread(target=_handle_indicator_status, args=(cb_chat_id,), daemon=True).start()
+            elif cb_data == "perf":
+                threading.Thread(target=_handle_indicator_perf, args=(cb_chat_id,), daemon=True).start()
+            elif cb_data == "db":
+                threading.Thread(target=_handle_indicator_db, args=(cb_chat_id,), daemon=True).start()
             return "ok"
 
         message = data.get("message", {})
@@ -1744,6 +1786,12 @@ def webhook():
         elif cmd == "/ind_status":
             threading.Thread(target=_handle_indicator_status, args=(chat_id,), daemon=True).start()
 
+        elif cmd == "/db":
+            threading.Thread(target=_handle_indicator_db, args=(chat_id,), daemon=True).start()
+
+        elif cmd == "/perf":
+            threading.Thread(target=_handle_indicator_perf, args=(chat_id,), daemon=True).start()
+
         elif cmd == "/flow_chart" or cmd.startswith("/flow_chart "):
             # /flow_chart → BTC-USD 1h 7d (legacy flow chart)
             parts = raw_text.split()
@@ -1775,6 +1823,8 @@ def webhook():
                 "─── 核心指標 ───\n"
                 "/chart — 4h 多空預測指標圖\n"
                 "/ind_status — 指標系統狀態\n"
+                "/perf — 模型即時表現\n"
+                "/db — 資料庫累積狀態\n"
                 "─── 流動性監控 ───\n"
                 "/flow_futures_btc — BTC taker flow\n"
                 "/flow_futures_all — 全幣種 flow\n"

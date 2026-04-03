@@ -1,6 +1,6 @@
 """
 Chart renderer — generates indicator PNG from prediction DataFrame.
-Adapted from research/indicator_chart.py for in-memory rendering.
+v2: Added direction probability panel (4th subplot).
 """
 from __future__ import annotations
 
@@ -24,10 +24,10 @@ CHART_PATH = Path("/tmp/indicator_chart.png")
 def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     """
     Render indicator chart and return PNG bytes.
-    Also saves to /tmp/indicator_chart.png.
 
     ind must have: open, high, low, close, pred_direction, confidence_score,
                    strength_score, pred_return_4h, bull_bear_power, regime
+    Optional: dir_prob_up (direction model probability)
     """
     sig = ind.tail(last_n).copy()
     sig = sig.dropna(subset=["open", "high", "low", "close"])
@@ -43,8 +43,15 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     x = np.arange(n)
     dates = sig.index
 
-    fig = plt.figure(figsize=(20, 11), facecolor="white")
-    gs = gridspec.GridSpec(3, 1, height_ratios=[0.8, 8, 3], hspace=0.05)
+    has_dir_prob = "dir_prob_up" in sig.columns and sig["dir_prob_up"].notna().any()
+
+    # Layout: 4 panels if dir_prob available, 3 otherwise
+    if has_dir_prob:
+        fig = plt.figure(figsize=(20, 13), facecolor="white")
+        gs = gridspec.GridSpec(4, 1, height_ratios=[0.8, 8, 2.5, 2.5], hspace=0.05)
+    else:
+        fig = plt.figure(figsize=(20, 11), facecolor="white")
+        gs = gridspec.GridSpec(3, 1, height_ratios=[0.8, 8, 3], hspace=0.05)
 
     # ── Panel 1: Confidence heatmap ──────────────────────────────────────
     ax_conf = fig.add_subplot(gs[0])
@@ -89,7 +96,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_price.vlines(x[up], lows[up], highs[up], color="#26a69a", linewidth=0.5)
     ax_price.vlines(x[down], lows[down], highs[down], color="#ef5350", linewidth=0.5)
 
-    # Direction triangles (confidence >= 40 only)
+    # Direction triangles (Strong signals only)
     price_range = highs.max() - lows.min()
     offset = price_range * 0.02
 
@@ -136,7 +143,6 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
                     framealpha=0.8, ncol=2)
 
-    # Latest prediction annotation
     # ── Panel 3: Bull/Bear Power ─────────────────────────────────────────
     ax_bbp = fig.add_subplot(gs[2])
     bbp = sig["bull_bear_power"].fillna(0).values
@@ -149,11 +155,51 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_bbp.set_xlim(-0.5, n - 0.5)
     ax_bbp.grid(True, alpha=0.15)
 
-    ax_bbp.set_xticks(tick_pos)
-    ax_bbp.set_xticklabels(
-        [dates[i].strftime("%m/%d %H:%M") for i in tick_pos],
-        fontsize=7, rotation=30, ha="right"
-    )
+    if not has_dir_prob:
+        # Bottom panel gets date labels
+        ax_bbp.set_xticks(tick_pos)
+        ax_bbp.set_xticklabels(
+            [dates[i].strftime("%m/%d %H:%M") for i in tick_pos],
+            fontsize=7, rotation=30, ha="right"
+        )
+    else:
+        ax_bbp.set_xticks([])
+
+    # ── Panel 4: Direction Probability (if available) ────────────────────
+    if has_dir_prob:
+        ax_dir = fig.add_subplot(gs[3])
+        dir_prob = sig["dir_prob_up"].fillna(0.5).values
+
+        # Color: green above 0.5, red below
+        dir_colors = []
+        for p in dir_prob:
+            if p > 0.65:
+                dir_colors.append("#004d40")   # high confidence UP
+            elif p > 0.5:
+                dir_colors.append("#26a69a")   # mild UP
+            elif p < 0.35:
+                dir_colors.append("#b71c1c")   # high confidence DOWN
+            else:
+                dir_colors.append("#ef5350")   # mild DOWN
+
+        ax_dir.bar(x, dir_prob - 0.5, bottom=0.5, width=0.8,
+                   color=dir_colors, alpha=0.8, edgecolor="none")
+        ax_dir.axhline(0.5, color="black", linewidth=0.8)
+        ax_dir.axhline(0.65, color="#004d40", linewidth=0.5, linestyle="--", alpha=0.5)
+        ax_dir.axhline(0.35, color="#b71c1c", linewidth=0.5, linestyle="--", alpha=0.5)
+        ax_dir.set_ylabel("Direction\nP(UP)", fontsize=9)
+        ax_dir.set_ylim(0.2, 0.8)
+        ax_dir.set_xlim(-0.5, n - 0.5)
+        ax_dir.set_yticks([0.35, 0.5, 0.65])
+        ax_dir.set_yticklabels(["0.35", "0.50", "0.65"], fontsize=7)
+        ax_dir.grid(True, alpha=0.15)
+
+        # Bottom panel gets date labels
+        ax_dir.set_xticks(tick_pos)
+        ax_dir.set_xticklabels(
+            [dates[i].strftime("%m/%d %H:%M") for i in tick_pos],
+            fontsize=7, rotation=30, ha="right"
+        )
 
     # Watermark
     fig.text(0.98, 0.01, "source@rfo", fontsize=9, color="gray",

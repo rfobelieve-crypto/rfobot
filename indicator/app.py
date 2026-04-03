@@ -536,6 +536,127 @@ def diagnostics():
     return jsonify(diag)
 
 
+@app.route("/indicator-db-stats", methods=["GET"])
+def indicator_db_stats():
+    """API: database accumulation stats for Telegram /db command."""
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        tables = [
+            ("indicator_history", "預測歷史"),
+            ("indicator_depth_snapshots", "Depth"),
+            ("indicator_aggtrades_snapshots", "AggTrades"),
+            ("indicator_options_snapshots", "Options/ETF/DVOL"),
+        ]
+        lines = ["<b>📦 資料庫狀態</b>\n"]
+        with conn.cursor() as cur:
+            for table, label in tables:
+                try:
+                    cur.execute(
+                        f"SELECT COUNT(*) as cnt, MIN(dt) as first_dt, MAX(dt) as last_dt "
+                        f"FROM `{table}`"
+                    )
+                    row = cur.fetchone()
+                    cnt = row["cnt"]
+                    first = str(row["first_dt"])[:16] if row["first_dt"] else "-"
+                    last = str(row["last_dt"])[:16] if row["last_dt"] else "-"
+                    lines.append(f"<b>{label}</b>: {cnt} 筆")
+                    if cnt > 0:
+                        lines.append(f"  {first} ~ {last}")
+                except Exception:
+                    lines.append(f"<b>{label}</b>: ❌ 表不存在")
+        conn.close()
+        return jsonify({"text": "\n".join(lines)})
+    except Exception as e:
+        return jsonify({"text": f"❌ 資料庫連線失敗: {e}"}), 500
+
+
+@app.route("/indicator-perf", methods=["GET"])
+def indicator_performance():
+    """API: direction model live performance for Telegram /perf command."""
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        with conn.cursor() as cur:
+            # Get predictions that are old enough to have 4h outcomes (> 4h ago)
+            cur.execute("""
+                SELECT dt, `close`, pred_return_4h, pred_direction_code,
+                       confidence_score, dir_prob_up
+                FROM indicator_history
+                ORDER BY dt DESC
+                LIMIT 200
+            """)
+            rows = cur.fetchall()
+        conn.close()
+
+        if len(rows) < 5:
+            return jsonify({"text": "⏳ 數據不足（需至少 5 筆歷史紀錄）"})
+
+        import pandas as pd
+        df = pd.DataFrame(rows)
+        df["dt"] = pd.to_datetime(df["dt"])
+        df = df.sort_values("dt").reset_index(drop=True)
+
+        # Compute actual 4h returns (shift -4)
+        df["actual_4h"] = df["close"].shift(-4) / df["close"] - 1
+        # Only evaluate rows with known outcomes
+        eval_df = df.dropna(subset=["actual_4h"]).copy()
+
+        if len(eval_df) < 3:
+            return jsonify({"text": "⏳ 尚無足夠的已實現結果（需等待 4h+）"})
+
+        # Direction accuracy
+        eval_df["pred_dir"] = eval_df["pred_direction_code"].map({1: "UP", -1: "DOWN", 0: "NEUTRAL"})
+        eval_df["actual_dir"] = eval_df["actual_4h"].apply(lambda x: "UP" if x > 0.001 else ("DOWN" if x < -0.001 else "NEUTRAL"))
+
+        # Filter non-neutral predictions
+        active = eval_df[eval_df["pred_dir"] != "NEUTRAL"]
+        if len(active) > 0:
+            dir_acc = (active["pred_dir"] == active["actual_dir"]).mean() * 100
+        else:
+            dir_acc = 0
+
+        # Direction model (dir_prob_up) accuracy
+        dir_model_active = eval_df[(eval_df["dir_prob_up"] > 0.65) | (eval_df["dir_prob_up"] < 0.35)]
+        if len(dir_model_active) > 0:
+            dm_pred = dir_model_active["dir_prob_up"].apply(lambda p: "UP" if p > 0.5 else "DOWN")
+            dm_acc = (dm_pred == dir_model_active["actual_dir"]).mean() * 100
+            dm_count = len(dir_model_active)
+        else:
+            dm_acc = 0
+            dm_count = 0
+
+        # Spearman IC
+        from scipy.stats import spearmanr
+        ic, _ = spearmanr(eval_df["pred_return_4h"], eval_df["actual_4h"])
+
+        # Strong signal performance
+        strong = eval_df[eval_df["confidence_score"] >= 80]
+        if len(strong) > 0:
+            strong_active = strong[strong["pred_dir"] != "NEUTRAL"]
+            strong_acc = (strong_active["pred_dir"] == strong_active["actual_dir"]).mean() * 100 if len(strong_active) > 0 else 0
+        else:
+            strong_acc = 0
+
+        lines = [
+            "<b>📊 模型表現 (Live)</b>\n",
+            f"評估期間: {len(eval_df)} 筆 ({str(eval_df['dt'].iloc[0])[:10]} ~ {str(eval_df['dt'].iloc[-1])[:10]})",
+            f"\n<b>方向準確率</b>",
+            f"  全部信號: {dir_acc:.1f}% ({len(active)} 筆)",
+            f"  Strong 信號: {strong_acc:.1f}% ({len(strong)} 筆)",
+            f"\n<b>Direction Model (高信心)</b>",
+            f"  準確率: {dm_acc:.1f}% ({dm_count} 筆觸發)",
+            f"\n<b>Spearman IC</b>: {ic:.3f}",
+            f"\n<b>最新預測</b>",
+            f"  Price: ${df.iloc[-1]['close']:,.0f}",
+            f"  Dir prob: {df.iloc[-1]['dir_prob_up']:.2f}",
+        ]
+        return jsonify({"text": "\n".join(lines)})
+    except Exception as e:
+        logger.exception("Performance calc failed")
+        return jsonify({"text": f"❌ 表現計算失敗: {e}"}), 500
+
+
 # ── Scheduler ────────────────────────────────────────────────────────────────
 
 def start_scheduler():
