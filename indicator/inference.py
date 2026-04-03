@@ -52,7 +52,7 @@ DIR_CHOPPY_DISABLED = True   # disable direction override in CHOPPY regime
 HYSTERESIS_MULT = 1.40       # to flip UP→DOWN, need strength < -(dz * 1.4)
 
 # Signal cooldown: minimum bars between direction flips
-FLIP_COOLDOWN_BARS = 3       # after flipping direction, hold for at least 3 bars
+FLIP_COOLDOWN_BARS = 1       # after flipping direction, hold for at least 1 bar
 
 # Dual-horizon blending
 BLEND_4H = 0.65              # weight for 4h strength
