@@ -59,7 +59,18 @@ def _make_reply_markup():
     return json.dumps({"inline_keyboard": [
         [
             {"text": "\U0001f4ca Chart", "callback_data": "chart"},
-            {"text": "\U0001f4cb Status", "callback_data": "status"},
+            {"text": "\U0001f4c8 Perf", "callback_data": "perf"},
+            {"text": "\U0001f4e6 DB", "callback_data": "db"},
+        ],
+        [
+            {"text": "\U0001f30a Flow BTC", "callback_data": "flow_btc"},
+            {"text": "\U0001f30d Flow All", "callback_data": "flow_all"},
+            {"text": "\u2699\ufe0f Status", "callback_data": "status"},
+        ],
+        [
+            {"text": "\U0001f6a8 Events", "callback_data": "events"},
+            {"text": "\U0001f9f9 Sweep", "callback_data": "sweep"},
+            {"text": "\u2753 Help", "callback_data": "help"},
         ],
     ]})
 

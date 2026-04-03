@@ -1694,6 +1694,59 @@ def _handle_indicator_perf(chat_id: str):
         send_message(chat_id, f"❌ 取得模型表現失敗: {e}")
 
 
+def _send_help(chat_id: str):
+    """Send help message with inline keyboard."""
+    import json as json_mod
+    help_msg = (
+        "<b>BTC Market Intelligence</b>\n\n"
+        "<b>--- 核心指標 ---</b>\n"
+        "/chart - 4h 多空預測指標圖\n"
+        "/perf - 模型即時表現\n"
+        "/db - 資料庫累積狀態\n"
+        "/ind_status - 指標系統狀態\n"
+        "\n<b>--- 流動性監控 ---</b>\n"
+        "/flow_futures_btc - BTC taker flow\n"
+        "/flow_futures_all - 全幣種 flow\n"
+        "/status - Bot 狀態\n"
+        "\n<b>--- 事件追蹤 ---</b>\n"
+        "/event_status - 進行中事件\n"
+        "/sweep_status - 掃蕩追蹤狀態\n"
+        "/snap - 最新事件快照\n"
+        "/score - 最近事件評分\n"
+        "/history - 事件歷史\n"
+        "\n<b>--- 其他 ---</b>\n"
+        "/flow_chart - 訂單流圖表\n\n"
+        "<i>也可直接點擊下方按鈕操作</i>"
+    )
+    keyboard = json_mod.dumps({"inline_keyboard": [
+        [
+            {"text": "\U0001f4ca Chart", "callback_data": "chart"},
+            {"text": "\U0001f4c8 Perf", "callback_data": "perf"},
+            {"text": "\U0001f4e6 DB", "callback_data": "db"},
+        ],
+        [
+            {"text": "\U0001f30a Flow BTC", "callback_data": "flow_btc"},
+            {"text": "\U0001f30d Flow All", "callback_data": "flow_all"},
+            {"text": "\u2699\ufe0f Status", "callback_data": "status"},
+        ],
+        [
+            {"text": "\U0001f6a8 Events", "callback_data": "events"},
+            {"text": "\U0001f9f9 Sweep", "callback_data": "sweep"},
+            {"text": "\u2753 Help", "callback_data": "help"},
+        ],
+    ]})
+    url = f"{API_URL}/sendMessage"
+    try:
+        requests.post(url, data={
+            "chat_id": chat_id,
+            "text": help_msg,
+            "parse_mode": "HTML",
+            "reply_markup": keyboard,
+        }, timeout=10)
+    except Exception as e:
+        logger.warning("Help send failed: %s", e)
+
+
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     try:
@@ -1725,6 +1778,16 @@ def webhook():
                 threading.Thread(target=_handle_indicator_perf, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "db":
                 threading.Thread(target=_handle_indicator_db, args=(cb_chat_id,), daemon=True).start()
+            elif cb_data == "flow_btc":
+                send_message(cb_chat_id, generate_report("BTC"))
+            elif cb_data == "flow_all":
+                send_message(cb_chat_id, generate_all_report())
+            elif cb_data == "events":
+                send_message(cb_chat_id, generate_current_event_report())
+            elif cb_data == "sweep":
+                send_message(cb_chat_id, outcome_tracker.format_active_trackers_report())
+            elif cb_data == "help":
+                _send_help(cb_chat_id)
             return "ok"
 
         message = data.get("message", {})
@@ -1818,29 +1881,7 @@ def webhook():
             threading.Thread(target=_send_chart, args=(chat_id, tf, days), daemon=True).start()
 
         elif cmd in ["/start", "/help"]:
-            help_msg = (
-                "📊 BTC Market Intelligence\n\n"
-                "─── 核心指標 ───\n"
-                "/chart — 4h 多空預測指標圖\n"
-                "/ind_status — 指標系統狀態\n"
-                "/perf — 模型即時表現\n"
-                "/db — 資料庫累積狀態\n"
-                "─── 流動性監控 ───\n"
-                "/flow_futures_btc — BTC taker flow\n"
-                "/flow_futures_all — 全幣種 flow\n"
-                "/status — Bot 狀態\n"
-                "─── 事件追蹤 ───\n"
-                "/event_status — 進行中事件\n"
-                "/sweep_status — 掃蕩追蹤狀態\n"
-                "─── 快照 & 評分 ───\n"
-                "/snap — 最新事件快照\n"
-                "/score — 最近事件評分\n"
-                "/history — 事件歷史\n"
-                "─── 其他 ───\n"
-                "/flow_chart — 訂單流圖表\n"
-                "/flow_chart 4h 14 — 指定週期+天數"
-            )
-            send_message(chat_id, help_msg)
+            _send_help(chat_id)
 
         else:
             send_message(chat_id, "❓未知指令，輸入 /help 查看支援功能")
