@@ -1709,10 +1709,12 @@ def _handle_force_update(chat_id: str):
             bars = detail.get("bars_predicted", "?")
             chart_kb = detail.get("chart_bytes", 0) // 1024
             direction = detail.get("direction", "?")
+            mode = detail.get("engine_mode", "?")
             send_message(chat_id,
                 f"✅ Update complete\n"
-                f"Direction: {direction} | Bars: {bars}\n"
-                f"Chart: {chart_kb}KB | TG send: {tg}")
+                f"Model: {mode} | Direction: {direction}\n"
+                f"Bars: {bars} | Chart: {chart_kb}KB\n"
+                f"TG send: {tg}")
         else:
             err = data.get("error", f"HTTP {resp.status_code}")
             send_message(chat_id, f"❌ Update failed: {err}")

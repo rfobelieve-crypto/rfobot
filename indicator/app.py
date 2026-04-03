@@ -447,6 +447,7 @@ def update_cycle() -> dict:
             logger.warning("Monitor check failed (non-critical): %s", mon_err)
 
         return {
+            "engine_mode": _engine.mode if _engine else "?",
             "bars_predicted": len(new_features) if 'new_features' in dir() else 0,
             "total_bars": len(indicator_df),
             "chart_bytes": len(png),
@@ -484,9 +485,11 @@ def chart():
 
 @app.route("/health")
 def health():
+    engine_mode = _engine.mode if _engine else "not_loaded"
     with _lock:
         return jsonify({
             "status": _state["status"],
+            "engine_mode": engine_mode,
             "last_update": _state["last_update"],
             "last_prediction": _state["last_prediction"],
             "error": _state["error"],
