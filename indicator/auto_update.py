@@ -327,15 +327,18 @@ def run_once(indicator_df: pd.DataFrame) -> pd.DataFrame:
 
     # Strong signal alert
     if strength == "Strong" and direction in ("UP", "DOWN"):
-        arrow_big = "\U0001f7e2" if direction == "UP" else "\U0001f534"
+        if direction == "UP":
+            icon = "\U0001f7e2\u25b2"  # 🟢▲
+            label = "STRONG BULLISH"
+        else:
+            icon = "\U0001f534\u25bc"  # 🔴▼
+            label = "STRONG BEARISH"
         alert = (
-            f"{arrow_big} <b>STRONG {direction} SIGNAL</b>\n"
-            f"\n"
+            f"{icon} <b>{label} SIGNAL</b>\n\n"
             f"BTC ${price:,.0f}\n"
             f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%}\n"
             f"Confidence: {conf:.0f}\n"
-            f"Regime: {last.get('regime', '?')}\n"
-            f"\n"
+            f"Regime: {last.get('regime', '?')}\n\n"
             f"⏰ {now}"
         )
         send_telegram_alert(alert)
