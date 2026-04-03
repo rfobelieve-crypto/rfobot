@@ -34,7 +34,7 @@ MIN_REGIME_IC_HISTORY = 50   # minimum bars per regime before IC is meaningful
 REGIME_BLEND_WEIGHT = 0.35   # weight for regime-specific model (vs global)
 
 # Dynamic deadzone parameters
-CHOPPY_DEADZONE_MULT = 1.20  # CHOPPY regime: widen deadzone (more conservative)
+CHOPPY_DEADZONE_MULT = 1.60  # CHOPPY regime: widen deadzone significantly
 TREND_DEADZONE_MULT = 0.90   # TRENDING: slightly tighter (momentum is real)
 VOL_DEADZONE_SCALE = 0.80    # how much vol ratio affects deadzone (0 = off, 1 = full)
 
@@ -46,9 +46,13 @@ BBP_CONFIRM_ENABLED = True   # master switch for BBP confirmation
 DIR_MODEL_ENABLED = True     # master switch for direction model
 DIR_HIGH_CONF = 0.65         # P(up) > this → override to UP
 DIR_LOW_CONF = 0.35          # P(up) < this → override to DOWN
+DIR_CHOPPY_DISABLED = True   # disable direction override in CHOPPY regime
 
 # Hysteresis: require stronger signal to FLIP direction vs maintain
 HYSTERESIS_MULT = 1.40       # to flip UP→DOWN, need strength < -(dz * 1.4)
+
+# Signal cooldown: minimum bars between direction flips
+FLIP_COOLDOWN_BARS = 3       # after flipping direction, hold for at least 3 bars
 
 # Dual-horizon blending
 BLEND_4H = 0.65              # weight for 4h strength
@@ -253,41 +257,54 @@ class IndicatorEngine:
         # Scale deadzone by realized vol ratio and regime
         dynamic_dz = self._compute_dynamic_deadzone(features, regime)
 
-        # ── Direction with hysteresis ─────────────────────────────────
+        # ── Direction with hysteresis + cooldown ─────────────────────
         # Initial direction from strength vs deadzone
         direction = np.full(n, "NEUTRAL", dtype=object)
         prev_dir = "NEUTRAL"
+        bars_since_flip = 999  # bars since last direction change
 
         for i in range(n):
             dz = dynamic_dz[i]
             s = strength[i]
 
+            # Compute candidate direction
             if prev_dir == "NEUTRAL":
-                # From NEUTRAL: standard deadzone to enter
                 if s > dz:
-                    direction[i] = "UP"
+                    candidate = "UP"
                 elif s < -dz:
-                    direction[i] = "DOWN"
+                    candidate = "DOWN"
                 else:
-                    direction[i] = "NEUTRAL"
+                    candidate = "NEUTRAL"
             elif prev_dir == "UP":
-                # Currently UP: need stronger signal to flip to DOWN
                 if s < -(dz * HYSTERESIS_MULT):
-                    direction[i] = "DOWN"    # strong reversal → flip
+                    candidate = "DOWN"
                 elif s > dz * 0.5:
-                    direction[i] = "UP"      # still above half-dz → hold
+                    candidate = "UP"
                 else:
-                    direction[i] = "NEUTRAL" # weakened → neutral first
+                    candidate = "NEUTRAL"
             elif prev_dir == "DOWN":
-                # Currently DOWN: need stronger signal to flip to UP
                 if s > dz * HYSTERESIS_MULT:
-                    direction[i] = "UP"      # strong reversal → flip
+                    candidate = "UP"
                 elif s < -dz * 0.5:
-                    direction[i] = "DOWN"    # still below half-dz → hold
+                    candidate = "DOWN"
                 else:
-                    direction[i] = "NEUTRAL" # weakened → neutral first
+                    candidate = "NEUTRAL"
+            else:
+                candidate = "NEUTRAL"
 
-            prev_dir = direction[i]
+            # Cooldown: if we flipped recently, hold previous direction
+            if candidate != prev_dir and prev_dir != "NEUTRAL":
+                if bars_since_flip < FLIP_COOLDOWN_BARS:
+                    candidate = prev_dir  # hold, don't flip yet
+
+            # Track flips
+            if candidate != prev_dir:
+                bars_since_flip = 0
+            else:
+                bars_since_flip += 1
+
+            direction[i] = candidate
+            prev_dir = candidate
 
         # ── BBP confirmation gate ─────────────────────────────────────
         # If BBP disagrees with strength direction, demote to NEUTRAL
@@ -307,7 +324,10 @@ class IndicatorEngine:
                 dir_X = self._prepare_direction_features(features)
                 dir_prob = self.dir_model.predict_proba(dir_X)[:, 1]  # P(up)
                 # Only override when classifier is very confident
+                # Skip override in CHOPPY regime (model unreliable in ranging markets)
                 for i in range(n):
+                    if DIR_CHOPPY_DISABLED and regime[i] == "CHOPPY":
+                        continue
                     if dir_prob[i] > DIR_HIGH_CONF and direction[i] != "UP":
                         direction[i] = "UP"
                     elif dir_prob[i] < DIR_LOW_CONF and direction[i] != "DOWN":
