@@ -1,7 +1,12 @@
 """
-Rebuild BTC_USD_1h_enhanced.parquet with newly discovered OI features.
-Adds: oi_close_pctchg_*, oi_range_zscore, oi_binance_share_zscore,
-      oi_upper_shadow, quote_vol_zscore, quote_vol_ratio.
+Rebuild BTC_USD_1h_enhanced.parquet with all features.
+
+Features include:
+  - Kline-derived (return, vol, taker delta, trade count)
+  - Coinglass (OI, liquidation, funding, taker, L/S ratios)
+  - Liquidation enhanced (surge, cascade, cumulative, asymmetry slope)
+  - Large trade proxy (avg_trade_size, trade_intensity, concentration)
+  - Cross-features, momentum, divergence, time encoding
 """
 import pandas as pd
 import numpy as np
@@ -245,15 +250,81 @@ def build():
             np.sign(-df["cg_funding_close_zscore"] * cvd_delta_z)
         )
 
+    # ── Absorption / Delta-Price Divergence ──
+    if "realized_vol_20b" in df.columns:
+        expected_move = df["realized_vol_20b"] * 0.5
+        price_return_abs = df["log_return"].abs()
+        under_reaction = (1 - price_return_abs / expected_move.replace(0, np.nan)).clip(-2, 2)
+        taker_delta_usd = taker_delta * df["close"]
+        df["absorption_score"] = taker_delta_usd * under_reaction
+        df["absorption_zscore"] = zscore(df["absorption_score"])
+        df["absorption_ma_4h"] = df["absorption_score"].rolling(4, min_periods=2).mean()
+        df["absorption_cumsum_4h"] = df["absorption_score"].rolling(4, min_periods=1).sum()
+
+    # ── Liquidation enhanced features ──
+    if "cg_liq_total" in df.columns:
+        liq_ma = df["cg_liq_total"].rolling(24, min_periods=4).mean().replace(0, np.nan)
+        df["cg_liq_surge"] = df["cg_liq_total"] / liq_ma
+
+        df["cg_liq_long_cum_4h"] = df.get("cg_liq_long", 0).rolling(4, min_periods=1).sum()
+        df["cg_liq_short_cum_4h"] = df.get("cg_liq_short", 0).rolling(4, min_periods=1).sum()
+        df["cg_liq_long_cum_8h"] = df.get("cg_liq_long", 0).rolling(8, min_periods=1).sum()
+        df["cg_liq_short_cum_8h"] = df.get("cg_liq_short", 0).rolling(8, min_periods=1).sum()
+
+        # Cascade: consecutive bars with above-average liquidation
+        above_avg = (df["cg_liq_total"] > liq_ma).astype(int)
+        reset = above_avg.eq(0).cumsum()
+        df["cg_liq_cascade"] = above_avg.groupby(reset).cumsum()
+
+        # Imbalance slope
+        if "cg_liq_imbalance" in df.columns:
+            df["cg_liq_imbalance_slope_4h"] = df["cg_liq_imbalance"].rolling(
+                4, min_periods=2
+            ).apply(lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) >= 2 else 0, raw=False)
+
+        # Liquidation vs volume
+        vol_usd = df["close"] * df["volume"]
+        df["cg_liq_vs_vol"] = df["cg_liq_total"] / vol_usd.replace(0, np.nan)
+
+        # Surge z-score
+        df["cg_liq_surge_zscore"] = zscore(df["cg_liq_surge"])
+
+    # ── Large trade proxy (from kline trade_count / volume) ──
+    if "trade_count" in df.columns and "volume" in df.columns:
+        tc = df["trade_count"].replace(0, np.nan)
+        df["avg_trade_size"] = df["volume"] / tc
+        df["avg_trade_size_zscore"] = zscore(df["avg_trade_size"])
+
+        if "quote_vol" in kdf.columns:
+            qv = pd.to_numeric(kdf["quote_vol"], errors="coerce").reindex(df.index)
+            df["avg_trade_notional"] = qv / tc
+            df["avg_trade_notional_zscore"] = zscore(df["avg_trade_notional"])
+
+        df["trade_intensity"] = tc / df["volume"].replace(0, np.nan)
+        df["trade_intensity_zscore"] = zscore(df["trade_intensity"])
+
+        tc_ma_4h = tc.rolling(4, min_periods=2).mean()
+        tc_ma_24h = tc.rolling(24, min_periods=4).mean()
+        df["trade_count_accel"] = tc_ma_4h / tc_ma_24h.replace(0, np.nan)
+
+        if "taker_delta_ratio" in df.columns:
+            df["large_taker_signal"] = (
+                df["avg_trade_size_zscore"] * df["taker_delta_ratio"]
+            )
+
     print(f"Built: {len(df)} bars x {len(df.columns)} columns")
     print(f"Range: {df.index[0]} ~ {df.index[-1]}")
 
-    # NEW features summary
+    # Feature summary
     new_cols = [c for c in df.columns if any(tag in c for tag in [
         "pctchg_", "oi_range", "oi_upper_shadow", "binance_share_zscore",
         "quote_vol_zscore", "quote_vol_ratio",
+        "liq_surge", "liq_long_cum", "liq_short_cum", "liq_cascade",
+        "liq_imbalance_slope", "liq_vs_vol",
+        "avg_trade_size", "avg_trade_notional", "trade_intensity",
+        "trade_count_accel", "large_taker_signal",
     ])]
-    print(f"NEW features added: {new_cols}")
+    print(f"Enhanced features: {new_cols}")
 
     df.to_parquet(OUT)
     print(f"Saved to {OUT}")

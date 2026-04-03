@@ -102,7 +102,10 @@ def send_telegram_alert(message: str):
 
 def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
     """Fetch new data, predict, render chart. Returns (updated_df, png_bytes)."""
-    from indicator.data_fetcher import fetch_binance_klines, fetch_coinglass
+    from indicator.data_fetcher import (
+        fetch_binance_klines, fetch_coinglass,
+        fetch_binance_depth, fetch_binance_aggtrades,
+    )
     from indicator.feature_builder_live import build_live_features
     from indicator.inference import IndicatorEngine
     from indicator.chart_renderer import render_chart
@@ -110,6 +113,8 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
     # Fetch live data
     klines = fetch_binance_klines(limit=500)
     cg_data = fetch_coinglass(interval="1h", limit=500)
+    depth = fetch_binance_depth()
+    aggtrades = fetch_binance_aggtrades()
 
     # Data freshness check
     freshness_warnings = check_data_freshness(klines, cg_data)
@@ -118,7 +123,7 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
         logger.warning("Data freshness issues: %s", freshness_warnings)
         send_telegram_alert(alert)
 
-    features = build_live_features(klines, cg_data)
+    features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades)
 
     # Backfill OHLC from klines into history
     for col in ["open", "high", "low", "close"]:
@@ -141,6 +146,14 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
         indicator_df = indicator_df[~indicator_df.index.duplicated(keep="last")]
         indicator_df = indicator_df.sort_index()
         logger.info("Added %d new bars. Total: %d", len(new_predictions), len(indicator_df))
+
+    # Save depth/aggtrades snapshots for future training
+    try:
+        from indicator.snapshot_collector import save_depth_snapshot, save_aggtrades_snapshot
+        save_depth_snapshot(depth)
+        save_aggtrades_snapshot(aggtrades)
+    except Exception as snap_err:
+        logger.warning("Snapshot save failed (non-critical): %s", snap_err)
 
     # Render chart
     chart_df = indicator_df.dropna(subset=["open", "high", "low", "close"])

@@ -41,12 +41,13 @@ HORIZON = 4  # 4h = 4 × 1h bars
 
 TARGETS = ["up_move_vol_adj", "down_move_vol_adj", "strength_vol_adj"]
 
-# ── Per-target feature selection (validated by target_feature_selection.py) ──
-# Only add features that IMPROVE the specific target's ICIR across all folds.
-# up_move:  +pctchg_8h (ΔICIR +1.65) +oi_range_zscore (ΔICIR +1.63)  → combo ICIR 4.04
-# down_move: +oi_range_pct only (ΔICIR +0.15) — all others HARMFUL
-# strength:  NO new features — all 11 candidates HARMFUL
+# ── Per-target feature selection ──
+# Features in NEW_FEATURES are excluded from baseline and selectively added per target.
+# Phase 1 (v4): OI derivatives validated via target_feature_selection.py
+# Phase 2 (v5): Liquidation enhanced + large trade proxy — include ALL in baseline
+#               (no exclusion needed since these are information-rich for all targets)
 NEW_FEATURES = {
+    # OI derivatives (Phase 1 — selective per-target)
     "cg_oi_close_pctchg_4h", "cg_oi_close_pctchg_8h",
     "cg_oi_close_pctchg_12h", "cg_oi_close_pctchg_24h",
     "cg_oi_range", "cg_oi_range_zscore", "cg_oi_range_pct",
@@ -58,8 +59,18 @@ NEW_FEATURES = {
 TARGET_EXTRA_FEATURES: dict[str, list[str]] = {
     "up_move_vol_adj":   ["cg_oi_close_pctchg_8h", "cg_oi_range_zscore"],
     "down_move_vol_adj": ["cg_oi_range_pct"],
-    "strength_vol_adj":  [],  # baseline only — all new features harmful
+    "strength_vol_adj":  [],  # OI derivatives harmful for strength
 }
+
+# Phase 2 features: included in ALL targets' baseline (not in NEW_FEATURES exclusion set)
+# These will be automatically picked up since they're not in EXCLUDE or NEW_FEATURES.
+# - cg_liq_surge, cg_liq_surge_zscore, cg_liq_cascade
+# - cg_liq_long_cum_4h/8h, cg_liq_short_cum_4h/8h
+# - cg_liq_imbalance_slope_4h, cg_liq_vs_vol
+# - avg_trade_size, avg_trade_size_zscore
+# - avg_trade_notional, avg_trade_notional_zscore
+# - trade_intensity, trade_intensity_zscore
+# - trade_count_accel, large_taker_signal
 
 # Features to exclude (targets, OHLC, intermediate columns)
 EXCLUDE = {

@@ -164,6 +164,158 @@ def _cg_fetch(path: str, exchange: str | None, symbol: str,
     return df
 
 
+def fetch_binance_depth(symbol: str = "BTCUSDT", limit: int = 20) -> dict:
+    """
+    Fetch order book depth snapshot from Binance Futures.
+
+    Returns dict with 'bids' and 'asks' as lists of [price, qty],
+    plus computed summary: bid_depth_usd, ask_depth_usd, imbalance.
+    Returns empty dict on failure.
+    """
+    url = "https://fapi.binance.com/fapi/v1/depth"
+    try:
+        resp = _retry_request("GET", url, params={
+            "symbol": symbol, "limit": limit,
+        })
+        data = resp.json()
+        bids = data.get("bids", [])
+        asks = data.get("asks", [])
+
+        if not bids or not asks:
+            logger.warning("Binance depth: empty order book")
+            return {}
+
+        # Compute USD depth (price * qty for each level)
+        bid_depth = sum(float(p) * float(q) for p, q in bids)
+        ask_depth = sum(float(p) * float(q) for p, q in asks)
+        total = bid_depth + ask_depth
+
+        # Near-price depth (top 5 levels)
+        near_bid = sum(float(p) * float(q) for p, q in bids[:5])
+        near_ask = sum(float(p) * float(q) for p, q in asks[:5])
+
+        best_bid = float(bids[0][0])
+        best_ask = float(asks[0][0])
+        mid = (best_bid + best_ask) / 2
+
+        result = {
+            "bid_depth_usd": bid_depth,
+            "ask_depth_usd": ask_depth,
+            "depth_imbalance": (bid_depth - ask_depth) / total if total > 0 else 0,
+            "near_bid_usd": near_bid,
+            "near_ask_usd": near_ask,
+            "near_imbalance": (near_bid - near_ask) / (near_bid + near_ask)
+                              if (near_bid + near_ask) > 0 else 0,
+            "spread_bps": (best_ask - best_bid) / mid * 10000 if mid > 0 else 0,
+            "mid_price": mid,
+        }
+        logger.info("Binance depth: bid=%.0f ask=%.0f imb=%.3f spread=%.1fbps",
+                     bid_depth, ask_depth, result["depth_imbalance"], result["spread_bps"])
+        return result
+
+    except Exception as e:
+        logger.error("Binance depth fetch failed: %s", e)
+        return {}
+
+
+def fetch_binance_aggtrades(symbol: str = "BTCUSDT",
+                            lookback_hours: int = 2,
+                            large_threshold_usd: float = 100_000) -> dict:
+    """
+    Fetch recent aggTrades and separate large vs small trades.
+
+    Returns dict with per-hour aggregated stats:
+        large_buy_usd, large_sell_usd, large_count, large_ratio,
+        small_buy_usd, small_sell_usd, avg_trade_usd, total_count.
+    Returns empty dict on failure.
+
+    Note: Binance aggTrades limit=1000, so for high-activity periods
+    this covers ~minutes. We make multiple requests to cover lookback.
+    """
+    url = "https://fapi.binance.com/fapi/v1/aggTrades"
+    now_ms = int(time.time() * 1000)
+    start_ms = now_ms - lookback_hours * 3600 * 1000
+
+    all_trades = []
+    current_end = now_ms
+
+    try:
+        # Paginate backwards (up to 5 requests to stay within rate limits)
+        for _ in range(5):
+            resp = _retry_request("GET", url, params={
+                "symbol": symbol,
+                "startTime": start_ms,
+                "endTime": current_end,
+                "limit": 1000,
+            })
+            trades = resp.json()
+            if not isinstance(trades, list) or len(trades) == 0:
+                break
+
+            all_trades.extend(trades)
+            # Move end time before earliest trade in this batch
+            earliest_ts = min(t["T"] for t in trades)
+            if earliest_ts <= start_ms:
+                break
+            current_end = earliest_ts - 1
+            time.sleep(0.2)  # Rate limit
+
+        if not all_trades:
+            logger.warning("Binance aggTrades: no trades fetched")
+            return {}
+
+        # Parse trades
+        large_buy_usd = 0.0
+        large_sell_usd = 0.0
+        large_count = 0
+        small_buy_usd = 0.0
+        small_sell_usd = 0.0
+        total_count = len(all_trades)
+
+        for t in all_trades:
+            price = float(t["p"])
+            qty = float(t["q"])
+            notional = price * qty
+            is_seller_maker = t["m"]  # True = taker is buyer
+
+            if notional >= large_threshold_usd:
+                large_count += 1
+                if not is_seller_maker:  # seller is taker
+                    large_sell_usd += notional
+                else:
+                    large_buy_usd += notional
+            else:
+                if not is_seller_maker:
+                    small_sell_usd += notional
+                else:
+                    small_buy_usd += notional
+
+        total_usd = large_buy_usd + large_sell_usd + small_buy_usd + small_sell_usd
+        result = {
+            "large_buy_usd": large_buy_usd,
+            "large_sell_usd": large_sell_usd,
+            "large_delta_usd": large_buy_usd - large_sell_usd,
+            "large_count": large_count,
+            "large_ratio": (large_buy_usd + large_sell_usd) / total_usd if total_usd > 0 else 0,
+            "large_buy_ratio": large_buy_usd / (large_buy_usd + large_sell_usd)
+                               if (large_buy_usd + large_sell_usd) > 0 else 0.5,
+            "small_buy_usd": small_buy_usd,
+            "small_sell_usd": small_sell_usd,
+            "small_delta_usd": small_buy_usd - small_sell_usd,
+            "avg_trade_usd": total_usd / total_count if total_count > 0 else 0,
+            "total_count": total_count,
+            "total_usd": total_usd,
+        }
+        logger.info("aggTrades: %d trades, large=%d (%.1f%%), large_delta=$%.0f",
+                     total_count, large_count,
+                     result["large_ratio"] * 100, result["large_delta_usd"])
+        return result
+
+    except Exception as e:
+        logger.error("Binance aggTrades fetch failed: %s", e)
+        return {}
+
+
 def fetch_coinglass(interval: str = "1h", limit: int = 500) -> dict[str, pd.DataFrame]:
     """Fetch all Coinglass endpoints with retry and cache fallback."""
     if not CG_API_KEY:

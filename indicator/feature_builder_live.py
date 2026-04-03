@@ -34,13 +34,17 @@ def _zscore(s: pd.Series, win: int = ZSCORE_WIN) -> pd.Series:
 
 
 def build_live_features(klines: pd.DataFrame,
-                        cg_data: dict[str, pd.DataFrame]) -> pd.DataFrame:
+                        cg_data: dict[str, pd.DataFrame],
+                        depth: dict | None = None,
+                        aggtrades: dict | None = None) -> pd.DataFrame:
     """
     Build feature DataFrame from live 1h API data.
 
     Parameters:
         klines: Binance 1h klines (OHLCV + taker_buy_vol + trade_count)
         cg_data: dict from fetch_coinglass() (native 1h data)
+        depth: dict from fetch_binance_depth() (order book snapshot, optional)
+        aggtrades: dict from fetch_binance_aggtrades() (large trade stats, optional)
 
     Returns:
         DataFrame indexed by datetime with all features.
@@ -127,6 +131,114 @@ def build_live_features(klines: pd.DataFrame,
             df["cg_oi_delta_zscore"].abs() *
             np.sign(-df["cg_funding_close_zscore"] * cvd_delta_z)
         )
+
+    # ── Absorption / Delta-Price Divergence ──────────────────────────────
+    # Large delta but small price move = limit order absorption (institutional)
+    # Positive = buy-side absorption (bullish), negative = sell-side absorption (bearish)
+    if "realized_vol_20b" in df.columns:
+        expected_move = df["realized_vol_20b"] * 0.5  # half ATR as expected move
+        price_return_abs = df["log_return"].abs()
+        under_reaction = (1 - price_return_abs / expected_move.replace(0, np.nan)).clip(-2, 2)
+        # taker_delta is in BTC; convert to directional USD
+        taker_delta_usd = taker_delta * df["close"]
+        df["absorption_score"] = taker_delta_usd * under_reaction
+        df["absorption_zscore"] = _zscore(df["absorption_score"])
+
+        # Rolling absorption momentum (sustained absorption = strong signal)
+        df["absorption_ma_4h"] = df["absorption_score"].rolling(SHORT_WIN, min_periods=2).mean()
+        df["absorption_cumsum_4h"] = df["absorption_score"].rolling(SHORT_WIN, min_periods=1).sum()
+
+    # ── Liquidation enhanced features ─────────────────────────────────────
+    if "cg_liq_total" in df.columns:
+        # Surge detection: current bar vs rolling mean
+        liq_ma = df["cg_liq_total"].rolling(LONG_WIN, min_periods=4).mean().replace(0, np.nan)
+        df["cg_liq_surge"] = df["cg_liq_total"] / liq_ma
+
+        # Cumulative liquidation pressure (4h / 8h windows)
+        df["cg_liq_long_cum_4h"] = df["cg_liq_long"].rolling(SHORT_WIN, min_periods=1).sum()
+        df["cg_liq_short_cum_4h"] = df["cg_liq_short"].rolling(SHORT_WIN, min_periods=1).sum()
+        df["cg_liq_long_cum_8h"] = df["cg_liq_long"].rolling(8, min_periods=1).sum()
+        df["cg_liq_short_cum_8h"] = df["cg_liq_short"].rolling(8, min_periods=1).sum()
+
+        # Cascade count: consecutive bars with above-average liquidation
+        above_avg = (df["cg_liq_total"] > liq_ma).astype(int)
+        # Count consecutive 1s using cumsum trick
+        reset = above_avg.eq(0).cumsum()
+        df["cg_liq_cascade"] = above_avg.groupby(reset).cumsum()
+
+        # Liquidation asymmetry slope (trend in long/short imbalance)
+        if "cg_liq_imbalance" in df.columns:
+            df["cg_liq_imbalance_slope_4h"] = df["cg_liq_imbalance"].rolling(
+                SHORT_WIN, min_periods=2
+            ).apply(lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) >= 2 else 0, raw=False)
+
+        # Liquidation vs volume ratio (market impact proxy)
+        if "volume" in df.columns:
+            vol_usd = df["close"] * df["volume"]
+            df["cg_liq_vs_vol"] = df["cg_liq_total"] / vol_usd.replace(0, np.nan)
+
+        # Liquidation surge z-score
+        df["cg_liq_surge_zscore"] = _zscore(df["cg_liq_surge"])
+
+    # ── Large trade flow proxy (from kline trade_count / volume) ──────────
+    if "trade_count" in df.columns and "volume" in df.columns:
+        tc = df["trade_count"].replace(0, np.nan)
+        # Average trade size in BTC
+        df["avg_trade_size"] = df["volume"] / tc
+        df["avg_trade_size_zscore"] = _zscore(df["avg_trade_size"])
+
+        # Average notional per trade (USD)
+        if "quote_vol" in klines.columns:
+            qv = pd.to_numeric(klines["quote_vol"], errors="coerce").reindex(df.index)
+            df["avg_trade_notional"] = qv / tc
+            df["avg_trade_notional_zscore"] = _zscore(df["avg_trade_notional"])
+
+        # Trade intensity: many small trades vs few large (high = many small)
+        df["trade_intensity"] = tc / df["volume"].replace(0, np.nan)
+        df["trade_intensity_zscore"] = _zscore(df["trade_intensity"])
+
+        # Trade count acceleration
+        tc_ma_4h = tc.rolling(SHORT_WIN, min_periods=2).mean()
+        tc_ma_24h = tc.rolling(LONG_WIN, min_periods=4).mean()
+        df["trade_count_accel"] = tc_ma_4h / tc_ma_24h.replace(0, np.nan)
+
+        # Taker buy concentration: when avg trade size is high AND taker delta is directional
+        if "taker_delta_ratio" in df.columns:
+            df["large_taker_signal"] = (
+                df["avg_trade_size_zscore"] * df["taker_delta_ratio"]
+            )
+
+    # ── Order book depth features (snapshot, appended to last bar only) ───
+    if depth and isinstance(depth, dict) and "depth_imbalance" in depth:
+        # These are point-in-time snapshots — only valid for the latest bar
+        # Set NaN for all historical bars, then fill last bar
+        for col in ["depth_imbalance", "near_imbalance", "spread_bps"]:
+            df[col] = np.nan
+            if col in depth:
+                df.iloc[-1, df.columns.get_loc(col)] = depth[col]
+        # Depth ratio: bid/ask depth
+        bid = depth.get("bid_depth_usd", 0)
+        ask = depth.get("ask_depth_usd", 0)
+        df["depth_bid_ask_ratio"] = np.nan
+        if ask > 0:
+            df.iloc[-1, df.columns.get_loc("depth_bid_ask_ratio")] = bid / ask
+
+    # ── Large trade aggTrades features (snapshot, last bar only) ──────────
+    if aggtrades and isinstance(aggtrades, dict) and "large_ratio" in aggtrades:
+        for col in ["large_ratio", "large_buy_ratio", "large_delta_usd",
+                     "avg_trade_usd"]:
+            df[col] = np.nan
+            if col in aggtrades:
+                df.iloc[-1, df.columns.get_loc(col)] = aggtrades[col]
+        # Large vs small delta divergence
+        large_d = aggtrades.get("large_delta_usd", 0)
+        small_d = aggtrades.get("small_delta_usd", 0)
+        df["large_small_divergence"] = np.nan
+        if abs(large_d) + abs(small_d) > 0:
+            # +1 = large and small agree, -1 = diverge
+            df.iloc[-1, df.columns.get_loc("large_small_divergence")] = (
+                np.sign(large_d) * np.sign(small_d) if large_d != 0 and small_d != 0 else 0
+            )
 
     # ── Time-of-day features (cyclical encoding) ───────────────────────────
     hour = df.index.hour

@@ -132,7 +132,10 @@ def _load_history() -> pd.DataFrame:
 
 def update_cycle():
     """Fetch new data, predict only new bars, append to history."""
-    from indicator.data_fetcher import fetch_binance_klines, fetch_coinglass
+    from indicator.data_fetcher import (
+        fetch_binance_klines, fetch_coinglass,
+        fetch_binance_depth, fetch_binance_aggtrades,
+    )
     from indicator.feature_builder_live import build_live_features
     from indicator.inference import IndicatorEngine
     from indicator.chart_renderer import render_chart
@@ -155,6 +158,8 @@ def update_cycle():
         # 1. Fetch live data
         klines = fetch_binance_klines(limit=500)
         cg_data = fetch_coinglass(interval="1h", limit=500)
+        depth = fetch_binance_depth()
+        aggtrades = fetch_binance_aggtrades()
 
         # Diagnose Coinglass data quality
         cg_status = {}
@@ -172,7 +177,7 @@ def update_cycle():
             logger.error("ALL Coinglass endpoints failed — BBP will be zero")
 
         # 2. Build features for ALL fetched bars
-        features = build_live_features(klines, cg_data)
+        features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades)
 
         # 3. Backfill OHLC into history from klines (history only has 'close')
         for col in ["open", "high", "low"]:
@@ -264,6 +269,14 @@ def update_cycle():
 
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
+
+        # Save depth/aggtrades snapshots for future training
+        try:
+            from indicator.snapshot_collector import save_depth_snapshot, save_aggtrades_snapshot
+            save_depth_snapshot(depth)
+            save_aggtrades_snapshot(aggtrades)
+        except Exception as snap_err:
+            logger.warning("Snapshot save failed (non-critical): %s", snap_err)
 
         # Run signal quality monitor (lightweight, won't block)
         try:
