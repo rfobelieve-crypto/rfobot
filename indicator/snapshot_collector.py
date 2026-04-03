@@ -379,6 +379,8 @@ def _append_parquet_row(path: Path, ts: datetime, data: dict):
     try:
         if path.exists():
             existing = pd.read_parquet(path)
+            existing.index = existing.index.astype("datetime64[ns, UTC]")
+            row.index = row.index.astype("datetime64[ns, UTC]")
             combined = pd.concat([existing, row])
             combined = combined[~combined.index.duplicated(keep="last")]
             combined = combined.sort_index()

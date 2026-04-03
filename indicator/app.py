@@ -209,6 +209,9 @@ def _backfill_from_mysql(df: pd.DataFrame) -> pd.DataFrame:
         logger.info("MySQL backfill: loaded %d rows (no parquet base)", len(mysql_df))
         return mysql_df
 
+    # Normalize datetime precision before concat
+    df.index = df.index.astype("datetime64[ns, UTC]")
+    mysql_df.index = mysql_df.index.astype("datetime64[ns, UTC]")
     combined = pd.concat([df, mysql_df])
     combined = combined[~combined.index.duplicated(keep="last")]
     combined = combined.sort_index()

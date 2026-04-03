@@ -91,6 +91,8 @@ def load_history() -> pd.DataFrame:
             if df.empty:
                 df = mysql_df
             else:
+                df.index = df.index.astype("datetime64[ns, UTC]")
+                mysql_df.index = mysql_df.index.astype("datetime64[ns, UTC]")
                 df = pd.concat([df, mysql_df])
                 df = df[~df.index.duplicated(keep="last")].sort_index()
             logger.info("MySQL backfill: +%d rows, total %d", len(rows), len(df))
