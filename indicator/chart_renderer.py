@@ -153,28 +153,34 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     # Date labels — shared tick positions for all panels
     tick_pos = np.linspace(0, n - 1, min(12, n)).astype(int)
 
-    # ── Panel 3: Magnitude (predicted |return_4h|) ───────────────────────
+    # ── Panel 3: Magnitude (predicted |return_4h|, signed by direction) ───
     if has_mag:
         ax_mag = fig.add_subplot(gs[panel_idx]); panel_idx += 1
-        mag_vals = sig["mag_pred"].fillna(0).values.astype(float) * 100  # to %
+        mag_raw = sig["mag_pred"].fillna(0).values.astype(float) * 100  # to %
         mag_dirs = sig["pred_direction"].fillna("NEUTRAL").values
 
+        # Sign by direction: UP = positive, DOWN = negative
+        mag_signed = np.zeros(n)
         mag_colors = []
         for i in range(n):
             d = mag_dirs[i]
-            m = mag_vals[i]
+            m = mag_raw[i]
             if d == "UP":
+                mag_signed[i] = m
                 mag_colors.append("#004d40" if m > 0.5 else "#26a69a")
             elif d == "DOWN":
+                mag_signed[i] = -m
                 mag_colors.append("#b71c1c" if m > 0.5 else "#ef5350")
             else:
+                mag_signed[i] = 0
                 mag_colors.append("#9e9e9e")
 
-        ax_mag.bar(x, mag_vals, width=0.8, color=mag_colors, alpha=0.8, edgecolor="none")
-        ax_mag.axhline(0.5, color="#666666", linewidth=0.5, linestyle="--", alpha=0.5)
+        ax_mag.bar(x, mag_signed, width=0.8, color=mag_colors, alpha=0.8, edgecolor="none")
+        ax_mag.axhline(0, color="black", linewidth=0.5)
         ax_mag.set_ylabel("Magnitude\n(%)", fontsize=9)
         ax_mag.set_xlim(-0.5, n - 0.5)
-        ax_mag.set_ylim(0, max(mag_vals.max() * 1.2, 1.0))
+        mag_max = max(abs(mag_signed).max() * 1.2, 0.5)
+        ax_mag.set_ylim(-mag_max, mag_max)
         ax_mag.grid(True, alpha=0.15)
         ax_mag.set_xticks([])
 
