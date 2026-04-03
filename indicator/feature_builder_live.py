@@ -264,9 +264,9 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
             if src in cg_df.columns:
                 left = df[["close"]].reset_index()
                 right = cg_df[[src]].reset_index().rename(columns={src: target})
-                # Unify datetime precision to avoid merge_asof type mismatch
-                left["dt"] = pd.to_datetime(left["dt"], utc=True)
-                right["dt"] = pd.to_datetime(right["dt"], utc=True)
+                # Force same datetime precision (pandas 2.x preserves original unit)
+                left["dt"] = left["dt"].astype("datetime64[ns, UTC]")
+                right["dt"] = right["dt"].astype("datetime64[ns, UTC]")
                 merged = pd.merge_asof(
                     left, right,
                     left_on="dt", right_on="dt", direction="backward",
