@@ -216,6 +216,14 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
 
     features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades)
 
+    # Normalize datetime index precision (avoid ms vs s merge errors)
+    if not indicator_df.empty and hasattr(indicator_df.index, 'as_unit'):
+        indicator_df.index = indicator_df.index.as_unit("ns")
+    if hasattr(klines.index, 'as_unit'):
+        klines.index = klines.index.as_unit("ns")
+    if hasattr(features.index, 'as_unit'):
+        features.index = features.index.as_unit("ns")
+
     # Backfill OHLC from klines into history
     for col in ["open", "high", "low", "close"]:
         if col in klines.columns:
@@ -233,6 +241,8 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
     if len(new_features) > 0:
         engine = IndicatorEngine()
         new_predictions = engine.predict(new_features)
+        if hasattr(new_predictions.index, 'as_unit'):
+            new_predictions.index = new_predictions.index.as_unit("ns")
         indicator_df = pd.concat([indicator_df, new_predictions])
         indicator_df = indicator_df[~indicator_df.index.duplicated(keep="last")]
         indicator_df = indicator_df.sort_index()

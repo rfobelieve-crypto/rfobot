@@ -246,6 +246,10 @@ def update_cycle() -> dict:
         if indicator_df is None:
             indicator_df = _load_history()
 
+        # Normalize index to ns precision (avoid ms vs s merge errors)
+        if indicator_df is not None and not indicator_df.empty:
+            indicator_df.index = indicator_df.index.as_unit("ns")
+
         # 1. Fetch live data
         klines = fetch_binance_klines(limit=500)
         cg_data = fetch_coinglass(interval="1h", limit=500)
@@ -307,6 +311,12 @@ def update_cycle() -> dict:
         # 2. Build features for ALL fetched bars
         features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades)
 
+        # Normalize all datetime indices to same precision
+        if hasattr(klines.index, 'as_unit'):
+            klines.index = klines.index.as_unit("ns")
+        if hasattr(features.index, 'as_unit'):
+            features.index = features.index.as_unit("ns")
+
         # 3. Backfill OHLC into history from klines (history only has 'close')
         for col in ["open", "high", "low"]:
             if col in klines.columns and (col not in indicator_df.columns or indicator_df[col].isna().all()):
@@ -340,6 +350,8 @@ def update_cycle() -> dict:
         # 5. Predict new + gap bars
         if len(new_features) > 0:
             new_predictions = _engine.predict(new_features)
+            if hasattr(new_predictions.index, 'as_unit'):
+                new_predictions.index = new_predictions.index.as_unit("ns")
             indicator_df = pd.concat([indicator_df, new_predictions])
             indicator_df = indicator_df[~indicator_df.index.duplicated(keep="last")]
             indicator_df = indicator_df.sort_index()
