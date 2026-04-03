@@ -285,20 +285,29 @@ def update_cycle():
                     m = kline_col.notna()
                     indicator_df.loc[m, col] = kline_col[m]
 
-        # 4. Find new bars (after history ends)
+        # 4. Find bars that need prediction:
+        #    - new bars after history ends
+        #    - gap bars (in features range but missing from history)
         if not indicator_df.empty:
-            last_hist_time = indicator_df.index[-1]
-            new_features = features[features.index > last_hist_time]
+            existing_times = set(indicator_df.index)
+            missing_mask = ~features.index.isin(existing_times)
+            new_features = features[missing_mask]
+            if len(new_features) < len(features[features.index > indicator_df.index[-1]]):
+                # At minimum, predict all bars after history end
+                after_end = features[features.index > indicator_df.index[-1]]
+                new_features = features[missing_mask | features.index.isin(after_end.index)]
+                new_features = new_features[~new_features.index.duplicated(keep="last")]
         else:
             new_features = features
 
-        # 5. Predict only new bars
+        # 5. Predict new + gap bars
         if len(new_features) > 0:
             new_predictions = _engine.predict(new_features)
             indicator_df = pd.concat([indicator_df, new_predictions])
             indicator_df = indicator_df[~indicator_df.index.duplicated(keep="last")]
             indicator_df = indicator_df.sort_index()
-            logger.info("Appended %d new bars. Total: %d", len(new_predictions), len(indicator_df))
+            logger.info("Predicted %d bars (new + gap fill). Total: %d",
+                        len(new_predictions), len(indicator_df))
         else:
             logger.info("No new bars to predict")
 
