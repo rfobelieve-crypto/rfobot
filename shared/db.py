@@ -73,15 +73,16 @@ def _resolve_config():
         return
 
     # Layer 1: environment variables (always highest priority)
-    env_host = os.getenv("MYSQL_HOST", "")
+    # Support both MYSQL_HOST (our format) and MYSQLHOST (Railway native format)
+    env_host = os.getenv("MYSQL_HOST", "") or os.getenv("MYSQLHOST", "")
 
     if env_host:
         _db_config = {
             "host": env_host,
-            "port": int(os.getenv("MYSQL_PORT", "3306")),
-            "user": os.getenv("MYSQL_USER", ""),
-            "password": os.getenv("MYSQL_PASSWORD", ""),
-            "database": os.getenv("MYSQL_DB", ""),
+            "port": int(os.getenv("MYSQL_PORT", "") or os.getenv("MYSQLPORT", "3306")),
+            "user": os.getenv("MYSQL_USER", "") or os.getenv("MYSQLUSER", ""),
+            "password": os.getenv("MYSQL_PASSWORD", "") or os.getenv("MYSQLPASSWORD", ""),
+            "database": os.getenv("MYSQL_DB", "") or os.getenv("MYSQLDATABASE", ""),
             "source": "environment",
         }
         _config_loaded = True
