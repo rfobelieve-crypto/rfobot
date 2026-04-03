@@ -596,6 +596,7 @@ def indicator_db_stats():
             ("indicator_depth_snapshots", "Depth"),
             ("indicator_aggtrades_snapshots", "AggTrades"),
             ("indicator_options_snapshots", "Options/ETF/DVOL"),
+            ("indicator_sentiment_snapshots", "Sentiment"),
         ]
         lines = ["<b>📦 資料庫狀態</b>\n"]
         with conn.cursor() as cur:
