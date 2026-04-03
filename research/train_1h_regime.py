@@ -37,9 +37,12 @@ warnings.filterwarnings("ignore")
 PARQUET = Path(__file__).parent / "ml_data" / "BTC_USD_1h_enhanced.parquet"
 ARTIFACT_DIR = Path(__file__).parent.parent / "indicator" / "model_artifacts"
 N_FOLDS = 5
-HORIZON = 4  # 4h = 4 × 1h bars
+HORIZON_4H = 4   # 4h = 4 × 1h bars
+HORIZON_1H = 1   # 1h = 1 bar
 
-TARGETS = ["up_move_vol_adj", "down_move_vol_adj", "strength_vol_adj"]
+TARGETS_4H = ["up_move_vol_adj", "down_move_vol_adj", "strength_vol_adj"]
+TARGETS_1H = ["up_move_1h_vol_adj", "down_move_1h_vol_adj", "strength_1h_vol_adj"]
+TARGETS = TARGETS_4H + TARGETS_1H
 
 # ── Per-target feature selection ──
 # Features in NEW_FEATURES are excluded from baseline and selectively added per target.
@@ -57,9 +60,12 @@ NEW_FEATURES = {
 }
 
 TARGET_EXTRA_FEATURES: dict[str, list[str]] = {
-    "up_move_vol_adj":   ["cg_oi_close_pctchg_8h", "cg_oi_range_zscore"],
-    "down_move_vol_adj": ["cg_oi_range_pct"],
-    "strength_vol_adj":  [],  # OI derivatives harmful for strength
+    "up_move_vol_adj":      ["cg_oi_close_pctchg_8h", "cg_oi_range_zscore"],
+    "down_move_vol_adj":    ["cg_oi_range_pct"],
+    "strength_vol_adj":     [],  # OI derivatives harmful for strength
+    "up_move_1h_vol_adj":   [],  # 1h targets: baseline until validated
+    "down_move_1h_vol_adj": [],
+    "strength_1h_vol_adj":  [],
 }
 
 # Phase 2 features: included in ALL targets' baseline (not in NEW_FEATURES exclusion set)
@@ -81,10 +87,12 @@ EXCLUDE = {
     "volume_ma_4h", "volume_ma_24h",
     "taker_delta_ma_4h", "taker_delta_std_4h",
     "return_skew",  # high NaN rate at edges
-    # targets
+    # targets (4h + 1h)
     "y_return_4h",
     "up_move_vol_adj", "down_move_vol_adj", "strength_vol_adj",
     "future_high_4h", "future_low_4h",
+    "up_move_1h_vol_adj", "down_move_1h_vol_adj", "strength_1h_vol_adj",
+    "future_high_1h", "future_low_1h",
     # regime (routing only)
     "regime_name",
 }
@@ -113,30 +121,36 @@ def load_and_prepare() -> tuple[pd.DataFrame, list[str]]:
     df = pd.read_parquet(PARQUET)
     df = df.sort_index()
 
-    # ── Create multi-target labels ────────────────────────────────────────
+    # ── Create multi-target labels (4h + 1h) ────────────────────────────
     close = df["close"].values.astype(float)
     high = df["high"].values.astype(float)
     low = df["low"].values.astype(float)
-
-    future_high = np.full(len(df), np.nan)
-    future_low = np.full(len(df), np.nan)
-    for i in range(len(df) - HORIZON):
-        future_high[i] = np.max(high[i + 1: i + 1 + HORIZON])
-        future_low[i] = np.min(low[i + 1: i + 1 + HORIZON])
-
-    df["future_high_4h"] = future_high
-    df["future_low_4h"] = future_low
-
-    up_move = np.maximum(future_high / close - 1, 0)
-    down_move = np.maximum(1 - future_low / close, 0)
-
-    # Volatility-adjusted
     rvol = df["realized_vol_20b"].values
     rvol_safe = np.where(rvol > 1e-6, rvol, np.nan)
 
-    df["up_move_vol_adj"] = up_move / rvol_safe
-    df["down_move_vol_adj"] = down_move / rvol_safe
+    # 4h targets (horizon = 4 bars)
+    fh_4h = np.full(len(df), np.nan)
+    fl_4h = np.full(len(df), np.nan)
+    for i in range(len(df) - HORIZON_4H):
+        fh_4h[i] = np.max(high[i + 1: i + 1 + HORIZON_4H])
+        fl_4h[i] = np.min(low[i + 1: i + 1 + HORIZON_4H])
+    df["future_high_4h"] = fh_4h
+    df["future_low_4h"] = fl_4h
+    df["up_move_vol_adj"] = np.maximum(fh_4h / close - 1, 0) / rvol_safe
+    df["down_move_vol_adj"] = np.maximum(1 - fl_4h / close, 0) / rvol_safe
     df["strength_vol_adj"] = df["up_move_vol_adj"] - df["down_move_vol_adj"]
+
+    # 1h targets (horizon = 1 bar)
+    fh_1h = np.full(len(df), np.nan)
+    fl_1h = np.full(len(df), np.nan)
+    for i in range(len(df) - HORIZON_1H):
+        fh_1h[i] = high[i + 1]
+        fl_1h[i] = low[i + 1]
+    df["future_high_1h"] = fh_1h
+    df["future_low_1h"] = fl_1h
+    df["up_move_1h_vol_adj"] = np.maximum(fh_1h / close - 1, 0) / rvol_safe
+    df["down_move_1h_vol_adj"] = np.maximum(1 - fl_1h / close, 0) / rvol_safe
+    df["strength_1h_vol_adj"] = df["up_move_1h_vol_adj"] - df["down_move_1h_vol_adj"]
 
     # Clip extreme outliers (vol-adj can spike on low-vol bars)
     for t in TARGETS:
@@ -347,13 +361,23 @@ def save_models(df: pd.DataFrame, target_feat_cols: dict[str, list[str]]):
         json.dump(model_manifest, f, indent=2)
 
     # Save training stats for confidence warmup
-    # Use up_move - down_move OOS predictions (synthetic strength)
-    up_cols = target_feat_cols["up_move_vol_adj"]
-    down_cols = target_feat_cols["down_move_vol_adj"]
-    X_up = df[up_cols].fillna(0).values
-    X_down = df[down_cols].fillna(0).values
-    y_up = df["up_move_vol_adj"].values
-    y_down = df["down_move_vol_adj"].values
+    # Use blended 4h + 1h OOS strength predictions
+    BLEND_4H = 0.65
+    BLEND_1H = 0.35
+
+    up4_cols = target_feat_cols["up_move_vol_adj"]
+    dn4_cols = target_feat_cols["down_move_vol_adj"]
+    up1_cols = target_feat_cols["up_move_1h_vol_adj"]
+    dn1_cols = target_feat_cols["down_move_1h_vol_adj"]
+
+    X_up4 = df[up4_cols].fillna(0).values
+    X_dn4 = df[dn4_cols].fillna(0).values
+    X_up1 = df[up1_cols].fillna(0).values
+    X_dn1 = df[dn1_cols].fillna(0).values
+
+    y_up4, y_dn4 = df["up_move_vol_adj"].values, df["down_move_vol_adj"].values
+    y_up1, y_dn1 = df["up_move_1h_vol_adj"].values, df["down_move_1h_vol_adj"].values
+
     n = len(df)
     fold = n // (N_FOLDS + 1)
     warmup_preds = []
@@ -362,21 +386,33 @@ def save_models(df: pd.DataFrame, target_feat_cols: dict[str, list[str]]):
         te_end = min(fold * (k + 1), n)
         if te_end <= tr_end:
             break
-        m_up = xgb.XGBRegressor(**XGB_PARAMS)
-        m_up.fit(X_up[:tr_end], y_up[:tr_end],
-                 eval_set=[(X_up[tr_end:te_end], y_up[tr_end:te_end])], verbose=False)
-        m_down = xgb.XGBRegressor(**XGB_PARAMS)
-        m_down.fit(X_down[:tr_end], y_down[:tr_end],
-                   eval_set=[(X_down[tr_end:te_end], y_down[tr_end:te_end])], verbose=False)
-        up_p = m_up.predict(X_up[tr_end:te_end])
-        down_p = m_down.predict(X_down[tr_end:te_end])
-        strength = np.maximum(up_p, 0) - np.maximum(down_p, 0)
-        warmup_preds.extend(strength.tolist())
+        # 4h models
+        m_up4 = xgb.XGBRegressor(**XGB_PARAMS)
+        m_up4.fit(X_up4[:tr_end], y_up4[:tr_end],
+                  eval_set=[(X_up4[tr_end:te_end], y_up4[tr_end:te_end])], verbose=False)
+        m_dn4 = xgb.XGBRegressor(**XGB_PARAMS)
+        m_dn4.fit(X_dn4[:tr_end], y_dn4[:tr_end],
+                  eval_set=[(X_dn4[tr_end:te_end], y_dn4[tr_end:te_end])], verbose=False)
+        # 1h models
+        m_up1 = xgb.XGBRegressor(**XGB_PARAMS)
+        m_up1.fit(X_up1[:tr_end], y_up1[:tr_end],
+                  eval_set=[(X_up1[tr_end:te_end], y_up1[tr_end:te_end])], verbose=False)
+        m_dn1 = xgb.XGBRegressor(**XGB_PARAMS)
+        m_dn1.fit(X_dn1[:tr_end], y_dn1[:tr_end],
+                  eval_set=[(X_dn1[tr_end:te_end], y_dn1[tr_end:te_end])], verbose=False)
+
+        s4 = np.maximum(m_up4.predict(X_up4[tr_end:te_end]), 0) - \
+             np.maximum(m_dn4.predict(X_dn4[tr_end:te_end]), 0)
+        s1 = np.maximum(m_up1.predict(X_up1[tr_end:te_end]), 0) - \
+             np.maximum(m_dn1.predict(X_dn1[tr_end:te_end]), 0)
+        blended = BLEND_4H * s4 + BLEND_1H * s1
+        warmup_preds.extend(blended.tolist())
 
     stats = {
         "pred_mean": float(np.mean(warmup_preds)),
         "pred_std": float(np.std(warmup_preds)),
         "pred_history": warmup_preds[-200:],
+        "blend_weights": {"4h": BLEND_4H, "1h": BLEND_1H},
     }
     with open(out_dir / "training_stats.json", "w") as f:
         json.dump(stats, f, indent=2)

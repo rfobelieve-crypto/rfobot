@@ -44,8 +44,14 @@ BBP_CONFIRM_ENABLED = True   # master switch for BBP confirmation
 # Hysteresis: require stronger signal to FLIP direction vs maintain
 HYSTERESIS_MULT = 1.40       # to flip UP→DOWN, need strength < -(dz * 1.4)
 
+# Dual-horizon blending
+BLEND_4H = 0.65              # weight for 4h strength
+BLEND_1H = 0.35              # weight for 1h strength
+
 # Regime models to use (skip strength_vol_adj — no signal)
-ACTIVE_TARGETS = ["up_move_vol_adj", "down_move_vol_adj"]
+ACTIVE_TARGETS_4H = ["up_move_vol_adj", "down_move_vol_adj"]
+ACTIVE_TARGETS_1H = ["up_move_1h_vol_adj", "down_move_1h_vol_adj"]
+ACTIVE_TARGETS = ACTIVE_TARGETS_4H + ACTIVE_TARGETS_1H
 
 
 class IndicatorEngine:
@@ -101,8 +107,11 @@ class IndicatorEngine:
         model_count = sum(len(v) for v in self.models.values())
         for t, fc in self.target_feature_cols.items():
             logger.info("  %s: %d features", t, len(fc))
-        logger.info("IndicatorEngine v4 loaded: %d models, %d warmup bars",
-                     model_count, len(self.pred_history))
+        has_1h = "up_move_1h_vol_adj" in self.models
+        logger.info("IndicatorEngine v5 loaded: %d models (%s), %d warmup bars",
+                     model_count,
+                     "4h+1h dual-horizon" if has_1h else "4h only",
+                     len(self.pred_history))
 
     def _load_legacy_model(self):
         """Fallback: load single model (v2 compatibility)."""
@@ -154,38 +163,49 @@ class IndicatorEngine:
             tc = self.target_feature_cols.get(target, self.feature_cols)
             target_X[target] = features[tc].fillna(0).values
 
-        # Predict up_move and down_move per bar
-        up_pred = np.zeros(n)
-        down_pred = np.zeros(n)
-
-        for i in range(n):
-            r = regime[i]
-
-            for target, arr in [("up_move_vol_adj", up_pred),
-                                ("down_move_vol_adj", down_pred)]:
-                x_i = target_X[target][i:i+1]
-                models = self.models[target]
+        # Helper: predict one target for all bars
+        def _predict_target(target_name: str) -> np.ndarray:
+            arr = np.zeros(n)
+            models = self.models.get(target_name)
+            if models is None:
+                return arr
+            for i in range(n):
+                r = regime[i]
+                x_i = target_X[target_name][i:i+1]
                 global_model = models.get("global")
                 regime_model = models.get(r)
-
                 if global_model is None:
                     continue
-
-                global_pred = float(global_model.predict(x_i)[0])
-
+                global_p = float(global_model.predict(x_i)[0])
                 if regime_model is not None and r != "WARMUP":
-                    regime_pred = float(regime_model.predict(x_i)[0])
-                    arr[i] = ((1 - REGIME_BLEND_WEIGHT) * global_pred +
-                              REGIME_BLEND_WEIGHT * regime_pred)
+                    regime_p = float(regime_model.predict(x_i)[0])
+                    arr[i] = ((1 - REGIME_BLEND_WEIGHT) * global_p +
+                              REGIME_BLEND_WEIGHT * regime_p)
                 else:
-                    arr[i] = global_pred
+                    arr[i] = global_p
+            return np.maximum(arr, 0)  # up/down moves >= 0
 
-        # Ensure non-negative (up/down moves are always >= 0)
-        up_pred = np.maximum(up_pred, 0)
-        down_pred = np.maximum(down_pred, 0)
+        # 4h predictions
+        up_pred_4h = _predict_target("up_move_vol_adj")
+        down_pred_4h = _predict_target("down_move_vol_adj")
+        strength_4h = up_pred_4h - down_pred_4h
 
-        # Strength = up - down (positive = bullish asymmetry)
-        strength = up_pred - down_pred
+        # 1h predictions (if models available)
+        up_pred_1h = _predict_target("up_move_1h_vol_adj")
+        down_pred_1h = _predict_target("down_move_1h_vol_adj")
+        has_1h = "up_move_1h_vol_adj" in self.models
+        strength_1h = up_pred_1h - down_pred_1h
+
+        # Blend: 4h + 1h (fall back to 4h-only if no 1h models)
+        if has_1h:
+            strength = BLEND_4H * strength_4h + BLEND_1H * strength_1h
+            up_pred = BLEND_4H * up_pred_4h + BLEND_1H * up_pred_1h
+            down_pred = BLEND_4H * down_pred_4h + BLEND_1H * down_pred_1h
+            logger.debug("Dual-horizon blend: 4h=%.2f, 1h=%.2f", BLEND_4H, BLEND_1H)
+        else:
+            strength = strength_4h
+            up_pred = up_pred_4h
+            down_pred = down_pred_4h
 
         # Bull/Bear Power (compute early — needed for confirmation gate)
         bbp = self._compute_bbp(features)

@@ -26,6 +26,33 @@
         "CHOPPY": "choppy_xgb.json"
       },
       "n_features": 90
+    },
+    "up_move_1h_vol_adj": {
+      "models": {
+        "global": "global_xgb.json",
+        "TRENDING_BULL": "trending_bull_xgb.json",
+        "TRENDING_BEAR": "trending_bear_xgb.json",
+        "CHOPPY": "choppy_xgb.json"
+      },
+      "n_features": 90
+    },
+    "down_move_1h_vol_adj": {
+      "models": {
+        "global": "global_xgb.json",
+        "TRENDING_BULL": "trending_bull_xgb.json",
+        "TRENDING_BEAR": "trending_bear_xgb.json",
+        "CHOPPY": "choppy_xgb.json"
+      },
+      "n_features": 90
+    },
+    "strength_1h_vol_adj": {
+      "models": {
+        "global": "global_xgb.json",
+        "TRENDING_BULL": "trending_bull_xgb.json",
+        "TRENDING_BEAR": "trending_bear_xgb.json",
+        "CHOPPY": "choppy_xgb.json"
+      },
+      "n_features": 90
     }
   }
 }
