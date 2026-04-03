@@ -9,6 +9,7 @@ MySQL tables (auto-created on first write):
   - indicator_depth_snapshots
   - indicator_aggtrades_snapshots
   - indicator_options_snapshots
+  - indicator_sentiment_snapshots
   - indicator_history
 
 Called from app.py / auto_update.py after each hourly update cycle.
@@ -70,6 +71,17 @@ OPTIONS_FIELD_MAP = {
     "etf_flow_fbtc": "etf_flow_fbtc",
     "etf_btc_price": "etf_btc_price",
 }
+
+SENTIMENT_COLUMNS = [
+    "fear_greed_value", "etf_aum_usd",
+    "futures_netflow_5m", "futures_netflow_15m", "futures_netflow_1h",
+    "futures_netflow_4h", "futures_netflow_24h",
+    "spot_netflow_5m", "spot_netflow_15m", "spot_netflow_1h",
+    "spot_netflow_4h", "spot_netflow_24h",
+    "hl_whale_count", "hl_whale_net_usd", "hl_whale_long_pct",
+]
+
+SENTIMENT_FIELD_MAP = {c: c for c in SENTIMENT_COLUMNS}
 
 
 # ── MySQL helpers ─────────────────────────────────────────────────────────
@@ -211,6 +223,34 @@ def save_options_snapshot(options_data: dict, bar_time: datetime | None = None):
                 options_data.get("etf_net_flow_usd", 0) / 1e6)
 
 
+def save_sentiment_snapshot(sentiment_data: dict, bar_time: datetime | None = None):
+    """Save one sentiment/whale/netflow snapshot row to MySQL + local parquet."""
+    if not sentiment_data:
+        return
+
+    ts = bar_time or datetime.now(timezone.utc)
+
+    # Map field names
+    mapped = {}
+    for src_key, db_col in SENTIMENT_FIELD_MAP.items():
+        mapped[db_col] = sentiment_data.get(src_key, 0)
+
+    # MySQL (persistent)
+    try:
+        _upsert_row("indicator_sentiment_snapshots", SENTIMENT_COLUMNS, ts, mapped)
+    except Exception as e:
+        logger.error("Sentiment MySQL save failed: %s", e)
+
+    # Local parquet (fast access)
+    _append_parquet_row(
+        SNAPSHOT_DIR / "sentiment_snapshots.parquet", ts, mapped,
+    )
+    logger.info("Sentiment snapshot saved (F&G=%.0f, AUM=$%.1fB, whales=%d)",
+                sentiment_data.get("fear_greed_value", 0),
+                sentiment_data.get("etf_aum_usd", 0) / 1e9,
+                sentiment_data.get("hl_whale_count", 0))
+
+
 def save_indicator_history(df: pd.DataFrame):
     """
     Save indicator prediction history to MySQL.
@@ -348,7 +388,8 @@ def get_snapshot_stats() -> dict:
         conn = _get_db_conn()
         with conn.cursor() as cur:
             for table in ["indicator_depth_snapshots", "indicator_aggtrades_snapshots",
-                          "indicator_options_snapshots", "indicator_history"]:
+                          "indicator_options_snapshots", "indicator_sentiment_snapshots",
+                          "indicator_history"]:
                 try:
                     cur.execute(f"SELECT COUNT(*) as cnt, MIN(dt) as first_dt, MAX(dt) as last_dt FROM `{table}`")
                     row = cur.fetchone()
@@ -364,7 +405,7 @@ def get_snapshot_stats() -> dict:
         stats["mysql_error"] = str(e)
 
     # Check local parquet files
-    for name in ["depth_snapshots", "aggtrades_snapshots", "options_snapshots"]:
+    for name in ["depth_snapshots", "aggtrades_snapshots", "options_snapshots", "sentiment_snapshots"]:
         path = SNAPSHOT_DIR / f"{name}.parquet"
         if path.exists():
             try:

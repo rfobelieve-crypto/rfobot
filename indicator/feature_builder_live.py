@@ -400,3 +400,96 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
         df["cg_crowding"] = df["cg_funding_close"] * df["cg_ls_ratio"]
     if "cg_taker_delta_zscore" in df.columns and "cg_oi_delta_zscore" in df.columns:
         df["cg_conviction"] = df["cg_taker_delta_zscore"] * df["cg_oi_delta_zscore"]
+
+    # ── New endpoints (Startup plan upgrade) ─────────────────────────────
+
+    # Coinbase Premium
+    cb = cg_data.get("coinbase_premium", pd.DataFrame())
+    _merge_cg(cb, {"premium": "cg_cb_premium", "premium_rate": "cg_cb_premium_rate"})
+
+    # Bitfinex Margin
+    bfx = cg_data.get("bitfinex_margin", pd.DataFrame())
+    _merge_cg(bfx, {"long_quantity": "cg_bfx_margin_long", "short_quantity": "cg_bfx_margin_short"})
+    if "cg_bfx_margin_long" in df.columns and "cg_bfx_margin_short" in df.columns:
+        total_bfx = (df["cg_bfx_margin_long"] + df["cg_bfx_margin_short"]).replace(0, np.nan)
+        df["cg_bfx_margin_ratio"] = df["cg_bfx_margin_long"] / total_bfx
+        df["cg_bfx_margin_delta"] = df["cg_bfx_margin_long"] - df["cg_bfx_margin_short"]
+
+    # Top L/S Position Ratio (different from account ratio!)
+    pos = cg_data.get("top_ls_position", pd.DataFrame())
+    _merge_cg(pos, {
+        "top_position_long_percent": "cg_pos_long_pct",
+        "top_position_short_percent": "cg_pos_short_pct",
+        "top_position_long_short_ratio": "cg_pos_ls_ratio",
+    })
+
+    # Futures CVD Aggregated (cross-exchange)
+    fcvd = cg_data.get("futures_cvd_agg", pd.DataFrame())
+    _merge_cg(fcvd, {
+        "agg_taker_buy_vol": "cg_fcvd_buy",
+        "agg_taker_sell_vol": "cg_fcvd_sell",
+        "cum_vol_delta": "cg_fcvd_cum",
+    })
+    if "cg_fcvd_buy" in df.columns and "cg_fcvd_sell" in df.columns:
+        df["cg_fcvd_delta"] = df["cg_fcvd_buy"] - df["cg_fcvd_sell"]
+
+    # Spot CVD Aggregated (cross-exchange)
+    scvd = cg_data.get("spot_cvd_agg", pd.DataFrame())
+    _merge_cg(scvd, {
+        "agg_taker_buy_vol": "cg_scvd_buy",
+        "agg_taker_sell_vol": "cg_scvd_sell",
+        "cum_vol_delta": "cg_scvd_cum",
+    })
+    if "cg_scvd_buy" in df.columns and "cg_scvd_sell" in df.columns:
+        df["cg_scvd_delta"] = df["cg_scvd_buy"] - df["cg_scvd_sell"]
+
+    # Liquidation Aggregated (cross-exchange)
+    liq_agg = cg_data.get("liq_agg", pd.DataFrame())
+    _merge_cg(liq_agg, {
+        "aggregated_long_liquidation_usd": "cg_liq_agg_long",
+        "aggregated_short_liquidation_usd": "cg_liq_agg_short",
+    })
+    if "cg_liq_agg_long" in df.columns and "cg_liq_agg_short" in df.columns:
+        total_la = (df["cg_liq_agg_long"] + df["cg_liq_agg_short"]).replace(0, np.nan)
+        df["cg_liq_agg_total"] = total_la
+        df["cg_liq_agg_imbalance"] = (df["cg_liq_agg_long"] - df["cg_liq_agg_short"]) / total_la
+
+    # OI Coin-Margin
+    oicm = cg_data.get("oi_coin_margin", pd.DataFrame())
+    _merge_cg(oicm, {"close": "cg_oi_cm_close"})
+    if "cg_oi_cm_close" in df.columns:
+        df["cg_oi_cm_delta"] = df["cg_oi_cm_close"].diff()
+
+    # ── Z-scores for new endpoints ───────────────────────────────────────
+    for col in [
+        "cg_cb_premium_rate", "cg_bfx_margin_ratio", "cg_bfx_margin_delta",
+        "cg_pos_ls_ratio", "cg_fcvd_delta", "cg_scvd_delta",
+        "cg_liq_agg_imbalance", "cg_oi_cm_delta",
+    ]:
+        if col in df.columns:
+            df[f"{col}_zscore"] = _zscore(df[col])
+
+    # ── New cross-source features ────────────────────────────────────────
+    # Spot vs Futures CVD divergence
+    if "cg_scvd_delta_zscore" in df.columns and "cg_fcvd_delta_zscore" in df.columns:
+        df["cg_spot_futures_cvd_divergence"] = (
+            df["cg_scvd_delta_zscore"] - df["cg_fcvd_delta_zscore"]
+        )
+    # Account ratio vs Position ratio divergence
+    if "cg_ls_ratio" in df.columns and "cg_pos_ls_ratio" in df.columns:
+        df["cg_pos_account_divergence"] = df["cg_ls_ratio"] - df["cg_pos_ls_ratio"]
+    # Binance share of total liquidations
+    if "cg_liq_total" in df.columns and "cg_liq_agg_total" in df.columns:
+        df["cg_liq_exchange_vs_agg"] = (
+            df["cg_liq_total"] / df["cg_liq_agg_total"].replace(0, np.nan)
+        )
+    # Coin-margin OI share
+    if "cg_oi_cm_close" in df.columns and "cg_oi_agg_close" in df.columns:
+        df["cg_oi_cm_vs_usd"] = (
+            df["cg_oi_cm_close"] / df["cg_oi_agg_close"].replace(0, np.nan)
+        )
+    # Bitfinex margin × Funding alignment
+    if "cg_bfx_margin_ratio_zscore" in df.columns and "cg_funding_close_zscore" in df.columns:
+        df["cg_margin_funding_align"] = (
+            df["cg_bfx_margin_ratio_zscore"] * df["cg_funding_close_zscore"]
+        )

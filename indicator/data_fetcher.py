@@ -29,13 +29,22 @@ RETRY_BASE_DELAY = 2  # seconds, doubles each attempt
 CACHE_DIR = Path(__file__).parent / "model_artifacts" / ".data_cache"
 
 CG_ENDPOINTS = {
-    "oi":          ("/futures/open-interest/history", "Binance", "BTCUSDT"),
-    "oi_agg":      ("/futures/open-interest/aggregated-history", None, "BTC"),
-    "liquidation": ("/futures/liquidation/history", "Binance", "BTCUSDT"),
-    "long_short":  ("/futures/top-long-short-account-ratio/history", "Binance", "BTCUSDT"),
-    "global_ls":   ("/futures/global-long-short-account-ratio/history", "Binance", "BTCUSDT"),
-    "funding":     ("/futures/funding-rate/history", "Binance", "BTCUSDT"),
-    "taker":       ("/futures/taker-buy-sell-volume/history", "Binance", "BTCUSDT"),
+    # --- Existing 7 endpoints ---
+    "oi":          {"path": "/futures/open-interest/history", "exchange": "Binance", "symbol": "BTCUSDT"},
+    "oi_agg":      {"path": "/futures/open-interest/aggregated-history", "symbol": "BTC"},
+    "liquidation": {"path": "/futures/liquidation/history", "exchange": "Binance", "symbol": "BTCUSDT"},
+    "long_short":  {"path": "/futures/top-long-short-account-ratio/history", "exchange": "Binance", "symbol": "BTCUSDT"},
+    "global_ls":   {"path": "/futures/global-long-short-account-ratio/history", "exchange": "Binance", "symbol": "BTCUSDT"},
+    "funding":     {"path": "/futures/funding-rate/history", "exchange": "Binance", "symbol": "BTCUSDT"},
+    "taker":       {"path": "/futures/taker-buy-sell-volume/history", "exchange": "Binance", "symbol": "BTCUSDT"},
+    # --- New timeseries endpoints (Startup plan) ---
+    "coinbase_premium": {"path": "/coinbase-premium-index"},
+    "bitfinex_margin":  {"path": "/bitfinex-margin-long-short", "symbol": "BTC"},
+    "top_ls_position":  {"path": "/futures/top-long-short-position-ratio/history", "exchange": "Binance", "symbol": "BTCUSDT"},
+    "futures_cvd_agg":  {"path": "/futures/aggregated-cvd/history", "symbol": "BTC", "extra_params": {"exchange_list": "Binance"}},
+    "spot_cvd_agg":     {"path": "/spot/aggregated-cvd/history", "symbol": "BTC", "extra_params": {"exchange_list": "Binance"}},
+    "liq_agg":          {"path": "/futures/liquidation/aggregated-history", "symbol": "BTC", "extra_params": {"exchange_list": "Binance"}},
+    "oi_coin_margin":   {"path": "/futures/open-interest/aggregated-coin-margin-history", "symbol": "BTC", "extra_params": {"exchange_list": "Binance"}},
 }
 
 # Deribit public API (no auth needed)
@@ -127,12 +136,17 @@ def fetch_binance_klines(symbol: str = "BTCUSDT", interval: str = "1h",
         return _load_cache("binance_klines")
 
 
-def _cg_fetch(path: str, exchange: str | None, symbol: str,
-              interval: str = "30m", limit: int = 500) -> pd.DataFrame:
+def _cg_fetch(path: str, exchange: str | None = None, symbol: str | None = None,
+              interval: str = "30m", limit: int = 500,
+              extra_params: dict | None = None) -> pd.DataFrame:
     """Fetch one Coinglass endpoint with retry."""
-    params = {"symbol": symbol, "interval": interval, "limit": limit}
+    params = {"interval": interval, "limit": limit}
+    if symbol:
+        params["symbol"] = symbol
     if exchange:
         params["exchange"] = exchange
+    if extra_params:
+        params.update(extra_params)
 
     headers = {"CG-API-KEY": CG_API_KEY}
     resp = _retry_request("GET", CG_BASE + path, params=params, headers=headers)
@@ -327,9 +341,16 @@ def fetch_coinglass(interval: str = "1h", limit: int = 500) -> dict[str, pd.Data
     result = {}
     failed = []
 
-    for name, (path, exchange, symbol) in CG_ENDPOINTS.items():
+    for name, cfg in CG_ENDPOINTS.items():
         try:
-            df = _cg_fetch(path, exchange, symbol, interval, limit)
+            df = _cg_fetch(
+                path=cfg["path"],
+                exchange=cfg.get("exchange"),
+                symbol=cfg.get("symbol"),
+                interval=interval,
+                limit=limit,
+                extra_params=cfg.get("extra_params"),
+            )
             if df.empty:
                 df = _load_cache(f"cg_{name}")
                 if not df.empty:
@@ -457,6 +478,119 @@ def fetch_cg_etf_flow() -> dict:
 
     except Exception as e:
         logger.error("CG ETF flow failed: %s", e)
+        return {}
+
+
+def fetch_cg_fear_greed() -> dict:
+    """Fetch Fear & Greed index (daily) from Coinglass."""
+    try:
+        data = _cg_fetch_raw("/index/fear-greed-history", {"limit": 2})
+        if not isinstance(data, dict):
+            return {}
+        data_list = data.get("data_list", [])
+        if not data_list:
+            return {}
+        latest = float(data_list[0])
+        result = {"fear_greed_value": latest}
+        logger.info("CG Fear & Greed: %.0f", latest)
+        return result
+    except Exception as e:
+        logger.error("CG Fear & Greed failed: %s", e)
+        return {}
+
+
+def fetch_cg_etf_aum() -> dict:
+    """Fetch BTC ETF total AUM from Coinglass."""
+    try:
+        data = _cg_fetch_raw("/etf/bitcoin/aum")
+        if not isinstance(data, list) or len(data) == 0:
+            return {}
+        latest = data[-1]
+        aum = float(latest.get("aum_usd", 0))
+        result = {"etf_aum_usd": aum}
+        logger.info("CG ETF AUM: $%.1fB", aum / 1e9)
+        return result
+    except Exception as e:
+        logger.error("CG ETF AUM failed: %s", e)
+        return {}
+
+
+def _parse_netflow_row(data: list | dict, symbol: str = "BTC") -> dict:
+    """Extract multi-timeframe netflow for a symbol from netflow-list response."""
+    if not isinstance(data, list):
+        return {}
+    for row in data:
+        if row.get("symbol", "").upper() == symbol.upper():
+            result = {}
+            for tf in ["5m", "15m", "1h", "4h", "24h"]:
+                key = f"net_flow_usd_{tf}"
+                if key in row:
+                    result[tf] = float(row[key])
+            return result
+    return {}
+
+
+def fetch_cg_futures_netflow() -> dict:
+    """Fetch futures net flow (multi-timeframe) for BTC from Coinglass."""
+    try:
+        data = _cg_fetch_raw("/futures/netflow-list", {"symbol": "BTC"})
+        nf = _parse_netflow_row(data, "BTC")
+        result = {f"futures_netflow_{tf}": v for tf, v in nf.items()}
+        if result:
+            logger.info("CG Futures netflow: 1h=$%.0f, 24h=$%.0f",
+                         result.get("futures_netflow_1h", 0),
+                         result.get("futures_netflow_24h", 0))
+        return result
+    except Exception as e:
+        logger.error("CG Futures netflow failed: %s", e)
+        return {}
+
+
+def fetch_cg_spot_netflow() -> dict:
+    """Fetch spot net flow (multi-timeframe) for BTC from Coinglass."""
+    try:
+        data = _cg_fetch_raw("/spot/netflow-list", {"symbol": "BTC"})
+        nf = _parse_netflow_row(data, "BTC")
+        result = {f"spot_netflow_{tf}": v for tf, v in nf.items()}
+        if result:
+            logger.info("CG Spot netflow: 1h=$%.0f, 24h=$%.0f",
+                         result.get("spot_netflow_1h", 0),
+                         result.get("spot_netflow_24h", 0))
+        return result
+    except Exception as e:
+        logger.error("CG Spot netflow failed: %s", e)
+        return {}
+
+
+def fetch_cg_hl_whale_positions() -> dict:
+    """Fetch Hyperliquid whale position summary from Coinglass."""
+    try:
+        data = _cg_fetch_raw("/hyperliquid/whale-position", {"limit": 200})
+        if not isinstance(data, list) or len(data) == 0:
+            return {}
+        # Aggregate: count, net USD, long fraction
+        total = len(data)
+        net_usd = 0.0
+        long_count = 0
+        for w in data:
+            size = float(w.get("position_size", 0))
+            entry = float(w.get("entry_price", 0))
+            notional = abs(size) * entry if entry > 0 else abs(size)
+            if size > 0:
+                net_usd += notional
+                long_count += 1
+            else:
+                net_usd -= notional
+        result = {
+            "hl_whale_count": total,
+            "hl_whale_net_usd": net_usd,
+            "hl_whale_long_pct": long_count / total if total > 0 else 0.5,
+        }
+        logger.info("CG HL whales: %d positions, net=$%.0f, long=%.1f%%",
+                     total, net_usd, result["hl_whale_long_pct"] * 100)
+        return result
+    except Exception as e:
+        logger.error("CG HL whale positions failed: %s", e)
         return {}
 
 

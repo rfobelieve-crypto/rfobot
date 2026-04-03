@@ -52,17 +52,40 @@ COINGLASS_RAW = [
     "cg_ls_divergence",                                        # top vs global
     "cg_funding_close", "cg_funding_range",
     "cg_taker_buy", "cg_taker_sell", "cg_taker_delta", "cg_taker_ratio",
+    # --- New Startup plan endpoints ---
+    # Coinbase Premium
+    "cg_cb_premium", "cg_cb_premium_rate",
+    # Bitfinex Margin
+    "cg_bfx_margin_long", "cg_bfx_margin_short",
+    "cg_bfx_margin_ratio", "cg_bfx_margin_delta",
+    # Top L/S Position Ratio
+    "cg_pos_long_pct", "cg_pos_short_pct", "cg_pos_ls_ratio",
+    # Futures CVD Aggregated
+    "cg_fcvd_buy", "cg_fcvd_sell", "cg_fcvd_cum", "cg_fcvd_delta",
+    # Spot CVD Aggregated
+    "cg_scvd_buy", "cg_scvd_sell", "cg_scvd_cum", "cg_scvd_delta",
+    # Liquidation Aggregated
+    "cg_liq_agg_long", "cg_liq_agg_short", "cg_liq_agg_total", "cg_liq_agg_imbalance",
+    # OI Coin-Margin
+    "cg_oi_cm_close", "cg_oi_cm_delta",
 ]
 
 COINGLASS_ZSCORE = [f"{f}_zscore" for f in [
     "cg_oi_delta", "cg_oi_agg_delta", "cg_liq_imbalance",
     "cg_ls_ratio", "cg_taker_delta", "cg_funding_close",
     "cg_oi_close", "cg_liq_total",
-    "cg_gls_ratio", "cg_ls_divergence",  # new
+    "cg_gls_ratio", "cg_ls_divergence",
+    # New endpoints
+    "cg_cb_premium_rate", "cg_bfx_margin_ratio", "cg_bfx_margin_delta",
+    "cg_pos_ls_ratio", "cg_fcvd_delta", "cg_scvd_delta",
+    "cg_liq_agg_imbalance", "cg_oi_cm_delta",
 ]]
 
 COINGLASS_CROSS = [
     "cg_liq_x_oi", "cg_crowding", "cg_conviction",
+    # New cross-source features
+    "cg_spot_futures_cvd_divergence", "cg_pos_account_divergence",
+    "cg_liq_exchange_vs_agg", "cg_oi_cm_vs_usd", "cg_margin_funding_align",
 ]
 
 # ── Momentum / slope / divergence features ────────────────────────────────
