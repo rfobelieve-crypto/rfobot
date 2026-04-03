@@ -38,6 +38,9 @@ CG_ENDPOINTS = {
     "taker":       ("/futures/taker-buy-sell-volume/history", "Binance", "BTCUSDT"),
 }
 
+# Deribit public API (no auth needed)
+DERIBIT_BASE = "https://www.deribit.com/api/v2/public"
+
 
 def _retry_request(method: str, url: str, **kwargs) -> requests.Response:
     """Execute HTTP request with exponential backoff retry."""
@@ -345,3 +348,251 @@ def fetch_coinglass(interval: str = "1h", limit: int = 500) -> dict[str, pd.Data
         logger.warning("Coinglass endpoints using cached data: %s", failed)
 
     return result
+
+
+# ── Coinglass Options + ETF endpoints ────────────────────────────────────
+
+def _cg_fetch_raw(path: str, params: dict | None = None) -> dict:
+    """Fetch raw Coinglass API response (for non-timeseries endpoints)."""
+    headers = {"CG-API-KEY": CG_API_KEY}
+    resp = _retry_request("GET", CG_BASE + path, params=params or {}, headers=headers)
+    data = resp.json()
+    if data.get("code") != "0":
+        logger.warning("CG %s: code=%s msg=%s", path, data.get("code"), data.get("msg"))
+        return {}
+    return data.get("data", {})
+
+
+def fetch_cg_options() -> dict:
+    """
+    Fetch Coinglass options data: max pain, options OI, options/futures ratio.
+
+    Returns dict with:
+        max_pain_price, call_oi_notional, put_oi_notional, pc_oi_ratio,
+        options_oi_total, opt_futures_ratio
+    """
+    result = {}
+
+    # 1. Max Pain (nearest expiry)
+    try:
+        data = _cg_fetch_raw("/option/max-pain", {"symbol": "BTC", "exchange": "Deribit"})
+        if isinstance(data, list) and len(data) > 0:
+            nearest = data[0]
+            call_oi = float(nearest.get("call_open_interest", 0))
+            put_oi = float(nearest.get("put_open_interest", 0))
+            result["max_pain_price"] = float(nearest.get("max_pain_price", 0))
+            result["call_oi_notional"] = float(nearest.get("call_open_interest_notional", 0))
+            result["put_oi_notional"] = float(nearest.get("put_open_interest_notional", 0))
+            result["pc_oi_ratio"] = put_oi / call_oi if call_oi > 0 else 1.0
+            result["nearest_expiry"] = nearest.get("date", "")
+            logger.info("CG options max_pain: $%.0f, P/C OI=%.2f",
+                        result["max_pain_price"], result["pc_oi_ratio"])
+    except Exception as e:
+        logger.error("CG options max_pain failed: %s", e)
+
+    time.sleep(1)
+
+    # 2. Options OI info (aggregated)
+    try:
+        data = _cg_fetch_raw("/option/info", {"symbol": "BTC"})
+        if isinstance(data, list):
+            total_oi = sum(float(d.get("openInterest", 0)) for d in data)
+            result["options_oi_total"] = total_oi
+    except Exception as e:
+        logger.error("CG options info failed: %s", e)
+
+    time.sleep(1)
+
+    # 3. Options/Futures OI ratio
+    try:
+        data = _cg_fetch_raw("/index/option-vs-futures-oi-ratio", {"symbol": "BTC"})
+        if isinstance(data, dict) and "ratio" in data:
+            result["opt_futures_ratio"] = float(data["ratio"])
+        elif isinstance(data, list) and len(data) > 0:
+            result["opt_futures_ratio"] = float(data[-1].get("ratio", 0))
+    except Exception as e:
+        logger.error("CG opt/futures ratio failed: %s", e)
+
+    if result:
+        logger.info("CG options: %d fields fetched", len(result))
+    return result
+
+
+def fetch_cg_etf_flow() -> dict:
+    """
+    Fetch BTC ETF net flow data from Coinglass.
+
+    Returns dict with:
+        etf_net_flow_usd  — total daily net flow (all ETFs combined)
+        etf_flow_ibit     — BlackRock IBIT net flow
+        etf_flow_fbtc     — Fidelity FBTC net flow
+        etf_btc_price     — BTC price at time of flow data
+    """
+    try:
+        data = _cg_fetch_raw("/etf/bitcoin/flow-history")
+        if not isinstance(data, list) or len(data) == 0:
+            logger.warning("CG ETF flow: empty response")
+            return {}
+
+        latest = data[-1]
+        result = {
+            "etf_net_flow_usd": float(latest.get("flow_usd", 0)),
+            "etf_btc_price": float(latest.get("price_usd", 0)),
+        }
+
+        # Per-ticker breakdown
+        tickers = latest.get("etf_flows", [])
+        if isinstance(tickers, list):
+            for t in tickers:
+                name = t.get("etf_ticker", "").upper()
+                flow = float(t.get("flow_usd", 0))
+                if name == "IBIT":
+                    result["etf_flow_ibit"] = flow
+                elif name == "FBTC":
+                    result["etf_flow_fbtc"] = flow
+
+        logger.info("CG ETF flow: net=$%.1fM",
+                     result["etf_net_flow_usd"] / 1e6)
+        return result
+
+    except Exception as e:
+        logger.error("CG ETF flow failed: %s", e)
+        return {}
+
+
+# ── Deribit public API (free, no auth) ───────────────────────────────────
+
+def fetch_deribit_dvol() -> dict:
+    """
+    Fetch Deribit DVOL (BTC Volatility Index) via OHLC candle endpoint.
+
+    Returns dict with dvol_value (close), dvol_open, dvol_high, dvol_low.
+    """
+    try:
+        now_ms = int(time.time() * 1000)
+        start_ms = now_ms - 7200_000  # last 2 hours
+        resp = _retry_request("GET", DERIBIT_BASE + "/get_volatility_index_data", params={
+            "currency": "BTC",
+            "resolution": "3600",
+            "start_timestamp": start_ms,
+            "end_timestamp": now_ms,
+        })
+        data = resp.json().get("result", {}).get("data", [])
+
+        if not data:
+            logger.warning("Deribit DVOL: no data returned")
+            return {}
+
+        # Each entry: [timestamp, open, high, low, close]
+        latest = data[-1]
+        result = {
+            "dvol_value": float(latest[4]),  # close
+            "dvol_open": float(latest[1]),
+            "dvol_high": float(latest[2]),
+            "dvol_low": float(latest[3]),
+            "dvol_change": float(latest[4]) - float(latest[1]),  # close - open
+        }
+        logger.info("Deribit DVOL: %.1f (change=%.2f)",
+                     result["dvol_value"], result["dvol_change"])
+        return result
+
+    except Exception as e:
+        logger.error("Deribit DVOL fetch failed: %s", e)
+        return {}
+
+
+def fetch_deribit_options_summary() -> dict:
+    """
+    Fetch Deribit BTC options summary — compute put/call ratio and IV skew.
+
+    Returns dict with:
+        pc_volume_ratio   — put/call volume ratio
+        pc_oi_ratio       — put/call OI ratio
+        iv_skew_25d       — 25-delta skew (OTM put IV - OTM call IV)
+        mean_call_iv      — average call mark IV
+        mean_put_iv       — average put mark IV
+        total_call_oi     — total call OI in USD
+        total_put_oi      — total put OI in USD
+    """
+    try:
+        resp = _retry_request("GET", DERIBIT_BASE + "/get_book_summary_by_currency", params={
+            "currency": "BTC", "kind": "option",
+        })
+        data = resp.json().get("result", [])
+
+        if not isinstance(data, list) or len(data) == 0:
+            return {}
+
+        call_vol = 0.0
+        put_vol = 0.0
+        call_oi = 0.0
+        put_oi = 0.0
+
+        # For IV skew: collect OTM options near ATM
+        # We need the index price to determine OTM
+        # Parse strike from instrument name: BTC-DDMMMYY-STRIKE-C/P
+        calls_by_strike = {}  # strike -> mark_iv
+        puts_by_strike = {}
+
+        for item in data:
+            name = item.get("instrument_name", "")
+            vol = float(item.get("volume_usd", 0) or 0)
+            oi = float(item.get("open_interest", 0) or 0)
+            mark_iv = item.get("mark_iv")
+
+            # Parse strike price from name
+            parts = name.split("-")
+            if len(parts) < 4:
+                continue
+            try:
+                strike = float(parts[2])
+            except (ValueError, IndexError):
+                continue
+
+            if name.endswith("-C"):
+                call_vol += vol
+                call_oi += oi
+                if mark_iv and mark_iv > 0:
+                    calls_by_strike[strike] = float(mark_iv)
+            elif name.endswith("-P"):
+                put_vol += vol
+                put_oi += oi
+                if mark_iv and mark_iv > 0:
+                    puts_by_strike[strike] = float(mark_iv)
+
+        result = {
+            "pc_volume_ratio": put_vol / call_vol if call_vol > 0 else 1.0,
+            "pc_oi_ratio_deribit": put_oi / call_oi if call_oi > 0 else 1.0,
+            "total_call_oi": call_oi,
+            "total_put_oi": put_oi,
+        }
+
+        # IV skew: compare 25-delta proxy (OTM puts vs OTM calls near ATM)
+        # Find strikes where both put and call have IV data
+        common_strikes = sorted(set(calls_by_strike) & set(puts_by_strike))
+        if common_strikes:
+            # ATM ~ median strike; take strikes ~5-15% OTM
+            mid_strike = common_strikes[len(common_strikes) // 2]
+            # OTM puts: strikes below ATM; OTM calls: strikes above ATM
+            otm_put_ivs = [puts_by_strike[s] for s in common_strikes
+                           if s < mid_strike * 0.95 and s > mid_strike * 0.75]
+            otm_call_ivs = [calls_by_strike[s] for s in common_strikes
+                            if s > mid_strike * 1.05 and s < mid_strike * 1.25]
+
+            if otm_put_ivs and otm_call_ivs:
+                result["iv_skew"] = np.mean(otm_put_ivs) - np.mean(otm_call_ivs)
+            else:
+                result["iv_skew"] = 0.0
+            result["mean_otm_put_iv"] = np.mean(otm_put_ivs) if otm_put_ivs else 0
+            result["mean_otm_call_iv"] = np.mean(otm_call_ivs) if otm_call_ivs else 0
+        else:
+            result["iv_skew"] = 0.0
+
+        logger.info("Deribit options: P/C vol=%.2f, P/C OI=%.2f, IV skew=%.1f",
+                     result["pc_volume_ratio"], result["pc_oi_ratio_deribit"],
+                     result["iv_skew"])
+        return result
+
+    except Exception as e:
+        logger.error("Deribit options summary failed: %s", e)
+        return {}

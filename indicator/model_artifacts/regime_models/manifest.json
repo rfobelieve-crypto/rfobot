@@ -7,7 +7,7 @@
         "TRENDING_BEAR": "trending_bear_xgb.json",
         "CHOPPY": "choppy_xgb.json"
       },
-      "n_features": 92
+      "n_features": 103
     },
     "down_move_vol_adj": {
       "models": {
@@ -16,7 +16,7 @@
         "TRENDING_BEAR": "trending_bear_xgb.json",
         "CHOPPY": "choppy_xgb.json"
       },
-      "n_features": 91
+      "n_features": 102
     },
     "strength_vol_adj": {
       "models": {
@@ -25,7 +25,7 @@
         "TRENDING_BEAR": "trending_bear_xgb.json",
         "CHOPPY": "choppy_xgb.json"
       },
-      "n_features": 90
+      "n_features": 101
     },
     "up_move_1h_vol_adj": {
       "models": {
@@ -34,7 +34,7 @@
         "TRENDING_BEAR": "trending_bear_xgb.json",
         "CHOPPY": "choppy_xgb.json"
       },
-      "n_features": 90
+      "n_features": 101
     },
     "down_move_1h_vol_adj": {
       "models": {
@@ -43,7 +43,7 @@
         "TRENDING_BEAR": "trending_bear_xgb.json",
         "CHOPPY": "choppy_xgb.json"
       },
-      "n_features": 90
+      "n_features": 101
     },
     "strength_1h_vol_adj": {
       "models": {
@@ -52,7 +52,7 @@
         "TRENDING_BEAR": "trending_bear_xgb.json",
         "CHOPPY": "choppy_xgb.json"
       },
-      "n_features": 90
+      "n_features": 101
     }
   }
 }

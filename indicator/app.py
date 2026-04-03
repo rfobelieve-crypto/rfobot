@@ -135,6 +135,8 @@ def update_cycle():
     from indicator.data_fetcher import (
         fetch_binance_klines, fetch_coinglass,
         fetch_binance_depth, fetch_binance_aggtrades,
+        fetch_cg_options, fetch_cg_etf_flow,
+        fetch_deribit_dvol, fetch_deribit_options_summary,
     )
     from indicator.feature_builder_live import build_live_features
     from indicator.inference import IndicatorEngine
@@ -160,6 +162,27 @@ def update_cycle():
         cg_data = fetch_coinglass(interval="1h", limit=500)
         depth = fetch_binance_depth()
         aggtrades = fetch_binance_aggtrades()
+
+        # Fetch options + ETF + DVOL data (direction signals — accumulating for future model)
+        options_data = {}
+        try:
+            options_data.update(fetch_cg_options())
+        except Exception as e:
+            logger.warning("CG options fetch failed: %s", e)
+        try:
+            options_data.update(fetch_cg_etf_flow())
+        except Exception as e:
+            logger.warning("CG ETF flow fetch failed: %s", e)
+        try:
+            options_data.update(fetch_deribit_dvol())
+        except Exception as e:
+            logger.warning("Deribit DVOL fetch failed: %s", e)
+        try:
+            options_data.update(fetch_deribit_options_summary())
+        except Exception as e:
+            logger.warning("Deribit options fetch failed: %s", e)
+        if options_data:
+            logger.info("Options/ETF data: %d fields", len(options_data))
 
         # Diagnose Coinglass data quality
         cg_status = {}
@@ -270,11 +293,14 @@ def update_cycle():
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
 
-        # Save depth/aggtrades snapshots for future training
+        # Save depth/aggtrades/options snapshots for future training
         try:
-            from indicator.snapshot_collector import save_depth_snapshot, save_aggtrades_snapshot
+            from indicator.snapshot_collector import (
+                save_depth_snapshot, save_aggtrades_snapshot, save_options_snapshot,
+            )
             save_depth_snapshot(depth)
             save_aggtrades_snapshot(aggtrades)
+            save_options_snapshot(options_data)
         except Exception as snap_err:
             logger.warning("Snapshot save failed (non-critical): %s", snap_err)
 

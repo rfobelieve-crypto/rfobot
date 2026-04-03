@@ -82,6 +82,54 @@ def save_aggtrades_snapshot(aggtrades: dict, bar_time: datetime | None = None):
                 aggtrades.get("large_delta_usd", 0))
 
 
+def save_options_snapshot(options_data: dict, bar_time: datetime | None = None):
+    """Append one options/ETF/DVOL snapshot row to the accumulating parquet."""
+    if not options_data:
+        return
+
+    SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    path = SNAPSHOT_DIR / "options_snapshots.parquet"
+
+    ts = bar_time or datetime.now(timezone.utc)
+    row = pd.DataFrame([{
+        "dt": ts,
+        # Deribit DVOL
+        "dvol_value": options_data.get("dvol_value", 0),
+        "dvol_open": options_data.get("dvol_open", 0),
+        "dvol_high": options_data.get("dvol_high", 0),
+        "dvol_low": options_data.get("dvol_low", 0),
+        "dvol_change": options_data.get("dvol_change", 0),
+        # Deribit options
+        "pc_volume_ratio": options_data.get("pc_volume_ratio", 0),
+        "pc_oi_ratio_deribit": options_data.get("pc_oi_ratio_deribit", 0),
+        "iv_skew": options_data.get("iv_skew", 0),
+        "mean_otm_put_iv": options_data.get("mean_otm_put_iv", 0),
+        "mean_otm_call_iv": options_data.get("mean_otm_call_iv", 0),
+        "total_call_oi": options_data.get("total_call_oi", 0),
+        "total_put_oi": options_data.get("total_put_oi", 0),
+        # Coinglass options
+        "max_pain_price": options_data.get("max_pain_price", 0),
+        "cg_pc_oi_ratio": options_data.get("pc_oi_ratio", 0),
+        "call_oi_notional": options_data.get("call_oi_notional", 0),
+        "put_oi_notional": options_data.get("put_oi_notional", 0),
+        "opt_futures_ratio": options_data.get("opt_futures_ratio", 0),
+        # ETF flows
+        "etf_net_flow_usd": options_data.get("etf_net_flow_usd", 0),
+        "etf_flow_ibit": options_data.get("etf_flow_ibit", 0),
+        "etf_flow_fbtc": options_data.get("etf_flow_fbtc", 0),
+        "etf_btc_price": options_data.get("etf_btc_price", 0),
+    }])
+    row["dt"] = pd.to_datetime(row["dt"], utc=True)
+    row = row.set_index("dt")
+
+    _append_parquet(path, row)
+    logger.info("Options snapshot saved (DVOL=%.1f, IV_skew=%.1f, P/C=%.2f, ETF=$%.1fM)",
+                options_data.get("dvol_value", 0),
+                options_data.get("iv_skew", 0),
+                options_data.get("pc_volume_ratio", 0),
+                options_data.get("etf_net_flow_usd", 0) / 1e6)
+
+
 def _append_parquet(path: Path, new_row: pd.DataFrame):
     """Append row to existing parquet or create new one."""
     try:
@@ -101,7 +149,7 @@ def _append_parquet(path: Path, new_row: pd.DataFrame):
 def get_snapshot_stats() -> dict:
     """Return stats about accumulated snapshot data (for health checks)."""
     stats = {}
-    for name in ["depth_snapshots", "aggtrades_snapshots"]:
+    for name in ["depth_snapshots", "aggtrades_snapshots", "options_snapshots"]:
         path = SNAPSHOT_DIR / f"{name}.parquet"
         if path.exists():
             try:

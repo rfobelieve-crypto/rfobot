@@ -8,6 +8,8 @@ Features include:
   - Large trade proxy (avg_trade_size, trade_intensity, concentration)
   - Cross-features, momentum, divergence, time encoding
 """
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 from scipy.stats import entropy as sp_entropy
@@ -311,6 +313,37 @@ def build():
             df["large_taker_signal"] = (
                 df["avg_trade_size_zscore"] * df["taker_delta_ratio"]
             )
+
+    # ── Real aggTrades large/small flow (from backfill_aggtrades.py) ──
+    aggtrades_path = Path("research/ml_data/binance_aggtrades_1h.parquet")
+    if aggtrades_path.exists():
+        agg = pd.read_parquet(aggtrades_path)
+        agg_cols = {
+            "large_delta": "agg_large_delta",
+            "small_delta": "agg_small_delta",
+            "large_small_div": "agg_large_small_div",
+            "large_small_div_zscore": "agg_large_small_div_zscore",
+            "large_delta_zscore": "agg_large_delta_zscore",
+            "large_ratio": "agg_large_ratio",
+            "large_buy_ratio": "agg_large_buy_ratio",
+            "imbalance_divergence": "agg_imbalance_div",
+            "large_delta_ma_4h": "agg_large_delta_ma_4h",
+            "large_delta_ma_8h": "agg_large_delta_ma_8h",
+            "large_delta_frac": "agg_large_delta_frac",
+        }
+        for src, tgt in agg_cols.items():
+            if src in agg.columns:
+                merged = pd.merge_asof(
+                    df[["close"]].reset_index(),
+                    agg[[src]].reset_index().rename(columns={src: tgt}),
+                    left_on="dt", right_on="dt", direction="backward",
+                ).set_index("dt")
+                df[tgt] = merged[tgt]
+            else:
+                df[tgt] = np.nan
+        print(f"  Merged aggTrades: {len(agg)} bars, {len(agg_cols)} features")
+    else:
+        print("  WARNING: binance_aggtrades_1h.parquet not found, skipping aggTrades features")
 
     print(f"Built: {len(df)} bars x {len(df.columns)} columns")
     print(f"Range: {df.index[0]} ~ {df.index[-1]}")

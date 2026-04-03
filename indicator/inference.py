@@ -1,10 +1,10 @@
 """
 Model inference — regime-conditional multi-target prediction.
 
-v3: Uses up_move + down_move dual-model architecture.
-    Direction derived from (up_pred - down_pred) asymmetry.
-    Regime routing selects global or regime-specific model.
-    Falls back to legacy single model if regime_models/ not found.
+v6: Adds dedicated direction classifier (XGB binary) as high-confidence
+    override for the magnitude-derived direction signal.
+    Direction model only fires when P(up) > 0.65 or P(up) < 0.35 (top ~10%).
+    Otherwise falls back to magnitude-based direction (up_pred - down_pred).
 """
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 ARTIFACT_DIR = Path(__file__).parent / "model_artifacts"
 REGIME_DIR = ARTIFACT_DIR / "regime_models"
+DIRECTION_DIR = ARTIFACT_DIR / "direction_models"
 
 # ── Parameters ────────────────────────────────────────────────────────────
 STRENGTH_DEADZONE = 0.50     # base |up_pred - down_pred| below this → NEUTRAL
@@ -40,6 +41,11 @@ VOL_DEADZONE_SCALE = 0.80    # how much vol ratio affects deadzone (0 = off, 1 =
 # BBP confirmation gate
 BBP_CONFIRM_THRESHOLD = 0.15 # |BBP| must exceed this to confirm direction
 BBP_CONFIRM_ENABLED = True   # master switch for BBP confirmation
+
+# Direction model (binary classifier) — high-confidence override
+DIR_MODEL_ENABLED = True     # master switch for direction model
+DIR_HIGH_CONF = 0.65         # P(up) > this → override to UP
+DIR_LOW_CONF = 0.35          # P(up) < this → override to DOWN
 
 # Hysteresis: require stronger signal to FLIP direction vs maintain
 HYSTERESIS_MULT = 1.40       # to flip UP→DOWN, need strength < -(dz * 1.4)
@@ -62,6 +68,12 @@ class IndicatorEngine:
             self._load_regime_models()
         else:
             self._load_legacy_model()
+
+        # Direction classifier (optional — enhances direction signal)
+        self.dir_model = None
+        self.dir_feature_cols: list[str] = []
+        if DIR_MODEL_ENABLED:
+            self._load_direction_model()
 
         # Regime IC tracking (persists across calls)
         self.regime_history: dict[str, list[tuple[float, float]]] = {}
@@ -127,6 +139,33 @@ class IndicatorEngine:
         self.pred_history = deque(stats.get("pred_history", []), maxlen=500)
 
         logger.info("IndicatorEngine legacy loaded: %d features", len(self.feature_cols))
+
+    def _load_direction_model(self):
+        """Load dedicated direction classifier (XGBClassifier, binary)."""
+        model_path = DIRECTION_DIR / "direction_xgb.json"
+        fc_path = DIRECTION_DIR / "feature_cols.json"
+        config_path = DIRECTION_DIR / "config.json"
+
+        if not model_path.exists():
+            logger.info("Direction model not found at %s — disabled", model_path)
+            return
+
+        try:
+            self.dir_model = xgb.XGBClassifier()
+            self.dir_model.load_model(str(model_path))
+
+            with open(fc_path) as f:
+                self.dir_feature_cols = json.load(f)
+
+            with open(config_path) as f:
+                dir_config = json.load(f)
+
+            logger.info("Direction model loaded: %d features, threshold=%.2f/%.2f",
+                        len(self.dir_feature_cols),
+                        DIR_HIGH_CONF, DIR_LOW_CONF)
+        except Exception as e:
+            logger.warning("Failed to load direction model: %s", e)
+            self.dir_model = None
 
     def predict(self, features: pd.DataFrame) -> pd.DataFrame:
         """
@@ -261,6 +300,24 @@ class IndicatorEngine:
                 elif direction[i] == "DOWN" and bbp[i] > BBP_CONFIRM_THRESHOLD:
                     direction[i] = "NEUTRAL"
 
+        # ── Direction classifier override (high-confidence only) ────────
+        dir_prob = np.full(n, 0.5)  # default: uncertain
+        if self.dir_model is not None:
+            try:
+                dir_X = self._prepare_direction_features(features)
+                dir_prob = self.dir_model.predict_proba(dir_X)[:, 1]  # P(up)
+                # Only override when classifier is very confident
+                for i in range(n):
+                    if dir_prob[i] > DIR_HIGH_CONF and direction[i] != "UP":
+                        direction[i] = "UP"
+                    elif dir_prob[i] < DIR_LOW_CONF and direction[i] != "DOWN":
+                        direction[i] = "DOWN"
+                n_override = int(np.sum((dir_prob > DIR_HIGH_CONF) | (dir_prob < DIR_LOW_CONF)))
+                if n_override > 0:
+                    logger.info("Direction model: %d/%d bars overridden", n_override, n)
+            except Exception as e:
+                logger.warning("Direction model inference failed: %s", e)
+
         # Synthetic pred_return_4h (for chart compatibility)
         # Scale strength to approximate return scale
         pred_return = strength * 0.003  # rough scaling factor
@@ -290,12 +347,22 @@ class IndicatorEngine:
         out["down_pred"] = down_pred
         out["strength_raw"] = strength
         out["dynamic_deadzone"] = dynamic_dz
+        out["dir_prob_up"] = dir_prob
 
         for c in ["open", "high", "low", "close"]:
             if c in features.columns:
                 out[c] = features[c].values
 
         return out
+
+    def _prepare_direction_features(self, features: pd.DataFrame) -> np.ndarray:
+        """Prepare feature matrix for direction classifier."""
+        missing = [c for c in self.dir_feature_cols if c not in features.columns]
+        if missing:
+            logger.debug("Direction model missing %d features (zero-filled)", len(missing))
+            for c in missing:
+                features[c] = np.nan
+        return features[self.dir_feature_cols].fillna(0).values
 
     # ── Legacy prediction (v2 fallback) ───────────────────────────────────
 
