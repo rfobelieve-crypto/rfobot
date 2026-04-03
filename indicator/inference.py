@@ -208,6 +208,15 @@ class IndicatorEngine:
                      len(self.dual_dir_features), len(self.dual_mag_features),
                      len(self.pred_history))
 
+    def backfill_mag_pred(self, features: pd.DataFrame) -> pd.Series:
+        """Predict magnitude only — no state changes. For backfilling historical bars."""
+        if self.mode != "dual" or not hasattr(self, "dual_mag_model"):
+            return pd.Series(np.nan, index=features.index)
+
+        X = features.reindex(columns=self.dual_mag_features, fill_value=0).fillna(0).values
+        mag = self.dual_mag_model.predict(X)
+        return pd.Series(np.maximum(mag, 0), index=features.index)
+
     def predict(self, features: pd.DataFrame) -> pd.DataFrame:
         """
         Run prediction on feature DataFrame.

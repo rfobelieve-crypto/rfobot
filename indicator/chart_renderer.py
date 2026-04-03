@@ -172,7 +172,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
                 mag_signed[i] = -m
                 mag_colors.append("#b71c1c" if m > 0.5 else "#ef5350")
             else:
-                mag_signed[i] = 0
+                mag_signed[i] = m  # NEUTRAL: show magnitude unsigned (above zero)
                 mag_colors.append("#9e9e9e")
 
         ax_mag.bar(x, mag_signed, width=0.8, color=mag_colors, alpha=0.8, edgecolor="none")

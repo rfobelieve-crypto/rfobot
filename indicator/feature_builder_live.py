@@ -36,7 +36,8 @@ def _zscore(s: pd.Series, win: int = ZSCORE_WIN) -> pd.Series:
 def build_live_features(klines: pd.DataFrame,
                         cg_data: dict[str, pd.DataFrame],
                         depth: dict | None = None,
-                        aggtrades: dict | None = None) -> pd.DataFrame:
+                        aggtrades: dict | None = None,
+                        options_data: dict | None = None) -> pd.DataFrame:
     """
     Build feature DataFrame from live 1h API data.
 
@@ -45,6 +46,7 @@ def build_live_features(klines: pd.DataFrame,
         cg_data: dict from fetch_coinglass() (native 1h data)
         depth: dict from fetch_binance_depth() (order book snapshot, optional)
         aggtrades: dict from fetch_binance_aggtrades() (large trade stats, optional)
+        options_data: dict from fetch_deribit_dvol() + fetch_deribit_options_summary() (optional)
 
     Returns:
         DataFrame indexed by datetime with all features.
@@ -225,17 +227,40 @@ def build_live_features(klines: pd.DataFrame,
 
     # ── Large trade aggTrades features (snapshot, last bar only) ──────────
     if aggtrades and isinstance(aggtrades, dict) and "large_ratio" in aggtrades:
+        # Legacy columns (backward compat)
         for col in ["large_ratio", "large_buy_ratio", "large_delta_usd",
                      "avg_trade_usd"]:
             df[col] = np.nan
             if col in aggtrades:
                 df.iloc[-1, df.columns.get_loc(col)] = aggtrades[col]
-        # Large vs small delta divergence
+
+        # ── agg_* columns (direction_models expected names) ──
         large_d = aggtrades.get("large_delta_usd", 0)
         small_d = aggtrades.get("small_delta_usd", 0)
+        total_usd = aggtrades.get("total_usd", 0)
+
+        agg_snap = {
+            "agg_large_delta": large_d,
+            "agg_small_delta": small_d,
+            "agg_large_ratio": aggtrades.get("large_ratio", np.nan),
+            "agg_large_buy_ratio": aggtrades.get("large_buy_ratio", np.nan),
+            "agg_large_small_div": large_d - small_d,
+            "agg_imbalance_div": (large_d - small_d) / max(abs(large_d) + abs(small_d), 1e-10),
+            "agg_large_delta_frac": abs(large_d) / max(total_usd, 1e-10) if total_usd else np.nan,
+        }
+        for col, val in agg_snap.items():
+            df[col] = np.nan
+            df.iloc[-1, df.columns.get_loc(col)] = val
+
+        # Rolling features (NaN for historical bars — need snapshot accumulation)
+        for col in ["agg_large_delta_zscore", "agg_large_small_div_zscore",
+                     "agg_large_delta_ma_4h", "agg_large_delta_ma_8h"]:
+            if col not in df.columns:
+                df[col] = np.nan
+
+        # Large vs small delta divergence (legacy)
         df["large_small_divergence"] = np.nan
         if abs(large_d) + abs(small_d) > 0:
-            # +1 = large and small agree, -1 = diverge
             df.iloc[-1, df.columns.get_loc("large_small_divergence")] = (
                 np.sign(large_d) * np.sign(small_d) if large_d != 0 and small_d != 0 else 0
             )
@@ -247,6 +272,59 @@ def build_live_features(klines: pd.DataFrame,
     weekday = df.index.dayofweek
     df["weekday_sin"] = np.sin(2 * np.pi * weekday / 7)
     df["weekday_cos"] = np.cos(2 * np.pi * weekday / 7)
+
+    # ── Deribit DVOL → bvol_* features (snapshot, last bar only) ─────────
+    if options_data and isinstance(options_data, dict) and "dvol_value" in options_data:
+        bvol_snap = {
+            "bvol_close": options_data.get("dvol_value", np.nan),
+            "bvol_open": options_data.get("dvol_open", np.nan),
+            "bvol_high": options_data.get("dvol_high", np.nan),
+            "bvol_low": options_data.get("dvol_low", np.nan),
+        }
+        for col, val in bvol_snap.items():
+            df[col] = np.nan
+            df.iloc[-1, df.columns.get_loc(col)] = val
+
+        # Intra-bar range
+        dvol_h = bvol_snap["bvol_high"]
+        dvol_l = bvol_snap["bvol_low"]
+        dvol_c = bvol_snap["bvol_close"]
+        df["bvol_intra_range"] = np.nan
+        df["bvol_intra_range_pct"] = np.nan
+        if not np.isnan(dvol_h) and not np.isnan(dvol_l):
+            df.iloc[-1, df.columns.get_loc("bvol_intra_range")] = dvol_h - dvol_l
+            if dvol_c and dvol_c > 0:
+                df.iloc[-1, df.columns.get_loc("bvol_intra_range_pct")] = (dvol_h - dvol_l) / dvol_c
+
+        # Change from open
+        dvol_o = bvol_snap["bvol_open"]
+        df["bvol_change_1h"] = np.nan
+        if not np.isnan(dvol_c) and not np.isnan(dvol_o) and dvol_o > 0:
+            df.iloc[-1, df.columns.get_loc("bvol_change_1h")] = (dvol_c - dvol_o) / dvol_o
+
+        # Rolling features need history — set NaN columns for model compatibility
+        for col in ["bvol_std", "bvol_change_4h", "bvol_change_8h", "bvol_change_24h",
+                     "bvol_ma_24h", "bvol_ma_72h", "bvol_ratio_ma24",
+                     "bvol_zscore", "bvol_slope_4h", "bvol_accel_4h"]:
+            if col not in df.columns:
+                df[col] = np.nan
+
+        logger.info("DVOL features added: close=%.1f", bvol_snap["bvol_close"])
+
+    # ── Direction-specific features (from research pipeline) ─────────────
+    try:
+        from research.direction_features import build_direction_feature_set
+        dir_feats = build_direction_feature_set(df)
+        if not dir_feats.empty:
+            # Merge without overwriting existing columns
+            new_cols = [c for c in dir_feats.columns if c not in df.columns]
+            if new_cols:
+                df = pd.concat([df, dir_feats[new_cols]], axis=1)
+                logger.info("Direction features added: %d new columns", len(new_cols))
+    except ImportError:
+        logger.debug("research.direction_features not available — skipping")
+    except Exception as e:
+        logger.warning("Direction features failed (non-critical): %s", e)
 
     logger.info("Live features: %d bars x %d columns", len(df), len(df.columns))
     return df

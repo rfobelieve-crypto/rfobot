@@ -19,6 +19,7 @@ import threading
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+import numpy as np
 import requests
 import pandas as pd
 from flask import Flask, Response, jsonify, request
@@ -312,7 +313,8 @@ def update_cycle() -> dict:
             logger.error("ALL Coinglass endpoints failed — BBP will be zero")
 
         # 2. Build features for ALL fetched bars
-        features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades)
+        features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades,
+                                       options_data=options_data)
 
         # Normalize all datetime indices to same precision
         if hasattr(klines.index, 'as_unit'):
@@ -362,6 +364,17 @@ def update_cycle() -> dict:
                         len(new_predictions), len(indicator_df))
         else:
             logger.info("No new bars to predict")
+
+        # 5b. Backfill mag_pred for historical bars that don't have it
+        if "mag_pred" not in indicator_df.columns:
+            indicator_df["mag_pred"] = np.nan
+        missing_mag = indicator_df["mag_pred"].isna() | (indicator_df["mag_pred"] == 0)
+        backfill_idx = indicator_df.index[missing_mag].intersection(features.index)
+        if len(backfill_idx) > 0:
+            indicator_df.loc[backfill_idx, "mag_pred"] = _engine.backfill_mag_pred(
+                features.loc[backfill_idx]
+            )
+            logger.info("Backfilled mag_pred for %d historical bars", len(backfill_idx))
 
         # 6. Render chart (last 200 bars that have OHLC data)
         chart_df = indicator_df.dropna(subset=["open", "high", "low", "close"])

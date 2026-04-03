@@ -21,6 +21,7 @@ import argparse
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
+import numpy as np
 import requests
 import pandas as pd
 
@@ -216,7 +217,8 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
         logger.warning("Data freshness issues: %s", freshness_warnings)
         send_telegram_alert(alert)
 
-    features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades)
+    features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades,
+                                   options_data=options_data)
 
     # Normalize datetime index precision (avoid ms vs s merge errors)
     if not indicator_df.empty and hasattr(indicator_df.index, 'as_unit'):
@@ -240,8 +242,9 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
     else:
         new_features = features
 
+    engine = IndicatorEngine()
+
     if len(new_features) > 0:
-        engine = IndicatorEngine()
         new_predictions = engine.predict(new_features)
         if hasattr(new_predictions.index, 'as_unit'):
             new_predictions.index = new_predictions.index.as_unit("ns")
@@ -249,6 +252,17 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
         indicator_df = indicator_df[~indicator_df.index.duplicated(keep="last")]
         indicator_df = indicator_df.sort_index()
         logger.info("Added %d new bars. Total: %d", len(new_predictions), len(indicator_df))
+
+    # Backfill mag_pred for historical bars that don't have it
+    if "mag_pred" not in indicator_df.columns:
+        indicator_df["mag_pred"] = np.nan
+    missing_mag = indicator_df["mag_pred"].isna() | (indicator_df["mag_pred"] == 0)
+    backfill_idx = indicator_df.index[missing_mag].intersection(features.index)
+    if len(backfill_idx) > 0:
+        indicator_df.loc[backfill_idx, "mag_pred"] = engine.backfill_mag_pred(
+            features.loc[backfill_idx]
+        )
+        logger.info("Backfilled mag_pred for %d historical bars", len(backfill_idx))
 
     # Save depth/aggtrades/options/sentiment snapshots to MySQL + parquet
     try:
