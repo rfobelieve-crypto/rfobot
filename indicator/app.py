@@ -740,9 +740,21 @@ def indicator_performance():
 
 @app.route("/force-update", methods=["POST", "GET"])
 def force_update():
-    """Manually trigger an update cycle (for testing)."""
-    threading.Thread(target=update_cycle, daemon=True).start()
-    return jsonify({"status": "update_triggered"})
+    """Manually trigger an update cycle (for testing).
+
+    ?sync=1 runs synchronously and returns result/error (timeout-sensitive).
+    Default: async (returns immediately, check /health for result).
+    """
+    sync = request.args.get("sync", "0") == "1"
+    if sync:
+        try:
+            update_cycle()
+            return jsonify({"status": "ok", "error": None})
+        except Exception as e:
+            return jsonify({"status": "error", "error": str(e)}), 500
+    else:
+        threading.Thread(target=update_cycle, daemon=True).start()
+        return jsonify({"status": "update_triggered"})
 
 
 # ── Scheduler ────────────────────────────────────────────────────────────────

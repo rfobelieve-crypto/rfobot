@@ -1695,20 +1695,24 @@ def _handle_indicator_perf(chat_id: str):
 
 
 def _handle_force_update(chat_id: str):
-    """Trigger manual indicator update cycle."""
+    """Trigger manual indicator update cycle (sync mode — waits for result)."""
     if not INDICATOR_SERVICE_URL:
         send_message(chat_id, "INDICATOR_SERVICE_URL not set")
         return
     try:
-        send_message(chat_id, "Manual update triggered...")
-        resp = requests.get(f"{INDICATOR_SERVICE_URL}/force-update", timeout=60)
-        if resp.status_code == 200:
-            send_message(chat_id, "Update started. New chart will arrive shortly.")
+        send_message(chat_id, "⏳ Updating... (may take 30-60s)")
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/force-update?sync=1", timeout=120)
+        data = resp.json()
+        if resp.status_code == 200 and data.get("status") == "ok":
+            send_message(chat_id, "✅ Update complete — chart sent.")
         else:
-            send_message(chat_id, f"Trigger failed ({resp.status_code})")
+            err = data.get("error", f"HTTP {resp.status_code}")
+            send_message(chat_id, f"❌ Update failed: {err}")
+    except requests.exceptions.Timeout:
+        send_message(chat_id, "⚠️ Update timed out (>120s). Check /health for status.")
     except Exception as e:
         logger.exception("force update error: %s", e)
-        send_message(chat_id, f"Update failed: {e}")
+        send_message(chat_id, f"❌ Update error: {e}")
 
 
 def _send_help(chat_id: str):
