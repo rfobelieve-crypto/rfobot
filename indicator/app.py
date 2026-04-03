@@ -293,14 +293,16 @@ def update_cycle():
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
 
-        # Save depth/aggtrades/options snapshots for future training
+        # Save depth/aggtrades/options snapshots to MySQL + parquet
         try:
             from indicator.snapshot_collector import (
-                save_depth_snapshot, save_aggtrades_snapshot, save_options_snapshot,
+                save_depth_snapshot, save_aggtrades_snapshot,
+                save_options_snapshot, save_indicator_history,
             )
             save_depth_snapshot(depth)
             save_aggtrades_snapshot(aggtrades)
             save_options_snapshot(options_data)
+            save_indicator_history(indicator_df)
         except Exception as snap_err:
             logger.warning("Snapshot save failed (non-critical): %s", snap_err)
 
