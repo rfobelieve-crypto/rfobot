@@ -96,7 +96,8 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_price.vlines(x[up], lows[up], highs[up], color="#26a69a", linewidth=0.5)
     ax_price.vlines(x[down], lows[down], highs[down], color="#ef5350", linewidth=0.5)
 
-    # Direction triangles (Strong signals only)
+    # Direction triangles — direction model determines shape, magnitude determines size
+    has_mag = "mag_pred" in sig.columns and sig["mag_pred"].notna().any()
     price_range = highs.max() - lows.min()
     offset = price_range * 0.02
 
@@ -105,12 +106,21 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         c = sig.iloc[i]["confidence_score"]
         s = sig.iloc[i]["strength_score"]
 
-        if d == "NEUTRAL" or pd.isna(c) or s != "Strong":
+        if d == "NEUTRAL" or pd.isna(c):
             continue
 
-        msize = 12
-        alpha = max(0.5, min(c / 100, 1.0))
+        # Size: based on magnitude (larger predicted move = bigger triangle)
+        if has_mag:
+            mag = abs(float(sig.iloc[i].get("mag_pred", 0) or 0))
+            # Scale: 0.2% → size 6, 0.5% → 9, 1%+ → 13
+            msize = np.clip(6 + mag * 700, 6, 14)
+        else:
+            msize = 10
 
+        # Alpha: based on confidence
+        alpha = max(0.4, min(c / 100, 1.0))
+
+        # Strong signals: brighter color + edge ring
         if d == "UP":
             y_pos = lows[i] - offset
             marker = "^"
@@ -120,8 +130,11 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
             marker = "v"
             color = "#b71c1c" if s == "Strong" else "#ef5350"
 
+        edge = "white" if s == "Strong" else "none"
+        lw = 1.2 if s == "Strong" else 0
         ax_price.scatter(i, y_pos, marker=marker, s=msize**2,
-                         color=color, alpha=alpha, edgecolors="none", zorder=5)
+                         color=color, alpha=alpha, edgecolors=edge,
+                         linewidths=lw, zorder=5)
 
     ax_price.set_ylabel("Price (USD)", fontsize=10)
     ax_price.grid(True, alpha=0.15)
@@ -137,11 +150,13 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
 
     # Legend
     legend_elements = [
-        plt.scatter([], [], marker="^", color="#004d40", s=144, label="Strong UP"),
-        plt.scatter([], [], marker="v", color="#b71c1c", s=144, label="Strong DOWN"),
+        plt.scatter([], [], marker="^", color="#004d40", s=169, edgecolors="white", linewidths=1.2, label="Strong UP"),
+        plt.scatter([], [], marker="^", color="#26a69a", s=100, label="UP"),
+        plt.scatter([], [], marker="v", color="#ef5350", s=100, label="DOWN"),
+        plt.scatter([], [], marker="v", color="#b71c1c", s=169, edgecolors="white", linewidths=1.2, label="Strong DOWN"),
     ]
     ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
-                    framealpha=0.8, ncol=2)
+                    framealpha=0.8, ncol=4)
 
     # ── Panel 3: Bull/Bear Power ─────────────────────────────────────────
     ax_bbp = fig.add_subplot(gs[2])
