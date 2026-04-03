@@ -502,6 +502,25 @@ def indicator_status_api():
     return jsonify({"text": "\n".join(lines)})
 
 
+@app.route("/db-diag")
+def db_diagnostics():
+    """Show MySQL env var names (no values) for debugging."""
+    mysql_vars = {k: f"{v[:3]}***" if v else "EMPTY"
+                  for k, v in os.environ.items()
+                  if "MYSQL" in k.upper() or "DB" in k.upper()}
+    all_env = sorted(os.environ.keys())
+    try:
+        from shared.db import get_db_info
+        db_info = get_db_info()
+    except Exception as e:
+        db_info = {"error": str(e)}
+    return jsonify({
+        "mysql_vars_found": mysql_vars,
+        "db_info": db_info,
+        "all_env_names": all_env,
+    })
+
+
 @app.route("/diag")
 def diagnostics():
     """Live diagnostics — check Coinglass API and BBP pipeline."""
