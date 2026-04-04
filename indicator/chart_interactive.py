@@ -88,7 +88,7 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                     "position": "belowBar",
                     "color": "#004d40" if strength == "Strong" else "#26a69a",
                     "shape": "arrowUp",
-                    "text": f"{strength[0]} {conf_score:.0f}% {mag_pct:.2f}%",
+                    "text": "",
                     "size": 2 if strength == "Strong" else 1,
                 })
             else:
@@ -97,7 +97,7 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                     "position": "aboveBar",
                     "color": "#b71c1c" if strength == "Strong" else "#ef5350",
                     "shape": "arrowDown",
-                    "text": f"{strength[0]} {conf_score:.0f}% {mag_pct:.2f}%",
+                    "text": "",
                     "size": 2 if strength == "Strong" else 1,
                 })
 
