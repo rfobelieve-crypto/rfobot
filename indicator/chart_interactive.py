@@ -1,11 +1,11 @@
 """
 Interactive indicator chart — Plotly-based HTML with zoom, pan, crosshair.
 
-Serves the same 4-panel layout as chart_renderer.py but interactive:
-  1. Confidence heatmap (top)
-  2. Candlestick + direction markers
+Layout matches Telegram static chart (chart_renderer.py):
+  1. Confidence heatmap (top, thin)
+  2. Candlestick + direction triangles (main, large)
   3. Magnitude bars (signed by direction)
-  4. Bull/Bear Power bars
+  4. Bull/Bear Power bars (bottom)
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from plotly.subplots import make_subplots
 
 logger = logging.getLogger(__name__)
 
-# ── Colors (match static chart) ──
+# ── Colors (match static chart exactly) ──
 GREEN_STRONG = "#004d40"
 GREEN_MOD    = "#26a69a"
 RED_STRONG   = "#b71c1c"
@@ -28,11 +28,14 @@ BG_COLOR     = "#0d1117"
 CARD_COLOR   = "#161b22"
 GRID_COLOR   = "#1c222b"
 TEXT_COLOR   = "#b0b8c4"
+CONF_LOW     = "#1a1a2e"
+CONF_MID     = "#6a1b9a"
+CONF_HIGH    = "#e040fb"
 
 
 def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     """
-    Render interactive indicator chart. Returns HTML string.
+    Render interactive indicator chart. Returns full HTML string.
 
     ind must have: open, high, low, close, pred_direction, confidence_score,
                    strength_score, pred_return_4h, bull_bear_power, regime
@@ -52,43 +55,45 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
             sig.index = sig.index.tz_localize("UTC")
         sig.index = sig.index.tz_convert(TZ_UTC8)
     except Exception:
-        pass  # keep original index if conversion fails
+        pass
     dates = sig.index
 
     has_mag = "mag_pred" in sig.columns and sig["mag_pred"].notna().any()
 
-    # ── Subplot layout ──
-    row_count = 4 if has_mag else 3
-    row_heights = [0.06, 0.58, 0.18, 0.18] if has_mag else [0.06, 0.7, 0.24]
-    subplot_titles = (
-        "Confidence", "BTC Price", "Magnitude (%)", "Bull/Bear Power"
-    ) if has_mag else (
-        "Confidence", "BTC Price", "Bull/Bear Power"
-    )
+    # ── Subplot layout (match static: 0.8 / 8 / 2 / 2 = total 12.8) ──
+    if has_mag:
+        row_count = 4
+        row_heights = [0.06, 0.62, 0.16, 0.16]
+    else:
+        row_count = 3
+        row_heights = [0.07, 0.70, 0.23]
 
     fig = make_subplots(
         rows=row_count, cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.02,
+        vertical_spacing=0.015,
         row_heights=row_heights,
-        subplot_titles=subplot_titles,
     )
 
-    # ── Panel 1: Confidence heatmap ──
+    # ════════════════════════════════════════════════════════════════
+    # Panel 1: Confidence heatmap (thin purple bar)
+    # ════════════════════════════════════════════════════════════════
     conf = sig["confidence_score"].fillna(0).values.astype(float)
     fig.add_trace(go.Bar(
         x=dates, y=[1] * len(dates),
         marker=dict(
             color=conf,
-            colorscale=[[0, "#1a1a2e"], [0.5, "#6a1b9a"], [1, "#e040fb"]],
+            colorscale=[[0, CONF_LOW], [0.5, CONF_MID], [1, CONF_HIGH]],
             cmin=0, cmax=100,
             showscale=False,
         ),
-        hovertemplate="Confidence: %{marker.color:.0f}<extra></extra>",
+        hovertemplate="Confidence: %{marker.color:.0f}%<extra></extra>",
         showlegend=False,
     ), row=1, col=1)
 
-    # ── Panel 2: Candlestick ──
+    # ════════════════════════════════════════════════════════════════
+    # Panel 2: Candlestick + direction triangles
+    # ════════════════════════════════════════════════════════════════
     fig.add_trace(go.Candlestick(
         x=dates,
         open=sig["open"], high=sig["high"],
@@ -101,31 +106,43 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         showlegend=False,
     ), row=2, col=1)
 
-    # Direction triangles (Moderate/Strong only)
+    # Direction triangles — Moderate and Strong only (same filter as static)
+    price_range = sig["high"].max() - sig["low"].min()
+    offset = price_range * 0.015
+
     for strength, direction, marker_sym, color, name in [
         ("Strong", "UP", "triangle-up", GREEN_STRONG, "Strong UP"),
         ("Moderate", "UP", "triangle-up", GREEN_MOD, "Moderate UP"),
         ("Moderate", "DOWN", "triangle-down", RED_MOD, "Moderate DOWN"),
         ("Strong", "DOWN", "triangle-down", RED_STRONG, "Strong DOWN"),
     ]:
-        mask = (sig["strength_score"] == strength) & (sig["pred_direction"] == direction)
+        mask = (
+            (sig["strength_score"] == strength) &
+            (sig["pred_direction"] == direction) &
+            sig["confidence_score"].notna()
+        )
         if not mask.any():
             continue
         subset = sig[mask]
-        y_vals = subset["low"] * 0.999 if direction == "UP" else subset["high"] * 1.001
+        if direction == "UP":
+            y_vals = subset["low"] - offset
+        else:
+            y_vals = subset["high"] + offset
+
         fig.add_trace(go.Scatter(
             x=subset.index, y=y_vals,
             mode="markers",
             marker=dict(
                 symbol=marker_sym,
-                size=12 if strength == "Strong" else 9,
+                size=14 if strength == "Strong" else 10,
                 color=color,
                 line=dict(width=1.5, color="white") if strength == "Strong" else dict(width=0),
             ),
             name=name,
             hovertemplate=(
                 f"{name}<br>"
-                "Conf: %{customdata[0]:.0f}<br>"
+                "Price: $%{y:,.0f}<br>"
+                "Conf: %{customdata[0]:.0f}%<br>"
                 "Mag: %{customdata[1]:.2%}<extra></extra>"
             ),
             customdata=np.column_stack([
@@ -134,7 +151,9 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
             ]),
         ), row=2, col=1)
 
-    # ── Panel 3: Magnitude bars ──
+    # ════════════════════════════════════════════════════════════════
+    # Panel 3: Magnitude bars (signed by direction, same as static)
+    # ════════════════════════════════════════════════════════════════
     if has_mag:
         mag_raw = sig["mag_pred"].fillna(0).values.astype(float) * 100
         mag_dirs = sig["pred_direction"].fillna("NEUTRAL").values
@@ -142,8 +161,7 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         mag_signed = np.zeros(len(mag_raw))
         mag_colors = []
         for i in range(len(mag_raw)):
-            d = mag_dirs[i]
-            m = mag_raw[i]
+            d, m = mag_dirs[i], mag_raw[i]
             if d == "UP":
                 mag_signed[i] = m
                 mag_colors.append(GREEN_STRONG if m > 0.5 else GREEN_MOD)
@@ -151,21 +169,20 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                 mag_signed[i] = -m
                 mag_colors.append(RED_STRONG if m > 0.5 else RED_MOD)
             else:
-                mag_signed[i] = m
+                mag_signed[i] = m  # NEUTRAL: grey above zero
                 mag_colors.append(GRAY)
 
-        mag_panel_row = 3
         fig.add_trace(go.Bar(
             x=dates, y=mag_signed,
             marker_color=mag_colors,
             name="Magnitude",
             showlegend=False,
-            hovertemplate="Mag: %{y:.2f}%<extra></extra>",
-        ), row=mag_panel_row, col=1)
-        fig.add_hline(y=0, line_width=0.5, line_color="white",
-                      row=mag_panel_row, col=1)
+            hovertemplate="Mag: %{y:.3f}%<extra></extra>",
+        ), row=3, col=1)
 
-    # ── Panel 4 (or 3): BBP bars ──
+    # ════════════════════════════════════════════════════════════════
+    # Panel 4 (or 3): Bull/Bear Power bars
+    # ════════════════════════════════════════════════════════════════
     bbp_row = 4 if has_mag else 3
     bbp = sig["bull_bear_power"].fillna(0).values.astype(float)
     bbp_colors = [GREEN_MOD if v > 0 else RED_MOD for v in bbp]
@@ -175,27 +192,28 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         marker_color=bbp_colors,
         name="BBP",
         showlegend=False,
-        hovertemplate="BBP: %{y:.3f}<extra></extra>",
+        hovertemplate="BBP: %{y:+.3f}<extra></extra>",
     ), row=bbp_row, col=1)
-    fig.add_hline(y=0, line_width=0.5, line_color="white",
-                  row=bbp_row, col=1)
 
-    # ── Layout ──
+    # ════════════════════════════════════════════════════════════════
+    # Layout — match Telegram style
+    # ════════════════════════════════════════════════════════════════
+    last_time = dates[-1].strftime("%Y-%m-%d %H:%M UTC+8")
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor=BG_COLOR,
         plot_bgcolor=CARD_COLOR,
-        font=dict(color=TEXT_COLOR, size=11),
+        font=dict(color=TEXT_COLOR, size=11, family="Calibri, sans-serif"),
         title=dict(
-            text="BTC Market Intelligence Indicator (4h prediction)",
-            font=dict(size=16, color="white"),
+            text=f"BTC Market Intelligence Indicator (4h prediction)  |  Updated: {last_time}",
+            font=dict(size=14, color="white"),
             x=0.5,
         ),
-        height=850,
-        margin=dict(l=60, r=30, t=50, b=40),
+        height=900,
+        margin=dict(l=60, r=30, t=45, b=35),
         legend=dict(
             orientation="h",
-            yanchor="bottom", y=1.02,
+            yanchor="bottom", y=1.01,
             xanchor="center", x=0.5,
             font=dict(size=10),
         ),
@@ -203,29 +221,38 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         xaxis_rangeslider_visible=False,
     )
 
-    # Style all axes
-    for i in range(1, row_count + 1):
-        yaxis = f"yaxis{i}" if i > 1 else "yaxis"
-        xaxis = f"xaxis{i}" if i > 1 else "xaxis"
-        fig.update_layout(**{
-            yaxis: dict(gridcolor=GRID_COLOR, zeroline=False),
-            xaxis: dict(gridcolor=GRID_COLOR),
-        })
+    # ── Axis styling ──
+    # Panel 1: confidence — hide y ticks
+    fig.update_yaxes(showticklabels=False, fixedrange=True, row=1, col=1)
 
-    # Hide confidence y-axis ticks
-    fig.update_yaxes(showticklabels=False, row=1, col=1)
+    # Panel 2: price
+    fig.update_yaxes(title_text="Price (USD)", title_font_size=10, row=2, col=1)
 
-    # Crosshair cursor
+    # Panel 3: magnitude
+    if has_mag:
+        fig.update_yaxes(title_text="Magnitude (%)", title_font_size=10, row=3, col=1)
+        fig.add_hline(y=0, line_width=0.5, line_color="white", row=3, col=1)
+
+    # Panel 4: BBP
+    fig.update_yaxes(title_text="Bull/Bear Power", title_font_size=10, row=bbp_row, col=1)
+    fig.add_hline(y=0, line_width=0.5, line_color="white", row=bbp_row, col=1)
+
+    # Grid color for all panels
+    for r in range(1, row_count + 1):
+        fig.update_yaxes(gridcolor=GRID_COLOR, zeroline=False, row=r, col=1)
+        fig.update_xaxes(gridcolor=GRID_COLOR, row=r, col=1)
+
+    # ── Crosshair cursor (all panels) ──
     fig.update_xaxes(
         showspikes=True, spikemode="across", spikesnap="cursor",
-        spikecolor="#888", spikethickness=0.5, spikedash="dot",
+        spikecolor="#555", spikethickness=0.5, spikedash="dot",
     )
     fig.update_yaxes(
         showspikes=True, spikemode="across", spikesnap="cursor",
-        spikecolor="#888", spikethickness=0.5, spikedash="dot",
+        spikecolor="#555", spikethickness=0.5, spikedash="dot",
     )
 
-    # Range selector buttons
+    # ── Range selector (top panel) ──
     fig.update_xaxes(
         rangeselector=dict(
             buttons=[
@@ -239,6 +266,16 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
             activecolor="#3f51b5",
         ),
         row=1, col=1,
+    )
+
+    # ── Watermark ──
+    fig.add_annotation(
+        text="source@rfo",
+        xref="paper", yref="paper",
+        x=0.99, y=0.01,
+        showarrow=False,
+        font=dict(size=9, color=GRAY),
+        opacity=0.5,
     )
 
     return fig.to_html(
