@@ -538,6 +538,20 @@ def test_telegram():
     return jsonify({"status": "sent", "env_keys_found": tg_vars})
 
 
+@app.route("/live-chart", methods=["GET"])
+def live_chart():
+    """Interactive HTML chart with zoom, pan, crosshair."""
+    from indicator.chart_interactive import render_interactive_chart
+    with _lock:
+        indicator_df = _state["indicator_df"]
+    if indicator_df is None or indicator_df.empty:
+        return "<h3>Chart not ready</h3>", 503
+    chart_df = indicator_df.dropna(subset=["open", "high", "low", "close"])
+    last_n = request.args.get("n", 200, type=int)
+    html = render_interactive_chart(chart_df, last_n=last_n)
+    return Response(html, mimetype="text/html")
+
+
 @app.route("/indicator-chart", methods=["GET"])
 def indicator_chart_api():
     """API for main bot to fetch indicator chart + caption."""
