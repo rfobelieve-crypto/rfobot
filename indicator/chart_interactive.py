@@ -233,9 +233,10 @@ candleSeries.setMarkers(markers);
 
 // ── Magnitude chart ──
 let magChart = null;
+let magSeries = null;
 if (hasMag) {{
   magChart = makeChart('chart-mag', magH);
-  const magSeries = magChart.addHistogramSeries({{
+  magSeries = magChart.addHistogramSeries({{
     priceFormat: {{ type: 'custom', formatter: (v) => v.toFixed(2) + '%' }},
     priceLineVisible: false,
     lastValueVisible: false,
