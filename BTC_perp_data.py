@@ -1762,7 +1762,7 @@ def _send_help(chat_id: str):
             {"text": "\u2699\ufe0f Status", "callback_data": "status"},
         ],
         [
-            {"text": "\U0001f6a8 Events", "callback_data": "events"},
+            {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
             {"text": "\U0001f9f9 Sweep", "callback_data": "sweep"},
             {"text": "\u2753 Help", "callback_data": "help"},
         ],
@@ -1814,8 +1814,15 @@ def webhook():
                 send_message(cb_chat_id, generate_report("BTC"))
             elif cb_data == "flow_all":
                 send_message(cb_chat_id, generate_all_report())
-            elif cb_data == "events":
-                send_message(cb_chat_id, generate_current_event_report())
+            elif cb_data == "ichart":
+                if INDICATOR_SERVICE_URL:
+                    url_link = f"{INDICATOR_SERVICE_URL}/live-chart"
+                    send_message(cb_chat_id,
+                        f"<b>Interactive Chart</b>\n\n"
+                        f"<a href=\"{url_link}\">點擊開啟互動圖表</a>\n\n"
+                        f"功能: 放大縮小 / 拖曳平移 / 十字線游標")
+                else:
+                    send_message(cb_chat_id, "INDICATOR_SERVICE_URL 未設定")
             elif cb_data == "sweep":
                 send_message(cb_chat_id, outcome_tracker.format_active_trackers_report())
             elif cb_data == "help":

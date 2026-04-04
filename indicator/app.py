@@ -69,7 +69,7 @@ def _make_reply_markup():
             {"text": "\u2699\ufe0f Status", "callback_data": "status"},
         ],
         [
-            {"text": "\U0001f6a8 Events", "callback_data": "events"},
+            {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
             {"text": "\U0001f9f9 Sweep", "callback_data": "sweep"},
             {"text": "\u2753 Help", "callback_data": "help"},
         ],
