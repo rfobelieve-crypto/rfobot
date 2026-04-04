@@ -205,12 +205,14 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         plot_bgcolor=CARD_COLOR,
         font=dict(color=TEXT_COLOR, size=11, family="Calibri, sans-serif"),
         title=dict(
-            text=f"BTC Market Intelligence Indicator (4h prediction)  |  Updated: {last_time}",
+            text=f"BTC Market Intelligence Indicator (4h prediction)  |  {last_time}  |  v2",
             font=dict(size=14, color="white"),
             x=0.5,
         ),
         height=900,
         margin=dict(l=60, r=30, t=45, b=35),
+        # Disable all candlestick rangesliders (they bleed into other panels)
+        xaxis2_rangeslider_visible=False,
         legend=dict(
             orientation="h",
             yanchor="bottom", y=1.01,
