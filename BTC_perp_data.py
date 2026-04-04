@@ -1732,6 +1732,7 @@ def _send_help(chat_id: str):
         "<b>BTC Market Intelligence</b>\n\n"
         "<b>--- 核心指標 ---</b>\n"
         "/chart - 4h 多空預測指標圖\n"
+        "/ichart - 互動圖表 (可放大/十字線)\n"
         "/perf - 模型即時表現\n"
         "/db - 資料庫累積狀態\n"
         "/ind_status - 指標系統狀態\n"
@@ -1876,6 +1877,18 @@ def webhook():
         elif cmd == "/chart":
             # /chart → 4h indicator chart (core)
             threading.Thread(target=_handle_indicator_chart, args=(chat_id,), daemon=True).start()
+
+        elif cmd == "/ichart":
+            # /ichart → interactive chart link
+            if INDICATOR_SERVICE_URL:
+                url = f"{INDICATOR_SERVICE_URL}/live-chart"
+                send_message(chat_id,
+                    f"<b>Interactive Chart</b>\n\n"
+                    f"<a href=\"{url}\">點擊開啟互動圖表</a>\n\n"
+                    f"功能: 放大縮小 / 拖曳平移 / 十字線游標\n"
+                    f"時間快選: 24h / 3d / 7d / All")
+            else:
+                send_message(chat_id, "INDICATOR_SERVICE_URL 未設定")
 
         elif cmd == "/ind_status":
             threading.Thread(target=_handle_indicator_status, args=(chat_id,), daemon=True).start()
