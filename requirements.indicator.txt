@@ -12,3 +12,4 @@ scipy
 python-dotenv
 pyarrow
 pymysql
+plotly
