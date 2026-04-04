@@ -47,7 +47,12 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     # UTC+8
     from datetime import timezone, timedelta
     TZ_UTC8 = timezone(timedelta(hours=8))
-    sig.index = sig.index.tz_convert(TZ_UTC8)
+    try:
+        if sig.index.tz is None:
+            sig.index = sig.index.tz_localize("UTC")
+        sig.index = sig.index.tz_convert(TZ_UTC8)
+    except Exception:
+        pass  # keep original index if conversion fails
     dates = sig.index
 
     has_mag = "mag_pred" in sig.columns and sig["mag_pred"].notna().any()
