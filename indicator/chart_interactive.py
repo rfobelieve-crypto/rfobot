@@ -269,16 +269,33 @@ charts.forEach((chart, idx) => {{
   }});
 }});
 
-// ── Sync crosshair ──
-charts.forEach((chart, idx) => {{
-  chart.subscribeCrosshairMove((param) => {{
-    if (!param || !param.time) return;
-    charts.forEach((other, j) => {{
+// ── Sync crosshair across all panels ──
+const chartSeriesPairs = [
+  [confChart, confSeries],
+  [priceChart, candleSeries],
+  hasMag ? [magChart, magSeries] : null,
+  [bbpChart, bbpSeries],
+].filter(Boolean);
+
+let isSyncingCH = false;
+chartSeriesPairs.forEach(([srcChart, srcSeries], idx) => {{
+  srcChart.subscribeCrosshairMove((param) => {{
+    if (isSyncingCH) return;
+    isSyncingCH = true;
+    chartSeriesPairs.forEach(([dstChart, dstSeries], j) => {{
       if (j !== idx) {{
-        // Lightweight Charts v4: no direct setCrosshairPosition API
-        // but synced time scale handles visual alignment
+        if (param.time) {{
+          // Get the data value at this time for the destination series
+          const data = param.seriesData ? param.seriesData.get(srcSeries) : null;
+          try {{
+            dstChart.setCrosshairPosition(NaN, param.time, dstSeries);
+          }} catch(e) {{}}
+        }} else {{
+          try {{ dstChart.clearCrosshairPosition(); }} catch(e) {{}}
+        }}
       }}
     }});
+    isSyncingCH = false;
   }});
 }});
 
