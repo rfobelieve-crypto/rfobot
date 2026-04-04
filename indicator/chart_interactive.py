@@ -79,8 +79,10 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     # Panel 1: Confidence heatmap (thin purple bar)
     # ════════════════════════════════════════════════════════════════
     conf = sig["confidence_score"].fillna(0).values.astype(float)
+    bar_width_1h = 3600000 * 0.8  # 80% of 1h in ms
     fig.add_trace(go.Bar(
         x=dates, y=[1] * len(dates),
+        width=bar_width_1h,
         marker=dict(
             color=conf,
             colorscale=[[0, CONF_LOW], [0.5, CONF_MID], [1, CONF_HIGH]],
@@ -172,9 +174,12 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                 mag_signed[i] = m  # NEUTRAL: grey above zero
                 mag_colors.append(GRAY)
 
+        # Width in ms: 1h = 3600000, use 80% fill
+        bar_width = 3600000 * 0.8
         fig.add_trace(go.Bar(
             x=dates, y=mag_signed,
             marker_color=mag_colors,
+            width=bar_width,
             name="Magnitude",
             showlegend=False,
             hovertemplate="Mag: %{y:.3f}%<extra></extra>",
@@ -187,9 +192,11 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     bbp = sig["bull_bear_power"].fillna(0).values.astype(float)
     bbp_colors = [GREEN_MOD if v > 0 else RED_MOD for v in bbp]
 
+    bar_width_bbp = 3600000 * 0.8
     fig.add_trace(go.Bar(
         x=dates, y=bbp,
         marker_color=bbp_colors,
+        width=bar_width_bbp,
         name="BBP",
         showlegend=False,
         hovertemplate="BBP: %{y:+.3f}<extra></extra>",
@@ -205,7 +212,7 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         plot_bgcolor=CARD_COLOR,
         font=dict(color=TEXT_COLOR, size=11, family="Calibri, sans-serif"),
         title=dict(
-            text=f"BTC Market Intelligence Indicator (4h prediction)  |  {last_time}  |  v2",
+            text=f"BTC Market Intelligence Indicator (4h prediction)  |  {last_time}  |  v3",
             font=dict(size=14, color="white"),
             x=0.5,
         ),
