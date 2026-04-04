@@ -1,53 +1,29 @@
 """
-Interactive indicator chart — Plotly-based HTML with zoom, pan, crosshair.
+Interactive indicator chart — TradingView Lightweight Charts.
 
-Layout matches Telegram static chart (chart_renderer.py):
-  1. Confidence heatmap (top, thin)
-  2. Candlestick + direction triangles (main, large)
-  3. Magnitude bars (signed by direction)
-  4. Bull/Bear Power bars (bottom)
+Mobile-optimized: pinch-to-zoom, drag-to-scroll, crosshair on touch.
+Same 4-panel layout as Telegram static chart.
 """
 from __future__ import annotations
 
+import json
 import logging
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 logger = logging.getLogger(__name__)
 
-# ── Colors (match static chart exactly) ──
-GREEN_STRONG = "#004d40"
-GREEN_MOD    = "#26a69a"
-RED_STRONG   = "#b71c1c"
-RED_MOD      = "#ef5350"
-GRAY         = "#9e9e9e"
-BG_COLOR     = "#0d1117"
-CARD_COLOR   = "#161b22"
-GRID_COLOR   = "#1c222b"
-TEXT_COLOR   = "#b0b8c4"
-CONF_LOW     = "#1a1a2e"
-CONF_MID     = "#6a1b9a"
-CONF_HIGH    = "#e040fb"
-
 
 def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
-    """
-    Render interactive indicator chart. Returns full HTML string.
-
-    ind must have: open, high, low, close, pred_direction, confidence_score,
-                   strength_score, pred_return_4h, bull_bear_power, regime
-    Optional: mag_pred
-    """
+    """Render interactive chart using TradingView Lightweight Charts. Returns HTML."""
     sig = ind.tail(last_n).copy()
     sig = sig.dropna(subset=["open", "high", "low", "close"])
 
     if len(sig) == 0:
         return "<h3>No data</h3>"
 
-    # UTC+8
+    # Convert index to UTC timestamps (seconds)
     from datetime import timezone, timedelta
     TZ_UTC8 = timezone(timedelta(hours=8))
     try:
@@ -56,244 +32,269 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         sig.index = sig.index.tz_convert(TZ_UTC8)
     except Exception:
         pass
-    dates = sig.index
 
     has_mag = "mag_pred" in sig.columns and sig["mag_pred"].notna().any()
 
-    # ── Subplot layout (match static: 0.8 / 8 / 2 / 2 = total 12.8) ──
-    if has_mag:
-        row_count = 4
-        row_heights = [0.06, 0.62, 0.16, 0.16]
-    else:
-        row_count = 3
-        row_heights = [0.07, 0.70, 0.23]
+    # ── Build data arrays ──
+    candle_data = []
+    conf_data = []
+    mag_data = []
+    bbp_data = []
+    markers = []
 
-    fig = make_subplots(
-        rows=row_count, cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.015,
-        row_heights=row_heights,
-    )
+    for i, (dt, row) in enumerate(sig.iterrows()):
+        ts = int(dt.timestamp())
+        o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
 
-    # ════════════════════════════════════════════════════════════════
-    # Panel 1: Confidence heatmap (thin purple bar)
-    # ════════════════════════════════════════════════════════════════
-    conf = sig["confidence_score"].fillna(0).values.astype(float)
-    bar_width_1h = 3600000 * 0.8  # 80% of 1h in ms
-    fig.add_trace(go.Bar(
-        x=dates, y=[1] * len(dates),
-        width=bar_width_1h,
-        marker=dict(
-            color=conf,
-            colorscale=[[0, CONF_LOW], [0.5, CONF_MID], [1, CONF_HIGH]],
-            cmin=0, cmax=100,
-            showscale=False,
-        ),
-        hovertemplate="Confidence: %{marker.color:.0f}%<extra></extra>",
-        showlegend=False,
-    ), row=1, col=1)
+        candle_data.append({"time": ts, "open": o, "high": h, "low": l, "close": c})
 
-    # ════════════════════════════════════════════════════════════════
-    # Panel 2: Candlestick + direction triangles
-    # ════════════════════════════════════════════════════════════════
-    fig.add_trace(go.Candlestick(
-        x=dates,
-        open=sig["open"], high=sig["high"],
-        low=sig["low"], close=sig["close"],
-        increasing_line_color=GREEN_MOD,
-        increasing_fillcolor=GREEN_MOD,
-        decreasing_line_color=RED_MOD,
-        decreasing_fillcolor=RED_MOD,
-        name="BTC",
-        showlegend=False,
-    ), row=2, col=1)
-
-    # Direction triangles — Moderate and Strong only (same filter as static)
-    price_range = sig["high"].max() - sig["low"].min()
-    offset = price_range * 0.015
-
-    for strength, direction, marker_sym, color, name in [
-        ("Strong", "UP", "triangle-up", GREEN_STRONG, "Strong UP"),
-        ("Moderate", "UP", "triangle-up", GREEN_MOD, "Moderate UP"),
-        ("Moderate", "DOWN", "triangle-down", RED_MOD, "Moderate DOWN"),
-        ("Strong", "DOWN", "triangle-down", RED_STRONG, "Strong DOWN"),
-    ]:
-        mask = (
-            (sig["strength_score"] == strength) &
-            (sig["pred_direction"] == direction) &
-            sig["confidence_score"].notna()
-        )
-        if not mask.any():
-            continue
-        subset = sig[mask]
-        if direction == "UP":
-            y_vals = subset["low"] - offset
+        # Confidence → color
+        conf_val = float(row.get("confidence_score", 0) or 0)
+        if conf_val >= 70:
+            conf_color = "#e040fb"
+        elif conf_val >= 40:
+            conf_color = "#6a1b9a"
         else:
-            y_vals = subset["high"] + offset
+            conf_color = "#1a1a2e"
+        conf_data.append({"time": ts, "value": conf_val / 100, "color": conf_color})
 
-        fig.add_trace(go.Scatter(
-            x=subset.index, y=y_vals,
-            mode="markers",
-            marker=dict(
-                symbol=marker_sym,
-                size=14 if strength == "Strong" else 10,
-                color=color,
-                line=dict(width=1.5, color="white") if strength == "Strong" else dict(width=0),
-            ),
-            name=name,
-            hovertemplate=(
-                f"{name}<br>"
-                "Price: $%{y:,.0f}<br>"
-                "Conf: %{customdata[0]:.0f}%<br>"
-                "Mag: %{customdata[1]:.2%}<extra></extra>"
-            ),
-            customdata=np.column_stack([
-                subset["confidence_score"].fillna(0).values,
-                subset.get("mag_pred", pd.Series(0, index=subset.index)).fillna(0).values,
-            ]),
-        ), row=2, col=1)
-
-    # ════════════════════════════════════════════════════════════════
-    # Panel 3: Magnitude bars (signed by direction, same as static)
-    # ════════════════════════════════════════════════════════════════
-    if has_mag:
-        mag_raw = sig["mag_pred"].fillna(0).values.astype(float) * 100
-        mag_dirs = sig["pred_direction"].fillna("NEUTRAL").values
-
-        mag_signed = np.zeros(len(mag_raw))
-        mag_colors = []
-        for i in range(len(mag_raw)):
-            d, m = mag_dirs[i], mag_raw[i]
+        # Magnitude
+        if has_mag:
+            mag_val = float(row.get("mag_pred", 0) or 0) * 100
+            d = str(row.get("pred_direction", "NEUTRAL"))
             if d == "UP":
-                mag_signed[i] = m
-                mag_colors.append(GREEN_STRONG if m > 0.5 else GREEN_MOD)
+                mag_color = "#004d40" if mag_val > 0.5 else "#26a69a"
             elif d == "DOWN":
-                mag_signed[i] = -m
-                mag_colors.append(RED_STRONG if m > 0.5 else RED_MOD)
+                mag_val = -mag_val
+                mag_color = "#b71c1c" if abs(mag_val) > 0.5 else "#ef5350"
             else:
-                mag_signed[i] = m  # NEUTRAL: grey above zero
-                mag_colors.append(GRAY)
+                mag_color = "#9e9e9e"
+            mag_data.append({"time": ts, "value": round(mag_val, 4), "color": mag_color})
 
-        # Width in ms: 1h = 3600000, use 80% fill
-        bar_width = 3600000 * 0.8
-        fig.add_trace(go.Bar(
-            x=dates, y=mag_signed,
-            marker_color=mag_colors,
-            width=bar_width,
-            name="Magnitude",
-            showlegend=False,
-            hovertemplate="Mag: %{y:.3f}%<extra></extra>",
-        ), row=3, col=1)
+        # BBP
+        bbp_val = float(row.get("bull_bear_power", 0) or 0)
+        bbp_color = "#26a69a" if bbp_val > 0 else "#ef5350"
+        bbp_data.append({"time": ts, "value": round(bbp_val, 4), "color": bbp_color})
 
-    # ════════════════════════════════════════════════════════════════
-    # Panel 4 (or 3): Bull/Bear Power bars
-    # ════════════════════════════════════════════════════════════════
-    bbp_row = 4 if has_mag else 3
-    bbp = sig["bull_bear_power"].fillna(0).values.astype(float)
-    bbp_colors = [GREEN_MOD if v > 0 else RED_MOD for v in bbp]
+        # Direction markers (Moderate/Strong only)
+        strength = str(row.get("strength_score", ""))
+        direction = str(row.get("pred_direction", ""))
+        if strength in ("Moderate", "Strong") and direction in ("UP", "DOWN"):
+            conf_score = float(row.get("confidence_score", 0) or 0)
+            mag_pct = float(row.get("mag_pred", 0) or 0) * 100
+            if direction == "UP":
+                markers.append({
+                    "time": ts,
+                    "position": "belowBar",
+                    "color": "#004d40" if strength == "Strong" else "#26a69a",
+                    "shape": "arrowUp",
+                    "text": f"{strength[0]} {conf_score:.0f}% {mag_pct:.2f}%",
+                    "size": 2 if strength == "Strong" else 1,
+                })
+            else:
+                markers.append({
+                    "time": ts,
+                    "position": "aboveBar",
+                    "color": "#b71c1c" if strength == "Strong" else "#ef5350",
+                    "shape": "arrowDown",
+                    "text": f"{strength[0]} {conf_score:.0f}% {mag_pct:.2f}%",
+                    "size": 2 if strength == "Strong" else 1,
+                })
 
-    bar_width_bbp = 3600000 * 0.8
-    fig.add_trace(go.Bar(
-        x=dates, y=bbp,
-        marker_color=bbp_colors,
-        width=bar_width_bbp,
-        name="BBP",
-        showlegend=False,
-        hovertemplate="BBP: %{y:+.3f}<extra></extra>",
-    ), row=bbp_row, col=1)
+    last_time = sig.index[-1].strftime("%Y-%m-%d %H:%M UTC+8")
+    last_price = float(sig["close"].iloc[-1])
+    last_dir = str(sig.get("pred_direction", pd.Series("?")).iloc[-1])
+    last_conf = float(sig.get("confidence_score", pd.Series(0)).iloc[-1] or 0)
+    last_str = str(sig.get("strength_score", pd.Series("?")).iloc[-1])
 
-    # ════════════════════════════════════════════════════════════════
-    # Layout — match Telegram style
-    # ════════════════════════════════════════════════════════════════
-    last_time = dates[-1].strftime("%Y-%m-%d %H:%M UTC+8")
-    fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor=BG_COLOR,
-        plot_bgcolor=CARD_COLOR,
-        font=dict(color=TEXT_COLOR, size=11, family="Calibri, sans-serif"),
-        title=dict(
-            text=f"BTC Market Intelligence Indicator (4h prediction)  |  {last_time}  |  v3",
-            font=dict(size=14, color="white"),
-            x=0.5,
-        ),
-        height=900,
-        margin=dict(l=60, r=30, t=45, b=35),
-        # Disable all candlestick rangesliders (they bleed into other panels)
-        xaxis2_rangeslider_visible=False,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom", y=1.01,
-            xanchor="center", x=0.5,
-            font=dict(size=10),
-        ),
-        hovermode="x unified",
-        xaxis_rangeslider_visible=False,
-    )
-
-    # ── Axis styling ──
-    # Panel 1: confidence — hide y ticks
-    fig.update_yaxes(showticklabels=False, fixedrange=True, row=1, col=1)
-
-    # Panel 2: price
-    fig.update_yaxes(title_text="Price (USD)", title_font_size=10, row=2, col=1)
-
-    # Panel 3: magnitude
+    # Height ratios for panels
     if has_mag:
-        fig.update_yaxes(title_text="Magnitude (%)", title_font_size=10, row=3, col=1)
-        fig.add_hline(y=0, line_width=0.5, line_color="white", row=3, col=1)
+        price_pct = 60
+        mag_pct_h = 15
+        bbp_pct = 15
+        conf_pct = 10
+    else:
+        price_pct = 70
+        mag_pct_h = 0
+        bbp_pct = 20
+        conf_pct = 10
 
-    # Panel 4: BBP
-    fig.update_yaxes(title_text="Bull/Bear Power", title_font_size=10, row=bbp_row, col=1)
-    fig.add_hline(y=0, line_width=0.5, line_color="white", row=bbp_row, col=1)
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BTC Indicator</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ background: #0d1117; color: #b0b8c4; font-family: -apple-system, sans-serif; overflow: hidden; }}
+  #header {{
+    padding: 8px 12px; font-size: 12px; color: #7a828e;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #1c222b;
+  }}
+  #header .title {{ color: #fff; font-weight: 600; font-size: 13px; }}
+  #header .info {{ color: #58a6ff; }}
+  .chart-label {{
+    position: absolute; left: 4px; top: 2px; font-size: 10px;
+    color: #7a828e; z-index: 10; pointer-events: none;
+  }}
+  .chart-wrapper {{ position: relative; }}
+  #footer {{
+    padding: 4px 12px; font-size: 10px; color: #7a828e;
+    text-align: right; border-top: 1px solid #1c222b;
+  }}
+</style>
+</head>
+<body>
+<div id="header">
+  <span class="title">BTC Market Intelligence Indicator (4h prediction)</span>
+  <span class="info">{last_dir} | Conf {last_conf:.0f}% ({last_str}) | ${last_price:,.0f}</span>
+  <span>{last_time}</span>
+</div>
+<div class="chart-wrapper" id="conf-wrapper">
+  <div class="chart-label">Confidence</div>
+  <div id="chart-conf"></div>
+</div>
+<div class="chart-wrapper" id="price-wrapper">
+  <div class="chart-label">Price (USD)</div>
+  <div id="chart-price"></div>
+</div>
+{"<div class='chart-wrapper' id='mag-wrapper'><div class='chart-label'>Magnitude (%)</div><div id='chart-mag'></div></div>" if has_mag else ""}
+<div class="chart-wrapper" id="bbp-wrapper">
+  <div class="chart-label">Bull/Bear Power</div>
+  <div id="chart-bbp"></div>
+</div>
+<div id="footer">source@rfo</div>
 
-    # Grid color for all panels
-    for r in range(1, row_count + 1):
-        fig.update_yaxes(gridcolor=GRID_COLOR, zeroline=False, row=r, col=1)
-        fig.update_xaxes(gridcolor=GRID_COLOR, row=r, col=1)
+<script>
+const candleData = {json.dumps(candle_data)};
+const confData = {json.dumps(conf_data)};
+const magData = {json.dumps(mag_data)};
+const bbpData = {json.dumps(bbp_data)};
+const markers = {json.dumps(markers)};
+const hasMag = {'true' if has_mag else 'false'};
 
-    # ── Crosshair cursor (all panels) ──
-    fig.update_xaxes(
-        showspikes=True, spikemode="across", spikesnap="cursor",
-        spikecolor="#555", spikethickness=0.5, spikedash="dot",
-    )
-    fig.update_yaxes(
-        showspikes=True, spikemode="across", spikesnap="cursor",
-        spikecolor="#555", spikethickness=0.5, spikedash="dot",
-    )
+const BG = '#0d1117';
+const CARD = '#161b22';
+const GRID = '#1c222b';
+const TEXT = '#7a828e';
 
-    # ── Range selector (top panel) ──
-    fig.update_xaxes(
-        rangeselector=dict(
-            buttons=[
-                dict(count=24, label="24h", step="hour", stepmode="backward"),
-                dict(count=72, label="3d", step="hour", stepmode="backward"),
-                dict(count=168, label="7d", step="hour", stepmode="backward"),
-                dict(step="all", label="All"),
-            ],
-            bgcolor=CARD_COLOR,
-            font=dict(color=TEXT_COLOR, size=10),
-            activecolor="#3f51b5",
-        ),
-        row=1, col=1,
-    )
+const headerH = 36;
+const footerH = 24;
+const totalH = window.innerHeight - headerH - footerH;
+const confH = Math.round(totalH * 0.{conf_pct:02d});
+const priceH = Math.round(totalH * 0.{price_pct:02d});
+const magH = hasMag ? Math.round(totalH * 0.{mag_pct_h:02d}) : 0;
+const bbpH = Math.round(totalH * 0.{bbp_pct:02d});
 
-    # ── Watermark ──
-    fig.add_annotation(
-        text="source@rfo",
-        xref="paper", yref="paper",
-        x=0.99, y=0.01,
-        showarrow=False,
-        font=dict(size=9, color=GRAY),
-        opacity=0.5,
-    )
+function makeChart(container, height, opts) {{
+  const el = document.getElementById(container);
+  el.style.height = height + 'px';
+  const chart = LightweightCharts.createChart(el, {{
+    width: window.innerWidth,
+    height: height,
+    layout: {{ background: {{ color: BG }}, textColor: TEXT, fontSize: 10 }},
+    grid: {{ vertLines: {{ color: GRID }}, horzLines: {{ color: GRID }} }},
+    crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
+    timeScale: {{
+      timeVisible: true, secondsVisible: false,
+      borderColor: GRID,
+    }},
+    rightPriceScale: {{ borderColor: GRID }},
+    ...opts,
+  }});
+  return chart;
+}}
 
-    return fig.to_html(
-        full_html=True,
-        include_plotlyjs="cdn",
-        config={
-            "scrollZoom": True,
-            "displayModeBar": True,
-            "modeBarButtonsToAdd": ["drawline", "drawrect"],
-            "modeBarButtonsToRemove": ["lasso2d", "select2d"],
-        },
-    )
+// ── Confidence chart ──
+const confChart = makeChart('chart-conf', confH, {{
+  rightPriceScale: {{ visible: false }},
+}});
+const confSeries = confChart.addHistogramSeries({{
+  priceFormat: {{ type: 'custom', formatter: (v) => (v * 100).toFixed(0) + '%' }},
+  priceLineVisible: false,
+  lastValueVisible: false,
+}});
+confSeries.setData(confData);
+
+// ── Price chart ──
+const priceChart = makeChart('chart-price', priceH, {{
+  rightPriceScale: {{ autoScale: true }},
+}});
+const candleSeries = priceChart.addCandlestickSeries({{
+  upColor: '#26a69a', downColor: '#ef5350',
+  borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+  wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+}});
+candleSeries.setData(candleData);
+candleSeries.setMarkers(markers);
+
+// ── Magnitude chart ──
+let magChart = null;
+if (hasMag) {{
+  magChart = makeChart('chart-mag', magH);
+  const magSeries = magChart.addHistogramSeries({{
+    priceFormat: {{ type: 'custom', formatter: (v) => v.toFixed(2) + '%' }},
+    priceLineVisible: false,
+    lastValueVisible: false,
+  }});
+  magSeries.setData(magData);
+}}
+
+// ── BBP chart ──
+const bbpChart = makeChart('chart-bbp', bbpH);
+const bbpSeries = bbpChart.addHistogramSeries({{
+  priceFormat: {{ type: 'custom', formatter: (v) => v.toFixed(3) }},
+  priceLineVisible: false,
+  lastValueVisible: false,
+}});
+bbpSeries.setData(bbpData);
+
+// ── Sync all charts (scroll + zoom) ──
+const charts = [confChart, priceChart, magChart, bbpChart].filter(Boolean);
+
+let isSyncing = false;
+charts.forEach((chart, idx) => {{
+  chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {{
+    if (isSyncing) return;
+    isSyncing = true;
+    charts.forEach((other, j) => {{
+      if (j !== idx && range) {{
+        other.timeScale().setVisibleLogicalRange(range);
+      }}
+    }});
+    isSyncing = false;
+  }});
+}});
+
+// ── Sync crosshair ──
+charts.forEach((chart, idx) => {{
+  chart.subscribeCrosshairMove((param) => {{
+    if (!param || !param.time) return;
+    charts.forEach((other, j) => {{
+      if (j !== idx) {{
+        // Lightweight Charts v4: no direct setCrosshairPosition API
+        // but synced time scale handles visual alignment
+      }}
+    }});
+  }});
+}});
+
+// ── Resize ──
+window.addEventListener('resize', () => {{
+  const totalH2 = window.innerHeight - headerH - footerH;
+  const newConfH = Math.round(totalH2 * 0.{conf_pct:02d});
+  const newPriceH = Math.round(totalH2 * 0.{price_pct:02d});
+  const newMagH = hasMag ? Math.round(totalH2 * 0.{mag_pct_h:02d}) : 0;
+  const newBbpH = Math.round(totalH2 * 0.{bbp_pct:02d});
+  confChart.resize(window.innerWidth, newConfH);
+  priceChart.resize(window.innerWidth, newPriceH);
+  if (magChart) magChart.resize(window.innerWidth, newMagH);
+  bbpChart.resize(window.innerWidth, newBbpH);
+}});
+</script>
+</body>
+</html>"""
+    return html
