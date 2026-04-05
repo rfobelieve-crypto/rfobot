@@ -488,6 +488,24 @@ def update_cycle() -> dict:
         except Exception as mon_err:
             logger.warning("Monitor check failed (non-critical): %s", mon_err)
 
+        # IC decay check (every update, lightweight)
+        try:
+            from scipy.stats import spearmanr as _sp
+            _hist = indicator_df.copy()
+            _hist["_actual"] = _hist["close"].shift(-4) / _hist["close"] - 1
+            _eval = _hist.dropna(subset=["_actual", "pred_return_4h"]).tail(168)  # 7 days
+            if len(_eval) >= 50:
+                _ic7, _ = _sp(_eval["pred_return_4h"], _eval["_actual"])
+                if _ic7 < 0:
+                    _send_telegram_text(
+                        "🔴 <b>IC Decay Alert</b>\n\n"
+                        f"7 天 Rolling IC = {_ic7:.3f} (負值)\n"
+                        "模型預測方向與實際收益反向，建議重訓模型"
+                    )
+                    logger.warning("IC decay alert: 7d IC = %.3f", _ic7)
+        except Exception as ic_err:
+            logger.debug("IC decay check skipped: %s", ic_err)
+
         return {
             "engine_mode": _engine.mode if _engine else "?",
             "bars_predicted": len(new_features) if 'new_features' in dir() else 0,
@@ -731,12 +749,14 @@ def indicator_db_stats():
 
 @app.route("/indicator-perf", methods=["GET"])
 def indicator_performance():
-    """API: direction model live performance for Telegram /perf command."""
+    """API: comprehensive model performance for Telegram /perf command."""
     try:
         from shared.db import get_db_conn
+        from scipy.stats import spearmanr
+        import pandas as pd
+
         conn = get_db_conn()
         with conn.cursor() as cur:
-            # Get predictions that are old enough to have 4h outcomes (> 4h ago)
             cur.execute("""
                 SELECT dt, `close`, pred_return_4h, pred_direction_code,
                        confidence_score, dir_prob_up,
@@ -744,7 +764,7 @@ def indicator_performance():
                        COALESCE(regime_code, 0) as regime_code
                 FROM indicator_history
                 ORDER BY dt DESC
-                LIMIT 200
+                LIMIT 720
             """)
             rows = cur.fetchall()
         conn.close()
@@ -752,99 +772,127 @@ def indicator_performance():
         if len(rows) < 5:
             return jsonify({"text": "⏳ 數據不足（需至少 5 筆歷史紀錄）"})
 
-        import pandas as pd
         df = pd.DataFrame(rows)
         df["dt"] = pd.to_datetime(df["dt"])
         df = df.sort_values("dt").reset_index(drop=True)
 
-        # Compute actual 4h returns (shift -4)
+        # Actual 4h returns
         df["actual_4h"] = df["close"].shift(-4) / df["close"] - 1
-        # Only evaluate rows with known outcomes
         eval_df = df.dropna(subset=["actual_4h"]).copy()
 
         if len(eval_df) < 3:
             return jsonify({"text": "⏳ 尚無足夠的已實現結果（需等待 4h+）"})
 
-        # Direction accuracy
-        eval_df["pred_dir"] = eval_df["pred_direction_code"].map({1: "UP", -1: "DOWN", 0: "NEUTRAL"})
-        eval_df["actual_dir"] = eval_df["actual_4h"].apply(lambda x: "UP" if x > 0.001 else ("DOWN" if x < -0.001 else "NEUTRAL"))
+        # Direction labels
+        eval_df["pred_dir"] = eval_df["pred_direction_code"].map(
+            {1: "UP", -1: "DOWN", 0: "NEUTRAL"})
+        eval_df["actual_dir"] = eval_df["actual_4h"].apply(
+            lambda x: "UP" if x > 0.001 else ("DOWN" if x < -0.001 else "NEUTRAL"))
 
-        # Filter non-neutral predictions
         active = eval_df[eval_df["pred_dir"] != "NEUTRAL"]
-        if len(active) > 0:
-            dir_acc = (active["pred_dir"] == active["actual_dir"]).mean() * 100
-        else:
-            dir_acc = 0
+        dir_acc = (active["pred_dir"] == active["actual_dir"]).mean() * 100 if len(active) > 0 else 0
 
-        # Direction model (dir_prob_up) accuracy
-        dir_model_active = eval_df[(eval_df["dir_prob_up"] > 0.65) | (eval_df["dir_prob_up"] < 0.35)]
-        if len(dir_model_active) > 0:
-            dm_pred = dir_model_active["dir_prob_up"].apply(lambda p: "UP" if p > 0.5 else "DOWN")
-            dm_acc = (dm_pred == dir_model_active["actual_dir"]).mean() * 100
-            dm_count = len(dir_model_active)
-        else:
-            dm_acc = 0
-            dm_count = 0
-
-        # Spearman IC
-        from scipy.stats import spearmanr
-        ic, _ = spearmanr(eval_df["pred_return_4h"], eval_df["actual_4h"])
-
-        # Strong signal performance
+        # Strong signal accuracy
         strong = eval_df[eval_df["confidence_score"] >= 80]
-        if len(strong) > 0:
-            strong_active = strong[strong["pred_dir"] != "NEUTRAL"]
-            strong_acc = (strong_active["pred_dir"] == strong_active["actual_dir"]).mean() * 100 if len(strong_active) > 0 else 0
-        else:
-            strong_acc = 0
+        strong_active = strong[strong["pred_dir"] != "NEUTRAL"] if len(strong) > 0 else pd.DataFrame()
+        strong_acc = (strong_active["pred_dir"] == strong_active["actual_dir"]).mean() * 100 if len(strong_active) > 0 else 0
 
-        # Magnitude model IC (if available)
+        # Overall IC
+        ic_all, _ = spearmanr(eval_df["pred_return_4h"], eval_df["actual_4h"])
+
+        # Magnitude IC
         mag_active = eval_df[eval_df["mag_pred"] > 0]
-        if len(mag_active) >= 5:
-            mag_ic, _ = spearmanr(mag_active["mag_pred"], mag_active["actual_4h"].abs())
-            mag_ic_str = f"{mag_ic:.3f}"
-        else:
-            mag_ic_str = "N/A"
+        mag_ic_str = f"{spearmanr(mag_active['mag_pred'], mag_active['actual_4h'].abs())[0]:.3f}" if len(mag_active) >= 5 else "N/A"
 
-        # Regime breakdown
+        # ── Rolling IC (7d / 30d) ──
+        def _rolling_ic(data, window_bars):
+            if len(data) < window_bars:
+                return None
+            recent = data.tail(window_bars)
+            if recent["pred_return_4h"].std() == 0 or recent["actual_4h"].std() == 0:
+                return None
+            val, _ = spearmanr(recent["pred_return_4h"], recent["actual_4h"])
+            return val
+
+        ic_7d = _rolling_ic(eval_df, 168)   # 7 * 24
+        ic_30d = _rolling_ic(eval_df, 720)  # 30 * 24
+
+        # IC trend: compare 7d vs 30d
+        if ic_7d is not None and ic_30d is not None:
+            if ic_7d > ic_30d + 0.03:
+                ic_trend = "📈 上升"
+            elif ic_7d < ic_30d - 0.03:
+                ic_trend = "📉 下降"
+            else:
+                ic_trend = "➡️ 持平"
+        else:
+            ic_trend = "—"
+
+        # ── Decay alerts ──
+        alerts = []
+        if ic_7d is not None:
+            if ic_7d < 0:
+                alerts.append("🔴 7 天 IC 為負 — 建議重訓模型")
+            elif ic_7d < 0.05:
+                alerts.append("🟡 7 天 IC 偏低 (< 0.05) — 密切觀察")
+
+        # Strong signal win rate alert (need 20+ samples)
+        try:
+            from indicator.signal_tracker import _ensure_table, _get_db_conn
+            _ensure_table()
+            sconn = _get_db_conn()
+            with sconn.cursor() as cur:
+                cur.execute("""
+                    SELECT COUNT(*) as total, SUM(correct) as wins
+                    FROM strong_signals WHERE filled = 1
+                """)
+                sr = cur.fetchone()
+            sconn.close()
+            s_total = int(sr["total"] or 0)
+            s_wins = int(sr["wins"] or 0)
+            if s_total >= 20:
+                s_wr = s_wins / s_total * 100
+                if s_wr < 55:
+                    alerts.append(f"🔴 Strong 累積勝率 {s_wr:.0f}% (< 55%) — 建議重訓")
+        except Exception:
+            pass
+
+        # ── Regime breakdown ──
         regime_map = {2: "TRENDING_BULL", -2: "TRENDING_BEAR", 0: "CHOPPY", -99: "WARMUP"}
         eval_df["regime"] = eval_df["regime_code"].map(regime_map).fillna("UNKNOWN")
         current_regime = regime_map.get(int(df.iloc[-1].get("regime_code", 0)), "UNKNOWN")
 
         regime_lines = []
-        for regime_name in ["TRENDING_BULL", "TRENDING_BEAR", "CHOPPY"]:
-            r_df = eval_df[eval_df["regime"] == regime_name]
-            r_active = r_df[r_df["pred_dir"] != "NEUTRAL"]
+        for rn in ["TRENDING_BULL", "TRENDING_BEAR", "CHOPPY"]:
+            r_active = eval_df[(eval_df["regime"] == rn) & (eval_df["pred_dir"] != "NEUTRAL")]
             if len(r_active) >= 2:
                 r_acc = (r_active["pred_dir"] == r_active["actual_dir"]).mean() * 100
-                r_label = {"TRENDING_BULL": "趨勢多", "TRENDING_BEAR": "趨勢空", "CHOPPY": "盤整"}[regime_name]
+                r_label = {"TRENDING_BULL": "趨勢多", "TRENDING_BEAR": "趨勢空", "CHOPPY": "盤整"}[rn]
                 regime_lines.append(f"  {r_label}: {r_acc:.1f}% ({len(r_active)} 筆)")
 
+        # ── Build report ──
         lines = [
             "<b>📊 模型表現 (Live)</b>\n",
             f"評估期間: {len(eval_df)} 筆 ({str(eval_df['dt'].iloc[0])[:10]} ~ {str(eval_df['dt'].iloc[-1])[:10]})",
             f"\n<b>方向準確率</b>",
             f"  全部信號: {dir_acc:.1f}% ({len(active)} 筆)",
-            f"  Strong 信號: {strong_acc:.1f}% ({len(strong)} 筆)",
-            f"\n<b>Direction Model (P(UP))</b>",
-            f"  高信心準確率: {dm_acc:.1f}% ({dm_count} 筆觸發)",
+            f"  Strong 信號: {strong_acc:.1f}% ({len(strong_active)} 筆)",
             f"\n<b>Regime 拆解</b> (當前: {current_regime})",
         ]
-        if regime_lines:
-            lines.extend(regime_lines)
-        else:
-            lines.append("  數據不足")
-        lines.extend([
-            f"\n<b>IC</b>",
-            f"  Direction IC: {ic:.3f}",
-            f"  Magnitude IC: {mag_ic_str}",
-        ])
+        lines.extend(regime_lines if regime_lines else ["  數據不足"])
+
+        # Rolling IC
+        lines.append(f"\n<b>Rolling IC</b>")
+        lines.append(f"  全期: {ic_all:.3f}")
+        lines.append(f"  7 天: {ic_7d:.3f}" if ic_7d is not None else "  7 天: N/A (數據不足)")
+        lines.append(f"  30 天: {ic_30d:.3f}" if ic_30d is not None else "  30 天: N/A (數據不足)")
+        lines.append(f"  趨勢: {ic_trend}")
+        lines.append(f"  Magnitude IC: {mag_ic_str}")
 
         # Strong signal tracker
         try:
             from indicator.signal_tracker import get_performance_report
             sig_report = get_performance_report()
-            # Strip the title line (already under /perf header)
             sig_lines = sig_report.split("\n")
             sig_body = [l for l in sig_lines if not l.startswith("<b>📊")]
             if sig_body:
@@ -853,13 +901,19 @@ def indicator_performance():
         except Exception as e:
             logger.warning("Signal tracker report failed: %s", e)
 
+        # Alerts
+        if alerts:
+            lines.append(f"\n<b>⚠️ 警報</b>")
+            lines.extend(f"  {a}" for a in alerts)
+
+        # Latest prediction
         lines.extend([
             f"\n<b>最新預測</b>",
             f"  Price: ${df.iloc[-1]['close']:,.0f}",
             f"  P(UP): {df.iloc[-1]['dir_prob_up']:.2f}",
             f"  Mag: {df.iloc[-1]['mag_pred']:.4f}" if df.iloc[-1]['mag_pred'] > 0 else "",
         ])
-        lines = [l for l in lines if l]  # remove empty
+        lines = [l for l in lines if l]
         return jsonify({"text": "\n".join(lines)})
     except Exception as e:
         logger.exception("Performance calc failed")
