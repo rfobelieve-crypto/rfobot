@@ -141,11 +141,6 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     color: #7a828e; z-index: 10; pointer-events: none;
   }}
   .chart-wrapper {{ position: relative; }}
-  .crosshair-line {{
-    position: absolute; top: 0; bottom: 0; width: 1px;
-    background: rgba(136,136,136,0.6); pointer-events: none;
-    z-index: 20; display: none;
-  }}
   #footer {{
     padding: 4px 12px; font-size: 10px; color: #7a828e;
     text-align: right; border-top: 1px solid #1c222b;
@@ -160,18 +155,15 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
 </div>
 <div class="chart-wrapper" id="conf-wrapper">
   <div class="chart-label">Confidence</div>
-  <div class="crosshair-line" id="xh-conf"></div>
   <div id="chart-conf"></div>
 </div>
 <div class="chart-wrapper" id="price-wrapper">
   <div class="chart-label">Price (USD)</div>
-  <div class="crosshair-line" id="xh-price"></div>
   <div id="chart-price"></div>
 </div>
-{"<div class='chart-wrapper' id='mag-wrapper'><div class='chart-label'>Magnitude (%)</div><div class='crosshair-line' id='xh-mag'></div><div id='chart-mag'></div></div>" if has_mag else ""}
+{"<div class='chart-wrapper' id='mag-wrapper'><div class='chart-label'>Magnitude (%)</div><div id='chart-mag'></div></div>" if has_mag else ""}
 <div class="chart-wrapper" id="bbp-wrapper">
   <div class="chart-label">Bull/Bear Power</div>
-  <div class="crosshair-line" id="xh-bbp"></div>
   <div id="chart-bbp"></div>
 </div>
 <div id="footer">source@rfo</div>
@@ -218,7 +210,8 @@ function makeChart(container, height, opts) {{
 
 // ── Confidence chart ──
 const confChart = makeChart('chart-conf', confH, {{
-  rightPriceScale: {{ visible: false }},
+  rightPriceScale: {{ visible: true, borderVisible: false, drawTicks: false,
+    scaleMargins: {{ top: 0, bottom: 0 }} }},
 }});
 const confSeries = confChart.addHistogramSeries({{
   priceFormat: {{ type: 'custom', formatter: (v) => (v * 100).toFixed(0) + '%' }},
@@ -278,31 +271,37 @@ charts.forEach((chart, idx) => {{
   }});
 }});
 
-// ── Sync crosshair via DOM vertical lines ──
-const xhLines = [
-  document.getElementById('xh-conf'),
-  document.getElementById('xh-price'),
-  hasMag ? document.getElementById('xh-mag') : null,
-  document.getElementById('xh-bbp'),
+// ── Sync crosshair across all panels ──
+const chartSeriesPairs = [
+  [confChart, confSeries, 0.5],
+  [priceChart, candleSeries, null],
+  hasMag ? [magChart, magSeries, 0] : null,
+  [bbpChart, bbpSeries, 0],
 ].filter(Boolean);
 
-function showCrosshairs(x) {{
-  xhLines.forEach(line => {{
-    line.style.display = 'block';
-    line.style.left = x + 'px';
-  }});
-}}
-function hideCrosshairs() {{
-  xhLines.forEach(line => {{ line.style.display = 'none'; }});
-}}
-
-charts.forEach((chart) => {{
-  chart.subscribeCrosshairMove((param) => {{
-    if (param.point && param.point.x >= 0) {{
-      showCrosshairs(param.point.x);
-    }} else {{
-      hideCrosshairs();
-    }}
+let isSyncingCH = false;
+chartSeriesPairs.forEach(([srcChart], idx) => {{
+  srcChart.subscribeCrosshairMove((param) => {{
+    if (isSyncingCH) return;
+    isSyncingCH = true;
+    chartSeriesPairs.forEach(([dstChart, dstSeries, defaultPrice], j) => {{
+      if (j !== idx) {{
+        if (param.time) {{
+          try {{
+            // For candlestick, use close price; for histograms use default
+            let price = defaultPrice !== null ? defaultPrice : 0;
+            if (dstSeries === candleSeries && param.seriesData) {{
+              const srcData = param.seriesData.get(chartSeriesPairs[idx][1]);
+              if (srcData && srcData.close) price = srcData.close;
+            }}
+            dstChart.setCrosshairPosition(price, param.time, dstSeries);
+          }} catch(e) {{}}
+        }} else {{
+          try {{ dstChart.clearCrosshairPosition(); }} catch(e) {{}}
+        }}
+      }}
+    }});
+    isSyncingCH = false;
   }});
 }});
 
