@@ -43,7 +43,7 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     markers = []
 
     for i, (dt, row) in enumerate(sig.iterrows()):
-        ts = int(dt.timestamp())
+        ts = int(dt.timestamp()) + 8 * 3600  # UTC+8 offset for display
         o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
 
         candle_data.append({"time": ts, "open": o, "high": h, "low": l, "close": c})
@@ -286,10 +286,9 @@ chartSeriesPairs.forEach(([srcChart, srcSeries], idx) => {{
     chartSeriesPairs.forEach(([dstChart, dstSeries], j) => {{
       if (j !== idx) {{
         if (param.time) {{
-          // Get the data value at this time for the destination series
-          const data = param.seriesData ? param.seriesData.get(srcSeries) : null;
           try {{
-            dstChart.setCrosshairPosition(NaN, param.time, dstSeries);
+            // Use 0 as price — only the vertical time line matters
+            dstChart.setCrosshairPosition(0, param.time, dstSeries);
           }} catch(e) {{}}
         }} else {{
           try {{ dstChart.clearCrosshairPosition(); }} catch(e) {{}}
