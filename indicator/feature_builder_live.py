@@ -210,6 +210,48 @@ def build_live_features(klines: pd.DataFrame,
                 df["avg_trade_size_zscore"] * df["taker_delta_ratio"]
             )
 
+    # ── Liquidity Fragility / Impact Asymmetry ─────────────────────────
+    # Core insight: which side of the market is easier to push?
+    # Buy impact > sell impact → buyers move price more easily
+    # IC = -0.071 (p=0.00002): price tends to reverse AGAINST the fragile side
+    price_move = (df["close"] - df["open"]).abs()
+    vol_nz = df["volume"].replace(0, np.nan)
+
+    # Price impact per unit volume (liquidity thinness)
+    df["price_impact"] = price_move / vol_nz
+    df["price_impact_zscore"] = _zscore(df["price_impact"])
+
+    # Directional impact: separate buy-side vs sell-side
+    buy_bars = taker_delta > 0
+    sell_bars = taker_delta < 0
+
+    buy_impact = pd.Series(np.nan, index=df.index)
+    sell_impact = pd.Series(np.nan, index=df.index)
+    taker_sell_vol = df["volume"] - df["taker_buy_vol"]
+
+    buy_impact[buy_bars] = (
+        (df["close"][buy_bars] - df["open"][buy_bars]) /
+        df["taker_buy_vol"][buy_bars].replace(0, np.nan)
+    )
+    sell_impact[sell_bars] = (
+        (df["open"][sell_bars] - df["close"][sell_bars]) /
+        taker_sell_vol[sell_bars].replace(0, np.nan)
+    )
+
+    # Rolling average (8 bar) then asymmetry
+    buy_impact_avg = buy_impact.rolling(8, min_periods=2).mean()
+    sell_impact_avg = sell_impact.rolling(8, min_periods=2).mean()
+
+    # Positive = buy side moves price easier, Negative = sell side easier
+    df["impact_asymmetry"] = buy_impact_avg - sell_impact_avg
+    df["impact_asymmetry_zscore"] = _zscore(df["impact_asymmetry"])
+
+    # Fragility: thin liquidity + low volume
+    vol_ma = df["volume"].rolling(LONG_WIN, min_periods=4).mean()
+    vol_ratio = df["volume"] / vol_ma.replace(0, np.nan)
+    df["fragility"] = df["price_impact"] / vol_ratio.replace(0, np.nan)
+    df["fragility_zscore"] = _zscore(df["fragility"])
+
     # ── Order book depth features (snapshot, appended to last bar only) ───
     if depth and isinstance(depth, dict) and "depth_imbalance" in depth:
         # These are point-in-time snapshots — only valid for the latest bar
