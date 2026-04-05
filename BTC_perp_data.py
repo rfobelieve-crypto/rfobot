@@ -1747,8 +1747,7 @@ def _send_help(chat_id: str):
         "<b>--- 核心指標 ---</b>\n"
         "/chart - 4h 多空預測指標圖\n"
         "/ichart - 互動圖表 (可放大/十字線)\n"
-        "/perf - 模型即時表現\n"
-        "/signal_perf - Strong 信號績效追蹤\n"
+        "/perf - 模型表現 + Strong 信號績效\n"
         "/db - 資料庫累積狀態\n"
         "/ind_status - 指標系統狀態\n"
         "\n<b>--- 流動性監控 ---</b>\n"
@@ -1920,9 +1919,6 @@ def webhook():
 
         elif cmd == "/perf":
             threading.Thread(target=_handle_indicator_perf, args=(chat_id,), daemon=True).start()
-
-        elif cmd == "/signal_perf":
-            threading.Thread(target=_handle_signal_perf, args=(chat_id,), daemon=True).start()
 
         elif cmd == "/update":
             threading.Thread(target=_handle_force_update, args=(chat_id,), daemon=True).start()

@@ -838,6 +838,22 @@ def indicator_performance():
             f"\n<b>IC</b>",
             f"  Direction IC: {ic:.3f}",
             f"  Magnitude IC: {mag_ic_str}",
+        ])
+
+        # Strong signal tracker
+        try:
+            from indicator.signal_tracker import get_performance_report
+            sig_report = get_performance_report()
+            # Strip the title line (already under /perf header)
+            sig_lines = sig_report.split("\n")
+            sig_body = [l for l in sig_lines if not l.startswith("<b>📊")]
+            if sig_body:
+                lines.append(f"\n<b>Strong 信號追蹤</b>")
+                lines.extend(sig_body)
+        except Exception as e:
+            logger.warning("Signal tracker report failed: %s", e)
+
+        lines.extend([
             f"\n<b>最新預測</b>",
             f"  Price: ${df.iloc[-1]['close']:,.0f}",
             f"  P(UP): {df.iloc[-1]['dir_prob_up']:.2f}",
