@@ -719,7 +719,8 @@ def indicator_performance():
             cur.execute("""
                 SELECT dt, `close`, pred_return_4h, pred_direction_code,
                        confidence_score, dir_prob_up,
-                       COALESCE(mag_pred, 0) as mag_pred
+                       COALESCE(mag_pred, 0) as mag_pred,
+                       COALESCE(regime_code, 0) as regime_code
                 FROM indicator_history
                 ORDER BY dt DESC
                 LIMIT 200
@@ -784,6 +785,20 @@ def indicator_performance():
         else:
             mag_ic_str = "N/A"
 
+        # Regime breakdown
+        regime_map = {2: "TRENDING_BULL", -2: "TRENDING_BEAR", 0: "CHOPPY", -99: "WARMUP"}
+        eval_df["regime"] = eval_df["regime_code"].map(regime_map).fillna("UNKNOWN")
+        current_regime = regime_map.get(int(df.iloc[-1].get("regime_code", 0)), "UNKNOWN")
+
+        regime_lines = []
+        for regime_name in ["TRENDING_BULL", "TRENDING_BEAR", "CHOPPY"]:
+            r_df = eval_df[eval_df["regime"] == regime_name]
+            r_active = r_df[r_df["pred_dir"] != "NEUTRAL"]
+            if len(r_active) >= 2:
+                r_acc = (r_active["pred_dir"] == r_active["actual_dir"]).mean() * 100
+                r_label = {"TRENDING_BULL": "趨勢多", "TRENDING_BEAR": "趨勢空", "CHOPPY": "盤整"}[regime_name]
+                regime_lines.append(f"  {r_label}: {r_acc:.1f}% ({len(r_active)} 筆)")
+
         lines = [
             "<b>📊 模型表現 (Live)</b>\n",
             f"評估期間: {len(eval_df)} 筆 ({str(eval_df['dt'].iloc[0])[:10]} ~ {str(eval_df['dt'].iloc[-1])[:10]})",
@@ -792,6 +807,13 @@ def indicator_performance():
             f"  Strong 信號: {strong_acc:.1f}% ({len(strong)} 筆)",
             f"\n<b>Direction Model (P(UP))</b>",
             f"  高信心準確率: {dm_acc:.1f}% ({dm_count} 筆觸發)",
+            f"\n<b>Regime 拆解</b> (當前: {current_regime})",
+        ]
+        if regime_lines:
+            lines.extend(regime_lines)
+        else:
+            lines.append("  數據不足")
+        lines.extend([
             f"\n<b>IC</b>",
             f"  Direction IC: {ic:.3f}",
             f"  Magnitude IC: {mag_ic_str}",
@@ -799,7 +821,7 @@ def indicator_performance():
             f"  Price: ${df.iloc[-1]['close']:,.0f}",
             f"  P(UP): {df.iloc[-1]['dir_prob_up']:.2f}",
             f"  Mag: {df.iloc[-1]['mag_pred']:.4f}" if df.iloc[-1]['mag_pred'] > 0 else "",
-        ]
+        ])
         lines = [l for l in lines if l]  # remove empty
         return jsonify({"text": "\n".join(lines)})
     except Exception as e:
