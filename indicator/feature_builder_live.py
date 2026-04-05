@@ -265,6 +265,52 @@ def build_live_features(klines: pd.DataFrame,
                 np.sign(large_d) * np.sign(small_d) if large_d != 0 and small_d != 0 else 0
             )
 
+    # ── Liquidity Sweep / Stop Hunt Reversal Features ──────────────────────
+    # Core insight: taker spike + OI drop = stops triggered (forced close),
+    # not new positions → price likely to reverse
+    if "cg_oi_delta" in df.columns:
+        # 1. Taker-OI divergence: taker volume up but OI down = stop hunt
+        #    Positive = buy-side sweep (shorts stopped out → expect continuation or reversal)
+        #    Negative = sell-side sweep (longs stopped out)
+        oi_delta = df["cg_oi_delta"].fillna(0)
+        td = taker_delta * df["close"]  # taker delta in USD terms
+
+        # When taker is strong but OI drops → forced liquidation, not new position
+        # sign(taker) != sign(oi_change) → divergence
+        df["sweep_oi_divergence"] = td * (-oi_delta.clip(upper=0))
+        # Positive = buy taker + OI drop (short stops hit) → bullish reversal
+        # Zero when OI rising (normal new-position flow)
+        df["sweep_oi_divergence_zscore"] = _zscore(df["sweep_oi_divergence"])
+
+        # 2. Stop hunt intensity: |taker spike| × |OI drop| (unsigned magnitude)
+        taker_spike = _zscore(td.abs())  # how unusual is the taker volume
+        oi_drop = (-oi_delta).clip(lower=0)  # only negative OI changes
+        oi_drop_z = _zscore(oi_drop)
+        df["sweep_intensity"] = taker_spike * oi_drop_z
+        # High = large taker volume hitting while lots of positions closing
+
+        # 3. Price at extreme: is current price near recent high/low?
+        #    Stops cluster at obvious levels (swing highs/lows)
+        high_20 = df["high"].rolling(20, min_periods=5).max()
+        low_20 = df["low"].rolling(20, min_periods=5).min()
+        range_20 = (high_20 - low_20).replace(0, np.nan)
+        df["price_position_20"] = (df["close"] - low_20) / range_20
+        # Near 1.0 = at recent high (BSL zone), near 0.0 = at recent low (SSL zone)
+
+        # 4. Sweep reversal score: combines all three
+        #    High when: large taker + OI dropping + price at extreme
+        at_high = (df["price_position_20"] > 0.85).astype(float)
+        at_low = (df["price_position_20"] < 0.15).astype(float)
+        at_extreme = at_high + at_low  # 1 if at either extreme
+
+        df["sweep_reversal_score"] = df["sweep_intensity"] * at_extreme
+        df["sweep_reversal_zscore"] = _zscore(df["sweep_reversal_score"])
+
+        # 5. Liquidation confirmation: cg_liq_surge during sweep
+        if "cg_liq_surge" in df.columns:
+            df["sweep_with_liq"] = df["sweep_intensity"] * df["cg_liq_surge"].fillna(0)
+            # High = sweep + liquidation surge together → stronger reversal signal
+
     # ── Time-of-day features (cyclical encoding) ───────────────────────────
     hour = df.index.hour
     df["hour_sin"] = np.sin(2 * np.pi * hour / 24)
