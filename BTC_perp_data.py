@@ -1694,6 +1694,20 @@ def _handle_indicator_perf(chat_id: str):
         send_message(chat_id, f"❌ 取得模型表現失敗: {e}")
 
 
+def _handle_signal_perf(chat_id: str):
+    """Fetch Strong signal performance report from Indicator service."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "INDICATOR_SERVICE_URL not set")
+        return
+    try:
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/signal-perf", timeout=30)
+        data = resp.json()
+        send_message(chat_id, data.get("text", "N/A"))
+    except Exception as e:
+        logger.exception("signal perf error: %s", e)
+        send_message(chat_id, f"❌ 信號績效查詢失敗: {e}")
+
+
 def _handle_force_update(chat_id: str):
     """Trigger manual indicator update cycle (sync mode — waits for result)."""
     if not INDICATOR_SERVICE_URL:
@@ -1734,6 +1748,7 @@ def _send_help(chat_id: str):
         "/chart - 4h 多空預測指標圖\n"
         "/ichart - 互動圖表 (可放大/十字線)\n"
         "/perf - 模型即時表現\n"
+        "/signal_perf - Strong 信號績效追蹤\n"
         "/db - 資料庫累積狀態\n"
         "/ind_status - 指標系統狀態\n"
         "\n<b>--- 流動性監控 ---</b>\n"
@@ -1905,6 +1920,9 @@ def webhook():
 
         elif cmd == "/perf":
             threading.Thread(target=_handle_indicator_perf, args=(chat_id,), daemon=True).start()
+
+        elif cmd == "/signal_perf":
+            threading.Thread(target=_handle_signal_perf, args=(chat_id,), daemon=True).start()
 
         elif cmd == "/update":
             threading.Thread(target=_handle_force_update, args=(chat_id,), daemon=True).start()

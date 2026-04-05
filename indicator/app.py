@@ -442,6 +442,27 @@ def update_cycle() -> dict:
             _send_telegram_text(alert)
             logger.info("Strong signal alert sent: %s", direction)
 
+            # Record Strong signal for performance tracking
+            try:
+                from indicator.signal_tracker import record_strong_signal
+                sig_time = indicator_df.index[-1]
+                if hasattr(sig_time, 'to_pydatetime'):
+                    sig_time = sig_time.to_pydatetime()
+                record_strong_signal(
+                    signal_time=sig_time, direction=direction,
+                    p_up=dir_prob, mag_pred=mag, confidence=conf,
+                    entry_price=price, regime=regime,
+                )
+            except Exception as e:
+                logger.warning("Signal tracker record failed: %s", e)
+
+        # Backfill 4h outcomes for past Strong signals
+        try:
+            from indicator.signal_tracker import backfill_outcomes
+            backfill_outcomes()
+        except Exception as e:
+            logger.warning("Signal tracker backfill failed: %s", e)
+
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
 
@@ -827,6 +848,18 @@ def indicator_performance():
     except Exception as e:
         logger.exception("Performance calc failed")
         return jsonify({"text": f"❌ 表現計算失敗: {e}"}), 500
+
+
+@app.route("/signal-perf", methods=["GET"])
+def signal_perf_api():
+    """API: Strong signal performance report for Telegram."""
+    try:
+        from indicator.signal_tracker import get_performance_report
+        report = get_performance_report()
+        return jsonify({"text": report})
+    except Exception as e:
+        logger.exception("Signal perf failed")
+        return jsonify({"text": f"❌ 信號績效查詢失敗: {e}"}), 500
 
 
 @app.route("/force-update", methods=["POST", "GET"])
