@@ -13,3 +13,4 @@ python-dotenv
 pyarrow
 pymysql
 plotly
+shap

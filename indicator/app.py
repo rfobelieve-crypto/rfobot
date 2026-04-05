@@ -431,12 +431,28 @@ def update_cycle() -> dict:
             else:
                 icon = "\U0001f534\u25bc"  # 🔴▼
                 label = "STRONG BEARISH"
+            # SHAP explanation for this Strong signal
+            shap_text = ""
+            shap_json_str = ""
+            try:
+                from indicator.signal_explainer import explain_strong_signal, format_shap_for_telegram
+                import json as _json
+                # Get last bar's feature values
+                last_features = features.iloc[-1].to_dict() if len(features) > 0 else {}
+                shap_result = explain_strong_signal(last_features, direction)
+                if shap_result:
+                    shap_text = format_shap_for_telegram(shap_result, direction)
+                    shap_json_str = _json.dumps(shap_result, ensure_ascii=False)
+            except Exception as e:
+                logger.warning("SHAP explanation failed (non-critical): %s", e)
+
             alert = (
                 f"{icon} <b>{label} SIGNAL</b>\n\n"
                 f"BTC ${price:,.0f}\n"
                 f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%}\n"
                 f"Confidence: {conf:.0f}\n"
-                f"Regime: {regime}\n\n"
+                f"Regime: {regime}"
+                f"{shap_text}\n\n"
                 f"⏰ {now_str}"
             )
             _send_telegram_text(alert)
@@ -452,6 +468,7 @@ def update_cycle() -> dict:
                     signal_time=sig_time, direction=direction,
                     p_up=dir_prob, mag_pred=mag, confidence=conf,
                     entry_price=price, regime=regime,
+                    shap_json=shap_json_str,
                 )
             except Exception as e:
                 logger.warning("Signal tracker record failed: %s", e)
@@ -900,6 +917,15 @@ def indicator_performance():
                 lines.extend(sig_body)
         except Exception as e:
             logger.warning("Signal tracker report failed: %s", e)
+
+        # SHAP cumulative stats
+        try:
+            from indicator.signal_explainer import get_shap_stats_report
+            shap_stats = get_shap_stats_report()
+            if shap_stats:
+                lines.append(shap_stats)
+        except Exception as e:
+            logger.warning("SHAP stats failed: %s", e)
 
         # Alerts
         if alerts:

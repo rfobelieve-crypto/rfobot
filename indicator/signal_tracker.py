@@ -36,6 +36,7 @@ def _ensure_table():
                     `actual_return_4h` DOUBLE DEFAULT NULL,
                     `correct` TINYINT DEFAULT NULL,
                     `filled` TINYINT DEFAULT 0,
+                    `shap_top` TEXT DEFAULT NULL,
                     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
@@ -46,24 +47,39 @@ def _ensure_table():
 
 def record_strong_signal(signal_time: datetime, direction: str, p_up: float,
                          mag_pred: float, confidence: float, entry_price: float,
-                         regime: str = ""):
+                         regime: str = "", shap_json: str = ""):
     """Record a new Strong signal. Called when Strong signal fires."""
     _ensure_table()
+
+    # Auto-add shap_top column if missing (existing tables won't have it)
+    conn = _get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute("SELECT shap_top FROM strong_signals LIMIT 0")
+            except Exception:
+                cur.execute("ALTER TABLE strong_signals ADD COLUMN `shap_top` TEXT DEFAULT NULL")
+                logger.info("Added shap_top column to strong_signals")
+                conn.commit()
+    finally:
+        conn.close()
+
     conn = _get_db_conn()
     try:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO `strong_signals`
-                    (signal_time, direction, p_up, mag_pred, confidence, entry_price, regime)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (signal_time, direction, p_up, mag_pred, confidence, entry_price, regime, shap_top)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     direction=VALUES(direction), p_up=VALUES(p_up),
                     mag_pred=VALUES(mag_pred), confidence=VALUES(confidence),
-                    entry_price=VALUES(entry_price), regime=VALUES(regime)
+                    entry_price=VALUES(entry_price), regime=VALUES(regime),
+                    shap_top=VALUES(shap_top)
             """, (
                 signal_time.strftime("%Y-%m-%d %H:%M:%S"),
                 direction, float(p_up), float(mag_pred),
-                float(confidence), float(entry_price), regime,
+                float(confidence), float(entry_price), regime, shap_json or None,
             ))
         conn.commit()
         logger.info("Strong signal recorded: %s %s @ $%.0f", direction, signal_time, entry_price)
