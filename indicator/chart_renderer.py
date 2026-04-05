@@ -110,8 +110,8 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         c = sig.iloc[i]["confidence_score"]
         s = sig.iloc[i]["strength_score"]
 
-        # Filter: skip NEUTRAL, Weak, and NaN
-        if d == "NEUTRAL" or pd.isna(c) or s == "Weak":
+        # Filter: only Strong signals
+        if d == "NEUTRAL" or pd.isna(c) or s != "Strong":
             continue
 
         alpha = max(0.5, min(c / 100, 1.0))
@@ -142,13 +142,11 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     legend_elements = [
         plt.scatter([], [], marker="^", color="#004d40", s=169, edgecolors="white",
                     linewidths=1.2, label="Strong UP"),
-        plt.scatter([], [], marker="^", color="#26a69a", s=100, label="Moderate UP"),
-        plt.scatter([], [], marker="v", color="#ef5350", s=100, label="Moderate DOWN"),
         plt.scatter([], [], marker="v", color="#b71c1c", s=169, edgecolors="white",
                     linewidths=1.2, label="Strong DOWN"),
     ]
     ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
-                    framealpha=0.8, ncol=4)
+                    framealpha=0.8, ncol=2)
 
     # Date labels — shared tick positions for all panels
     tick_pos = np.linspace(0, n - 1, min(12, n)).astype(int)
