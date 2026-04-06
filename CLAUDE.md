@@ -72,3 +72,10 @@ y_return_4h = close.shift(-16) / close - 1
 階段 9：持續迭代
 
 每次任務時，先確認目前階段，並遵守以上所有原則。
+
+## 圖表同步規則
+系統有兩個圖表，修改時**必須同步更新**：
+1. **靜態圖表** (`indicator/chart_renderer.py`) — Telegram 推送的 PNG
+2. **互動圖表** (`indicator/chart_interactive.py`) — `/ichart` 的 TradingView Lightweight Charts HTML
+
+任何圖表邏輯變更（面板、三角形、顏色、過濾條件）都要兩邊一起改。

@@ -2,7 +2,7 @@
 Chart renderer — generates indicator PNG from prediction DataFrame.
 v4: 4-panel layout (removed Direction P(UP) panel):
     1. Confidence heatmap
-    2. Candlestick + direction triangles (Moderate/Strong only)
+    2. Candlestick + direction triangles (Strong only)
     3. Magnitude bar chart (predicted |return|)
     4. Bull/Bear Power histogram
 """
@@ -101,7 +101,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_price.vlines(x[up], lows[up], highs[up], color="#26a69a", linewidth=0.5)
     ax_price.vlines(x[down], lows[down], highs[down], color="#ef5350", linewidth=0.5)
 
-    # Direction triangles — only Moderate and Strong signals
+    # Direction triangles — Strong signals only
     price_range = highs.max() - lows.min()
     offset = price_range * 0.02
 

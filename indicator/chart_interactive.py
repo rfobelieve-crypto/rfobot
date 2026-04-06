@@ -76,7 +76,7 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         bbp_color = "#26a69a" if bbp_val > 0 else "#ef5350"
         bbp_data.append({"time": ts, "value": round(bbp_val, 4), "color": bbp_color})
 
-        # Direction markers (Moderate/Strong only)
+        # Direction markers (Strong only)
         strength = str(row.get("strength_score", ""))
         direction = str(row.get("pred_direction", ""))
         if strength == "Strong" and direction in ("UP", "DOWN"):
