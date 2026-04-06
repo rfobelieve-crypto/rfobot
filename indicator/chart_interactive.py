@@ -76,10 +76,10 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         bbp_color = "#26a69a" if bbp_val > 0 else "#ef5350"
         bbp_data.append({"time": ts, "value": round(bbp_val, 4), "color": bbp_color})
 
-        # Direction markers (Strong only)
+        # Direction markers (Moderate + Strong)
         strength = str(row.get("strength_score", ""))
         direction = str(row.get("pred_direction", ""))
-        if strength == "Strong" and direction in ("UP", "DOWN"):
+        if strength in ("Moderate", "Strong") and direction in ("UP", "DOWN"):
             conf_score = float(row.get("confidence_score", 0) or 0)
             mag_pct = float(row.get("mag_pred", 0) or 0) * 100
             if direction == "UP":

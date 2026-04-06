@@ -2,7 +2,7 @@
 Chart renderer — generates indicator PNG from prediction DataFrame.
 v4: 4-panel layout (removed Direction P(UP) panel):
     1. Confidence heatmap
-    2. Candlestick + direction triangles (Strong only)
+    2. Candlestick + direction triangles (Moderate + Strong)
     3. Magnitude bar chart (predicted |return|)
     4. Bull/Bear Power histogram
 """
@@ -101,7 +101,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_price.vlines(x[up], lows[up], highs[up], color="#26a69a", linewidth=0.5)
     ax_price.vlines(x[down], lows[down], highs[down], color="#ef5350", linewidth=0.5)
 
-    # Direction triangles — Strong signals only
+    # Direction triangles — Moderate and Strong signals
     price_range = highs.max() - lows.min()
     offset = price_range * 0.02
 
@@ -110,8 +110,8 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         c = sig.iloc[i]["confidence_score"]
         s = sig.iloc[i]["strength_score"]
 
-        # Filter: only Strong signals
-        if d == "NEUTRAL" or pd.isna(c) or s != "Strong":
+        # Filter: skip NEUTRAL, Weak, and NaN
+        if d == "NEUTRAL" or pd.isna(c) or s == "Weak":
             continue
 
         alpha = max(0.5, min(c / 100, 1.0))
@@ -142,11 +142,13 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     legend_elements = [
         plt.scatter([], [], marker="^", color="#004d40", s=169, edgecolors="white",
                     linewidths=1.2, label="Strong UP"),
+        plt.scatter([], [], marker="^", color="#26a69a", s=100, label="Moderate UP"),
+        plt.scatter([], [], marker="v", color="#ef5350", s=100, label="Moderate DOWN"),
         plt.scatter([], [], marker="v", color="#b71c1c", s=169, edgecolors="white",
                     linewidths=1.2, label="Strong DOWN"),
     ]
     ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
-                    framealpha=0.8, ncol=2)
+                    framealpha=0.8, ncol=4)
 
     # Date labels — shared tick positions for all panels
     tick_pos = np.linspace(0, n - 1, min(12, n)).astype(int)
