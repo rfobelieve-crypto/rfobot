@@ -10,68 +10,83 @@
 - 交易績效最大化、strategy backtest framework
 - 自動下單 execution logic、fee simulation
 
-## 專案概覽
-你是資深量化開發者（Quant + Python Engineer），專精加密永續合約訂單流分析。
-目標：在 BTCUSDT Perpetual 市場，使用 aggTrade、OI、Funding Rate、Coinglass 多源數據，
-在每個 15 分鐘 bar 輸出多空強度預測指標。
+## 系統架構（v7 Dual-Model）
+Dual XGBoost 架構：Direction Classifier + Magnitude Regressor，獨立管線。
 
-### 模型輸出（固定格式）
-- **pred_return_4h**: 預測未來 4h 收益率
+### 數據層
+- **Binance REST API** (3 endpoints)：klines (1h, 500 bars)、depth (L20)、aggTrades
+- **Coinglass API v4** (24 endpoints)：15 timeseries + 9 snapshot
+- **Deribit Public API** (2 endpoints)：DVOL 波動率指數、Options Summary
+
+### 特徵工程
+- **130+ 工程特徵**，12 個群組
+- 所有計算為 trailing-only（無前視偏差）
+- Coinglass 原生 1h 使用 merge_asof 精確對齊
+- 自訂 alpha 特徵：impact_asymmetry (IC=-0.071)、post_absorb_breakout (mag IC=0.191)
+
+### 模型
+- **Direction Model**：XGBClassifier, 89 特徵, 輸出 P(UP)
+- **Magnitude Model**：XGBRegressor, 87 特徵, 輸出 |return_4h|
+- **Regime Detection**：CHOPPY / TRENDING_BULL / TRENDING_BEAR / WARMUP
+
+### 信號生成
+- Direction: P(UP) > 0.60 → UP, < 0.40 → DOWN
+- Confidence = mag_percentile × (0.7 + 0.3 × dir_conviction)
+- Strong ≥ 80, Moderate ≥ 65, Weak < 65
+- BBP 確認閘門 + Regime 動態死區 + Hysteresis + Cooldown
+
+### 輸出
+- 4 面板圖表 (Confidence / K線+三角形 / Magnitude / BBP)
+- Telegram 推送 (Strong 信號文字告警 + SHAP 驅動因子)
+- REST API (10 routes)
+- MySQL + Parquet 持久化
+
+### 績效追蹤
+- Rolling IC (7d/30d) + IC 趨勢 + 衰退警報
+- Strong 信號追蹤 (4h 後自動回填結果)
+- SHAP 驅動因子分析 (Strong 信號時觸發)
+- Regime 拆解準確率
+- 全部整合在 /perf 指令
+
+## 模型輸出（固定格式）
+- **pred_return_4h**: sign(direction) × magnitude
 - **pred_direction**: UP / DOWN / NEUTRAL
 - **strength_score**: Strong / Moderate / Weak
 - **confidence_score**: 0~100
+- **mag_pred**: |return_4h| 預測值
+- **dir_prob_up**: P(UP) 原始值
+- **bull_bear_power**: [-1, 1] 合成指標
 - **regime**: 當前市場狀態
 
 ### 核心 target
-y_return_4h = close.shift(-16) / close - 1
-
-### 最終產品形態
-圖表指標（非交易信號）：
-- K 線圖上的向上/向下三角形
-- 顏色深淺表示 confidence
-- 下方 bull/bear power histogram
-- 文字說明：「未來 4h 預測偏多，預估漲幅 X%，信心 Y 分」
+y_return_4h = close.shift(-4) / close - 1
 
 ### 評估指標
 - Spearman IC / ICIR（預測值與實際收益的排序相關）
-- 方向準確率 > 58%
+- 方向準確率
 - Calibration monotonicity（預測越強，實際收益越高）
-- 信心分布合理性（不應全部集中在 Weak）
+- Strong 信號勝率（目標 > 95%）
+- Magnitude Top/Bot ratio
 
-## 技術 Stack（嚴格遵守優先順序）
+## 技術 Stack
 - Python 3.11
-- 資料處理：Polars（優先） > Pandas
-- 資料庫：ClickHouse（高頻 insert 與聚合查詢）
-- 儲存：Parquet + S3（原始/半處理資料）
-- 模型：XGBoost / LightGBM（快速迭代） + PyTorch / Temporal Fusion Transformer（序列模型）
-- 其他：Docker、Grafana、ONNX（生產推論）、Redis/Kafka（即時快取）
+- 資料處理：Pandas + NumPy + SciPy
+- 資料庫：MySQL 8.0 (Railway 託管)
+- 儲存：Parquet（歷史備份）、.data_cache/（API 回退快取）
+- 模型：XGBoost (Classifier + Regressor)
+- Web：Flask + APScheduler
+- 圖表：Matplotlib (靜態) + TradingView Lightweight Charts (互動)
+- 推送：Telegram Bot API
+- 部署：Railway (git push 自動部署)
+- 解釋性：SHAP (TreeExplainer, Strong 信號時觸發)
 
 ## 核心原則（永遠不能違反）
-1. **歷史與即時一致性**：所有 Processor / Pipeline 必須使用同一套邏輯，嚴格避免 look-ahead bias。
-2. **Stateful 設計**：類別必須維護狀態（current_cvd、last_oi、last_funding 等），同時支援 batch（歷史）與 incremental single-tick（即時）模式。
-3. **時間對齊精準**：aggTrade 使用 tick 級，Funding 使用 asof merge 或 forward-fill 對齊。
-4. **可即時計算**：所有特徵（CVD、VPIN、BVC、ΔOI、Funding × Signed Volume 等）必須支援增量更新。
-5. **Edge Cases 處理**：資料缺失、Funding 結算跳動、交易所維護、rate limit、高波動時段、週末流動性差異。
-6. **預測導向設計**：所有評估以預測品質（IC、方向準確率、calibration）為準，不做交易績效回測。
-
-## 命名與程式碼規範
-- Class：CamelCase（如 OrderFlowProcessor、FeatureGenerator）
-- 函數/變數：snake_case（如 process_historical_batch、process_single_tick）
-- 必須包含：Type hints、詳細 docstring、logging、單元測試或 replay 驗證案例
-- 偏好：清晰、可讀性高、模組化
-
-## 專案階段（參考使用）
-階段 1：需求定義
-階段 2：資料管線（目前重點）
-階段 3：EDA + Regime Detection
-階段 4：特徵工程
-階段 5：模型開發
-階段 6：嚴格回測
-階段 7：風險管理
-階段 8：部署
-階段 9：持續迭代
-
-每次任務時，先確認目前階段，並遵守以上所有原則。
+1. **無前視偏差**：所有特徵計算使用 trailing-only rolling，嚴格禁止 look-ahead。
+2. **歷史與即時一致性**：`build_live_features()` 同時用於訓練數據建構和生產推論。
+3. **時間對齊精準**：Coinglass 使用 merge_asof backward 對齊，快照數據只設定最後一根 bar。
+4. **預測導向設計**：所有評估以 IC、方向準確率、calibration 為準，不做交易績效回測。
+5. **特徵先回測再加入**：新特徵必須先跑 IC 回測驗證有效才加進系統。
+6. **Edge Cases 處理**：假日流動性差異、Funding 結算跳動、rate limit、資料缺失。
 
 ## 圖表同步規則
 系統有兩個圖表，修改時**必須同步更新**：
@@ -79,3 +94,14 @@ y_return_4h = close.shift(-16) / close - 1
 2. **互動圖表** (`indicator/chart_interactive.py`) — `/ichart` 的 TradingView Lightweight Charts HTML
 
 任何圖表邏輯變更（面板、三角形、顏色、過濾條件）都要兩邊一起改。
+
+## 命名與程式碼規範
+- Class：CamelCase（如 IndicatorEngine、SignalExplainer）
+- 函數/變數：snake_case（如 build_live_features、backfill_mag_pred）
+- 偏好：清晰、可讀性高、模組化
+- 新特徵加入前必須回測驗證 IC
+
+## 專案階段
+- 階段 4：特徵工程（目前重點 — 自訂 alpha 特徵 + 數據累積）
+- 階段 5：模型開發（Magnitude 已重訓 v2, Direction 等 2 週後重訓）
+- 階段 9：持續迭代（績效追蹤、IC 監控、衰退警報已上線）
