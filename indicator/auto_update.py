@@ -253,16 +253,16 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
         indicator_df = indicator_df.sort_index()
         logger.info("Added %d new bars. Total: %d", len(new_predictions), len(indicator_df))
 
-    # Backfill mag_pred for historical bars that don't have it
+    # Re-score mag_pred for ALL historical bars with current model
     if "mag_pred" not in indicator_df.columns:
         indicator_df["mag_pred"] = np.nan
-    missing_mag = indicator_df["mag_pred"].isna() | (indicator_df["mag_pred"] == 0)
-    backfill_idx = indicator_df.index[missing_mag].intersection(features.index)
-    if len(backfill_idx) > 0:
-        indicator_df.loc[backfill_idx, "mag_pred"] = engine.backfill_mag_pred(
-            features.loc[backfill_idx]
-        )
-        logger.info("Backfilled mag_pred for %d historical bars", len(backfill_idx))
+    rescore_idx = indicator_df.index.intersection(features.index)
+    if len(rescore_idx) > 0:
+        new_mag = engine.backfill_mag_pred(features.loc[rescore_idx])
+        changed = (indicator_df.loc[rescore_idx, "mag_pred"].fillna(-1) != new_mag.fillna(-1)).sum()
+        indicator_df.loc[rescore_idx, "mag_pred"] = new_mag
+        if changed > 0:
+            logger.info("Re-scored mag_pred for %d bars (%d changed)", len(rescore_idx), changed)
 
     # Save depth/aggtrades/options/sentiment snapshots to MySQL + parquet
     try:
