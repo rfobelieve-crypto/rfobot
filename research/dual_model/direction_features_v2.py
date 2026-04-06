@@ -61,6 +61,14 @@ OLD_DERIVED = [
     "vol_entropy", "squeeze_proxy",
 ]
 
+# ── Liquidity fragility (IC=-0.071, p=0.00002, time-stable) ──────────
+
+LIQUIDITY_FRAGILITY = [
+    "impact_asymmetry", "impact_asymmetry_zscore",
+    "price_impact", "price_impact_zscore",
+    "fragility", "fragility_zscore",
+]
+
 OLD_FEATURES = OLD_KLINE + OLD_CG + OLD_DERIVED
 
 # ── New key 4 features (highest directional potential) ──────────────────
@@ -111,7 +119,7 @@ NEW_CG_ALL = [
 
 # ── Full direction feature set (old + all new) ─────────────────────────
 
-FULL_DIRECTION = sorted(set(OLD_FEATURES + NEW_CG_ALL))
+FULL_DIRECTION = sorted(set(OLD_FEATURES + NEW_CG_ALL + LIQUIDITY_FRAGILITY))
 
 # ── Ablation groups for Experiment 2 ───────────────────────────────────
 
@@ -122,6 +130,7 @@ ABLATION_GROUPS = {
     "+ pos_divergence": OLD_FEATURES + ["cg_pos_account_divergence", "cg_pos_long_pct", "cg_pos_short_pct", "cg_pos_ls_ratio", "cg_pos_ls_ratio_zscore"],
     "+ bfx_margin":     OLD_FEATURES + ["cg_bfx_margin_ratio", "cg_bfx_margin_delta", "cg_bfx_margin_ratio_zscore", "cg_bfx_margin_delta_zscore"],
     "+ key_4_only":     OLD_FEATURES + NEW_KEY_4,
+    "+ liq_fragility":  OLD_FEATURES + NEW_KEY_4 + LIQUIDITY_FRAGILITY,
     "full_expanded":    FULL_DIRECTION,
 }
 

@@ -95,11 +95,22 @@ NEW_MAGNITUDE = [
 
 EXPANDED_MAGNITUDE = sorted(set(OLD_MAGNITUDE + NEW_MAGNITUDE))
 
+# ── Liquidity fragility (captures "thin liquidity = bigger moves") ────
+
+LIQUIDITY_FRAGILITY = [
+    "impact_asymmetry", "impact_asymmetry_zscore",
+    "price_impact", "price_impact_zscore",
+    "fragility", "fragility_zscore",
+]
+
+EXPANDED_WITH_FRAGILITY = sorted(set(EXPANDED_MAGNITUDE + LIQUIDITY_FRAGILITY))
+
 # ── For Experiment 3 comparison ─────────────────────────────────────────
 
 MAGNITUDE_GROUPS = {
     "baseline_old": OLD_MAGNITUDE,
     "expanded":     EXPANDED_MAGNITUDE,
+    "+ liq_fragility": EXPANDED_WITH_FRAGILITY,
 }
 
 

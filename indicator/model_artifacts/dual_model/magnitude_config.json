@@ -1,9 +1,7 @@
 {
-  "feature_set": "expanded",
-  "n_features": 76,
+  "feature_set": "expanded + liq_fragility",
+  "n_features": 82,
   "n_samples": 3995,
-  "y_mean": 0.007215410160416589,
-  "y_std": 0.007882523137989303,
   "params": {
     "objective": "reg:squarederror",
     "eval_metric": "mae",
