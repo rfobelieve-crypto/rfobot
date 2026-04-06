@@ -1,4 +1,6 @@
 [
+  "abs_completion",
+  "abs_completion_z",
   "cg_bfx_margin_delta",
   "cg_bfx_margin_delta_zscore",
   "cg_conviction",
@@ -59,6 +61,7 @@
   "cg_taker_delta_zscore",
   "cg_taker_ratio",
   "cg_taker_sell",
+  "flow_trend_score",
   "fragility",
   "fragility_zscore",
   "funding_taker_align",
@@ -67,6 +70,8 @@
   "impact_asymmetry",
   "impact_asymmetry_zscore",
   "oi_price_divergence",
+  "post_absorb_breakout",
+  "post_absorb_breakout_z",
   "price_impact",
   "price_impact_zscore",
   "realized_vol_20b",

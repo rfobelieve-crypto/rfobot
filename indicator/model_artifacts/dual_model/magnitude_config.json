@@ -1,6 +1,6 @@
 {
-  "feature_set": "expanded + liq_fragility",
-  "n_features": 82,
+  "feature_set": "expanded + fragility + post_absorption",
+  "n_features": 87,
   "n_samples": 3995,
   "params": {
     "objective": "reg:squarederror",

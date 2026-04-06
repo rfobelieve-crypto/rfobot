@@ -103,7 +103,13 @@ LIQUIDITY_FRAGILITY = [
     "fragility", "fragility_zscore",
 ]
 
-EXPANDED_WITH_FRAGILITY = sorted(set(EXPANDED_MAGNITUDE + LIQUIDITY_FRAGILITY))
+POST_ABSORPTION = [
+    "post_absorb_breakout", "post_absorb_breakout_z",
+    "abs_completion", "abs_completion_z",
+    "flow_trend_score",
+]
+
+EXPANDED_WITH_FRAGILITY = sorted(set(EXPANDED_MAGNITUDE + LIQUIDITY_FRAGILITY + POST_ABSORPTION))
 
 # ── For Experiment 3 comparison ─────────────────────────────────────────
 

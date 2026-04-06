@@ -252,6 +252,40 @@ def build_live_features(klines: pd.DataFrame,
     df["fragility"] = df["price_impact"] / vol_ratio.replace(0, np.nan)
     df["fragility_zscore"] = _zscore(df["fragility"])
 
+    # ── Flow Regime & Post-Absorption Breakout ─────────────────────────
+    # Core insight from trading experience:
+    #   - High flow + price moving = trend (follow it)
+    #   - Absorption was happening, now volume spikes = breakout (big move)
+    #   - Low price + absorption ending = accumulation complete (expect UP)
+    #   - High price + absorption ending = distribution complete (expect DOWN)
+    taker_total = df["taker_buy_vol"].abs() + (df["volume"] - df["taker_buy_vol"]).abs()
+    taker_total_ma = taker_total.rolling(72, min_periods=10).mean()
+    flow_level = taker_total / taker_total_ma.replace(0, np.nan)
+
+    # Flow trend: high flow × big price move = trend confirmation
+    ret_4h = df["close"].pct_change(4)
+    ret_4h_z = _zscore(ret_4h)
+    df["flow_trend_score"] = flow_level * ret_4h_z.abs()
+
+    # Absorption ending detection
+    if "absorption_score" in df.columns:
+        abs_score = df["absorption_score"].fillna(0)
+        abs_ma_8h = abs_score.abs().rolling(8, min_periods=2).mean()
+        abs_current = abs_score.abs()
+
+        # Post-absorption breakout: absorption was high, now volume explodes
+        vol_ma_24 = df["volume"].rolling(LONG_WIN, min_periods=4).mean()
+        vol_spike = df["volume"] / vol_ma_24.replace(0, np.nan)
+        df["post_absorb_breakout"] = abs_ma_8h.shift(1) * vol_spike
+        df["post_absorb_breakout_z"] = _zscore(df["post_absorb_breakout"])
+
+        # Absorption completion: was high, now dropping
+        abs_ending = abs_ma_8h.shift(1) / abs_score.abs().rolling(
+            LONG_WIN, min_periods=4).mean().replace(0, np.nan)
+        abs_drop = (abs_ma_8h.shift(1) - abs_current > 0).astype(float)
+        df["abs_completion"] = abs_ending * abs_drop
+        df["abs_completion_z"] = _zscore(df["abs_completion"])
+
     # ── Order book depth features (snapshot, appended to last bar only) ───
     if depth and isinstance(depth, dict) and "depth_imbalance" in depth:
         # These are point-in-time snapshots — only valid for the latest bar

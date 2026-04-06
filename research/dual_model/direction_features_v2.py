@@ -69,6 +69,14 @@ LIQUIDITY_FRAGILITY = [
     "fragility", "fragility_zscore",
 ]
 
+# ── Post-absorption breakout (mag IC=0.191, dir IC=0.065) ────────────
+
+POST_ABSORPTION = [
+    "post_absorb_breakout", "post_absorb_breakout_z",
+    "abs_completion", "abs_completion_z",
+    "flow_trend_score",
+]
+
 OLD_FEATURES = OLD_KLINE + OLD_CG + OLD_DERIVED
 
 # ── New key 4 features (highest directional potential) ──────────────────
@@ -119,7 +127,7 @@ NEW_CG_ALL = [
 
 # ── Full direction feature set (old + all new) ─────────────────────────
 
-FULL_DIRECTION = sorted(set(OLD_FEATURES + NEW_CG_ALL + LIQUIDITY_FRAGILITY))
+FULL_DIRECTION = sorted(set(OLD_FEATURES + NEW_CG_ALL + LIQUIDITY_FRAGILITY + POST_ABSORPTION))
 
 # ── Ablation groups for Experiment 2 ───────────────────────────────────
 
@@ -131,6 +139,7 @@ ABLATION_GROUPS = {
     "+ bfx_margin":     OLD_FEATURES + ["cg_bfx_margin_ratio", "cg_bfx_margin_delta", "cg_bfx_margin_ratio_zscore", "cg_bfx_margin_delta_zscore"],
     "+ key_4_only":     OLD_FEATURES + NEW_KEY_4,
     "+ liq_fragility":  OLD_FEATURES + NEW_KEY_4 + LIQUIDITY_FRAGILITY,
+    "+ post_absorption": OLD_FEATURES + NEW_KEY_4 + LIQUIDITY_FRAGILITY + POST_ABSORPTION,
     "full_expanded":    FULL_DIRECTION,
 }
 
