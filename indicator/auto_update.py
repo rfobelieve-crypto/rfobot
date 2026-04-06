@@ -253,16 +253,17 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
         indicator_df = indicator_df.sort_index()
         logger.info("Added %d new bars. Total: %d", len(new_predictions), len(indicator_df))
 
-    # Re-score mag_pred for ALL historical bars with current model
-    if "mag_pred" not in indicator_df.columns:
-        indicator_df["mag_pred"] = np.nan
-    rescore_idx = indicator_df.index.intersection(features.index)
-    if len(rescore_idx) > 0:
-        new_mag = engine.backfill_mag_pred(features.loc[rescore_idx])
-        changed = (indicator_df.loc[rescore_idx, "mag_pred"].fillna(-1) != new_mag.fillna(-1)).sum()
-        indicator_df.loc[rescore_idx, "mag_pred"] = new_mag
-        if changed > 0:
-            logger.info("Re-scored mag_pred for %d bars (%d changed)", len(rescore_idx), changed)
+    # Re-predict ALL historical bars with current model
+    overlap_idx = indicator_df.index.intersection(features.index)
+    if len(overlap_idx) > 0:
+        repredicted = engine.predict(features.loc[overlap_idx])
+        if hasattr(repredicted.index, 'as_unit'):
+            repredicted.index = repredicted.index.as_unit("ns")
+        pred_cols = [c for c in repredicted.columns if c not in ("open", "high", "low", "close")]
+        for col in pred_cols:
+            if col in repredicted.columns:
+                indicator_df.loc[overlap_idx, col] = repredicted[col]
+        logger.info("Re-predicted %d historical bars with current model", len(overlap_idx))
 
     # Save depth/aggtrades/options/sentiment snapshots to MySQL + parquet
     try:

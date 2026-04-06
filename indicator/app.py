@@ -365,17 +365,19 @@ def update_cycle() -> dict:
         else:
             logger.info("No new bars to predict")
 
-        # 5b. Re-score mag_pred for ALL historical bars with current model
-        #     This ensures chart reflects the latest magnitude model.
-        if "mag_pred" not in indicator_df.columns:
-            indicator_df["mag_pred"] = np.nan
-        rescore_idx = indicator_df.index.intersection(features.index)
-        if len(rescore_idx) > 0:
-            new_mag = _engine.backfill_mag_pred(features.loc[rescore_idx])
-            changed = (indicator_df.loc[rescore_idx, "mag_pred"].fillna(-1) != new_mag.fillna(-1)).sum()
-            indicator_df.loc[rescore_idx, "mag_pred"] = new_mag
-            if changed > 0:
-                logger.info("Re-scored mag_pred for %d bars (%d changed)", len(rescore_idx), changed)
+        # 5b. Re-predict ALL historical bars with current model
+        #     Ensures chart reflects latest model (confidence, strength, mag_pred all updated)
+        overlap_idx = indicator_df.index.intersection(features.index)
+        if len(overlap_idx) > 0:
+            repredicted = _engine.predict(features.loc[overlap_idx])
+            if hasattr(repredicted.index, 'as_unit'):
+                repredicted.index = repredicted.index.as_unit("ns")
+            # Preserve OHLC from indicator_df, update prediction columns
+            pred_cols = [c for c in repredicted.columns if c not in ("open", "high", "low", "close")]
+            for col in pred_cols:
+                if col in repredicted.columns:
+                    indicator_df.loc[overlap_idx, col] = repredicted[col]
+            logger.info("Re-predicted %d historical bars with current model", len(overlap_idx))
 
         # 6. Render chart (last 200 bars that have OHLC data)
         chart_df = indicator_df.dropna(subset=["open", "high", "low", "close"])
