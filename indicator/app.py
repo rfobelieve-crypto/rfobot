@@ -425,7 +425,7 @@ def update_cycle() -> dict:
         )
         tg_result = _send_telegram_photo(png, caption)
 
-        # Strong signal alert
+        # Strong signal alert (Telegram push for Strong only)
         if strength == "Strong" and direction in ("UP", "DOWN"):
             regime = str(last_row.get("regime", "?"))
             if direction == "UP":
@@ -440,7 +440,6 @@ def update_cycle() -> dict:
             try:
                 from indicator.signal_explainer import explain_strong_signal, format_shap_for_telegram
                 import json as _json
-                # Get last bar's feature values
                 last_features = features.iloc[-1].to_dict() if len(features) > 0 else {}
                 shap_result = explain_strong_signal(last_features, direction)
                 if shap_result:
@@ -461,22 +460,26 @@ def update_cycle() -> dict:
             _send_telegram_text(alert)
             logger.info("Strong signal alert sent: %s", direction)
 
-            # Record Strong signal for performance tracking
+        # Record Strong + Moderate signals for performance tracking
+        if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
             try:
-                from indicator.signal_tracker import record_strong_signal
+                from indicator.signal_tracker import record_signal
                 sig_time = indicator_df.index[-1]
                 if hasattr(sig_time, 'to_pydatetime'):
                     sig_time = sig_time.to_pydatetime()
-                record_strong_signal(
+                shap_json_str = shap_json_str if strength == "Strong" else ""
+                record_signal(
                     signal_time=sig_time, direction=direction,
+                    strength=strength,
                     p_up=dir_prob, mag_pred=mag, confidence=conf,
-                    entry_price=price, regime=regime,
+                    entry_price=price,
+                    regime=str(last_row.get("regime", "")),
                     shap_json=shap_json_str,
                 )
             except Exception as e:
                 logger.warning("Signal tracker record failed: %s", e)
 
-        # Backfill 4h outcomes for past Strong signals
+        # Backfill 4h outcomes for past signals (Strong + Moderate)
         try:
             from indicator.signal_tracker import backfill_outcomes
             backfill_outcomes()
