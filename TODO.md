@@ -8,26 +8,25 @@
 - [ ] 監控 Magnitude IC 是否從假日效應恢復
 
 ### Direction 模型重訓（預計 4/20 後）
-- [ ] 加入 impact_asymmetry + post_absorb_breakout + flow_trend_score
-- [ ] 加入 abs_completion
-- [ ] 加入 tox_pressure_zscore（IC=+0.077 vs direction，與現有特徵 r<0.04）
-- [ ] 加入 tox_liq_exhaust（IC=-0.034 vs direction）
-- [ ] Walk-forward 評估，確認 AUC 和 Top-decile 都提升才部署
-- [ ] 特徵篩選：permutation importance 砍掉 < 0.5% 的噪音特徵
-- [ ] 目標：AUC > 0.60, Top-decile > 0.61
+- [ ] 特徵集: liq_frag + absorb (99 特徵, walk-forward AUC=0.608, Acc=58.9%)
+  - 包含: OLD + NEW_KEY_4 + LIQUIDITY_FRAGILITY + POST_ABSORPTION
+  - impact_asymmetry, post_absorb_breakout, flow_trend_score, abs_completion 等
+- [ ] **暫不加入 toxicity** — walk-forward 顯示加 tox 後 AUC 從 0.608 降到 0.588，被其他特徵吸收
+- [ ] 特徵篩選: permutation importance 砍掉 < 0.5% 噪音，99 → 目標 50~60 精銳
+- [ ] Walk-forward 評估，AUC > 0.60 + Top-decile > 0.61 才部署
+- [ ] 若篩選後特徵數降到 60 以下，再嘗試加入 tox_pressure_zscore 看是否有邊際提升
 
 ### Magnitude 模型重訓（預計 4/20 後）
-- [ ] 加入 tox_pressure（IC=-0.060 vs |mag|）
-- [ ] 加入 tox_accum_zscore（IC=-0.058 vs |mag|）
-- [ ] 加入 tox_bv_vpin_zscore（IC=-0.055 vs |mag|）
-- [ ] 加入 tox_div_taker（IC=-0.050 vs |mag|）
-- [ ] 注意：負 IC = 高毒性 → 波動偏小（可能是同期效應），需驗證是否為真正的預測力
-- [ ] Walk-forward 評估，ICIR 不降才部署
+- [ ] 特徵集: expanded + liq_frag + absorb + toxicity (91 特徵, walk-forward IC=0.374, ICIR=2.42)
+  - 新增 toxicity: tox_pressure, tox_accum_zscore, tox_bv_vpin_zscore, tox_div_taker
+  - Toxicity 對 Magnitude 有正貢獻: IC +0.006, ICIR +0.06, Top decile 1.194%
+- [ ] 特徵篩選: permutation importance，91 → 砍掉底部噪音
+- [ ] Walk-forward 評估，ICIR > 2.35 才部署
 
 ### 特徵篩選（隨重訓一起做）
-- [ ] Direction 模型：89 + 新特徵 → permutation importance 篩選 → 目標 50~60 個精銳
-- [ ] Magnitude 模型：87 + 新特徵 → 砍掉底部噪音
-- [ ] 砍掉後重訓，OOS 表現不降才確認
+- [ ] Direction: 99 → 目標 50~60（permutation importance）
+- [ ] Magnitude: 91 → 砍底部噪音
+- [ ] 砍掉後重訓，OOS 不降才確認
 - [ ] 減少 overfit 風險
 
 ## 中優先
