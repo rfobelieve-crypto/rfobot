@@ -10,13 +10,23 @@
 ### Direction 模型重訓（預計 4/20 後）
 - [ ] 加入 impact_asymmetry + post_absorb_breakout + flow_trend_score
 - [ ] 加入 abs_completion
+- [ ] 加入 tox_pressure_zscore（IC=+0.077 vs direction，與現有特徵 r<0.04）
+- [ ] 加入 tox_liq_exhaust（IC=-0.034 vs direction）
 - [ ] Walk-forward 評估，確認 AUC 和 Top-decile 都提升才部署
 - [ ] 特徵篩選：permutation importance 砍掉 < 0.5% 的噪音特徵
 - [ ] 目標：AUC > 0.60, Top-decile > 0.61
 
+### Magnitude 模型重訓（預計 4/20 後）
+- [ ] 加入 tox_pressure（IC=-0.060 vs |mag|）
+- [ ] 加入 tox_accum_zscore（IC=-0.058 vs |mag|）
+- [ ] 加入 tox_bv_vpin_zscore（IC=-0.055 vs |mag|）
+- [ ] 加入 tox_div_taker（IC=-0.050 vs |mag|）
+- [ ] 注意：負 IC = 高毒性 → 波動偏小（可能是同期效應），需驗證是否為真正的預測力
+- [ ] Walk-forward 評估，ICIR 不降才部署
+
 ### 特徵篩選（隨重訓一起做）
-- [ ] Direction 模型：89 → 目標 50~60 個精銳
-- [ ] Magnitude 模型：87 → 砍掉底部噪音
+- [ ] Direction 模型：89 + 新特徵 → permutation importance 篩選 → 目標 50~60 個精銳
+- [ ] Magnitude 模型：87 + 新特徵 → 砍掉底部噪音
 - [ ] 砍掉後重訓，OOS 表現不降才確認
 - [ ] 減少 overfit 風險
 
@@ -64,8 +74,13 @@
 - [x] Moderate + Strong 三角形顯示
 - [x] 歷史 bar 全量重跑 predict()
 - [x] 圖表同步規則寫入 CLAUDE.md
+- [x] Order Flow Toxicity 特徵 (tox_pressure_zscore IC=+0.071, 9 個新特徵)
+- [x] Parquet 自動 freshness 檢查 (shared_data.py, 訓練前 6h 閾值自動 backfill)
+- [x] indicator_history 合併完整歷史 (621→4118 rows, 10/17→4/7)
+- [x] 統一 backfill 腳本 (backfill_all_parquet.py, Binance + 14 CG endpoints)
 
 ## 回測失敗（已排除）
 - [x] ~~流動性獵取反轉~~ — 4h 週期上 IC ≈ 0，方向無預測力
 - [x] ~~K 線 delta 背離~~ — IC = 0.01，太弱
 - [x] ~~consolidation_score~~ — IC ≈ 0，無效
+- [x] ~~ChessDomination 4D (CDP)~~ — cdp_score IC=0.012 無效，合成乘法結構稀釋信號；cdp_x (-0.039) 和 cdp_pressure_level (+0.039) 邊際有效但本質是 price percentile
