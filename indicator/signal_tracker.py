@@ -7,9 +7,11 @@ Records signals with confidence >= 65 (Moderate+) and auto-backfills
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
+
+TZ_TPE = timezone(timedelta(hours=8))
 
 TABLE = "tracked_signals"
 
@@ -264,7 +266,12 @@ def get_performance_report() -> str:
             if recent:
                 lines.append("<b>最近信號</b>")
                 for r in recent:
-                    t = str(r["signal_time"])[5:16]
+                    # Convert UTC to UTC+8 for display
+                    sig_utc = r["signal_time"]
+                    if hasattr(sig_utc, 'replace'):
+                        sig_utc = sig_utc.replace(tzinfo=timezone.utc)
+                    sig_local = sig_utc.astimezone(TZ_TPE)
+                    t = sig_local.strftime("%m-%d %H:%M")
                     d = r["direction"]
                     st = r["strength"][0]  # S or M
                     icon = "🟢▲" if d == "UP" else "🔴▼"

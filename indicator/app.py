@@ -921,7 +921,7 @@ def indicator_performance():
         # ── Build report ──
         lines = [
             "<b>📊 模型表現 (Live)</b>\n",
-            f"評估期間: {len(eval_df)} 筆 ({str(eval_df['dt'].iloc[0])[:10]} ~ {str(eval_df['dt'].iloc[-1])[:10]})",
+            f"評估期間: {len(eval_df)} 筆 ({(eval_df['dt'].iloc[0] + pd.Timedelta(hours=8)).strftime('%m/%d')} ~ {(eval_df['dt'].iloc[-1] + pd.Timedelta(hours=8)).strftime('%m/%d')})",
             f"\n<b>方向準確率 (近 30 天 tracked)</b>",
         ]
         lines.extend(tracked_acc_lines if tracked_acc_lines else [f"  全部: {dir_acc:.1f}% ({len(active)} 筆)"])
