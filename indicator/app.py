@@ -859,24 +859,25 @@ def indicator_performance():
             elif ic_7d < 0.05:
                 alerts.append("🟡 7 天 IC 偏低 (< 0.05) — 密切觀察")
 
-        # Strong signal win rate alert (need 20+ samples)
+        # Signal win rate alert (need 20+ samples)
         try:
-            from indicator.signal_tracker import _ensure_table, _get_db_conn
+            from indicator.signal_tracker import _ensure_table, _get_db_conn, TABLE
             _ensure_table()
             sconn = _get_db_conn()
             with sconn.cursor() as cur:
-                cur.execute("""
-                    SELECT COUNT(*) as total, SUM(correct) as wins
-                    FROM strong_signals WHERE filled = 1
-                """)
-                sr = cur.fetchone()
+                for tier in ["Strong", "Moderate"]:
+                    cur.execute(f"""
+                        SELECT COUNT(*) as total, SUM(correct) as wins
+                        FROM `{TABLE}` WHERE filled = 1 AND strength = %s
+                    """, (tier,))
+                    sr = cur.fetchone()
+                    s_total = int(sr["total"] or 0)
+                    s_wins = int(sr["wins"] or 0)
+                    if s_total >= 20:
+                        s_wr = s_wins / s_total * 100
+                        if s_wr < 55:
+                            alerts.append(f"🔴 {tier} 累積勝率 {s_wr:.0f}% (< 55%) — 建議重訓")
             sconn.close()
-            s_total = int(sr["total"] or 0)
-            s_wins = int(sr["wins"] or 0)
-            if s_total >= 20:
-                s_wr = s_wins / s_total * 100
-                if s_wr < 55:
-                    alerts.append(f"🔴 Strong 累積勝率 {s_wr:.0f}% (< 55%) — 建議重訓")
         except Exception:
             pass
 
@@ -912,14 +913,14 @@ def indicator_performance():
         lines.append(f"  趨勢: {ic_trend}")
         lines.append(f"  Magnitude IC: {mag_ic_str}")
 
-        # Strong signal tracker
+        # Signal tracker (Strong + Moderate)
         try:
             from indicator.signal_tracker import get_performance_report
             sig_report = get_performance_report()
             sig_lines = sig_report.split("\n")
             sig_body = [l for l in sig_lines if not l.startswith("<b>📊")]
             if sig_body:
-                lines.append(f"\n<b>Strong 信號追蹤</b>")
+                lines.append(f"\n<b>信號追蹤 (Strong + Moderate)</b>")
                 lines.extend(sig_body)
         except Exception as e:
             logger.warning("Signal tracker report failed: %s", e)
