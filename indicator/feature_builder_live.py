@@ -402,6 +402,21 @@ def build_live_features(klines: pd.DataFrame,
     except Exception as e:
         logger.warning("Direction features failed (non-critical): %s", e)
 
+    # ── Order Flow Toxicity features (IC=+0.071, p<0.00001) ────────────
+    try:
+        from research.features.order_flow_toxicity import OrderFlowToxicity
+        tox = OrderFlowToxicity()  # adaptive P75 threshold
+        tox_df = tox.transform(df)
+        tox_cols = [c for c in tox_df.columns if c.startswith("tox_") and c not in df.columns]
+        if tox_cols:
+            for c in tox_cols:
+                df[c] = tox_df[c]
+            logger.info("Toxicity features added: %d columns", len(tox_cols))
+    except ImportError:
+        logger.debug("order_flow_toxicity not available — skipping")
+    except Exception as e:
+        logger.warning("Toxicity features failed (non-critical): %s", e)
+
     logger.info("Live features: %d bars x %d columns", len(df), len(df.columns))
     return df
 

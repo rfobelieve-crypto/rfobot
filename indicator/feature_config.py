@@ -112,11 +112,24 @@ TIME_FEATURES = [
     "weekday_sin", "weekday_cos",
 ]
 
+# ── Order Flow Toxicity features (IC-validated) ────────────────────────────
+TOXICITY_FEATURES = [
+    "tox_bv_vpin",           # Bulk Volume VPIN (IC -0.021)
+    "tox_bv_vpin_zscore",    # VPIN z-score
+    "tox_accum",             # toxic flow accumulation
+    "tox_accum_zscore",      # accumulation z-score
+    "tox_div_taker",         # VPIN vs taker divergence
+    "tox_liq_exhaust",       # toxicity × liquidity exhaustion (IC -0.024)
+    "tox_funding_pressure",  # toxicity × funding × OI feedback
+    "tox_pressure",          # composite toxicity pressure (signed)
+    "tox_pressure_zscore",   # composite z-score (IC +0.071, p<0.00001)
+]
+
 # ── All feature columns (used for training and inference) ─────────────────
 # v3 regime models use all features including VOLUME_DYNAMICS.
 ALL_FEATURES = (KLINE_DERIVED + COINGLASS_RAW + COINGLASS_ZSCORE
                 + COINGLASS_CROSS + TIME_FEATURES + MOMENTUM_FEATURES
-                + VOLUME_DYNAMICS)
+                + VOLUME_DYNAMICS + TOXICITY_FEATURES)
 
 # ── Columns never used as features ────────────────────────────────────────
 EXCLUDE = {
