@@ -416,12 +416,33 @@ def update_cycle() -> dict:
         dir_prob = float(last_row.get("dir_prob_up", 0.5))
         mag = float(last_row.get("mag_pred", 0))
 
+        # Entropy risk assessment
+        risk_text = ""
+        risk_score = 50.0
+        try:
+            from indicator.entropy_tools import EntropyRiskManager
+            _risk_mgr = EntropyRiskManager()
+            _risk = _risk_mgr.assess(
+                features, dir_prob_up=dir_prob, confidence=conf,
+                market_regime=str(last_row.get("regime", "")),
+            )
+            risk_score = _risk["risk_score"]
+            risk_icon = {"HIGH": "\u26a0\ufe0f", "MEDIUM": "", "LOW": ""}[_risk["risk_level"]]
+            risk_text = f"\nRisk: {risk_score:.0f}/100 ({_risk['position_scale']:.0%})"
+            if risk_icon:
+                risk_text += f" {risk_icon}"
+            logger.info("Entropy risk: %.0f/100 (%s) pos=%.0f%%",
+                        risk_score, _risk["risk_level"], _risk["position_scale"] * 100)
+        except Exception as e:
+            logger.warning("Entropy risk failed (non-critical): %s", e)
+
         arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
         caption = (
             f"{arrow} BTC 4h Indicator | {now_str}\n"
             f"Price: ${price:,.0f}\n"
             f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
             f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%} | BBP: {bbp:+.2f}"
+            f"{risk_text}"
         )
         tg_result = _send_telegram_photo(png, caption)
 
@@ -448,14 +469,15 @@ def update_cycle() -> dict:
             except Exception as e:
                 logger.warning("SHAP explanation failed (non-critical): %s", e)
 
+            risk_line = f"\nRisk: {risk_score:.0f}/100" if risk_score > 0 else ""
             alert = (
                 f"{icon} <b>{label} SIGNAL</b>\n\n"
                 f"BTC ${price:,.0f}\n"
                 f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%}\n"
-                f"Confidence: {conf:.0f}\n"
+                f"Confidence: {conf:.0f}{risk_line}\n"
                 f"Regime: {regime}"
                 f"{shap_text}\n\n"
-                f"⏰ {now_str}"
+                f"\u23f0 {now_str}"
             )
             _send_telegram_text(alert)
             logger.info("Strong signal alert sent: %s", direction)
