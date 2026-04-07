@@ -256,7 +256,9 @@ def get_performance_report() -> str:
             cur.execute(f"""
                 SELECT signal_time, direction, strength, confidence, entry_price,
                        exit_price, actual_return_4h, correct, filled
-                FROM `{TABLE}` ORDER BY signal_time DESC LIMIT 10
+                FROM `{TABLE}`
+                WHERE signal_time >= DATE_SUB(NOW(), INTERVAL 3 DAY)
+                ORDER BY signal_time DESC LIMIT 15
             """)
             recent = cur.fetchall()
             if recent:

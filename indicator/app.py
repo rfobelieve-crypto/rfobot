@@ -894,15 +894,38 @@ def indicator_performance():
                 r_label = {"TRENDING_BULL": "趨勢多", "TRENDING_BEAR": "趨勢空", "CHOPPY": "盤整"}[rn]
                 regime_lines.append(f"  {r_label}: {r_acc:.1f}% ({len(r_active)} 筆)")
 
+        # ── Live direction accuracy from tracked_signals (more reliable) ──
+        tracked_acc_lines = []
+        try:
+            from indicator.signal_tracker import _get_db_conn as _ts_conn, TABLE
+            tsconn = _ts_conn()
+            with tsconn.cursor() as tcur:
+                for tier in ["Strong", "Moderate"]:
+                    tcur.execute(f"""
+                        SELECT COUNT(*) as t, SUM(correct) as w,
+                               AVG(actual_return_4h) as avg_ret
+                        FROM `{TABLE}`
+                        WHERE filled = 1 AND strength = %s
+                          AND signal_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                    """, (tier,))
+                    tr = tcur.fetchone()
+                    tt, tw = int(tr["t"] or 0), int(tr["w"] or 0)
+                    if tt >= 3:
+                        wr = tw / tt * 100
+                        ar = float(tr["avg_ret"] or 0) * 100
+                        tracked_acc_lines.append(f"  {tier}: {wr:.1f}% ({tw}W/{tt-tw}L, avg={ar:+.2f}%)")
+            tsconn.close()
+        except Exception:
+            pass
+
         # ── Build report ──
         lines = [
             "<b>📊 模型表現 (Live)</b>\n",
             f"評估期間: {len(eval_df)} 筆 ({str(eval_df['dt'].iloc[0])[:10]} ~ {str(eval_df['dt'].iloc[-1])[:10]})",
-            f"\n<b>方向準確率</b>",
-            f"  全部信號: {dir_acc:.1f}% ({len(active)} 筆)",
-            f"  Strong 信號: {strong_acc:.1f}% ({len(strong_active)} 筆)",
-            f"\n<b>Regime 拆解</b> (當前: {current_regime})",
+            f"\n<b>方向準確率 (近 30 天 tracked)</b>",
         ]
+        lines.extend(tracked_acc_lines if tracked_acc_lines else [f"  全部: {dir_acc:.1f}% ({len(active)} 筆)"])
+        lines.append(f"\n<b>Regime 拆解</b> (當前: {current_regime})")
         lines.extend(regime_lines if regime_lines else ["  數據不足"])
 
         # Rolling IC
@@ -940,11 +963,15 @@ def indicator_performance():
             lines.extend(f"  {a}" for a in alerts)
 
         # Latest prediction
+        last = df.iloc[-1]
+        mag_val = float(last.get("mag_pred", 0))
+        # mag_pred is vol-adjusted; multiply by realized_vol to get approx %
+        mag_display = f"{mag_val:.2f}σ" if mag_val > 0 else ""
         lines.extend([
             f"\n<b>最新預測</b>",
-            f"  Price: ${df.iloc[-1]['close']:,.0f}",
-            f"  P(UP): {df.iloc[-1]['dir_prob_up']:.2f}",
-            f"  Mag: {df.iloc[-1]['mag_pred']:.4f}" if df.iloc[-1]['mag_pred'] > 0 else "",
+            f"  Price: ${last['close']:,.0f}",
+            f"  P(UP): {last['dir_prob_up']:.2f}",
+            f"  Mag: {mag_display}" if mag_display else "",
         ])
         lines = [l for l in lines if l]
         return jsonify({"text": "\n".join(lines)})
