@@ -1,9 +1,12 @@
 {
-  "feature_set": "+ key_4_only",
-  "n_features": 88,
-  "n_samples": 2953,
-  "up_rate": 0.49610565526583134,
-  "scale_pos_weight": 1.0156996587030716,
+  "feature_set": "old + key_4 + liq_frag + post_absorption",
+  "n_features": 99,
+  "n_samples": 2954,
+  "up_rate": 0.4983073798239675,
+  "scale_pos_weight": 1.0067934782608696,
+  "oos_auc": 0.6081183270209594,
+  "oos_accuracy": 0.588730332967435,
+  "oos_ic": 0.15363592943501003,
   "params": {
     "objective": "binary:logistic",
     "eval_metric": "auc",

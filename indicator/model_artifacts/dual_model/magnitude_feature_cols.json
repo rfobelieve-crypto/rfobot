@@ -85,5 +85,9 @@
   "vol_kurtosis",
   "vol_regime",
   "weekday_cos",
-  "weekday_sin"
+  "weekday_sin",
+  "tox_pressure",
+  "tox_accum_zscore",
+  "tox_bv_vpin_zscore",
+  "tox_div_taker"
 ]

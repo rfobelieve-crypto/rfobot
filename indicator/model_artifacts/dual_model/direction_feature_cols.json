@@ -86,5 +86,16 @@
   "cg_bfx_margin_ratio",
   "cg_bfx_margin_delta",
   "cg_bfx_margin_ratio_zscore",
-  "cg_bfx_margin_delta_zscore"
+  "cg_bfx_margin_delta_zscore",
+  "impact_asymmetry",
+  "impact_asymmetry_zscore",
+  "price_impact",
+  "price_impact_zscore",
+  "fragility",
+  "fragility_zscore",
+  "post_absorb_breakout",
+  "post_absorb_breakout_z",
+  "abs_completion",
+  "abs_completion_z",
+  "flow_trend_score"
 ]
