@@ -89,14 +89,18 @@ def _fetch_klines_paginated(total: int, symbol: str = "BTCUSDT",
     return combined
 
 
-def load_and_cache_data(limit: int = 4000, force_refresh: bool = False) -> pd.DataFrame:
+def load_and_cache_data(limit: int = 4000, force_refresh: bool = False,
+                        max_stale_hours: float = 6.0) -> pd.DataFrame:
     """
     Fetch klines + CG data, build all features, cache to parquet.
+
+    Automatically refreshes raw parquet data if older than max_stale_hours.
 
     Parameters
     ----------
     limit : Number of 1h bars to fetch (CG endpoints support up to ~4000).
     force_refresh : If True, re-fetch even if cache exists.
+    max_stale_hours : Auto-backfill raw parquet if older than this.
 
     Returns
     -------
@@ -105,10 +109,22 @@ def load_and_cache_data(limit: int = 4000, force_refresh: bool = False) -> pd.Da
     ensure_dirs()
     cache_path = CACHE_DIR / "features_all.parquet"
 
+    # Auto-refresh raw parquet data if stale
+    try:
+        from research.backfill_all_parquet import ensure_fresh
+        ensure_fresh(max_age_hours=max_stale_hours)
+    except Exception as e:
+        logger.warning("Auto-backfill check failed (non-critical): %s", e)
+
     if cache_path.exists() and not force_refresh:
         df = pd.read_parquet(cache_path)
-        logger.info("Loaded cached features: %d bars x %d cols", len(df), len(df.columns))
-        return df
+        # Invalidate cache if raw data is newer
+        raw_klines = PROJECT_ROOT / "market_data" / "raw_data" / "binance_klines_1h.parquet"
+        if raw_klines.exists() and raw_klines.stat().st_mtime > cache_path.stat().st_mtime:
+            logger.info("Raw data newer than cache — rebuilding features")
+        else:
+            logger.info("Loaded cached features: %d bars x %d cols", len(df), len(df.columns))
+            return df
 
     from dotenv import load_dotenv
     load_dotenv(PROJECT_ROOT / ".env")
