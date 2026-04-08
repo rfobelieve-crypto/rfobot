@@ -428,7 +428,13 @@ def update_cycle() -> dict:
             )
             risk_score = _risk["risk_score"]
             risk_icon = {"HIGH": "\u26a0\ufe0f", "MEDIUM": "", "LOW": ""}[_risk["risk_level"]]
-            risk_text = f"\nRisk: {risk_score:.0f}/100 ({_risk['position_scale']:.0%})"
+            if risk_score >= 75:
+                risk_note = "high risk"
+            elif risk_score >= 50:
+                risk_note = "medium"
+            else:
+                risk_note = "low risk"
+            risk_text = f"\nRisk: {risk_score:.0f}/100 ({risk_note})"
             if risk_icon:
                 risk_text += f" {risk_icon}"
             logger.info("Entropy risk: %.0f/100 (%s) pos=%.0f%%",
@@ -441,7 +447,7 @@ def update_cycle() -> dict:
             f"{arrow} BTC 4h Indicator | {now_str}\n"
             f"Price: ${price:,.0f}\n"
             f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
-            f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%} | BBP: {bbp:+.2f}"
+            f"P(UP): {dir_prob:.0%} | Mag: {mag:.2f}x | BBP: {bbp:+.2f}"
             f"{risk_text}"
         )
         tg_result = _send_telegram_photo(png, caption)
@@ -473,7 +479,7 @@ def update_cycle() -> dict:
             alert = (
                 f"{icon} <b>{label} SIGNAL</b>\n\n"
                 f"BTC ${price:,.0f}\n"
-                f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%}\n"
+                f"P(UP): {dir_prob:.0%} | Mag: {mag:.2f}x\n"
                 f"Confidence: {conf:.0f}{risk_line}\n"
                 f"Regime: {regime}"
                 f"{shap_text}\n\n"
@@ -662,7 +668,7 @@ def indicator_chart_api():
         f"{arrow} BTC 4h Indicator\n"
         f"Price: ${price:,.0f}\n"
         f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
-        f"P(UP): {dir_prob:.0%} | Mag: {mag:.2%} | BBP: {bbp:+.2f}\n"
+        f"P(UP): {dir_prob:.0%} | Mag: {mag:.2f}x | BBP: {bbp:+.2f}\n"
         f"Updated: {last_update or '?'}"
     )
     import base64
