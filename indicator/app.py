@@ -64,7 +64,7 @@ def _make_reply_markup():
             {"text": "\U0001f4e6 DB", "callback_data": "db"},
         ],
         [
-            {"text": "\U0001f30a Flow BTC", "callback_data": "flow_btc"},
+            {"text": "\U0001f4cb Dashboard", "url": "https://enchanting-emotion-production-4b4d.up.railway.app/dashboard"},
             {"text": "\U0001f30d Flow All", "callback_data": "flow_all"},
             {"text": "\u2699\ufe0f Status", "callback_data": "status"},
         ],
@@ -1062,7 +1062,9 @@ def dashboard():
 
     engine_info = "N/A"
     if _engine:
-        engine_info = f"{_engine.mode} | Dir={getattr(_engine, '_dir_n_features', '?')} feat | Mag={getattr(_engine, '_mag_n_features', '?')} feat"
+        dir_n = len(getattr(_engine, 'dual_dir_features', getattr(_engine, 'dir_feature_cols', [])))
+        mag_n = len(getattr(_engine, 'dual_mag_features', []))
+        engine_info = f"{_engine.mode} | Dir={dir_n} feat | Mag={mag_n} feat"
 
     # 2. Signal tracker stats
     sig_stats = {}
@@ -1138,9 +1140,14 @@ def dashboard():
     except Exception as e:
         db_health["status"] = f"ERROR: {e}"
 
-    # 5. Coinglass status
+    # 5. Coinglass status — simplify dict to summary
     cg_text = "N/A"
-    if cg_status:
+    if cg_status and isinstance(cg_status, dict):
+        total = len(cg_status)
+        ok_count = sum(1 for v in cg_status.values()
+                       if isinstance(v, dict) and not v.get("empty", True))
+        cg_text = f"{ok_count}/{total} endpoints OK"
+    elif cg_status and isinstance(cg_status, str):
         cg_text = cg_status
 
     # ── Build HTML ──
@@ -1252,7 +1259,7 @@ def dashboard():
     <tr><th>Component</th><th>Status</th><th>Detail</th></tr>
     <tr><td>MySQL</td><td>{status_dot(db_health.get("status")=="OK")} {db_health.get("status","?")}</td>
         <td>indicator_history: {db_health.get("indicator_history","?")} rows | tracked_signals: {db_health.get("tracked_signals","?")} rows</td></tr>
-    <tr><td>Coinglass</td><td>{status_dot("OK" in str(cg_text))} {cg_text}</td><td></td></tr>
+    <tr><td>Coinglass</td><td>{status_dot("OK" in cg_text or "14/" in cg_text)} {cg_text}</td><td></td></tr>
     <tr><td>Model Engine</td><td>{status_dot(_engine is not None)} Loaded</td><td>{engine_info}</td></tr>
     <tr><td>Error</td><td>{status_dot(error is None)} {"None" if error is None else error}</td><td></td></tr>
   </table>
