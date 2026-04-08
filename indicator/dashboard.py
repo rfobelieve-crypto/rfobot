@@ -188,13 +188,27 @@ function toggle(id) {{
   <div class="regime-row">{regime_html if regime_html else '<div style="color:#666">No data</div>'}</div>
 ''')}
 
-{_section("Signal Performance", "signals", True, f'''
+{_section("Signal Performance", "signals", True, _build_signal_html(sig_stats, recent_html))}
+
+{_section("Data Freshness", "fresh", False, _build_freshness_html(freshness))}
+
+{_section("System Health", "syshealth", True, _build_health_html(
+    overall_health, health_checks, db_health, cg_text, engine, engine_info, error))}
+
+</body></html>"""
+    return html
+
+
+def _build_signal_html(sig_stats, recent_html):
+    s_s = sig_stats.get("Strong", {})
+    s_m = sig_stats.get("Moderate", {})
+    return f'''
   <table>
     <tr><th>Tier</th><th>Total</th><th>Filled</th><th>Win Rate</th><th>Avg Ret</th></tr>
-    <tr><td>Strong</td><td>{sig_stats.get("Strong",{{}}).get("total",0)}</td><td>{sig_stats.get("Strong",{{}}).get("filled",0)}</td>
-        <td>{sig_stats.get("Strong",{{}}).get("wr","N/A")}</td><td>{sig_stats.get("Strong",{{}}).get("avg_ret","N/A")}</td></tr>
-    <tr><td>Moderate</td><td>{sig_stats.get("Moderate",{{}}).get("total",0)}</td><td>{sig_stats.get("Moderate",{{}}).get("filled",0)}</td>
-        <td>{sig_stats.get("Moderate",{{}}).get("wr","N/A")}</td><td>{sig_stats.get("Moderate",{{}}).get("avg_ret","N/A")}</td></tr>
+    <tr><td>Strong</td><td>{s_s.get("total",0)}</td><td>{s_s.get("filled",0)}</td>
+        <td>{s_s.get("wr","N/A")}</td><td>{s_s.get("avg_ret","N/A")}</td></tr>
+    <tr><td>Moderate</td><td>{s_m.get("total",0)}</td><td>{s_m.get("filled",0)}</td>
+        <td>{s_m.get("wr","N/A")}</td><td>{s_m.get("avg_ret","N/A")}</td></tr>
   </table>
   <div style="margin-top:10px">
     <table>
@@ -202,20 +216,7 @@ function toggle(id) {{
       {recent_html}
     </table>
   </div>
-''')}
-
-{_section("Data Freshness", "fresh", False, f'''
-  <table>
-    <tr><th>Source</th><th>Age</th><th>Last Update</th></tr>
-    {fresh_html}
-  </table>
-''')}
-
-{_section("System Health", "syshealth", True, _build_health_html(
-    overall_health, health_checks, db_health, cg_text, engine, engine_info, error))}
-
-</body></html>"""
-    return html
+'''
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -233,6 +234,16 @@ def _card(title, value, subtitle="", color="#4fc3f7"):
 def _dot(ok):
     cls = "dot-ok" if ok else "dot-err"
     return f'<span class="{cls} dot"></span>'
+
+
+def _build_freshness_html(freshness):
+    lines = ['<table><tr><th>Source</th><th>Age</th><th>Last Update</th></tr>']
+    for f in freshness:
+        age = f["age_min"]
+        fc = "#4caf50" if age < 120 else "#ff9800" if age < 360 else "#f44336"
+        lines.append(f'<tr><td>{f["source"]}</td><td style="color:{fc}">{f["age_text"]}</td><td>{f["last_time"]}</td></tr>')
+    lines.append('</table>')
+    return "\n".join(lines)
 
 
 def _build_health_html(overall, checks, db_health, cg_text, engine, engine_info, error):
