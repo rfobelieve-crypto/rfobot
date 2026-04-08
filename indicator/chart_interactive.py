@@ -42,9 +42,10 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     markers = []
 
     for i, (dt, row) in enumerate(sig.iterrows()):
-        # Convert to UTC+8 for display, then get Unix timestamp
-        dt_utc8 = dt.astimezone(TZ_UTC8) if dt.tzinfo else dt.replace(tzinfo=timezone.utc).astimezone(TZ_UTC8)
-        ts = int(dt_utc8.timestamp())
+        # TradingView treats timestamps as UTC for display.
+        # Add 8h offset so the displayed time reads as UTC+8.
+        utc_ts = int(dt.timestamp()) if dt.tzinfo else int(dt.replace(tzinfo=timezone.utc).timestamp())
+        ts = utc_ts + 8 * 3600
         o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
 
         candle_data.append({"time": ts, "open": o, "high": h, "low": l, "close": c})
