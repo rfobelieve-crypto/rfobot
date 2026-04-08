@@ -1,10 +1,10 @@
 {
   "feature_set": "expanded + liq_frag + post_absorption + toxicity",
-  "n_features": 91,
+  "n_features": 68,
   "n_samples": 3991,
-  "oos_ic": 0.3731171429233987,
-  "oos_icir": 2.4667379714758777,
-  "oos_top_bot_ratio": 2.697906940224066,
+  "oos_ic": 0.3571472821202253,
+  "oos_icir": 2.3423741612790123,
+  "oos_top_bot_ratio": 2.1627798878415905,
   "params": {
     "objective": "reg:squarederror",
     "eval_metric": "mae",

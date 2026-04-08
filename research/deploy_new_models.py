@@ -64,9 +64,30 @@ dir_labels = build_direction_labels(df, k=0.5)
 df["y_dir"] = dir_labels["y_dir"]
 df["dir_return_4h"] = dir_labels["return_4h"]
 
-DIR_FEATURES = OLD_FEATURES + NEW_KEY_4 + LIQUIDITY_FRAGILITY + POST_ABSORPTION
-dir_feats = filter_available(DIR_FEATURES, list(df.columns))
-print(f"Features: {len(dir_feats)}")
+# Use VIF-pruned features
+pruning_path = Path("research/results/auto_pruning.json")
+if pruning_path.exists():
+    _pruning = json.loads(pruning_path.read_text())
+    dir_feats = [f for f in _pruning["direction"]["features"] if f in df.columns]
+    print(f"Features: {len(dir_feats)} (VIF-pruned)")
+else:
+    DIR_FEATURES = OLD_FEATURES + NEW_KEY_4 + LIQUIDITY_FRAGILITY + POST_ABSORPTION
+    dir_feats = filter_available(DIR_FEATURES, list(df.columns))
+    print(f"Features: {len(dir_feats)} (unpruned)")
+
+# Regime weighting: TRENDING_BULL 4x, TRENDING_BEAR 2x
+BULL_WEIGHT = 4.0
+BEAR_WEIGHT = 2.0
+
+# Compute regime for sample weighting
+_close = df["close"]
+_log_ret = np.log(_close / _close.shift(1))
+_ret_24h = _close.pct_change(24)
+_vol_24h = _log_ret.rolling(24).std()
+_vol_pct = _vol_24h.expanding(min_periods=168).rank(pct=True)
+_regime = np.full(len(df), "CHOPPY", dtype=object)
+_regime[(_vol_pct > 0.6).values & (_ret_24h > 0.005).values] = "TRENDING_BULL"
+_regime[(_vol_pct > 0.6).values & (_ret_24h < -0.005).values] = "TRENDING_BEAR"
 
 DIR_PARAMS = {
     "objective": "binary:logistic", "eval_metric": "auc",
@@ -94,8 +115,13 @@ for fold_i, (train_idx, test_idx) in enumerate(splits):
     up = y_tr.mean()
     p = DIR_PARAMS.copy()
     p["scale_pos_weight"] = (1 - up) / up if up > 0 else 1.0
+    # Regime sample weights
+    reg_tr = _regime[train_idx][tm.values]
+    sw = np.ones(len(y_tr))
+    sw[reg_tr == "TRENDING_BULL"] = BULL_WEIGHT
+    sw[reg_tr == "TRENDING_BEAR"] = BEAR_WEIGHT
     m = xgb.XGBClassifier(**p)
-    m.fit(X_tr, y_tr, eval_set=[(X_te, y_te)], verbose=False)
+    m.fit(X_tr, y_tr, sample_weight=sw, eval_set=[(X_te, y_te)], verbose=False)
     prob = m.predict_proba(X_te)[:, 1]
     dir_probs.extend(prob)
     dir_true.extend(y_te)
@@ -121,8 +147,13 @@ final_dir_params = DIR_PARAMS.copy()
 final_dir_params.pop("early_stopping_rounds")
 final_dir_params["scale_pos_weight"] = (1 - up_rate) / up_rate if up_rate > 0 else 1.0
 
+# Regime sample weights for final training
+sw_all = np.ones(len(y_all))
+reg_all = _regime[all_mask.values]
+sw_all[reg_all == "TRENDING_BULL"] = BULL_WEIGHT
+sw_all[reg_all == "TRENDING_BEAR"] = BEAR_WEIGHT
 dir_model = xgb.XGBClassifier(**final_dir_params)
-dir_model.fit(X_all, y_all, verbose=False)
+dir_model.fit(X_all, y_all, sample_weight=sw_all, verbose=False)
 
 # Export
 dir_model.get_booster().save_model(str(ARTIFACT_DIR / "direction_xgb.json"))
@@ -130,7 +161,7 @@ with open(ARTIFACT_DIR / "direction_feature_cols.json", "w") as f:
     json.dump(dir_feats, f, indent=2)
 with open(ARTIFACT_DIR / "direction_config.json", "w") as f:
     json.dump({
-        "feature_set": "old + key_4 + liq_frag + post_absorption",
+        "feature_set": "VIF-pruned + regime_weight(bull=4x,bear=2x)",
         "n_features": len(dir_feats),
         "n_samples": int(all_mask.sum()),
         "up_rate": float(up_rate),
@@ -156,10 +187,15 @@ mag_labels = build_magnitude_labels(df)
 df["y_abs_return"] = mag_labels["y_abs_return"]
 df["y_vol_adj_abs"] = mag_labels["y_vol_adj_abs"]
 
-TOXICITY_MAG = ["tox_pressure", "tox_accum_zscore", "tox_bv_vpin_zscore", "tox_div_taker"]
-MAG_FEATURES = EXPANDED_WITH_FRAGILITY + TOXICITY_MAG
-mag_feats = mag_filter(MAG_FEATURES, list(df.columns))
-print(f"Features: {len(mag_feats)}")
+# Use VIF-pruned magnitude features
+if pruning_path.exists():
+    mag_feats = [f for f in _pruning["magnitude"]["features"] if f in df.columns]
+    print(f"Features: {len(mag_feats)} (VIF-pruned)")
+else:
+    TOXICITY_MAG = ["tox_pressure", "tox_accum_zscore", "tox_bv_vpin_zscore", "tox_div_taker"]
+    MAG_FEATURES = EXPANDED_WITH_FRAGILITY + TOXICITY_MAG
+    mag_feats = mag_filter(MAG_FEATURES, list(df.columns))
+    print(f"Features: {len(mag_feats)} (unpruned)")
 
 MAG_PARAMS = {
     "objective": "reg:squarederror", "eval_metric": "mae",
