@@ -102,7 +102,9 @@ def render_dashboard(state: dict, engine) -> str:
     regime_html = ""
     for rt in regime_timeline:
         rc = {"BULL": "#4caf50", "BEAR": "#f44336", "CHOPPY": "#ff9800", "WARMUP": "#666"}.get(rt["regime"], "#999")
-        regime_html += f'<div class="regime-block" style="background:{rc};flex:{rt[\"hours\"]}" title="{rt["regime"]} ({rt["hours"]}h)">{rt["regime"][:4]}</div>'
+        hrs = rt["hours"]
+        rname = rt["regime"]
+        regime_html += f'<div class="regime-block" style="background:{rc};flex:{hrs}" title="{rname} ({hrs}h)">{rname[:4]}</div>'
 
     # Freshness rows
     fresh_html = ""
@@ -209,32 +211,8 @@ function toggle(id) {{
   </table>
 ''')}
 
-{_section("System Health", "syshealth", True, f'''
-  <div style="margin-bottom:8px">
-    Overall: <span style="color:{{"healthy":"#4caf50","degraded":"#ff9800","critical":"#f44336"}}.get("{overall_health}","#999")}">{overall_health.upper()}</span>
-  </div>
-  <table>
-    <tr><th>Check</th><th>Status</th><th>Detail</th></tr>
-    {"".join(
-        '<tr><td>{name}</td><td>{dot} {sev}</td><td>{detail}</td></tr>'.format(
-            name=c.get("name","?"),
-            dot=_dot(c.get("ok", False)),
-            sev=c.get("severity","?").upper(),
-            detail=c.get("detail","")[:80],
-        ) for c in health_checks
-    ) if health_checks else '<tr><td colspan="3" style="color:#666">Waiting for first update cycle...</td></tr>'}
-  </table>
-  <div style="margin-top:8px">
-    <table>
-      <tr><th>Component</th><th>Status</th><th>Detail</th></tr>
-      <tr><td>MySQL</td><td>{_dot(db_health.get("status")=="OK")} {db_health.get("status","?")}</td>
-          <td>history: {db_health.get("indicator_history","?")} | signals: {db_health.get("tracked_signals","?")}</td></tr>
-      <tr><td>Coinglass</td><td>{_dot("OK" in cg_text or "/" in cg_text)} {cg_text}</td><td></td></tr>
-      <tr><td>Engine</td><td>{_dot(engine is not None)} Loaded</td><td>{engine_info}</td></tr>
-      <tr><td>Error</td><td>{_dot(error is None)} {"None" if error is None else str(error)[:80]}</td><td></td></tr>
-    </table>
-  </div>
-''')}
+{_section("System Health", "syshealth", True, _build_health_html(
+    overall_health, health_checks, db_health, cg_text, engine, engine_info, error))}
 
 </body></html>"""
     return html
@@ -255,6 +233,47 @@ def _card(title, value, subtitle="", color="#4fc3f7"):
 def _dot(ok):
     cls = "dot-ok" if ok else "dot-err"
     return f'<span class="{cls} dot"></span>'
+
+
+def _build_health_html(overall, checks, db_health, cg_text, engine, engine_info, error):
+    """Build health section HTML (avoids f-string escaping issues)."""
+    color_map = {"healthy": "#4caf50", "degraded": "#ff9800", "critical": "#f44336"}
+    overall_color = color_map.get(overall, "#999")
+
+    lines = []
+    lines.append(f'<div style="margin-bottom:8px">')
+    lines.append(f'  Overall: <span style="color:{overall_color}">{overall.upper()}</span>')
+    lines.append(f'</div>')
+    lines.append('<table><tr><th>Check</th><th>Status</th><th>Detail</th></tr>')
+
+    if checks:
+        for c in checks:
+            name = c.get("name", "?")
+            dot = _dot(c.get("ok", False))
+            sev = c.get("severity", "?").upper()
+            detail = c.get("detail", "")[:80]
+            lines.append(f'<tr><td>{name}</td><td>{dot} {sev}</td><td>{detail}</td></tr>')
+    else:
+        lines.append('<tr><td colspan="3" style="color:#666">Waiting for first update cycle...</td></tr>')
+
+    lines.append('</table>')
+    lines.append('<div style="margin-top:8px"><table>')
+    lines.append('<tr><th>Component</th><th>Status</th><th>Detail</th></tr>')
+
+    db_ok = db_health.get("status") == "OK"
+    db_detail = f'history: {db_health.get("indicator_history", "?")} | signals: {db_health.get("tracked_signals", "?")}'
+    lines.append(f'<tr><td>MySQL</td><td>{_dot(db_ok)} {db_health.get("status", "?")}</td><td>{db_detail}</td></tr>')
+
+    cg_ok = "OK" in cg_text or "/" in cg_text
+    lines.append(f'<tr><td>Coinglass</td><td>{_dot(cg_ok)} {cg_text}</td><td></td></tr>')
+
+    lines.append(f'<tr><td>Engine</td><td>{_dot(engine is not None)} Loaded</td><td>{engine_info}</td></tr>')
+
+    err_text = "None" if error is None else str(error)[:80]
+    lines.append(f'<tr><td>Error</td><td>{_dot(error is None)} {err_text}</td><td></td></tr>')
+
+    lines.append('</table></div>')
+    return "\n".join(lines)
 
 
 def _section(title, sec_id, open_default, body):
