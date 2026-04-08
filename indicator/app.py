@@ -429,11 +429,11 @@ def update_cycle() -> dict:
             risk_score = _risk["risk_score"]
             risk_icon = {"HIGH": "\u26a0\ufe0f", "MEDIUM": "", "LOW": ""}[_risk["risk_level"]]
             if risk_score >= 75:
-                risk_note = "signal less reliable"
+                risk_note = "\u4fe1\u865f\u53ef\u4fe1\u5ea6\u4f4e"
             elif risk_score >= 50:
-                risk_note = "normal caution"
+                risk_note = "\u6b63\u5e38\u8b39\u614e"
             else:
-                risk_note = "signal more reliable"
+                risk_note = "\u4fe1\u865f\u53ef\u4fe1\u5ea6\u9ad8"
             risk_text = f"\nRisk: {risk_score:.0f}/100 - {risk_note}"
             if risk_icon:
                 risk_text += f" {risk_icon}"
