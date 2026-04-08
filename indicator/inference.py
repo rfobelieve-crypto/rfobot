@@ -38,6 +38,10 @@ REGIME_BLEND_WEIGHT = 0.35   # weight for regime-specific model (vs global)
 # Dynamic deadzone parameters
 CHOPPY_DEADZONE_MULT = 1.60  # CHOPPY regime: widen deadzone significantly
 TREND_DEADZONE_MULT = 0.90   # TRENDING: slightly tighter (momentum is real)
+
+# TRENDING_BULL fix: model IC=-0.03 in bull regime → contra-trend signals unreliable
+# Suppress DOWN signals in TRENDING_BULL by widening their deadzone
+BULL_CONTRA_PENALTY = 2.5    # DOWN signals in BULL need 2.5x more conviction
 VOL_DEADZONE_SCALE = 0.80    # how much vol ratio affects deadzone (0 = off, 1 = full)
 
 # BBP confirmation gate
@@ -463,10 +467,27 @@ class IndicatorEngine:
                 for i in range(n):
                     if DIR_CHOPPY_DISABLED and regime[i] == "CHOPPY":
                         continue
-                    if dir_prob[i] > DIR_HIGH_CONF and direction[i] != "UP":
-                        direction[i] = "UP"
-                    elif dir_prob[i] < DIR_LOW_CONF and direction[i] != "DOWN":
-                        direction[i] = "DOWN"
+                    # TRENDING_BULL fix: suppress contra-trend (DOWN) signals
+                    # Model IC=-0.03 in bull → DOWN predictions unreliable
+                    if regime[i] == "TRENDING_BULL":
+                        # UP signals: normal threshold
+                        if dir_prob[i] > DIR_HIGH_CONF and direction[i] != "UP":
+                            direction[i] = "UP"
+                        # DOWN signals: much stricter threshold
+                        elif dir_prob[i] < DIR_LOW_CONF / BULL_CONTRA_PENALTY and direction[i] != "DOWN":
+                            direction[i] = "DOWN"
+                        # (else: don't override to DOWN in bull)
+                    # TRENDING_BEAR: mirror — suppress UP signals
+                    elif regime[i] == "TRENDING_BEAR":
+                        if dir_prob[i] < DIR_LOW_CONF and direction[i] != "DOWN":
+                            direction[i] = "DOWN"
+                        elif dir_prob[i] > 1 - DIR_LOW_CONF / BULL_CONTRA_PENALTY and direction[i] != "UP":
+                            direction[i] = "UP"
+                    else:
+                        if dir_prob[i] > DIR_HIGH_CONF and direction[i] != "UP":
+                            direction[i] = "UP"
+                        elif dir_prob[i] < DIR_LOW_CONF and direction[i] != "DOWN":
+                            direction[i] = "DOWN"
                 n_override = int(np.sum((dir_prob > DIR_HIGH_CONF) | (dir_prob < DIR_LOW_CONF)))
                 if n_override > 0:
                     logger.info("Direction model: %d/%d bars overridden", n_override, n)
