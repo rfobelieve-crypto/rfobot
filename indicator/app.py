@@ -429,12 +429,12 @@ def update_cycle() -> dict:
             risk_score = _risk["risk_score"]
             risk_icon = {"HIGH": "\u26a0\ufe0f", "MEDIUM": "", "LOW": ""}[_risk["risk_level"]]
             if risk_score >= 75:
-                risk_note = "high risk"
+                risk_note = "signal less reliable"
             elif risk_score >= 50:
-                risk_note = "medium"
+                risk_note = "normal caution"
             else:
-                risk_note = "low risk"
-            risk_text = f"\nRisk: {risk_score:.0f}/100 ({risk_note})"
+                risk_note = "signal more reliable"
+            risk_text = f"\nRisk: {risk_score:.0f}/100 - {risk_note}"
             if risk_icon:
                 risk_text += f" {risk_icon}"
             logger.info("Entropy risk: %.0f/100 (%s) pos=%.0f%%",
