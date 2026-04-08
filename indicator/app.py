@@ -1041,8 +1041,17 @@ def force_update():
 
 
 @app.route("/dashboard")
-def dashboard():
-    """System diagnostic dashboard — single page overview."""
+def dashboard_route():
+    """System diagnostic dashboard."""
+    from indicator.dashboard import render_dashboard
+    with _lock:
+        state = dict(_state)
+    html = render_dashboard(state, _engine)
+    return Response(html, mimetype="text/html")
+
+
+def _dashboard_old():
+    """OLD dashboard — replaced by dashboard.py module."""
     from datetime import timedelta
     import pandas as pd
 
