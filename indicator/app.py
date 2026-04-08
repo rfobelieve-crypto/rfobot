@@ -1040,6 +1040,228 @@ def force_update():
         return jsonify({"status": "update_triggered"})
 
 
+@app.route("/dashboard")
+def dashboard():
+    """System diagnostic dashboard — single page overview."""
+    from datetime import timedelta
+    import pandas as pd
+
+    TZ8 = timezone(timedelta(hours=8))
+    now = datetime.now(TZ8).strftime("%Y-%m-%d %H:%M UTC+8")
+
+    # ── Collect all data ──
+    sections = {}
+
+    # 1. Engine & prediction state
+    with _lock:
+        pred = _state.get("last_prediction", {})
+        status = _state.get("status", "unknown")
+        last_update = _state.get("last_update", "N/A")
+        error = _state.get("error")
+        cg_status = _state.get("cg_status")
+
+    engine_info = "N/A"
+    if _engine:
+        engine_info = f"{_engine.mode} | Dir={getattr(_engine, '_dir_n_features', '?')} feat | Mag={getattr(_engine, '_mag_n_features', '?')} feat"
+
+    # 2. Signal tracker stats
+    sig_stats = {}
+    try:
+        from indicator.signal_tracker import _ensure_table, _get_db_conn, TABLE
+        _ensure_table()
+        sconn = _get_db_conn()
+        with sconn.cursor() as cur:
+            for tier in ["Strong", "Moderate"]:
+                cur.execute(f"""
+                    SELECT COUNT(*) as t, SUM(filled) as f, SUM(correct) as w,
+                           AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret
+                    FROM `{TABLE}` WHERE strength = %s
+                """, (tier,))
+                r = cur.fetchone()
+                tt, ff, ww = int(r["t"] or 0), int(r["f"] or 0), int(r["w"] or 0)
+                sig_stats[tier] = {
+                    "total": tt, "filled": ff, "wins": ww,
+                    "wr": f"{ww/ff*100:.0f}%" if ff > 0 else "N/A",
+                    "avg_ret": f"{float(r['avg_ret'] or 0)*100:+.2f}%" if ff > 0 else "N/A",
+                }
+            # Recent 5
+            cur.execute(f"""
+                SELECT signal_time, direction, strength, confidence, entry_price,
+                       actual_return_4h, correct, filled
+                FROM `{TABLE}` ORDER BY signal_time DESC LIMIT 5
+            """)
+            sig_stats["recent"] = cur.fetchall()
+        sconn.close()
+    except Exception as e:
+        sig_stats["error"] = str(e)
+
+    # 3. Entropy risk
+    risk_info = {}
+    try:
+        from indicator.entropy_tools import EntropyAnalyzer, EntropyRiskManager
+        with _lock:
+            features_df = _state.get("indicator_df")
+        if features_df is not None and not features_df.empty:
+            analyzer = EntropyAnalyzer()
+            me = analyzer._market_entropy(features_df)
+            risk_info["market_entropy"] = me.get("normalized", "N/A")
+            risk_info["market_entropy_zscore"] = me.get("zscore", "N/A")
+
+            risk_mgr = EntropyRiskManager()
+            r = risk_mgr.assess(
+                features_df,
+                dir_prob_up=pred.get("dir_prob_up", 0.5),
+                confidence=pred.get("confidence", 50),
+                market_regime=pred.get("regime", ""),
+            )
+            risk_info["risk_score"] = r["risk_score"]
+            risk_info["risk_level"] = r["risk_level"]
+            risk_info["position_scale"] = r["position_scale"]
+    except Exception as e:
+        risk_info["error"] = str(e)
+
+    # 4. DB health
+    db_health = {}
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) as n FROM indicator_history")
+            db_health["indicator_history"] = cur.fetchone()["n"]
+            try:
+                cur.execute(f"SELECT COUNT(*) as n FROM `{TABLE}`")
+                db_health["tracked_signals"] = cur.fetchone()["n"]
+            except Exception:
+                db_health["tracked_signals"] = "N/A"
+        conn.close()
+        db_health["status"] = "OK"
+    except Exception as e:
+        db_health["status"] = f"ERROR: {e}"
+
+    # 5. Coinglass status
+    cg_text = "N/A"
+    if cg_status:
+        cg_text = cg_status
+
+    # ── Build HTML ──
+    def card(title, value, subtitle="", color="#4fc3f7"):
+        return f"""
+        <div class="card">
+          <div class="card-title">{title}</div>
+          <div class="card-value" style="color:{color}">{value}</div>
+          <div class="card-sub">{subtitle}</div>
+        </div>"""
+
+    def status_dot(ok):
+        c = "#4caf50" if ok else "#f44336"
+        return f'<span style="color:{c}">●</span>'
+
+    # Risk color
+    risk_color = {"HIGH": "#f44336", "MEDIUM": "#ff9800", "LOW": "#4caf50"}.get(
+        risk_info.get("risk_level", ""), "#999")
+
+    # Recent signals HTML
+    recent_html = ""
+    for r in sig_stats.get("recent", []):
+        t = r["signal_time"]
+        if hasattr(t, "replace"):
+            t = t.replace(tzinfo=timezone.utc).astimezone(TZ8).strftime("%m/%d %H:%M")
+        d = r["direction"]
+        s = r["strength"][0]
+        icon = "▲" if d == "UP" else "▼"
+        dc = "#4caf50" if d == "UP" else "#f44336"
+        if r["filled"]:
+            ret = float(r["actual_return_4h"]) * 100
+            ok = "✓" if r["correct"] else "✗"
+            oc = "#4caf50" if r["correct"] else "#f44336"
+            recent_html += f'<tr><td>{t}</td><td>[{s}]</td><td style="color:{dc}">{icon} {d}</td><td>{r["confidence"]:.0f}</td><td>${r["entry_price"]:,.0f}</td><td style="color:{oc}">{ret:+.2f}% {ok}</td></tr>'
+        else:
+            recent_html += f'<tr><td>{t}</td><td>[{s}]</td><td style="color:{dc}">{icon} {d}</td><td>{r["confidence"]:.0f}</td><td>${r["entry_price"]:,.0f}</td><td style="color:#999">⏳</td></tr>'
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quant Dashboard</title>
+<meta http-equiv="refresh" content="300">
+<style>
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  body {{ background:#0d1117; color:#c9d1d9; font-family:-apple-system,sans-serif; padding:16px; }}
+  h1 {{ color:#58a6ff; font-size:20px; margin-bottom:4px; }}
+  .subtitle {{ color:#8b949e; font-size:12px; margin-bottom:16px; }}
+  .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }}
+  .card {{ background:#161b22; border:1px solid #30363d; border-radius:8px; padding:14px; }}
+  .card-title {{ color:#8b949e; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }}
+  .card-value {{ font-size:24px; font-weight:700; margin:4px 0; }}
+  .card-sub {{ color:#8b949e; font-size:11px; }}
+  .section {{ background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px; margin-bottom:16px; }}
+  .section-title {{ color:#58a6ff; font-size:14px; font-weight:600; margin-bottom:10px; }}
+  table {{ width:100%; border-collapse:collapse; font-size:13px; }}
+  th {{ text-align:left; color:#8b949e; padding:6px 8px; border-bottom:1px solid #30363d; font-size:11px; text-transform:uppercase; }}
+  td {{ padding:6px 8px; border-bottom:1px solid #21262d; }}
+  .tag {{ display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }}
+  .tag-ok {{ background:#1b4332; color:#4caf50; }}
+  .tag-warn {{ background:#3e2723; color:#ff9800; }}
+  .tag-err {{ background:#3c1111; color:#f44336; }}
+</style></head><body>
+<h1>Quant Diagnostic Dashboard</h1>
+<div class="subtitle">{now} | Auto-refresh 5min</div>
+
+<div class="grid">
+  {card("Status", status_dot(status=="healthy") + " " + status,
+        f"Last: {last_update[:19] if last_update != 'N/A' else 'N/A'}")}
+  {card("Direction", pred.get("direction","?"),
+        f'P(UP)={pred.get("dir_prob_up",0):.0%} | {pred.get("strength","?")}',
+        "#4caf50" if pred.get("direction")=="UP" else "#f44336" if pred.get("direction")=="DOWN" else "#999")}
+  {card("Confidence", f'{pred.get("confidence",0):.0f}',
+        f'Price: ${pred.get("close",0):,.0f}')}
+  {card("Risk", f'{risk_info.get("risk_score","?")}/100',
+        risk_info.get("risk_level","?"), risk_color)}
+  {card("Market Entropy", f'{risk_info.get("market_entropy","?")}'
+        if isinstance(risk_info.get("market_entropy"), float)
+        else "N/A",
+        f'z={risk_info.get("market_entropy_zscore","?")}')}
+  {card("Model", "Dual v7",
+        f'Dir=99f Mag=91f')}
+</div>
+
+<div class="section">
+  <div class="section-title">Signal Performance</div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;">
+    <div>
+      <table>
+        <tr><th>Tier</th><th>Total</th><th>Win Rate</th><th>Avg Ret</th></tr>
+        <tr><td>🔥 Strong</td><td>{sig_stats.get("Strong",{}).get("total",0)}</td>
+            <td>{sig_stats.get("Strong",{}).get("wr","N/A")}</td>
+            <td>{sig_stats.get("Strong",{}).get("avg_ret","N/A")}</td></tr>
+        <tr><td>📈 Moderate</td><td>{sig_stats.get("Moderate",{}).get("total",0)}</td>
+            <td>{sig_stats.get("Moderate",{}).get("wr","N/A")}</td>
+            <td>{sig_stats.get("Moderate",{}).get("avg_ret","N/A")}</td></tr>
+      </table>
+    </div>
+    <div>
+      <table>
+        <tr><th>Time</th><th>Tier</th><th>Dir</th><th>Conf</th><th>Entry</th><th>Result</th></tr>
+        {recent_html}
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">System Health</div>
+  <table>
+    <tr><th>Component</th><th>Status</th><th>Detail</th></tr>
+    <tr><td>MySQL</td><td>{status_dot(db_health.get("status")=="OK")} {db_health.get("status","?")}</td>
+        <td>indicator_history: {db_health.get("indicator_history","?")} rows | tracked_signals: {db_health.get("tracked_signals","?")} rows</td></tr>
+    <tr><td>Coinglass</td><td>{status_dot("OK" in str(cg_text))} {cg_text}</td><td></td></tr>
+    <tr><td>Model Engine</td><td>{status_dot(_engine is not None)} Loaded</td><td>{engine_info}</td></tr>
+    <tr><td>Error</td><td>{status_dot(error is None)} {"None" if error is None else error}</td><td></td></tr>
+  </table>
+</div>
+
+</body></html>"""
+    return Response(html, mimetype="text/html")
+
+
 # ── Scheduler ────────────────────────────────────────────────────────────────
 
 def start_scheduler():
