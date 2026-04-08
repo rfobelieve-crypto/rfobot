@@ -23,13 +23,12 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     if len(sig) == 0:
         return "<h3>No data</h3>"
 
-    # Convert index to UTC timestamps (seconds)
+    # Ensure UTC index, then offset for UTC+8 display
     from datetime import timezone, timedelta
     TZ_UTC8 = timezone(timedelta(hours=8))
     try:
         if sig.index.tz is None:
             sig.index = sig.index.tz_localize("UTC")
-        sig.index = sig.index.tz_convert(TZ_UTC8)
     except Exception:
         pass
 
@@ -43,7 +42,9 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     markers = []
 
     for i, (dt, row) in enumerate(sig.iterrows()):
-        ts = int(dt.timestamp()) + 8 * 3600  # UTC+8 offset for display
+        # Convert to UTC+8 for display, then get Unix timestamp
+        dt_utc8 = dt.astimezone(TZ_UTC8) if dt.tzinfo else dt.replace(tzinfo=timezone.utc).astimezone(TZ_UTC8)
+        ts = int(dt_utc8.timestamp())
         o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
 
         candle_data.append({"time": ts, "open": o, "high": h, "low": l, "close": c})
@@ -101,7 +102,10 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                     "size": 2 if strength == "Strong" else 1,
                 })
 
-    last_time = sig.index[-1].strftime("%Y-%m-%d %H:%M UTC+8")
+    last_dt = sig.index[-1]
+    if last_dt.tzinfo:
+        last_dt = last_dt.astimezone(TZ_UTC8)
+    last_time = last_dt.strftime("%Y-%m-%d %H:%M UTC+8")
     last_price = float(sig["close"].iloc[-1])
     last_dir = str(sig.get("pred_direction", pd.Series("?")).iloc[-1])
     last_conf = float(sig.get("confidence_score", pd.Series(0)).iloc[-1] or 0)
