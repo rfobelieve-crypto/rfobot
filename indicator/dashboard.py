@@ -53,6 +53,11 @@ def render_dashboard(state: dict, engine) -> str:
     # ── CG status ──
     cg_text = _format_cg_status(cg_status)
 
+    # ── System health (from health_monitor) ──
+    health = state.get("health", {})
+    health_checks = health.get("checks", [])
+    overall_health = health.get("overall_status", "unknown")
+
     # ── 24h prediction distribution ──
     dist_24h = _get_24h_distribution()
 
@@ -155,7 +160,10 @@ function toggle(id) {{
 <div class="subtitle">{now} | auto-refresh 5min</div>
 
 <div class="grid">
-  {_card("Status", _dot(status=="healthy") + " " + status, (last_update[:19] if last_update != "N/A" else "N/A"))}
+  {_card("Status",
+         _dot(overall_health in ("healthy","unknown")) + " " + overall_health.upper(),
+         (last_update[:19] if last_update != "N/A" else "N/A"),
+         {"healthy":"#4caf50","degraded":"#ff9800","critical":"#f44336"}.get(overall_health, "#999"))}
   {_card("Direction", pred.get("direction","?"), f'P(UP)={pred.get("dir_prob_up",0):.0%} | {pred.get("strength","?")}',
          "#4caf50" if pred.get("direction")=="UP" else "#f44336" if pred.get("direction")=="DOWN" else "#999")}
   {_card("Confidence", f'{pred.get("confidence",0):.0f}', f'${pred.get("close",0):,.0f}')}
@@ -201,15 +209,31 @@ function toggle(id) {{
   </table>
 ''')}
 
-{_section("System Health", "health", False, f'''
+{_section("System Health", "syshealth", True, f'''
+  <div style="margin-bottom:8px">
+    Overall: <span style="color:{{"healthy":"#4caf50","degraded":"#ff9800","critical":"#f44336"}}.get("{overall_health}","#999")}">{overall_health.upper()}</span>
+  </div>
   <table>
-    <tr><th>Component</th><th>Status</th><th>Detail</th></tr>
-    <tr><td>MySQL</td><td>{_dot(db_health.get("status")=="OK")} {db_health.get("status","?")}</td>
-        <td>history: {db_health.get("indicator_history","?")} | signals: {db_health.get("tracked_signals","?")}</td></tr>
-    <tr><td>Coinglass</td><td>{_dot("OK" in cg_text or "/" in cg_text)} {cg_text}</td><td></td></tr>
-    <tr><td>Engine</td><td>{_dot(engine is not None)} Loaded</td><td>{engine_info}</td></tr>
-    <tr><td>Error</td><td>{_dot(error is None)} {"None" if error is None else str(error)[:80]}</td><td></td></tr>
+    <tr><th>Check</th><th>Status</th><th>Detail</th></tr>
+    {"".join(
+        '<tr><td>{name}</td><td>{dot} {sev}</td><td>{detail}</td></tr>'.format(
+            name=c.get("name","?"),
+            dot=_dot(c.get("ok", False)),
+            sev=c.get("severity","?").upper(),
+            detail=c.get("detail","")[:80],
+        ) for c in health_checks
+    ) if health_checks else '<tr><td colspan="3" style="color:#666">Waiting for first update cycle...</td></tr>'}
   </table>
+  <div style="margin-top:8px">
+    <table>
+      <tr><th>Component</th><th>Status</th><th>Detail</th></tr>
+      <tr><td>MySQL</td><td>{_dot(db_health.get("status")=="OK")} {db_health.get("status","?")}</td>
+          <td>history: {db_health.get("indicator_history","?")} | signals: {db_health.get("tracked_signals","?")}</td></tr>
+      <tr><td>Coinglass</td><td>{_dot("OK" in cg_text or "/" in cg_text)} {cg_text}</td><td></td></tr>
+      <tr><td>Engine</td><td>{_dot(engine is not None)} Loaded</td><td>{engine_info}</td></tr>
+      <tr><td>Error</td><td>{_dot(error is None)} {"None" if error is None else str(error)[:80]}</td><td></td></tr>
+    </table>
+  </div>
 ''')}
 
 </body></html>"""

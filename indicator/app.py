@@ -316,6 +316,17 @@ def update_cycle() -> dict:
         features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades,
                                        options_data=options_data)
 
+        # 2b. NaN guard — check feature quality before prediction
+        try:
+            from indicator.health_monitor import HealthMonitor
+            safe, nan_msg = HealthMonitor.nan_guard(features, threshold=0.5)
+            if not safe:
+                logger.warning("NaN guard: %s — prediction may be unreliable", nan_msg)
+            else:
+                logger.debug("NaN guard: %s", nan_msg)
+        except Exception as e:
+            logger.warning("NaN guard check failed: %s", e)
+
         # Normalize all datetime indices to same precision
         if hasattr(klines.index, 'as_unit'):
             klines.index = klines.index.as_unit("ns")
@@ -539,6 +550,25 @@ def update_cycle() -> dict:
             run_monitor()
         except Exception as mon_err:
             logger.warning("Monitor check failed (non-critical): %s", mon_err)
+
+        # Run system health monitor
+        try:
+            from indicator.health_monitor import HealthMonitor
+            _hm = HealthMonitor()
+            with _lock:
+                _health = _hm.check_all(
+                    dict(_state), features_df=features,
+                    cg_status=cg_status, engine=_engine,
+                )
+                _state["health"] = _health
+            if _health["overall_status"] == "critical":
+                logger.error("HEALTH CRITICAL: %s",
+                             [a["detail"] for a in _health["alerts"]])
+            elif _health["overall_status"] == "degraded":
+                logger.warning("HEALTH DEGRADED: %s",
+                               [a["detail"] for a in _health["alerts"]])
+        except Exception as he:
+            logger.warning("Health monitor failed: %s", he)
 
         # IC decay check (every update, lightweight)
         try:
