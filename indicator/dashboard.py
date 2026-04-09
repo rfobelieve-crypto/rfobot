@@ -67,6 +67,15 @@ def render_dashboard(state: dict, engine) -> str:
     # ── Data freshness ──
     freshness = _get_data_freshness()
 
+    # ── IC / Win rate trend (7 days) ──
+    ic_trend = _get_ic_trend(days=7)
+
+    # ── Recent 24h predictions vs actual ──
+    pred_vs_actual = _get_pred_vs_actual(hours=24)
+
+    # ── Health alert history (7 days) ──
+    alert_history = _get_alert_history(days=7)
+
     # ── Build HTML ──
     risk_color = {"HIGH": "#f44336", "MEDIUM": "#ff9800", "LOW": "#4caf50"}.get(
         risk_info.get("risk_level", ""), "#999")
@@ -117,6 +126,7 @@ def render_dashboard(state: dict, engine) -> str:
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Quant Dashboard</title>
 <meta http-equiv="refresh" content="300">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
   body {{ background:#0d1117; color:#c9d1d9; font-family:-apple-system,BlinkMacSystemFont,sans-serif; padding:12px; font-size:13px; }}
@@ -190,6 +200,12 @@ function toggle(id) {{
 
 {_section("Signal Performance", "signals", True, _build_signal_html(sig_stats, recent_html))}
 
+{_section("IC / Win Rate Trend (7 days)", "ictrend", True, _build_ic_trend_html(ic_trend))}
+
+{_section("Prediction vs Actual (24h)", "predva", True, _build_pred_vs_actual_html(pred_vs_actual))}
+
+{_section("Alert History (7 days)", "alerts", False, _build_alert_history_html(alert_history))}
+
 {_section("Data Freshness", "fresh", False, _build_freshness_html(freshness))}
 
 {_section("System Health", "syshealth", True, _build_health_html(
@@ -234,6 +250,131 @@ def _card(title, value, subtitle="", color="#4fc3f7"):
 def _dot(ok):
     cls = "dot-ok" if ok else "dot-err"
     return f'<span class="{cls} dot"></span>'
+
+
+def _build_ic_trend_html(trend_data):
+    """Build IC + win rate trend chart using Chart.js."""
+    if not trend_data or not trend_data.get("labels"):
+        return '<div style="color:#666">Insufficient data for trend</div>'
+
+    import json as _json
+    labels_json = _json.dumps(trend_data["labels"])
+    ic_json = _json.dumps(trend_data["ic_values"])
+    wr_json = _json.dumps(trend_data["win_rates"])
+
+    return f'''
+<canvas id="icTrendChart" height="120"></canvas>
+<script>
+(function() {{
+  var ctx = document.getElementById('icTrendChart').getContext('2d');
+  new Chart(ctx, {{
+    type: 'line',
+    data: {{
+      labels: {labels_json},
+      datasets: [
+        {{
+          label: 'Rolling IC (24h)',
+          data: {ic_json},
+          borderColor: '#58a6ff',
+          backgroundColor: 'rgba(88,166,255,0.1)',
+          yAxisID: 'y',
+          tension: 0.3,
+        }},
+        {{
+          label: 'Win Rate % (24h)',
+          data: {wr_json},
+          borderColor: '#4caf50',
+          backgroundColor: 'rgba(76,175,80,0.1)',
+          yAxisID: 'y1',
+          tension: 0.3,
+        }}
+      ]
+    }},
+    options: {{
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {{ legend: {{ labels: {{ color: '#c9d1d9', font: {{ size: 10 }} }} }} }},
+      scales: {{
+        x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }} }},
+        y: {{ position: 'left', ticks: {{ color: '#58a6ff', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }}, title: {{ display: true, text: 'IC', color: '#58a6ff' }} }},
+        y1: {{ position: 'right', ticks: {{ color: '#4caf50', font: {{ size: 9 }} }}, grid: {{ drawOnChartArea: false }}, title: {{ display: true, text: 'Win %', color: '#4caf50' }} }}
+      }}
+    }}
+  }});
+}})();
+</script>
+'''
+
+
+def _build_pred_vs_actual_html(data):
+    """Build prediction direction vs actual price chart."""
+    if not data or not data.get("labels"):
+        return '<div style="color:#666">Insufficient data</div>'
+
+    import json as _json
+    labels_json = _json.dumps(data["labels"])
+    price_json = _json.dumps(data["prices"])
+    point_colors_json = _json.dumps(data["point_colors"])
+    point_sizes_json = _json.dumps(data["point_sizes"])
+
+    return f'''
+<canvas id="predChart" height="120"></canvas>
+<div style="color:#8b949e;font-size:10px;margin-top:4px">
+  Dots: UP=green, DOWN=red, NEUTRAL=gray. Larger=Strong, medium=Moderate.
+</div>
+<script>
+(function() {{
+  var ctx = document.getElementById('predChart').getContext('2d');
+  new Chart(ctx, {{
+    type: 'line',
+    data: {{
+      labels: {labels_json},
+      datasets: [{{
+        label: 'BTC Price',
+        data: {price_json},
+        borderColor: '#58a6ff',
+        backgroundColor: 'rgba(88,166,255,0.1)',
+        pointBackgroundColor: {point_colors_json},
+        pointRadius: {point_sizes_json},
+        pointHoverRadius: 6,
+        tension: 0.3,
+      }}]
+    }},
+    options: {{
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {{ legend: {{ display: false }} }},
+      scales: {{
+        x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }} }},
+        y: {{ ticks: {{ color: '#c9d1d9', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }} }}
+      }}
+    }}
+  }});
+}})();
+</script>
+'''
+
+
+def _build_alert_history_html(alerts):
+    """Build alert history table."""
+    if not alerts:
+        return '<div style="color:#4caf50">No alerts in past 7 days</div>'
+
+    lines = ['<table><tr><th>Time</th><th>Type</th><th>Alert</th></tr>']
+    for a in alerts[:20]:  # Most recent 20
+        t = a.get("time", "?")
+        atype = a.get("type", "?")
+        detail = a.get("detail", "")[:80]
+        sev = a.get("severity", "warn")
+        color = "#f44336" if sev == "critical" else "#ff9800"
+        lines.append(f'<tr><td>{t}</td><td style="color:{color}">{atype}</td><td>{detail}</td></tr>')
+    lines.append('</table>')
+
+    # Summary count
+    total = len(alerts)
+    critical = sum(1 for a in alerts if a.get("severity") == "critical")
+    summary = f'<div style="color:#8b949e;font-size:11px;margin-bottom:6px">Total: {total} alerts ({critical} critical) in past 7 days</div>'
+    return summary + "\n".join(lines)
 
 
 def _build_freshness_html(freshness):
@@ -489,3 +630,157 @@ def _get_data_freshness() -> list[dict]:
         items.append({"source": "DB", "age_min": 9999, "age_text": "ERROR", "last_time": ""})
 
     return items
+
+
+def _get_ic_trend(days: int = 7) -> dict:
+    """Compute rolling IC and win rate trend from indicator_history + tracked_signals."""
+    import numpy as np
+    import pandas as pd
+    from scipy.stats import spearmanr
+
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+    except Exception:
+        return {}
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT dt, close, pred_return_4h, pred_direction_code
+                FROM indicator_history
+                WHERE dt >= DATE_SUB(NOW(), INTERVAL %s DAY)
+                ORDER BY dt ASC
+            """, (days + 1,))
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    if not rows or len(rows) < 30:
+        return {}
+
+    df = pd.DataFrame(rows)
+    df["dt"] = pd.to_datetime(df["dt"])
+    df = df.sort_values("dt").reset_index(drop=True)
+    df["actual_4h"] = df["close"].shift(-4) / df["close"] - 1
+    df = df.dropna(subset=["actual_4h", "pred_return_4h"])
+
+    if len(df) < 30:
+        return {}
+
+    # Rolling 24-bar window
+    labels, ics, wrs = [], [], []
+    window = 24
+    for i in range(window, len(df), 6):  # step every 6 hours
+        chunk = df.iloc[i - window:i]
+        if chunk["pred_return_4h"].std() < 1e-10:
+            continue
+        ic, _ = spearmanr(chunk["pred_return_4h"], chunk["actual_4h"])
+
+        # Win rate: direction accuracy for non-neutral signals
+        active = chunk[chunk["pred_direction_code"] != 0]
+        if len(active) > 0:
+            correct = ((active["pred_direction_code"] == 1) & (active["actual_4h"] > 0)) | \
+                      ((active["pred_direction_code"] == -1) & (active["actual_4h"] < 0))
+            wr = correct.mean() * 100
+        else:
+            wr = None
+
+        labels.append(chunk["dt"].iloc[-1].strftime("%m/%d %H:%M"))
+        ics.append(round(float(ic), 3) if not np.isnan(ic) else 0)
+        wrs.append(round(float(wr), 1) if wr is not None else None)
+
+    return {"labels": labels, "ic_values": ics, "win_rates": wrs}
+
+
+def _get_pred_vs_actual(hours: int = 24) -> dict:
+    """Get price + prediction markers for last N hours."""
+    import pandas as pd
+
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+    except Exception:
+        return {}
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT dt, close, pred_direction_code, strength_code, confidence_score
+                FROM indicator_history
+                WHERE dt >= DATE_SUB(NOW(), INTERVAL %s HOUR)
+                ORDER BY dt ASC
+            """, (hours,))
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    if not rows:
+        return {}
+
+    labels, prices, point_colors, point_sizes = [], [], [], []
+    for r in rows:
+        dt = r["dt"]
+        if hasattr(dt, "replace"):
+            dt_local = dt.replace(tzinfo=timezone.utc).astimezone(TZ8)
+        else:
+            dt_local = dt
+        labels.append(dt_local.strftime("%H:%M"))
+        prices.append(round(float(r["close"]), 0))
+
+        dir_code = int(r["pred_direction_code"] or 0)
+        str_code = int(r["strength_code"] or 1)
+
+        # Color by direction
+        if dir_code == 1:
+            color = "#4caf50"
+        elif dir_code == -1:
+            color = "#f44336"
+        else:
+            color = "#666"
+
+        # Size by strength: Strong=6, Moderate=4, Weak=2
+        size = 6 if str_code == 3 else 4 if str_code == 2 else 2
+
+        point_colors.append(color)
+        point_sizes.append(size)
+
+    return {
+        "labels": labels,
+        "prices": prices,
+        "point_colors": point_colors,
+        "point_sizes": point_sizes,
+    }
+
+
+def _get_alert_history(days: int = 7) -> list[dict]:
+    """Read alert history from research/monitor_alerts.csv."""
+    import pandas as pd
+    from pathlib import Path
+
+    alert_file = Path("research/monitor_alerts.csv")
+    if not alert_file.exists():
+        return []
+
+    try:
+        df = pd.read_csv(alert_file)
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        df = df[df["timestamp"] >= cutoff]
+        df = df.sort_values("timestamp", ascending=False)
+
+        alerts = []
+        for _, row in df.iterrows():
+            t_local = row["timestamp"].tz_convert(TZ8) if row["timestamp"].tz else row["timestamp"]
+            alert_type = str(row.get("alert_type", "unknown"))
+            # Extract severity from alert text (common format)
+            severity = "critical" if "CRITICAL" in alert_type or "🔴" in alert_type else "warn"
+            alerts.append({
+                "time": t_local.strftime("%m/%d %H:%M"),
+                "type": alert_type.split(":")[0][:30],
+                "detail": alert_type[:120],
+                "severity": severity,
+            })
+        return alerts
+    except Exception:
+        return []
