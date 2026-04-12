@@ -1,12 +1,9 @@
 {
-  "feature_set": "expanded + liq_frag + post_absorption + toxicity",
-  "target": "y_vol_adj_abs",
-  "target_note": "Output is sigma-adjusted (|return|/realized_vol). Inference multiplies by realized_vol_20b to convert to return scale.",
-  "n_features": 68,
-  "n_samples": 3991,
-  "oos_ic": 0.3571472821202253,
-  "oos_icir": 2.3423741612790123,
-  "oos_top_bot_ratio": 2.1627798878415905,
+  "feature_set": "expanded",
+  "n_features": 76,
+  "n_samples": 3995,
+  "y_mean": 0.0071566479968883535,
+  "y_std": 0.007877175442709413,
   "params": {
     "objective": "reg:squarederror",
     "eval_metric": "mae",

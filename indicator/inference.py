@@ -383,17 +383,23 @@ class IndicatorEngine:
             else:
                 pred_return[i] = (dir_prob[i] - 0.5) * 2 * mag_pred[i]
 
-        # ── Confidence = magnitude percentile ──
-        # Use σ-scale values for percentile (pred_history is in σ-scale)
+        # ── Confidence = direction-first scoring ──
+        # Direction conviction is the PRIMARY driver (up to 80 pts).
+        # Magnitude percentile adds a BONUS (up to 20 pts).
+        # This ensures monotonicity: higher dir_prob → higher confidence.
         mag_score = self._compute_mag_score(mag_pred_sigma)
 
-        # Boost confidence when direction is strong
         confidence = np.full(n, np.nan)
         for i in range(n):
-            base = mag_score[i] if not np.isnan(mag_score[i]) else 50.0
-            # Scale by direction conviction (how far from 0.5)
-            dir_conviction = abs(dir_prob[i] - 0.5) * 2  # 0~1
-            confidence[i] = np.clip(base * (0.7 + 0.3 * dir_conviction), 0, 100)
+            # Direction score: how far from 0.5, power-curved
+            dir_dist = abs(dir_prob[i] - 0.5)  # 0~0.5
+            dir_score = (dir_dist / 0.5) ** 0.6 * 80  # 0~80
+
+            # Magnitude bonus: extreme predicted moves add up to 20 pts
+            ms = mag_score[i] if not np.isnan(mag_score[i]) else 50.0
+            mag_bonus = (ms / 100) * 20  # 0~20
+
+            confidence[i] = np.clip(dir_score + mag_bonus, 0, 100)
 
         # ── Strength tiers ──
         strength_tier = np.full(n, "Weak", dtype=object)
@@ -709,17 +715,19 @@ class IndicatorEngine:
     @staticmethod
     def _assign_regime(df: pd.DataFrame) -> np.ndarray:
         """Trailing-only regime classification from close prices."""
+        WARMUP_BARS = 72  # 3 days hourly — enough for stable vol percentile
+
         close = df["close"]
         log_ret = np.log(close / close.shift(1))
 
         ret_24h = close.pct_change(24)
         vol_24h = log_ret.rolling(24).std()
-        vol_pct = vol_24h.expanding(min_periods=168).rank(pct=True)
+        vol_pct = vol_24h.expanding(min_periods=WARMUP_BARS).rank(pct=True)
 
         regime = np.full(len(df), "CHOPPY", dtype=object)
         regime[(vol_pct > 0.6).values & (ret_24h > 0.005).values] = "TRENDING_BULL"
         regime[(vol_pct > 0.6).values & (ret_24h < -0.005).values] = "TRENDING_BEAR"
-        regime[:168] = "WARMUP"
+        regime[:WARMUP_BARS] = "WARMUP"
 
         return regime
 

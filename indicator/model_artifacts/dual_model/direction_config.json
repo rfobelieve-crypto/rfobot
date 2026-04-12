@@ -1,12 +1,9 @@
 {
-  "feature_set": "VIF-pruned + regime_weight(bull=4x,bear=2x)",
-  "n_features": 75,
-  "n_samples": 2950,
-  "up_rate": 0.49627118644067797,
-  "scale_pos_weight": 1.0150273224043718,
-  "oos_auc": 0.6032177720494093,
-  "oos_accuracy": 0.5847953216374269,
-  "oos_ic": 0.16680427646891072,
+  "feature_set": "+ key_4_only",
+  "n_features": 88,
+  "n_samples": 2937,
+  "up_rate": 0.4926796050391556,
+  "scale_pos_weight": 1.0297166551485835,
   "params": {
     "objective": "binary:logistic",
     "eval_metric": "auc",
