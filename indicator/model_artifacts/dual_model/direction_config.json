@@ -1,9 +1,14 @@
 {
-  "feature_set": "+ key_4_only",
-  "n_features": 88,
+  "feature_set": "pruned_29_ic_filtered",
+  "n_features": 29,
   "n_samples": 2937,
-  "up_rate": 0.4926796050391556,
-  "scale_pos_weight": 1.0297166551485835,
+  "up_rate": 0.4923391215526047,
+  "scale_pos_weight": 1.0311203319502074,
+  "oos_auc": 0.5971,
+  "oos_accuracy": 0.5814,
+  "oos_f1": 0.5888,
+  "oos_last10_auc": 0.6022,
+  "pruning_method": "univariate IC > 0.03 (p<0.05) + redundancy removal + structural features",
   "params": {
     "objective": "binary:logistic",
     "eval_metric": "auc",
