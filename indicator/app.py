@@ -1055,8 +1055,8 @@ def meeting_route():
 
     def _run_sweep():
         try:
-            from indicator.agents.watchdog import run_full_sweep
-            result = run_full_sweep()
+            from indicator.agents.watchdog import run_on_demand
+            result = run_on_demand()
             return {"status": "ok", **result}
         except Exception as e:
             logger.exception("Agent sweep failed")
@@ -1333,7 +1333,7 @@ def _dashboard_old():
 # ── Scheduler ────────────────────────────────────────────────────────────────
 
 def _run_watchdog_quick():
-    """Run quick agent sweep (DataCollector + Infra). Called by scheduler."""
+    """Gatekeeper check: free if healthy, invokes Claude only on anomalies."""
     try:
         from indicator.agents.watchdog import run_quick_sweep
         run_quick_sweep()
@@ -1342,7 +1342,7 @@ def _run_watchdog_quick():
 
 
 def _run_watchdog_full():
-    """Run full agent sweep (all 5 agents). Called by scheduler."""
+    """Gatekeeper + periodic model/signal deep check."""
     try:
         from indicator.agents.watchdog import run_full_sweep
         run_full_sweep()
