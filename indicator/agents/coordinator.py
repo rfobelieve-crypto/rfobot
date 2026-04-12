@@ -89,17 +89,23 @@ class AgentCoordinator:
         logger.info("Coordinator: done in %.1fs — overall=%s", total_time, overall)
         return results
 
-    def collect_all_context(self) -> dict:
-        """Collect context from all agents without calling Claude."""
-        contexts = {}
+    def collect_all_tool_outputs(self) -> dict:
+        """Run each agent's tools once without calling Claude. For debugging."""
+        outputs = {}
         for name, agent in self.agents.items():
-            try:
-                t0 = time.time()
-                contexts[name] = agent.collect_context()
-                contexts[name]["_collect_time_s"] = round(time.time() - t0, 2)
-            except Exception as e:
-                contexts[name] = {"error": str(e)}
-        return contexts
+            agent_out = {}
+            for tool in agent.get_tools():
+                try:
+                    t0 = time.time()
+                    result = agent.execute_tool(tool["name"], {})
+                    agent_out[tool["name"]] = {
+                        "result": json.loads(result) if isinstance(result, str) else result,
+                        "time_s": round(time.time() - t0, 2),
+                    }
+                except Exception as e:
+                    agent_out[tool["name"]] = {"error": str(e)}
+            outputs[name] = agent_out
+        return outputs
 
     def format_report(self, results: list[AgentResult]) -> str:
         """Format results as Telegram-ready HTML report."""
@@ -161,8 +167,8 @@ def main():
     coordinator = AgentCoordinator(agent_names=agent_names)
 
     if args.context_only:
-        contexts = coordinator.collect_all_context()
-        print(json.dumps(contexts, indent=2, default=str, ensure_ascii=False))
+        outputs = coordinator.collect_all_tool_outputs()
+        print(json.dumps(outputs, indent=2, default=str, ensure_ascii=False))
         return
 
     results = coordinator.run_all()

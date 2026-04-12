@@ -1,14 +1,13 @@
 """
-FeatureGuard Agent — AI-powered feature quality monitor.
+FeatureGuard Agent — Tool-Use Architecture.
 
-Monitors the 130+ engineered features for:
-  - NaN epidemics (which features, which data source caused it)
-  - Distribution drift (feature values shifting outside training range)
-  - Correlation breakdown (features that should co-move diverging)
-  - Upstream data source impact (if CG fails, which features go NaN)
+Claude gets tools to build features and inspect quality. It can check
+NaN rates, distributions, specific feature groups, and trace NaN patterns
+back to their upstream data source.
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
 from datetime import datetime, timezone, timedelta
@@ -22,32 +21,8 @@ logger = logging.getLogger(__name__)
 
 TZ_TPE = timezone(timedelta(hours=8))
 
-# Feature groups by data source — if a source fails, these go NaN
-FEATURE_GROUPS = {
-    "binance_klines": [
-        "log_return", "realized_vol_20b", "return_kurtosis", "close_to_ema20_ratio",
-        "vol_regime", "hour_sin", "hour_cos", "day_sin", "day_cos",
-        "volume", "taker_ratio", "volume_zscore_20",
-    ],
-    "coinglass_oi": ["oi_change_1h", "oi_change_4h", "oi_change_24h", "oi_zscore_20"],
-    "coinglass_funding": ["funding_rate", "funding_deviation", "funding_zscore_20"],
-    "coinglass_liquidation": ["liq_long_usd_1h", "liq_short_usd_1h", "liq_ratio_1h"],
-    "coinglass_sentiment": [
-        "long_short_ratio", "global_ls_ratio", "top_ls_position_ratio",
-        "coinbase_premium",
-    ],
-    "coinglass_flow": ["futures_cvd_agg", "spot_cvd_agg", "taker_buy_vol", "taker_sell_vol"],
-    "deribit": ["dvol", "dvol_change", "pc_vol_ratio", "pc_oi_ratio", "iv_skew"],
-    "depth": ["depth_imbalance", "near_bid_usd", "near_ask_usd", "spread_bps"],
-    "aggtrades": [
-        "large_buy_usd", "large_sell_usd", "large_delta_usd",
-        "large_trade_ratio", "avg_trade_usd",
-    ],
-    "engineered_alpha": [
-        "impact_asymmetry", "post_absorb_breakout", "liq_fragility",
-        "toxicity_flow_ratio", "smart_money_divergence",
-    ],
-}
+# Cached features from build — shared across tool calls within one run
+_cached_features: pd.DataFrame | None = None
 
 
 class FeatureGuardAgent(BaseAgent):
@@ -59,102 +34,96 @@ class FeatureGuardAgent(BaseAgent):
     @property
     def system_prompt(self) -> str:
         return """\
-You are a senior quantitative researcher monitoring feature quality for a \
-BTC prediction model. You understand that garbage features → garbage predictions, \
-and your job is to catch feature degradation BEFORE it corrupts model output.
+You are a senior quant researcher monitoring feature quality for a BTC prediction model.
 
-## System Context
-- 130+ engineered features from 12 groups, feeding dual XGBoost models
-- Features built hourly from: Binance (klines/depth/aggTrades), Coinglass (14+ endpoints), Deribit
-- All features are trailing-only (no look-ahead bias)
-- Feature builder: `build_live_features()` in `feature_builder_live.py`
+## Your Investigation Protocol
+1. First, build features from live data (build_features tool) — this gives you overall stats
+2. Check NaN rates by feature group — trace NaN epidemics to upstream source
+3. Check distribution of key features — catch drift or outliers
+4. Check sanity of critical values (vol, funding rate, magnitudes)
+5. Conclude with diagnosis
 
-## What You Monitor
+## What You Know
+- 130+ features from 12 groups, built from Binance + Coinglass + Deribit data
+- If upstream source fails → entire feature group goes NaN → zero-filled → silent degradation
+- Feature groups: binance_klines, coinglass_oi, coinglass_funding, coinglass_liquidation,
+  coinglass_sentiment, coinglass_flow, deribit, depth, aggtrades, engineered_alpha
+- Key sanity bounds:
+  - realized_vol_20b: 0.0001~0.1 (hourly std of log returns)
+  - funding_rate: -0.01~+0.01
+  - depth_imbalance: -1 to +1
+  - pred_return_4h: ±0.001~0.05 (if >0.5 → σ-scale bug)
+  - mag_pred: 0~0.05 (if >1 → vol conversion missing)
 
-### 1. NaN Epidemics
-- If an upstream source fails, entire feature groups go NaN
-- NaN features are zero-filled before model input — this silently degrades predictions
-- Key question: are NaNs random (one-off) or systematic (upstream failure)?
-- A single NaN column is noise. An entire group going NaN = upstream problem.
+## Self-Healing Actions (use repair tools when criteria are met)
+- If NaN rate >30% AND cache files are stale → `repair_clear_stale_cache` then `repair_trigger_update`
+- If a specific feature group is 100% NaN → likely upstream failure, clear cache for fresh fetch
+- Always verify: after repair, re-check NaN rates before concluding.
+- Do NOT repair if NaN rate is low (<10%) — small NaN rates are normal edge effects.
 
-### 2. Distribution Drift
-- Features should stay within their training range
-- Extreme outliers (>5σ from training mean) might be: data error, market regime change, or real signal
-- You need to distinguish "BTC just moved 10% so vol is extreme" from "funding_rate returned 999"
-- Key ratios to watch: realized_vol_20b, funding_rate, oi_change, depth_imbalance
+Respond in Traditional Chinese."""
 
-### 3. Value Sanity
-- `realized_vol_20b` should be 0.001-0.05 range (hourly std of log returns)
-- `funding_rate` should be -0.001 to +0.003 range (extreme: ±0.01)
-- `depth_imbalance` should be -1 to +1
-- `pred_return_4h` should be -0.05 to +0.05 (if larger → magnitude scale bug)
-- `mag_pred` should be 0 to 0.05 (if >1 → σ-scale not converted)
-
-### 4. Upstream Attribution
-- Feature groups map to data sources. If you see NaN pattern, trace it to the source.
-- Coinglass groups: oi, funding, liquidation, sentiment, flow
-- Binance groups: klines (most critical), depth, aggtrades
-- Deribit: dvol, options
-
-## Your Judgment
-- Don't just flag NaN%. Explain WHY and WHAT IMPACT on predictions.
-- "funding features 100% NaN" → "model loses funding signal, direction accuracy may drop 3-5%"
-- "realized_vol at 0.08 (4x normal)" → "market crash? check if BTC moved >8% today"
-- Correlate findings: if OI features drift AND funding extreme → leverage cascade happening
-- Respond in Traditional Chinese for summary/report fields."""
-
-    def collect_context(self) -> dict:
-        """Build features and analyze their quality."""
-        context = {}
-
-        # Build current features
-        try:
-            features, build_info = self._build_current_features()
-            context["build_success"] = True
-            context["build_info"] = build_info
-
-            # NaN analysis by group
-            context["nan_analysis"] = self._analyze_nans(features)
-
-            # Distribution stats for key features
-            context["distribution"] = self._analyze_distribution(features)
-
-            # Sanity checks on critical values
-            context["sanity_checks"] = self._check_sanity(features)
-
-            # Last row (what the model will actually see)
-            context["latest_features"] = self._extract_latest(features)
-
-        except Exception as e:
-            context["build_success"] = False
-            context["build_error"] = str(e)
-
-        return context
-
-    def get_available_actions(self) -> list[dict]:
+    def get_tools(self) -> list[dict]:
         return [
-            {"name": "ALERT", "description": "Send Telegram alert about feature degradation"},
-            {"name": "LOG", "description": "Log finding for historical tracking"},
-            {"name": "NONE", "description": "Informational, no action needed"},
+            {
+                "name": "build_features",
+                "description": "Build features from live data. Returns: row count, column count, build time, overall NaN rate, and list of columns.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "check_nan_by_group",
+                "description": "Check NaN rates grouped by data source. Shows which feature groups are affected and how severely.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "check_distribution",
+                "description": "Get distribution stats (mean, std, min, max, current z-score) for key features.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "check_feature_values",
+                "description": "Get the actual values of the latest feature row (what the model sees right now).",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "check_sanity",
+                "description": "Check critical feature values against known valid ranges.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
         ]
 
-    def _build_current_features(self) -> tuple:
-        """Build features from live data, capture timing and errors."""
+    def execute_tool(self, tool_name: str, tool_input: dict) -> str:
+        global _cached_features
+        handlers = {
+            "build_features": self._tool_build,
+            "check_nan_by_group": self._tool_nan_groups,
+            "check_distribution": self._tool_distribution,
+            "check_feature_values": self._tool_latest_values,
+            "check_sanity": self._tool_sanity,
+        }
+        handler = handlers.get(tool_name)
+        if not handler:
+            return json.dumps({"error": f"Unknown tool: {tool_name}"})
+        try:
+            return json.dumps(handler(), default=str, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    def _get_features(self) -> pd.DataFrame:
+        global _cached_features
+        if _cached_features is not None:
+            return _cached_features
         from indicator.data_fetcher import (
-            fetch_binance_klines, fetch_coinglass,
-            fetch_binance_depth, fetch_binance_aggtrades,
-            fetch_deribit_dvol, fetch_deribit_options_summary,
-            fetch_cg_options, fetch_cg_etf_flow,
+            fetch_binance_klines, fetch_coinglass, fetch_binance_depth,
+            fetch_binance_aggtrades, fetch_deribit_dvol,
+            fetch_deribit_options_summary, fetch_cg_options, fetch_cg_etf_flow,
         )
         from indicator.feature_builder_live import build_live_features
-
-        t0 = time.time()
 
         klines = fetch_binance_klines(limit=200)
         cg_data = fetch_coinglass(interval="1h", limit=200)
         depth = fetch_binance_depth()
         aggtrades = fetch_binance_aggtrades()
-
         options_data = {}
         for fn in [fetch_cg_options, fetch_cg_etf_flow,
                     fetch_deribit_dvol, fetch_deribit_options_summary]:
@@ -162,159 +131,124 @@ and your job is to catch feature degradation BEFORE it corrupts model output.
                 options_data.update(fn())
             except Exception:
                 pass
+        _cached_features = build_live_features(
+            klines, cg_data, depth=depth, aggtrades=aggtrades, options_data=options_data
+        )
+        return _cached_features
 
-        features = build_live_features(klines, cg_data, depth=depth,
-                                        aggtrades=aggtrades, options_data=options_data)
+    def _tool_build(self) -> dict:
+        t0 = time.time()
+        features = self._get_features()
         build_time = time.time() - t0
-
-        build_info = {
+        nan_rate = features.isna().mean().mean()
+        last_nan = features.iloc[-1].isna().mean() if len(features) > 0 else 1.0
+        return {
             "rows": len(features),
             "columns": len(features.columns),
             "build_time_s": round(build_time, 2),
+            "overall_nan_rate_pct": round(nan_rate * 100, 2),
+            "last_row_nan_pct": round(last_nan * 100, 1),
             "time_range": f"{features.index[0]} ~ {features.index[-1]}" if len(features) > 0 else "empty",
         }
 
-        return features, build_info
-
-    def _analyze_nans(self, features: pd.DataFrame) -> dict:
-        """Analyze NaN patterns by feature group."""
-        result = {}
-        total_cols = len(features.columns)
-        last_row = features.iloc[-1] if len(features) > 0 else pd.Series()
-
-        # Overall
-        nan_counts = features.isna().sum()
-        nan_pct = (nan_counts / len(features) * 100).round(1)
-        overall_nan_rate = features.isna().mean().mean()
-
-        result["overall"] = {
-            "total_features": total_cols,
-            "overall_nan_rate_pct": round(overall_nan_rate * 100, 2),
-            "last_row_nan_count": int(last_row.isna().sum()) if len(last_row) > 0 else None,
-            "last_row_nan_pct": round(last_row.isna().mean() * 100, 1) if len(last_row) > 0 else None,
+    def _tool_nan_groups(self) -> dict:
+        features = self._get_features()
+        groups = {
+            "binance_klines": ["log_return", "realized_vol_20b", "return_kurtosis", "volume", "taker_ratio"],
+            "coinglass_oi": ["oi_change_1h", "oi_change_4h", "oi_change_24h"],
+            "coinglass_funding": ["funding_rate", "funding_deviation", "funding_zscore_20"],
+            "coinglass_sentiment": ["long_short_ratio", "global_ls_ratio", "coinbase_premium"],
+            "coinglass_flow": ["futures_cvd_agg", "spot_cvd_agg", "taker_buy_vol"],
+            "deribit": ["dvol", "dvol_change", "pc_vol_ratio"],
+            "depth": ["depth_imbalance", "spread_bps", "near_bid_usd"],
+            "aggtrades": ["large_buy_usd", "large_sell_usd", "large_delta_usd"],
+            "engineered_alpha": ["impact_asymmetry", "post_absorb_breakout", "liq_fragility"],
         }
-
-        # By group
-        group_analysis = {}
-        for group_name, expected_features in FEATURE_GROUPS.items():
-            present = [f for f in expected_features if f in features.columns]
-            missing = [f for f in expected_features if f not in features.columns]
-
+        result = {}
+        last = features.iloc[-1] if len(features) > 0 else pd.Series()
+        for group, expected in groups.items():
+            present = [f for f in expected if f in features.columns]
+            missing = [f for f in expected if f not in features.columns]
             if present:
-                group_nan_pct = features[present].iloc[-5:].isna().mean().mean() * 100
-                last_nan = last_row[present].isna().sum() if len(last_row) > 0 else 0
+                group_nan = features[present].iloc[-5:].isna().mean().mean() * 100
+                last_nan = last[present].isna().sum() if len(last) > 0 else len(present)
             else:
-                group_nan_pct = 100.0
-                last_nan = len(expected_features)
-
-            group_analysis[group_name] = {
-                "expected": len(expected_features),
-                "present": len(present),
-                "missing_from_df": missing,
-                "nan_pct_last5": round(group_nan_pct, 1),
+                group_nan = 100.0
+                last_nan = len(expected)
+            result[group] = {
+                "expected": len(expected), "present": len(present),
+                "missing": missing,
+                "nan_pct_last5": round(group_nan, 1),
                 "last_row_nan": int(last_nan),
             }
-
-        result["by_group"] = group_analysis
-
-        # Top NaN features (last 5 rows)
-        last5_nan = features.iloc[-5:].isna().mean().sort_values(ascending=False)
-        top_nan = {col: round(pct * 100, 1) for col, pct in last5_nan.head(10).items() if pct > 0}
-        result["top_nan_features"] = top_nan
-
         return result
 
-    def _analyze_distribution(self, features: pd.DataFrame) -> dict:
-        """Check distribution stats for key features."""
-        key_features = [
-            "realized_vol_20b", "funding_rate", "depth_imbalance",
-            "oi_change_1h", "long_short_ratio", "volume_zscore_20",
-            "coinbase_premium", "dvol",
-        ]
-
+    def _tool_distribution(self) -> dict:
+        features = self._get_features()
+        key_feats = ["realized_vol_20b", "funding_rate", "depth_imbalance",
+                     "oi_change_1h", "long_short_ratio", "volume_zscore_20",
+                     "coinbase_premium", "dvol"]
         result = {}
-        for feat in key_features:
+        for feat in key_feats:
             if feat not in features.columns:
                 result[feat] = {"present": False}
                 continue
-
             vals = features[feat].dropna()
             if len(vals) < 10:
                 result[feat] = {"present": True, "insufficient_data": True}
                 continue
-
-            current = float(vals.iloc[-1]) if len(vals) > 0 else None
+            current = float(vals.iloc[-1])
+            std = float(vals.std())
             result[feat] = {
-                "present": True,
-                "current": current,
+                "current": round(current, 6),
                 "mean": round(float(vals.mean()), 6),
-                "std": round(float(vals.std()), 6),
+                "std": round(std, 6),
                 "min": round(float(vals.min()), 6),
                 "max": round(float(vals.max()), 6),
-                "zscore_current": round((current - float(vals.mean())) / max(float(vals.std()), 1e-10), 2) if current else None,
+                "zscore": round((current - float(vals.mean())) / max(std, 1e-10), 2),
             }
-
         return result
 
-    def _check_sanity(self, features: pd.DataFrame) -> dict:
-        """Check critical values against known valid ranges."""
-        checks = {}
-        last = features.iloc[-1] if len(features) > 0 else pd.Series()
+    def _tool_latest_values(self) -> dict:
+        features = self._get_features()
+        if features.empty:
+            return {"error": "no features"}
+        last = features.iloc[-1]
+        important = ["close", "log_return", "realized_vol_20b", "volume",
+                     "funding_rate", "oi_change_1h", "long_short_ratio",
+                     "depth_imbalance", "large_delta_usd", "dvol",
+                     "coinbase_premium", "taker_ratio",
+                     "impact_asymmetry", "post_absorb_breakout"]
+        return {f: round(float(last[f]), 6) for f in important if f in last.index and pd.notna(last[f])}
 
-        sanity_rules = {
-            "realized_vol_20b": (0.0001, 0.1, "hourly vol should be 0.01%-10%"),
-            "funding_rate": (-0.01, 0.01, "funding rate ±1% is extreme"),
-            "depth_imbalance": (-1.0, 1.0, "imbalance is bounded [-1, 1]"),
-            "volume_zscore_20": (-5, 5, "z-score beyond ±5 is very unusual"),
+    def _tool_sanity(self) -> dict:
+        features = self._get_features()
+        if features.empty:
+            return {"error": "no features"}
+        last = features.iloc[-1]
+        rules = {
+            "realized_vol_20b": (0.0001, 0.1, "hourly vol 0.01%-10%"),
+            "funding_rate": (-0.01, 0.01, "funding ±1% is extreme"),
+            "depth_imbalance": (-1.0, 1.0, "bounded [-1,1]"),
         }
-
-        for feat, (lo, hi, note) in sanity_rules.items():
+        result = {}
+        for feat, (lo, hi, note) in rules.items():
             if feat in last.index and pd.notna(last[feat]):
                 val = float(last[feat])
-                checks[feat] = {
-                    "value": val,
-                    "in_range": lo <= val <= hi,
-                    "range": f"[{lo}, {hi}]",
-                    "note": note,
-                }
-
-        return checks
-
-    def _extract_latest(self, features: pd.DataFrame) -> dict:
-        """Extract the latest feature row (what model actually sees)."""
-        if features.empty:
-            return {}
-
-        last = features.iloc[-1]
-        # Only include non-NaN values, limit to 30 most important
-        important = [
-            "close", "log_return", "realized_vol_20b", "volume",
-            "funding_rate", "oi_change_1h", "long_short_ratio",
-            "depth_imbalance", "large_delta_usd", "dvol",
-            "coinbase_premium", "taker_ratio",
-            "impact_asymmetry", "post_absorb_breakout",
-        ]
-        result = {}
-        for feat in important:
-            if feat in last.index and pd.notna(last[feat]):
-                result[feat] = round(float(last[feat]), 6)
+                result[feat] = {"value": val, "in_range": lo <= val <= hi, "range": f"[{lo},{hi}]", "note": note}
         return result
 
 
-# ── CLI ──────────────────────────────────────────────────────────────────
-
 if __name__ == "__main__":
-    import json as _json
     import sys
-
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-
     agent = FeatureGuardAgent()
     if "--context-only" in sys.argv:
-        ctx = agent.collect_context()
-        print(_json.dumps(ctx, indent=2, default=str, ensure_ascii=False))
+        for tool in agent.get_tools():
+            print(f"\n--- {tool['name']} ---")
+            print(agent.execute_tool(tool["name"], {}))
     else:
         result = agent.run()
         print(f"\nAgent: {result.agent_name} | Status: {result.status}")
         print(f"Summary: {result.summary}")
-        print(f"\nDiagnosis:\n{_json.dumps(result.diagnosis, indent=2, ensure_ascii=False)}")
+        print(f"Tools: {result.tool_calls_made} | Turns: {result.turns_used}")

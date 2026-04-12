@@ -1708,6 +1708,27 @@ def _handle_signal_perf(chat_id: str):
         send_message(chat_id, f"❌ 信號績效查詢失敗: {e}")
 
 
+def _handle_meeting(chat_id: str):
+    """Trigger AI agent meeting via Indicator service."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "\u274c INDICATOR_SERVICE_URL \u672a\u8a2d\u5b9a")
+        return
+    try:
+        resp = requests.get(
+            f"{INDICATOR_SERVICE_URL}/meeting",
+            params={"sync": "1", "chat_id": chat_id},
+            timeout=300,  # meetings can take a few minutes
+        )
+        data = resp.json()
+        if data.get("status") != "ok":
+            send_message(chat_id, f"\u274c Meeting \u5931\u6557: {data.get('error', 'unknown')}")
+    except requests.Timeout:
+        send_message(chat_id, "\u26a0\ufe0f Meeting \u903e\u6642\uff08>5\u5206\u9418\uff09\uff0c\u53ef\u80fd\u4ecd\u5728\u904b\u884c\u4e2d")
+    except Exception as e:
+        logger.exception("meeting error: %s", e)
+        send_message(chat_id, f"\u274c Meeting \u5931\u6557: {e}")
+
+
 def _handle_force_update(chat_id: str):
     """Trigger manual indicator update cycle (sync mode — waits for result)."""
     if not INDICATOR_SERVICE_URL:
@@ -1839,6 +1860,9 @@ def webhook():
                     send_message(cb_chat_id, "INDICATOR_SERVICE_URL 未設定")
             elif cb_data == "sweep":
                 send_message(cb_chat_id, outcome_tracker.format_active_trackers_report())
+            elif cb_data == "meeting":
+                send_message(cb_chat_id, "\U0001f4cb AI Meeting 啟動中... 5 個 agent 正在調查系統狀態，完成後會發送報告。")
+                threading.Thread(target=_handle_meeting, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "help":
                 _send_help(cb_chat_id)
             return "ok"

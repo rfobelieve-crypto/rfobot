@@ -1,15 +1,22 @@
 """
-Base AI Agent — the brain framework for all domain agents.
+Base AI Agent — Tool-Use Agentic Loop.
 
-Philosophy: Claude IS the maintenance engineer. The code just gives it
-eyes (context collection) and hands (action execution). Claude decides
-what's wrong, why, and what to do about it.
+Architecture: Claude gets a set of tools (check_binance, query_db, etc.)
+and drives the investigation itself. It decides what to check, in what order,
+and can drill down when it finds something suspicious.
 
-Each agent:
-  1. collect_context()  → raw system state (numbers, not booleans)
-  2. analyze()          → Claude reads the raw data, thinks like a SRE
-  3. act()              → Claude's recommended actions get executed
-  4. run()              → full cycle: collect → analyze → act → alert
+Flow:
+  1. Agent starts with a system prompt + initial task message
+  2. Claude calls tools to investigate
+  3. Agent executes tools, returns results to Claude
+  4. Claude continues investigating or concludes with diagnosis
+  5. Loop until Claude produces final diagnosis (stop_reason = "end_turn")
+
+This is fundamentally different from collect→analyze:
+  - Claude chooses WHAT to investigate (not everything)
+  - Claude can drill down (call tool A, then based on result, call tool B)
+  - Claude can correlate across tools in real time
+  - Much more token-efficient for healthy systems (Claude skips what looks fine)
 """
 from __future__ import annotations
 
@@ -20,7 +27,7 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 import anthropic
 
@@ -31,43 +38,25 @@ TZ_TPE = timezone(timedelta(hours=8))
 # ── Config ───────────────────────────────────────────────────────────────
 MODEL = os.environ.get("AGENT_MODEL", "claude-sonnet-4-20250514")
 MAX_TOKENS = int(os.environ.get("AGENT_MAX_TOKENS", "8192"))
+MAX_TURNS = int(os.environ.get("AGENT_MAX_TURNS", "15"))
 AGENT_API_KEY = os.environ.get("AGENT_API_KEY", "")
 
-# Telegram for agent alerts (reuse indicator bot or separate)
 AGENT_BOT_TOKEN = os.environ.get("AGENT_BOT_TOKEN", "")
 AGENT_CHAT_ID = os.environ.get("AGENT_CHAT_ID", "")
-
-# Response schema that every agent must follow
-RESPONSE_SCHEMA = """\
-Respond with ONLY this JSON (no markdown fences, no extra text):
-{
-  "status": "healthy | degraded | critical",
-  "summary": "one-line human-readable summary in Traditional Chinese",
-  "findings": [
-    {
-      "severity": "critical | warning | info",
-      "title": "short title",
-      "detail": "what you observed, why it matters, what could happen if ignored",
-      "action": "exactly what should be done — be specific (retry X, check Y, restart Z)",
-      "auto_action": "ALERT | RETRY_ENDPOINT | LOG | NONE"
-    }
-  ],
-  "telegram_report": "2-5 line HTML summary suitable for Telegram push (use <b> for bold, keep it concise)",
-  "next_check_minutes": 60
-}"""
 
 
 @dataclass
 class AgentResult:
     """Structured output from an agent run."""
     agent_name: str
-    status: str
-    summary: str
+    status: str                       # healthy | degraded | critical | error
+    summary: str                      # one-line summary in Traditional Chinese
     diagnosis: dict = field(default_factory=dict)
     raw_response: str = ""
+    tool_calls_made: list[str] = field(default_factory=list)
     actions_taken: list[str] = field(default_factory=list)
     alerts_sent: list[str] = field(default_factory=list)
-    context_snapshot: dict = field(default_factory=dict)
+    turns_used: int = 0
     timestamp: str = ""
     duration_s: float = 0.0
 
@@ -78,12 +67,13 @@ class AgentResult:
 
 class BaseAgent(ABC):
     """
-    Abstract base for all AI maintenance agents.
+    Abstract base for tool-use AI agents.
 
-    Claude is the brain — subclasses just define:
-      - What data to show Claude (collect_context)
-      - What Claude's role is (system_prompt)
-      - What actions are available (available_actions + execute_action)
+    Subclasses define:
+      - name: agent identifier
+      - system_prompt: Claude's role and expertise
+      - get_tools(): list of tool definitions (Anthropic tool schema)
+      - execute_tool(name, input): run a tool and return result
     """
 
     def __init__(self):
@@ -92,59 +82,37 @@ class BaseAgent(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        """Agent identifier, e.g. 'DataCollector'."""
+        """Agent identifier."""
 
     @property
     @abstractmethod
     def system_prompt(self) -> str:
+        """System prompt with deep domain expertise."""
+
+    @abstractmethod
+    def get_tools(self) -> list[dict]:
         """
-        System prompt defining this agent's expertise and domain knowledge.
-        This is the agent's "brain" — it should contain deep operational
-        knowledge, not just rules.
+        Return tool definitions in Anthropic API format.
+
+        Each tool: {
+            "name": "check_binance_klines",
+            "description": "Fetch recent Binance klines and return freshness/latency",
+            "input_schema": {
+                "type": "object",
+                "properties": { ... },
+                "required": [ ... ]
+            }
+        }
         """
 
     @abstractmethod
-    def collect_context(self) -> dict:
+    def execute_tool(self, tool_name: str, tool_input: dict) -> str:
         """
-        Gather RAW system state for Claude to analyze.
-
-        Feed raw numbers, not pre-digested booleans. Let Claude
-        interpret what's normal vs abnormal. Include enough context
-        for Claude to reason about root causes and correlations.
+        Execute a tool call and return the result as a string.
+        This is where the actual system interaction happens.
         """
 
-    def get_available_actions(self) -> list[dict]:
-        """
-        Define what actions this agent can take.
-        Override in subclass to add domain-specific actions.
-        Returns list of {"name": ..., "description": ...}
-        """
-        return [
-            {"name": "ALERT", "description": "Send Telegram alert to operator"},
-            {"name": "LOG", "description": "Log finding for record-keeping"},
-            {"name": "NONE", "description": "No action needed, just noting"},
-        ]
-
-    def execute_action(self, action_name: str, finding: dict, context: dict) -> str:
-        """
-        Execute an action recommended by Claude.
-        Override in subclass to add domain-specific action handlers.
-        Returns description of what was done.
-        """
-        if action_name == "ALERT":
-            msg = finding.get("detail", finding.get("title", "Unknown issue"))
-            self.send_alert(
-                f"🤖 <b>[{self.name}]</b>\n"
-                f"<b>{finding.get('title', '')}</b>\n"
-                f"{msg}"
-            )
-            return f"Alert sent: {finding.get('title', '')}"
-        elif action_name == "LOG":
-            logger.info("[%s] %s: %s", self.name, finding.get("title"), finding.get("detail"))
-            return f"Logged: {finding.get('title', '')}"
-        return f"No handler for action: {action_name}"
-
-    # ── Claude integration ──────────────────────────────────────────────
+    # ── Claude API ──────────────────────────────────────────────────────
 
     def _get_client(self) -> anthropic.Anthropic:
         if self._client is None:
@@ -152,149 +120,262 @@ class BaseAgent(ABC):
             if not api_key:
                 raise RuntimeError(
                     "AGENT_API_KEY not set. "
-                    "Set it in Railway env vars or local .env to enable AI agents."
+                    "Set it in env or .env to enable AI agents."
                 )
             self._client = anthropic.Anthropic(api_key=api_key)
         return self._client
 
-    def analyze(self, context: dict) -> tuple[dict, str]:
-        """
-        Send collected context to Claude for analysis.
-
-        Returns (parsed_diagnosis, raw_response_text).
-        """
-        client = self._get_client()
-
-        now = datetime.now(TZ_TPE)
-        actions_desc = "\n".join(
-            f"  - {a['name']}: {a['description']}"
-            for a in self.get_available_actions()
-        )
-
-        user_message = (
-            f"Current time: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC+8 "
-            f"(weekday={now.strftime('%A')})\n\n"
-            f"## Raw System Context\n\n"
-            f"{json.dumps(context, indent=2, default=str, ensure_ascii=False)}\n\n"
-            f"## Available Actions\n{actions_desc}\n\n"
-            f"Analyze the above data. Think step by step:\n"
-            f"1. What is the current state of each component?\n"
-            f"2. Are there any anomalies, correlations, or emerging patterns?\n"
-            f"3. What is the root cause if something is wrong?\n"
-            f"4. What specific action should be taken?\n\n"
-            f"{RESPONSE_SCHEMA}"
-        )
-
-        try:
-            response = client.messages.create(
-                model=MODEL,
-                max_tokens=MAX_TOKENS,
-                system=self.system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-            )
-            raw = response.content[0].text
-            parsed = self._parse_response(raw)
-            return parsed, raw
-        except Exception as e:
-            logger.error("[%s] Claude API call failed: %s", self.name, e)
-            fallback = {
-                "status": "error",
-                "summary": f"Claude API 呼叫失敗: {e}",
-                "findings": [],
-                "telegram_report": f"⚫ [{self.name}] Claude API 無法連線",
-                "next_check_minutes": 15,
-            }
-            return fallback, str(e)
-
-    def _parse_response(self, raw: str) -> dict:
-        """Extract JSON from Claude's response, handling markdown fences."""
-        text = raw.strip()
-        # Strip markdown code fences if present
-        if text.startswith("```"):
-            lines = text.split("\n")
-            lines = lines[1:]  # remove ```json
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            text = "\n".join(lines)
-
-        try:
-            start = text.index("{")
-            end = text.rindex("}") + 1
-            return json.loads(text[start:end])
-        except (ValueError, json.JSONDecodeError) as e:
-            logger.warning("[%s] Could not parse response JSON: %s", self.name, e)
-            return {
-                "status": "error",
-                "summary": f"Response parse failed: {raw[:200]}",
-                "findings": [],
-                "telegram_report": "",
-                "next_check_minutes": 60,
-            }
-
     # ── Telegram ────────────────────────────────────────────────────────
 
     def send_alert(self, message: str):
-        """Send alert via Telegram."""
         bot_token = AGENT_BOT_TOKEN or os.environ.get("INDICATOR_BOT_TOKEN", "")
         chat_id = AGENT_CHAT_ID or os.environ.get("INDICATOR_CHAT_ID", "")
-
         if not bot_token or not chat_id:
-            logger.warning("[%s] Telegram not configured: %s",
-                           self.name, message[:100])
+            logger.warning("[%s] Telegram not configured: %s", self.name, message[:100])
             return
-
         import requests
         try:
             requests.post(
                 f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                data={
-                    "chat_id": chat_id,
-                    "text": message,
-                    "parse_mode": "HTML",
-                },
+                data={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
                 timeout=15,
             )
         except Exception as e:
             logger.error("[%s] Alert send failed: %s", self.name, e)
 
-    # ── Main run cycle ──────────────────────────────────────────────────
+    # ── Shared tools available to all agents ────────────────────────────
+
+    def _repair_tools(self) -> list[dict]:
+        """Repair tools specific to this agent's domain."""
+        try:
+            from indicator.agents.repair_actions import get_repair_tools_for
+            return get_repair_tools_for(self.name)
+        except Exception:
+            return []
+
+    def _shared_tools(self) -> list[dict]:
+        """Tools every agent gets: alert, conclude, + domain repair tools."""
+        return [
+            {
+                "name": "send_telegram_alert",
+                "description": (
+                    "Send an alert to the operator via Telegram. "
+                    "Use for critical or warning findings that need human attention. "
+                    "Message should be HTML-formatted, concise, and in Traditional Chinese."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                            "description": "HTML-formatted alert message",
+                        },
+                    },
+                    "required": ["message"],
+                },
+            },
+            {
+                "name": "conclude",
+                "description": (
+                    "Submit your final diagnosis. Call this when you've gathered "
+                    "enough information to make a judgment. This ends the investigation."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "status": {
+                            "type": "string",
+                            "enum": ["healthy", "degraded", "critical"],
+                            "description": "Overall system status for your domain",
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "One-line summary in Traditional Chinese",
+                        },
+                        "findings": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "severity": {"type": "string", "enum": ["critical", "warning", "info"]},
+                                    "title": {"type": "string"},
+                                    "detail": {"type": "string"},
+                                },
+                            },
+                            "description": "List of findings from your investigation",
+                        },
+                        "telegram_report": {
+                            "type": "string",
+                            "description": "2-5 line HTML report for Telegram (Traditional Chinese)",
+                        },
+                    },
+                    "required": ["status", "summary", "findings"],
+                },
+            },
+        ]
+
+    def _execute_shared_tool(self, name: str, inp: dict) -> str | None:
+        """Handle shared tools. Returns result string, or None if not a shared tool."""
+        if name == "send_telegram_alert":
+            msg = inp.get("message", "")
+            self.send_alert(f"🤖 <b>[{self.name}]</b>\n{msg}")
+            return "Alert sent successfully."
+        if name == "conclude":
+            # This is handled in the run loop
+            return json.dumps(inp)
+        return None
+
+    # ── Agentic loop ────────────────────────────────────────────────────
 
     def run(self) -> AgentResult:
-        """Full agent cycle: collect → analyze → act → alert."""
+        """
+        Run the agentic tool-use loop.
+
+        Claude investigates using tools, then concludes with diagnosis.
+        """
         t0 = time.time()
-        logger.info("[%s] Starting run...", self.name)
+        logger.info("[%s] Starting investigation...", self.name)
 
-        # 1. Collect raw context
-        try:
-            context = self.collect_context()
-        except Exception as e:
-            logger.exception("[%s] collect_context failed", self.name)
-            return AgentResult(
-                agent_name=self.name,
-                status="error",
-                summary=f"Context collection failed: {e}",
-                duration_s=time.time() - t0,
-            )
-
-        # 2. Claude analyzes
-        diagnosis, raw = self.analyze(context)
-        status = diagnosis.get("status", "error")
-        summary = diagnosis.get("summary", "No summary")
-
-        # 3. Execute Claude's recommended actions
+        client = self._get_client()
+        all_tools = self.get_tools() + self._shared_tools() + self._repair_tools()
+        tool_calls_made = []
         actions_taken = []
-        for finding in diagnosis.get("findings", []):
-            auto_action = finding.get("auto_action", "NONE")
-            if auto_action and auto_action != "NONE":
-                try:
-                    result = self.execute_action(auto_action, finding, context)
-                    actions_taken.append(result)
-                except Exception as e:
-                    logger.exception("[%s] Action %s failed", self.name, auto_action)
-                    actions_taken.append(f"FAILED {auto_action}: {e}")
-
-        # 4. Send Telegram report if degraded/critical
         alerts_sent = []
+        diagnosis = {}
+
+        now = datetime.now(TZ_TPE)
+        initial_message = (
+            f"Current time: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC+8 "
+            f"({now.strftime('%A')})\n\n"
+            f"Begin your investigation. Use the tools available to check "
+            f"system health in your domain. Start with the most critical "
+            f"checks first. When you have enough information, call `conclude` "
+            f"with your diagnosis.\n\n"
+            f"Respond in Traditional Chinese for all user-facing text."
+        )
+
+        messages = [{"role": "user", "content": initial_message}]
+
+        for turn in range(MAX_TURNS):
+            try:
+                response = client.messages.create(
+                    model=MODEL,
+                    max_tokens=MAX_TOKENS,
+                    system=self.system_prompt,
+                    tools=all_tools,
+                    messages=messages,
+                )
+            except Exception as e:
+                logger.error("[%s] Claude API failed on turn %d: %s", self.name, turn, e)
+                return AgentResult(
+                    agent_name=self.name,
+                    status="error",
+                    summary=f"Claude API 呼叫失敗: {e}",
+                    turns_used=turn,
+                    duration_s=time.time() - t0,
+                )
+
+            # Process response blocks
+            assistant_content = response.content
+            messages.append({"role": "assistant", "content": assistant_content})
+
+            # Check if Claude is done (no tool use)
+            if response.stop_reason == "end_turn":
+                # Claude finished without calling conclude — extract text
+                text_parts = [b.text for b in assistant_content if hasattr(b, "text")]
+                diagnosis = {
+                    "status": "healthy",
+                    "summary": " ".join(text_parts)[:200] if text_parts else "調查完成",
+                    "findings": [],
+                }
+                break
+
+            # Process tool calls
+            tool_results = []
+            concluded = False
+
+            for block in assistant_content:
+                if block.type != "tool_use":
+                    continue
+
+                tool_name = block.name
+                tool_input = block.input
+                tool_id = block.id
+
+                logger.info("[%s] Turn %d: calling %s", self.name, turn, tool_name)
+                tool_calls_made.append(tool_name)
+
+                # Try shared tools first
+                shared_result = self._execute_shared_tool(tool_name, tool_input)
+
+                if tool_name == "conclude":
+                    diagnosis = tool_input
+                    concluded = True
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": "Investigation concluded.",
+                    })
+                    break
+                elif tool_name == "send_telegram_alert":
+                    alerts_sent.append(tool_input.get("message", ""))
+                    actions_taken.append(f"Sent alert: {tool_input.get('message', '')[:50]}")
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": shared_result,
+                    })
+                elif shared_result is not None:
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": shared_result,
+                    })
+                elif tool_name.startswith("repair_") or tool_name.startswith("suggest_"):
+                    # Repair (auto) or Suggest (human-approval) tool
+                    try:
+                        from indicator.agents.repair_actions import execute_repair_tool
+                        result = execute_repair_tool(self.name, tool_name, tool_input)
+                        actions_taken.append(f"{tool_name}: {json.dumps(tool_input, ensure_ascii=False)[:80]}")
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "content": result,
+                        })
+                    except Exception as e:
+                        logger.exception("[%s] Tool %s failed", self.name, tool_name)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "content": f"Tool error: {e}",
+                            "is_error": True,
+                        })
+                else:
+                    # Domain-specific tool
+                    try:
+                        result = self.execute_tool(tool_name, tool_input)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "content": result,
+                        })
+                    except Exception as e:
+                        logger.exception("[%s] Tool %s failed", self.name, tool_name)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "content": f"Tool error: {e}",
+                            "is_error": True,
+                        })
+
+            if concluded:
+                break
+
+            if tool_results:
+                messages.append({"role": "user", "content": tool_results})
+
+        # Send Telegram report for degraded/critical OR when repairs were made
+        status = diagnosis.get("status", "healthy")
         tg_report = diagnosis.get("telegram_report", "")
         if tg_report and status in ("degraded", "critical"):
             icon = "🔴" if status == "critical" else "🟡"
@@ -302,18 +383,30 @@ class BaseAgent(ABC):
             self.send_alert(full_msg)
             alerts_sent.append(full_msg)
 
+        # Notify when AUTO repair actions were taken (suggest tools handle their own TG)
+        auto_actions = [a for a in actions_taken if a.startswith("repair_")]
+        if auto_actions:
+            repair_msg = (
+                f"🔧 <b>[{self.name}] 自動修復</b>\n"
+                + "\n".join(f"  → {a}" for a in auto_actions)
+            )
+            self.send_alert(repair_msg)
+            alerts_sent.append(repair_msg)
+
         duration = time.time() - t0
-        logger.info("[%s] Done in %.1fs — status=%s: %s",
-                     self.name, duration, status, summary)
+        summary = diagnosis.get("summary", "調查完成")
+
+        logger.info("[%s] Done in %.1fs — status=%s, %d tool calls, %d turns",
+                     self.name, duration, status, len(tool_calls_made), turn + 1)
 
         return AgentResult(
             agent_name=self.name,
             status=status,
             summary=summary,
             diagnosis=diagnosis,
-            raw_response=raw,
+            tool_calls_made=tool_calls_made,
             actions_taken=actions_taken,
             alerts_sent=alerts_sent,
-            context_snapshot=context,
+            turns_used=turn + 1,
             duration_s=duration,
         )

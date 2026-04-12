@@ -71,7 +71,7 @@ def _make_reply_markup():
         [
             {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
             {"text": "\U0001f9f9 Sweep", "callback_data": "sweep"},
-            {"text": "\u2753 Help", "callback_data": "help"},
+            {"text": "\U0001f4cb Meeting", "callback_data": "meeting"},
         ],
     ]})
 
@@ -232,12 +232,13 @@ def update_cycle() -> dict:
         fetch_cg_hl_whale_positions,
     )
     from indicator.feature_builder_live import build_live_features
-    from indicator.inference import IndicatorEngine
+    from indicator.inference import IndicatorEngine, reload_config
     from indicator.chart_renderer import render_chart
 
     global _engine
 
     try:
+        reload_config()  # pick up any agent-made config changes
         logger.info("Update cycle starting...")
 
         # Initialize engine on first run
@@ -1046,6 +1047,30 @@ def signal_perf_api():
         return jsonify({"text": f"❌ 信號績效查詢失敗: {e}"}), 500
 
 
+@app.route("/meeting", methods=["GET", "POST"])
+def meeting_route():
+    """Trigger full agent sweep: all 5 agents investigate + self-heal."""
+    chat_id = request.args.get("chat_id", CHAT_ID)
+    sync = request.args.get("sync", "0") == "1"
+
+    def _run_sweep():
+        try:
+            from indicator.agents.watchdog import run_full_sweep
+            result = run_full_sweep()
+            return {"status": "ok", **result}
+        except Exception as e:
+            logger.exception("Agent sweep failed")
+            _send_telegram_text(f"\u274c Agent sweep failed: {e}", chat_id=chat_id)
+            return {"status": "error", "error": str(e)}
+
+    if sync:
+        return jsonify(_run_sweep())
+    else:
+        threading.Thread(target=_run_sweep, daemon=True).start()
+        return jsonify({"status": "sweep_triggered",
+                        "note": "Running all 5 agents. Results will be sent to Telegram."})
+
+
 @app.route("/force-update", methods=["POST", "GET"])
 def force_update():
     """Manually trigger an update cycle (for testing).
@@ -1307,13 +1332,36 @@ def _dashboard_old():
 
 # ── Scheduler ────────────────────────────────────────────────────────────────
 
+def _run_watchdog_quick():
+    """Run quick agent sweep (DataCollector + Infra). Called by scheduler."""
+    try:
+        from indicator.agents.watchdog import run_quick_sweep
+        run_quick_sweep()
+    except Exception as e:
+        logger.error("Watchdog quick sweep failed: %s", e)
+
+
+def _run_watchdog_full():
+    """Run full agent sweep (all 5 agents). Called by scheduler."""
+    try:
+        from indicator.agents.watchdog import run_full_sweep
+        run_full_sweep()
+    except Exception as e:
+        logger.error("Watchdog full sweep failed: %s", e)
+
+
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(update_cycle, "cron", minute="2", misfire_grace_time=300)
+
+    # Agent watchdog: quick sweep every hour at :15, full sweep every 4h at :20
+    scheduler.add_job(_run_watchdog_quick, "cron", minute="15", misfire_grace_time=300)
+    scheduler.add_job(_run_watchdog_full, "cron", hour="*/4", minute="20", misfire_grace_time=600)
+
     scheduler.start()
-    logger.info("Scheduler started: updates at :02 every hour")
+    logger.info("Scheduler started: updates at :02, watchdog quick at :15, full every 4h at :20")
 
     # Run first update immediately
     threading.Thread(target=update_cycle, daemon=True).start()

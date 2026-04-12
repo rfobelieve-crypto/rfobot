@@ -1,17 +1,15 @@
 """
-SignalTracker Agent — AI-powered signal quality analyst.
+SignalTracker Agent — Tool-Use Architecture.
 
-Focuses specifically on Strong + Moderate signals: are they profitable?
-Are certain patterns (direction, regime, time-of-day) consistently wrong?
-Is there a systematic bias Claude can detect in the win/loss patterns?
+Claude investigates signal quality: win rates, streaks, biases,
+and hourly/regime patterns. It decides how deep to drill based
+on what it finds.
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone, timedelta
-
-import numpy as np
-import pandas as pd
 
 from indicator.agents.base import BaseAgent
 
@@ -30,308 +28,258 @@ class SignalTrackerAgent(BaseAgent):
     @property
     def system_prompt(self) -> str:
         return """\
-You are a senior trading signal analyst reviewing the quality of an AI \
-prediction system's Strong and Moderate signals. Your focus is whether \
-the signals are making money and whether there are exploitable patterns \
-in the wins and losses.
+You are a senior trading signal analyst. Your job is to determine whether \
+the prediction system's Strong and Moderate signals are actually making money.
 
-## Signal System
-- **Strong** (confidence ≥ 80): highest conviction, should have best win rate
-- **Moderate** (confidence ≥ 65): medium conviction, acceptable if profitable
-- Each signal has: direction (UP/DOWN), entry_price, 4h exit_price, actual_return
-- Signals are tracked in `tracked_signals` MySQL table
-- Outcome filled automatically 4h after signal via `backfill_outcomes()`
+## Investigation Protocol
+1. Check overall win rates by tier (the most important metric)
+2. Look at recent signals (last 72h) — are we in a losing streak?
+3. Check direction bias (UP vs DOWN performance)
+4. Check regime-dependent performance
+5. Check if backfill is working (unfilled signals = broken tracking)
+6. Optionally: check hourly performance for time-of-day patterns
+7. Conclude
 
-## What You Analyze
+## Thresholds (use judgment)
+- Strong win rate: >55% = good, 50-55% = acceptable, <50% = broken
+- Moderate: >48% = acceptable, <45% = worse than random
+- 3 consecutive losses at 55% win rate = normal (happens 9% of the time)
+- 8+ consecutive losses = extremely unlikely, investigate
+- Expectancy = win_rate × avg_win + (1-win_rate) × avg_loss — must be positive
+- Pending signals >8h old = backfill is broken
 
-### 1. Win Rate Quality
-- Strong should be >55%, ideally >60%. Below 50% = coin flip = useless.
-- Moderate should be >48%. Below 45% = worse than random.
-- Compare UP vs DOWN: some models are better at predicting one direction.
-- Win rate × average win vs loss rate × average loss = expectancy.
+## Actionable Patterns
+- "DOWN signals in BULL regime: 0/5" → suggest disabling contra-trend signals
+- "Strong signals at hour 04:00 UTC: 1/8" → possible Asian session weakness
+- "UP signals 70% of all signals" → model has directional bias
 
-### 2. Pattern Detection
-- **Direction bias**: does the model predict UP more than DOWN? Is one direction more accurate?
-- **Regime bias**: signals in CHOPPY vs TRENDING may have very different win rates.
-- **Time-of-day**: some hours (e.g., US open, Asia close) may be systematically harder.
-- **Streak analysis**: is the model in a losing streak? How long? Is this within normal variance?
-- **Confidence calibration**: do higher confidence signals actually win more?
+## Actions
+AUTO (safe):
+- Backfill broken (pending signals >8h) → `repair_trigger_update`
 
-### 3. Return Quality
-- Average win size vs average loss size (reward/risk ratio)
-- Are wins small but losses large? That's a hidden problem even with >50% win rate.
-- Maximum drawdown from following the signals.
+SUGGEST ONLY (★★★★★ — never auto-modify signal parameters):
+- Strong win rate < 45% over 50+ signals → `suggest_pause_signals` with evidence
+- Strong win rate 45-50% over 100+ → `suggest_threshold_change` STRONG_THRESHOLD
+- Contra-trend losing (DOWN in BULL 0/5) → `suggest_threshold_change` BULL_CONTRA_PENALTY
+- Always include: sample size, time range, regime context in evidence.
 
-### 4. Backfill Health
-- Are outcomes being filled? Pending unfilled signals >8h old = backfill broken.
-- Missing outcomes corrupt all statistics.
+Respond in Traditional Chinese."""
 
-## Judgment
-- 20+ filled signals = enough to start judging. <20 = too early, note variance.
-- Don't panic at 3 consecutive losses — that's normal at 55% win rate.
-- DO panic at 8+ consecutive losses or win rate dropping below 40% over 30+ signals.
-- Look for actionable patterns: "DOWN signals in BULL regime are 0/5" → suggest disabling.
-
-Respond in Traditional Chinese for summary/report."""
-
-    def collect_context(self) -> dict:
-        """Load all signal data for Claude to analyze."""
-        context = {}
-
-        try:
-            from shared.db import get_db_conn
-            conn = get_db_conn()
-
-            context["signals_by_tier"] = self._load_tier_stats(conn)
-            context["signals_by_direction"] = self._load_direction_stats(conn)
-            context["signals_by_regime"] = self._load_regime_stats(conn)
-            context["recent_signals"] = self._load_recent(conn)
-            context["streak_analysis"] = self._load_streaks(conn)
-            context["backfill_health"] = self._load_backfill_status(conn)
-            context["hourly_performance"] = self._load_hourly(conn)
-
-            conn.close()
-        except Exception as e:
-            context["error"] = str(e)
-
-        return context
-
-    def get_available_actions(self) -> list[dict]:
+    def get_tools(self) -> list[dict]:
         return [
-            {"name": "ALERT", "description": "Send Telegram alert about signal quality"},
-            {"name": "LOG", "description": "Log finding"},
-            {"name": "NONE", "description": "No action"},
+            {
+                "name": "get_tier_stats",
+                "description": "Get win rate, avg return, best/worst, expectancy for each tier (Strong, Moderate).",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "get_recent_signals",
+                "description": "Get recent filled signals with full detail (time, direction, tier, return, correct). Use count param to control how many.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"count": {"type": "integer", "description": "Number of signals (default 20)"}},
+                    "required": [],
+                },
+            },
+            {
+                "name": "get_direction_breakdown",
+                "description": "Win rate broken down by direction (UP/DOWN) × tier.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "get_regime_breakdown",
+                "description": "Win rate broken down by regime × direction. Reveals regime-dependent biases.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "get_streak_analysis",
+                "description": "Current win/loss streak, longest streaks, and last 10 results.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "get_backfill_status",
+                "description": "Check if outcome backfill is working: pending signals, oldest unfilled age.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "get_hourly_performance",
+                "description": "Win rate by hour-of-day (UTC). Reveals time-dependent patterns.",
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
         ]
 
-    def _load_tier_stats(self, conn) -> dict:
+    def execute_tool(self, tool_name: str, tool_input: dict) -> str:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        try:
+            handlers = {
+                "get_tier_stats": lambda: self._tier_stats(conn),
+                "get_recent_signals": lambda: self._recent(conn, tool_input.get("count", 20)),
+                "get_direction_breakdown": lambda: self._direction(conn),
+                "get_regime_breakdown": lambda: self._regime(conn),
+                "get_streak_analysis": lambda: self._streaks(conn),
+                "get_backfill_status": lambda: self._backfill(conn),
+                "get_hourly_performance": lambda: self._hourly(conn),
+            }
+            handler = handlers.get(tool_name)
+            if not handler:
+                return json.dumps({"error": f"Unknown tool: {tool_name}"})
+            return json.dumps(handler(), default=str, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+        finally:
+            conn.close()
+
+    def _tier_stats(self, conn) -> dict:
         result = {}
         with conn.cursor() as cur:
             for tier in ["Strong", "Moderate"]:
                 cur.execute("""
-                    SELECT COUNT(*) as total,
-                           SUM(filled) as filled,
-                           SUM(correct) as wins,
+                    SELECT COUNT(*) as t, SUM(filled) as f, SUM(correct) as w,
                            AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret,
-                           AVG(CASE WHEN filled=1 AND correct=1 THEN actual_return_4h END) as avg_win_ret,
-                           AVG(CASE WHEN filled=1 AND correct=0 THEN actual_return_4h END) as avg_loss_ret,
+                           AVG(CASE WHEN filled=1 AND correct=1 THEN actual_return_4h END) as avg_win,
+                           AVG(CASE WHEN filled=1 AND correct=0 THEN actual_return_4h END) as avg_loss,
                            MAX(CASE WHEN filled=1 THEN actual_return_4h END) as best,
                            MIN(CASE WHEN filled=1 THEN actual_return_4h END) as worst
-                    FROM tracked_signals
-                    WHERE strength = %s AND signal_time >= %s
+                    FROM tracked_signals WHERE strength=%s AND signal_time>=%s
                 """, (tier, DUAL_MODEL_START))
                 r = cur.fetchone()
-                total = int(r["total"] or 0)
-                filled = int(r["filled"] or 0)
-                wins = int(r["wins"] or 0)
-
-                tier_data = {
-                    "total": total,
-                    "filled": filled,
-                    "pending": total - filled,
-                    "wins": wins,
-                    "losses": filled - wins,
-                    "win_rate_pct": round(wins / filled * 100, 1) if filled > 0 else None,
-                    "avg_return_pct": round(float(r["avg_ret"] or 0) * 100, 3),
-                    "avg_win_pct": round(float(r["avg_win_ret"] or 0) * 100, 3) if r["avg_win_ret"] else None,
-                    "avg_loss_pct": round(float(r["avg_loss_ret"] or 0) * 100, 3) if r["avg_loss_ret"] else None,
-                    "best_pct": round(float(r["best"] or 0) * 100, 3),
-                    "worst_pct": round(float(r["worst"] or 0) * 100, 3),
-                }
-
-                # Expectancy
-                if filled > 0 and tier_data["avg_win_pct"] and tier_data["avg_loss_pct"]:
-                    wr = wins / filled
-                    tier_data["expectancy_pct"] = round(
-                        wr * tier_data["avg_win_pct"] + (1 - wr) * tier_data["avg_loss_pct"], 3
-                    )
-
-                result[tier] = tier_data
+                t, f, w = int(r["t"] or 0), int(r["f"] or 0), int(r["w"] or 0)
+                d = {"total": t, "filled": f, "pending": t-f, "wins": w, "losses": f-w,
+                     "win_rate_pct": round(w/f*100, 1) if f > 0 else None,
+                     "avg_return_pct": round(float(r["avg_ret"] or 0)*100, 3),
+                     "avg_win_pct": round(float(r["avg_win"] or 0)*100, 3) if r["avg_win"] else None,
+                     "avg_loss_pct": round(float(r["avg_loss"] or 0)*100, 3) if r["avg_loss"] else None,
+                     "best_pct": round(float(r["best"] or 0)*100, 3),
+                     "worst_pct": round(float(r["worst"] or 0)*100, 3)}
+                if f > 0 and d["avg_win_pct"] and d["avg_loss_pct"]:
+                    wr = w / f
+                    d["expectancy_pct"] = round(wr * d["avg_win_pct"] + (1-wr) * d["avg_loss_pct"], 3)
+                result[tier] = d
         return result
 
-    def _load_direction_stats(self, conn) -> dict:
-        result = {}
+    def _recent(self, conn, count) -> list:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT direction, strength,
-                       COUNT(*) as cnt,
-                       SUM(correct) as wins,
-                       AVG(actual_return_4h) as avg_ret
-                FROM tracked_signals
-                WHERE filled = 1 AND signal_time >= %s
-                GROUP BY direction, strength
-            """, (DUAL_MODEL_START,))
-            for r in cur.fetchall():
-                key = f"{r['direction']}_{r['strength']}"
-                cnt = int(r["cnt"])
-                wins = int(r["wins"] or 0)
-                result[key] = {
-                    "count": cnt,
-                    "wins": wins,
-                    "win_rate_pct": round(wins / cnt * 100, 1) if cnt > 0 else None,
-                    "avg_return_pct": round(float(r["avg_ret"] or 0) * 100, 3),
-                }
-        return result
-
-    def _load_regime_stats(self, conn) -> dict:
-        result = {}
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT regime, direction,
-                       COUNT(*) as cnt,
-                       SUM(correct) as wins,
-                       AVG(actual_return_4h) as avg_ret
-                FROM tracked_signals
-                WHERE filled = 1 AND signal_time >= %s AND regime != ''
-                GROUP BY regime, direction
-            """, (DUAL_MODEL_START,))
-            for r in cur.fetchall():
-                key = f"{r['regime']}_{r['direction']}"
-                cnt = int(r["cnt"])
-                wins = int(r["wins"] or 0)
-                result[key] = {
-                    "count": cnt,
-                    "wins": wins,
-                    "win_rate_pct": round(wins / cnt * 100, 1) if cnt > 0 else None,
-                    "avg_return_pct": round(float(r["avg_ret"] or 0) * 100, 3),
-                }
-        return result
-
-    def _load_recent(self, conn) -> list:
-        """Last 30 filled signals with full detail."""
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT signal_time, direction, strength, confidence,
-                       entry_price, exit_price, actual_return_4h, correct, regime
-                FROM tracked_signals
-                WHERE filled = 1 AND signal_time >= %s
-                ORDER BY signal_time DESC
-                LIMIT 30
-            """, (DUAL_MODEL_START,))
+                SELECT signal_time, direction, strength, confidence, entry_price,
+                       exit_price, actual_return_4h, correct, filled, regime
+                FROM tracked_signals WHERE signal_time >= %s
+                ORDER BY signal_time DESC LIMIT %s
+            """, (DUAL_MODEL_START, count))
             return [
-                {
-                    "time": str(r["signal_time"]),
-                    "dir": r["direction"],
-                    "tier": r["strength"],
-                    "conf": round(float(r["confidence"]), 1) if r["confidence"] else None,
-                    "entry": float(r["entry_price"]) if r["entry_price"] else None,
-                    "exit": float(r["exit_price"]) if r["exit_price"] else None,
-                    "ret_pct": round(float(r["actual_return_4h"]) * 100, 3) if r["actual_return_4h"] else None,
-                    "correct": bool(r["correct"]) if r["correct"] is not None else None,
-                    "regime": r["regime"] or "unknown",
-                }
+                {"time": str(r["signal_time"]), "dir": r["direction"], "tier": r["strength"],
+                 "conf": round(float(r["confidence"]), 1) if r["confidence"] else None,
+                 "entry": float(r["entry_price"]) if r["entry_price"] else None,
+                 "ret_pct": round(float(r["actual_return_4h"])*100, 3) if r["actual_return_4h"] else None,
+                 "correct": bool(r["correct"]) if r["correct"] is not None else None,
+                 "filled": bool(r["filled"]), "regime": r["regime"] or "?"}
                 for r in cur.fetchall()
             ]
 
-    def _load_streaks(self, conn) -> dict:
-        """Analyze win/loss streaks."""
+    def _direction(self, conn) -> dict:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT correct FROM tracked_signals
-                WHERE filled = 1 AND signal_time >= %s
-                ORDER BY signal_time ASC
-            """, (DUAL_MODEL_START,))
-            results = [bool(r["correct"]) for r in cur.fetchall()]
-
-        if not results:
-            return {"total_signals": 0}
-
-        # Current streak
-        current_streak = 1
-        is_winning = results[-1]
-        for i in range(len(results) - 2, -1, -1):
-            if results[i] == is_winning:
-                current_streak += 1
-            else:
-                break
-
-        # Longest streaks
-        max_win, max_loss = 0, 0
-        cur_win, cur_loss = 0, 0
-        for r in results:
-            if r:
-                cur_win += 1
-                cur_loss = 0
-                max_win = max(max_win, cur_win)
-            else:
-                cur_loss += 1
-                cur_win = 0
-                max_loss = max(max_loss, cur_loss)
-
-        return {
-            "total_signals": len(results),
-            "current_streak": current_streak,
-            "current_streak_type": "WIN" if is_winning else "LOSS",
-            "longest_win_streak": max_win,
-            "longest_loss_streak": max_loss,
-            "last_10": ["W" if r else "L" for r in results[-10:]],
-        }
-
-    def _load_backfill_status(self, conn) -> dict:
-        """Check if outcome backfill is working."""
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT COUNT(*) as pending,
-                       MIN(signal_time) as oldest_pending,
-                       MAX(signal_time) as newest_pending
-                FROM tracked_signals
-                WHERE filled = 0 AND signal_time >= %s
-            """, (DUAL_MODEL_START,))
-            r = cur.fetchone()
-
-            pending = int(r["pending"] or 0)
-            oldest = r["oldest_pending"]
-            age_hours = None
-            if oldest:
-                oldest_utc = oldest.replace(tzinfo=timezone.utc) if hasattr(oldest, 'replace') else oldest
-                age_hours = round((datetime.now(timezone.utc) - oldest_utc).total_seconds() / 3600, 1)
-
-            return {
-                "pending_count": pending,
-                "oldest_pending": str(oldest) if oldest else None,
-                "oldest_age_hours": age_hours,
-                "newest_pending": str(r["newest_pending"]) if r["newest_pending"] else None,
-                "healthy": pending == 0 or (age_hours is not None and age_hours < 8),
-            }
-
-    def _load_hourly(self, conn) -> dict:
-        """Performance by hour-of-day (UTC)."""
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT HOUR(signal_time) as hour,
-                       COUNT(*) as cnt,
-                       SUM(correct) as wins
-                FROM tracked_signals
-                WHERE filled = 1 AND signal_time >= %s
-                GROUP BY HOUR(signal_time)
-                ORDER BY hour
+                SELECT direction, strength, COUNT(*) as n, SUM(correct) as w,
+                       AVG(actual_return_4h) as avg_ret
+                FROM tracked_signals WHERE filled=1 AND signal_time>=%s
+                GROUP BY direction, strength
             """, (DUAL_MODEL_START,))
             result = {}
             for r in cur.fetchall():
-                h = int(r["hour"])
-                cnt = int(r["cnt"])
-                wins = int(r["wins"] or 0)
-                if cnt >= 3:
-                    result[f"{h:02d}:00"] = {
-                        "count": cnt,
-                        "win_rate_pct": round(wins / cnt * 100, 1),
-                    }
-        return result
+                k = f"{r['direction']}_{r['strength']}"
+                n = int(r["n"])
+                w = int(r["w"] or 0)
+                result[k] = {"count": n, "wins": w,
+                             "win_rate_pct": round(w/n*100, 1) if n > 0 else None,
+                             "avg_return_pct": round(float(r["avg_ret"] or 0)*100, 3)}
+            return result
 
+    def _regime(self, conn) -> dict:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT regime, direction, COUNT(*) as n, SUM(correct) as w,
+                       AVG(actual_return_4h) as avg_ret
+                FROM tracked_signals WHERE filled=1 AND signal_time>=%s AND regime!=''
+                GROUP BY regime, direction
+            """, (DUAL_MODEL_START,))
+            result = {}
+            for r in cur.fetchall():
+                k = f"{r['regime']}_{r['direction']}"
+                n = int(r["n"])
+                w = int(r["w"] or 0)
+                result[k] = {"count": n, "wins": w,
+                             "win_rate_pct": round(w/n*100, 1) if n > 0 else None,
+                             "avg_return_pct": round(float(r["avg_ret"] or 0)*100, 3)}
+            return result
 
-# ── CLI ──────────────────────────────────────────────────────────────────
+    def _streaks(self, conn) -> dict:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT correct FROM tracked_signals
+                WHERE filled=1 AND signal_time>=%s ORDER BY signal_time ASC
+            """, (DUAL_MODEL_START,))
+            results = [bool(r["correct"]) for r in cur.fetchall()]
+        if not results:
+            return {"total": 0}
+        # Current streak
+        streak = 1
+        is_win = results[-1]
+        for i in range(len(results)-2, -1, -1):
+            if results[i] == is_win:
+                streak += 1
+            else:
+                break
+        # Max streaks
+        mw, ml, cw, cl = 0, 0, 0, 0
+        for r in results:
+            if r:
+                cw += 1; cl = 0; mw = max(mw, cw)
+            else:
+                cl += 1; cw = 0; ml = max(ml, cl)
+        return {
+            "total": len(results),
+            "current_streak": streak, "current_type": "WIN" if is_win else "LOSS",
+            "longest_win": mw, "longest_loss": ml,
+            "last_10": ["W" if r else "L" for r in results[-10:]],
+        }
+
+    def _backfill(self, conn) -> dict:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*) as n, MIN(signal_time) as oldest, MAX(signal_time) as newest
+                FROM tracked_signals WHERE filled=0 AND signal_time>=%s
+            """, (DUAL_MODEL_START,))
+            r = cur.fetchone()
+            pending = int(r["n"] or 0)
+            age_h = None
+            if r["oldest"]:
+                o = r["oldest"].replace(tzinfo=timezone.utc) if hasattr(r["oldest"], 'replace') else r["oldest"]
+                age_h = round((datetime.now(timezone.utc) - o).total_seconds() / 3600, 1)
+            return {"pending": pending, "oldest": str(r["oldest"]) if r["oldest"] else None,
+                    "oldest_age_hours": age_h, "healthy": pending == 0 or (age_h is not None and age_h < 8)}
+
+    def _hourly(self, conn) -> dict:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT HOUR(signal_time) as h, COUNT(*) as n, SUM(correct) as w
+                FROM tracked_signals WHERE filled=1 AND signal_time>=%s
+                GROUP BY HOUR(signal_time) ORDER BY h
+            """, (DUAL_MODEL_START,))
+            return {f"{r['h']:02d}:00": {"count": int(r["n"]),
+                    "win_rate_pct": round(int(r["w"] or 0)/int(r["n"])*100, 1)}
+                    for r in cur.fetchall() if int(r["n"]) >= 3}
+
 
 if __name__ == "__main__":
-    import json as _json
     import sys
-
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-
     agent = SignalTrackerAgent()
     if "--context-only" in sys.argv:
-        ctx = agent.collect_context()
-        print(_json.dumps(ctx, indent=2, default=str, ensure_ascii=False))
+        for tool in agent.get_tools():
+            print(f"\n--- {tool['name']} ---")
+            print(agent.execute_tool(tool["name"], {}))
     else:
         result = agent.run()
         print(f"\nAgent: {result.agent_name} | Status: {result.status}")
         print(f"Summary: {result.summary}")
-        print(f"\nDiagnosis:\n{_json.dumps(result.diagnosis, indent=2, ensure_ascii=False)}")
+        print(f"Tools: {result.tool_calls_made} | Turns: {result.turns_used}")

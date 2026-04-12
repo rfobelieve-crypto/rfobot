@@ -26,6 +26,45 @@ REGIME_DIR = ARTIFACT_DIR / "regime_models"
 DIRECTION_DIR = ARTIFACT_DIR / "direction_models"
 DUAL_MODEL_DIR = ARTIFACT_DIR / "dual_model"
 
+
+def _cfg(key: str, default):
+    """Read config value: config_overrides.json → Python default."""
+    try:
+        from indicator.agents.config_store import get_override
+        val = get_override(key)
+        return val if val is not None else default
+    except Exception:
+        return default
+
+
+def reload_config():
+    """Reload tunable parameters from config_overrides.json.
+
+    Called at the start of each update cycle so agent-made changes
+    take effect without a restart.
+    """
+    global STRENGTH_DEADZONE, STRONG_THRESHOLD, MODERATE_THRESHOLD
+    global CHOPPY_DEADZONE_MULT, TREND_DEADZONE_MULT, BULL_CONTRA_PENALTY
+    global BBP_CONFIRM_THRESHOLD, BBP_CONFIRM_ENABLED
+    global DUAL_DIR_UP_TH, DUAL_DIR_DN_TH
+    global HYSTERESIS_MULT, FLIP_COOLDOWN_BARS
+
+    STRENGTH_DEADZONE   = _cfg("STRENGTH_DEADZONE", 0.50)
+    STRONG_THRESHOLD    = _cfg("STRONG_THRESHOLD", 80.0)
+    MODERATE_THRESHOLD  = _cfg("MODERATE_THRESHOLD", 65.0)
+    CHOPPY_DEADZONE_MULT = _cfg("CHOPPY_DEADZONE_MULT", 1.60)
+    TREND_DEADZONE_MULT = _cfg("TREND_DEADZONE_MULT", 0.90)
+    BULL_CONTRA_PENALTY = _cfg("BULL_CONTRA_PENALTY", 2.5)
+    BBP_CONFIRM_THRESHOLD = _cfg("BBP_CONFIRM_THRESHOLD", 0.15)
+    BBP_CONFIRM_ENABLED = _cfg("BBP_CONFIRM_ENABLED", True)
+    DUAL_DIR_UP_TH      = _cfg("DUAL_DIR_UP_TH", 0.58)
+    DUAL_DIR_DN_TH      = _cfg("DUAL_DIR_DN_TH", 0.42)
+    HYSTERESIS_MULT     = _cfg("HYSTERESIS_MULT", 1.40)
+    FLIP_COOLDOWN_BARS  = _cfg("FLIP_COOLDOWN_BARS", 1)
+
+    logger.debug("Config reloaded from overrides")
+
+
 # ── Parameters ────────────────────────────────────────────────────────────
 STRENGTH_DEADZONE = 0.50     # base |up_pred - down_pred| below this → NEUTRAL
 STRONG_THRESHOLD = 80.0      # confidence percentile for Strong
