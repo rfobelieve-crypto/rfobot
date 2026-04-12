@@ -119,3 +119,41 @@ watchdog 新增的 `_check_dual_model()` 檢查 `engine.dir_model` 和 `engine.m
 寫監控代碼前先 `grep self\.dual_dir` 確認屬性名。已修正為 `dual_dir_model` / `dual_mag_model` + `hasattr` 防禦。
 
 **Rule:** 引用物件屬性前先 grep 確認。特別是有多種初始化路徑的類別（如 IndicatorEngine 的 dual/regime/legacy），不同路徑設定的屬性名不同。不要憑記憶猜。
+
+---
+
+## 2026-04-13: 用 sparse indicator 做 feature interaction 是退化操作
+
+**What happened:**
+為了解決 Direction Model 的 regime 適應性問題，原本想加 9 個 regime interaction 特徵：
+```python
+oi_agg_close_x_bear = cg_oi_agg_close * is_bear
+bfx_margin_x_bull   = cg_bfx_margin_ratio * is_bull
+ls_ratio_x_bear     = cg_ls_ratio * is_bear
+# ... 等等
+```
+寫法看起來完全合理，是 ML 教科書經典 interaction term 寫法。
+
+跑 IC 驗證後發現怪事：4 個本質完全不同的金融特徵在 ×is_bear 之後互相相關 0.96-0.98：
+```
+bfx_margin_x_bear ↔ oi_agg_close_x_bear     corr = +0.984
+bfx_margin_x_bear ↔ ls_ratio_x_bear         corr = +0.957
+oi_agg_close_x_bear ↔ ls_ratio_x_bear       corr = +0.968
+```
+而且 IC 全部從 base 的 -0.05~-0.07 掉到 +0.01，p-value 變不顯著，train/test FLIP。
+
+**Root cause:**
+BEAR 只佔 18% 樣本（724/4000）。`feature × is_bear` 等於：
+- 非 BEAR 時 = 0（佔 82%）
+- BEAR 時 = feature 原值（佔 18%）
+
+問題在於**「在哪些 timestamp 是 0」這個 sparsity pattern 在所有 ×is_bear 特徵裡完全一樣**。所有特徵共享同一組 18% 的非零 mask。剩下 82% 的零值貢獻了大部分變異數。
+
+結果 spearman correlation 主要在量「這個 sample 是不是在 BEAR 期間」，而不是「這個 feature 在 BEAR 的時候值是多少」。三個 base 完全不同的特徵看起來幾乎一模一樣，因為它們的 0/非0 pattern 完全重疊——indicator 的 sparsity 訊號壓過了被乘的特徵本身。
+
+**Correct approach:**
+1. **乘以 `(1 - is_X)` 才有意義**：保留 80%+ 樣本，只把死掉的 regime 設 0。例如 `vol_kurt_non_bear = vol_kurtosis * (1 - is_trending_bear)`，IC validated +0.054 stable, `oi_8h_non_bull = cg_oi_close_pctchg_8h * (1 - is_trending_bull)` IC validated -0.071（比 base -0.062 強 15%）。
+2. **regime indicator 本身要直接當 feature 加進去**（is_trending_bull / is_trending_bear），讓 XGB 自己用 tree split 決定 conditional rule。手動寫 `feat × is_X` 是把訊號塞進更窄的 channel。
+3. **inter-feature correlation matrix 必須當成標準驗證步驟**，跟 train/test split、rolling IC 同等重要。如果一群本應獨立的特徵互相相關 > 0.9，那不是訊號，是 indicator pattern leakage。
+
+**Rule:** 設計 interaction feature 時，**永遠不要寫 `feat × sparse_indicator`**——當 indicator 的非零比例 < 30%，乘出來的特徵會被 sparsity pattern 主導，跟其他用同一 indicator 乘的特徵高度相關，IC 也會 collapse。如果要做 regime conditioning：(a) 把 indicator 直接當 feature，讓 XGB 自己學 split；(b) 只在「base feature 在某 regime 完全死掉」的情況下用 `feat × (1 - is_dead_regime)` 形式屏蔽噪音。設計完任何 interaction 都要先跑 inter-feature correlation matrix。

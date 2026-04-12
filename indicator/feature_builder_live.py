@@ -119,6 +119,16 @@ def build_live_features(klines: pd.DataFrame,
         "realized_vol_20b"
     ].rolling(LONG_WIN, min_periods=10).mean().replace(0, np.nan)
 
+    # ── Directional regime indicators (matches production regime classifier) ──
+    # Reproduces vol_pct > 0.6 + ret_24h direction logic from indicator_engine.py
+    # Gives XGB ability to do regime-aware tree splits on OTHER features
+    _vol_24h = df["log_return"].rolling(LONG_WIN, min_periods=12).std()
+    _vol_pct = _vol_24h.expanding(min_periods=72).rank(pct=True)
+    _ret_24h = df["close"].pct_change(LONG_WIN)
+    df["is_trending_bull"] = ((_vol_pct > 0.6) & (_ret_24h > 0.005)).astype(float)
+    df["is_trending_bear"] = ((_vol_pct > 0.6) & (_ret_24h < -0.005)).astype(float)
+    # During warmup (vol_pct NaN) keep them as 0 (CHOPPY default)
+
     # ── Volume dynamics (IC-validated new features) ─────────────────────────
     vol_ma_4h = df["volume"].rolling(SHORT_WIN, min_periods=2).mean()
     vol_ma_24h = df["volume"].rolling(LONG_WIN, min_periods=4).mean()
@@ -126,6 +136,17 @@ def build_live_features(klines: pd.DataFrame,
     df["vol_kurtosis"] = df["volume"].rolling(LONG_WIN, min_periods=10).apply(
         lambda x: x.kurtosis(), raw=False
     )
+
+    # ── Regime-conditional interactions (zero out where base feature is dead) ──
+    # vol_kurtosis IC dies in TRENDING_BEAR (CHOPPY +0.106, BULL +0.055, BEAR -0.012)
+    # IC validated +0.0601 (p=2e-4), train +0.085 / test +0.041 STABLE
+    df["vol_kurt_non_bear"] = df["vol_kurtosis"] * (1.0 - df["is_trending_bear"])
+
+    # cg_oi_close_pctchg_8h IC dies in TRENDING_BULL (CHOPPY -0.071, BULL +0.004, BEAR -0.066)
+    # IC validated -0.0676 (p=2e-5), train -0.060 / test -0.072 STABLE
+    if "cg_oi_close_pctchg_8h" in df.columns:
+        df["oi_8h_non_bull"] = df["cg_oi_close_pctchg_8h"] * (1.0 - df["is_trending_bull"])
+
     df["vol_entropy"] = df["volume"].rolling(LONG_WIN, min_periods=10).apply(
         lambda x: _entropy_10bin(x), raw=False
     )
@@ -168,6 +189,14 @@ def build_live_features(klines: pd.DataFrame,
         df["cg_liq_short_cum_4h"] = df["cg_liq_short"].rolling(SHORT_WIN, min_periods=1).sum()
         df["cg_liq_long_cum_8h"] = df["cg_liq_long"].rolling(8, min_periods=1).sum()
         df["cg_liq_short_cum_8h"] = df["cg_liq_short"].rolling(8, min_periods=1).sum()
+
+        # Long-liq exhaustion z-score: regime-normalized 4h long liquidation
+        # IC validated +0.0667 (p=3e-5) vs y_return_4h, +0.0798 vs y_dir
+        # Improves on raw cg_liq_long_cum_4h (+0.0481) by removing vol-regime bias
+        _ll_cum = df["cg_liq_long_cum_4h"]
+        _ll_mu = _ll_cum.rolling(168, min_periods=84).mean()
+        _ll_sd = _ll_cum.rolling(168, min_periods=84).std().replace(0, np.nan)
+        df["long_liq_exhaustion_4h"] = (_ll_cum - _ll_mu) / _ll_sd
 
         # Cascade count: consecutive bars with above-average liquidation
         above_avg = (df["cg_liq_total"] > liq_ma).astype(int)
@@ -655,6 +684,16 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
         df["cg_spot_futures_cvd_divergence"] = (
             df["cg_scvd_delta_zscore"] - df["cg_fcvd_delta_zscore"]
         )
+
+    # 12h CVD persistence z-score (mean-reversion signal)
+    # IC validated -0.0343 (p=0.03) vs y_return_4h, train/test STABLE
+    # NEGATIVE sign: sustained 12h aggressive buying → 4h reversal down (FOMO top)
+    if "cg_fcvd_delta" in df.columns and "cg_scvd_delta" in df.columns:
+        _cvd_total = df["cg_fcvd_delta"].fillna(0) + df["cg_scvd_delta"].fillna(0)
+        _cvd_12h = _cvd_total.rolling(12, min_periods=6).sum()
+        _cvd_mu = _cvd_12h.rolling(168, min_periods=84).mean()
+        _cvd_sd = _cvd_12h.rolling(168, min_periods=84).std().replace(0, np.nan)
+        df["cvd_persistence_12h"] = (_cvd_12h - _cvd_mu) / _cvd_sd
     # Account ratio vs Position ratio divergence
     if "cg_ls_ratio" in df.columns and "cg_pos_ls_ratio" in df.columns:
         df["cg_pos_account_divergence"] = df["cg_ls_ratio"] - df["cg_pos_ls_ratio"]
