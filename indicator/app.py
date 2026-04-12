@@ -571,23 +571,12 @@ def update_cycle() -> dict:
         except Exception as he:
             logger.warning("Health monitor failed: %s", he)
 
-        # IC decay check (every update, lightweight)
+        # IC decay check — delegated to monitor_icir (has proper thresholds + cooldown)
         try:
-            from scipy.stats import spearmanr as _sp
-            _hist = indicator_df.copy()
-            _hist["_actual"] = _hist["close"].shift(-4) / _hist["close"] - 1
-            _eval = _hist.dropna(subset=["_actual", "pred_return_4h"]).tail(168)  # 7 days
-            if len(_eval) >= 50:
-                _ic7, _ = _sp(_eval["pred_return_4h"], _eval["_actual"])
-                if _ic7 < 0:
-                    _send_telegram_text(
-                        "🔴 <b>IC Decay Alert</b>\n\n"
-                        f"7 天 Rolling IC = {_ic7:.3f} (負值)\n"
-                        "模型預測方向與實際收益反向，建議重訓模型"
-                    )
-                    logger.warning("IC decay alert: 7d IC = %.3f", _ic7)
+            from indicator.monitor_icir import run_monitor
+            run_monitor()
         except Exception as ic_err:
-            logger.debug("IC decay check skipped: %s", ic_err)
+            logger.debug("IC monitor skipped: %s", ic_err)
 
         return {
             "engine_mode": _engine.mode if _engine else "?",
