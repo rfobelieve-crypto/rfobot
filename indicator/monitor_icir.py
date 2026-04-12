@@ -34,6 +34,10 @@ FLIP_RATE_WARN = 0.40        # direction flip rate > this → warning
 NEUTRAL_RATE_WARN = 0.70     # NEUTRAL > 70% → too conservative
 ALERT_COOLDOWN_H = 12        # cooldown per alert type
 
+# Dual model went live 2026-03-12, WARMUP ended 2026-03-19.
+# Only evaluate predictions from stable dual-model period.
+DUAL_MODEL_START = "2026-03-20"
+
 
 def _get_db_conn():
     from shared.db import get_db_conn
@@ -60,9 +64,10 @@ def load_live_oos(lookback_bars: int = 720) -> pd.DataFrame | None:
                 SELECT dt, close, pred_direction_code, strength_code,
                        confidence_score, pred_return_4h, dir_prob_up
                 FROM indicator_history
+                WHERE dt >= %s
                 ORDER BY dt DESC
                 LIMIT %s
-            """, (lookback_bars,))
+            """, (DUAL_MODEL_START, lookback_bars))
             rows = cur.fetchall()
     finally:
         conn.close()
@@ -224,12 +229,17 @@ def check_alerts(metrics: dict) -> list[str]:
             f"Model too conservative (>{NEUTRAL_RATE_WARN:.0%} NEUTRAL)"
         )
 
-    # IC check
+    # IC check — only alert on meaningfully negative IC, not noise around zero
     ic = metrics.get("ic", 0)
-    if total >= 100 and ic < 0:
+    if total >= 100 and ic < -0.05:
         alerts.append(
             f"🔴 <b>Negative IC: {ic:+.3f}</b>\n"
             f"Predictions inversely correlated with outcomes — consider retraining"
+        )
+    elif total >= 100 and ic < 0:
+        alerts.append(
+            f"🟡 <b>IC near zero: {ic:+.3f}</b>\n"
+            f"Model not adding value — monitor closely"
         )
 
     return alerts

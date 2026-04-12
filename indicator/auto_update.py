@@ -245,7 +245,7 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
     engine = IndicatorEngine()
 
     if len(new_features) > 0:
-        new_predictions = engine.predict(new_features)
+        new_predictions = engine.predict(new_features, context_features=features)
         if hasattr(new_predictions.index, 'as_unit'):
             new_predictions.index = new_predictions.index.as_unit("ns")
         indicator_df = pd.concat([indicator_df, new_predictions])
@@ -256,7 +256,7 @@ def run_update(indicator_df: pd.DataFrame) -> tuple[pd.DataFrame, bytes]:
     # Re-predict ALL historical bars with current model
     overlap_idx = indicator_df.index.intersection(features.index)
     if len(overlap_idx) > 0:
-        repredicted = engine.predict(features.loc[overlap_idx])
+        repredicted = engine.predict(features.loc[overlap_idx], context_features=features)
         if hasattr(repredicted.index, 'as_unit'):
             repredicted.index = repredicted.index.as_unit("ns")
         pred_cols = [c for c in repredicted.columns if c not in ("open", "high", "low", "close")]

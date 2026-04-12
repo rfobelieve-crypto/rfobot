@@ -35,7 +35,7 @@ MIN_MAG_HISTORY = 30         # minimum bars before mag_score is valid
 MIN_REGIME_IC_HISTORY = 50   # minimum bars per regime before IC is meaningful
 REGIME_BLEND_WEIGHT = 0.35   # weight for regime-specific model (vs global)
 
-# Dynamic deadzone parameters
+# Dynamic deadzone parameters (only affects regime model fallback, NOT dual model)
 CHOPPY_DEADZONE_MULT = 1.60  # CHOPPY regime: widen deadzone significantly
 TREND_DEADZONE_MULT = 0.90   # TRENDING: slightly tighter (momentum is real)
 
@@ -53,6 +53,11 @@ DIR_MODEL_ENABLED = True     # master switch for direction model
 DIR_HIGH_CONF = 0.65         # P(up) > this → override to UP
 DIR_LOW_CONF = 0.35          # P(up) < this → override to DOWN
 DIR_CHOPPY_DISABLED = True   # disable direction override in CHOPPY regime
+
+# Dual model direction thresholds
+# P(UP) > DUAL_DIR_UP_TH → UP, P(UP) < DUAL_DIR_DN_TH → DOWN, else NEUTRAL
+DUAL_DIR_UP_TH = 0.58       # was 0.60 hardcoded; lowered to reduce NEUTRAL over-suppression
+DUAL_DIR_DN_TH = 0.42       # was 0.40 hardcoded; raised symmetrically
 
 # Hysteresis: require stronger signal to FLIP direction vs maintain
 HYSTERESIS_MULT = 1.40       # to flip UP→DOWN, need strength < -(dz * 1.4)
@@ -218,12 +223,32 @@ class IndicatorEngine:
             return pd.Series(np.nan, index=features.index)
 
         X = features.reindex(columns=self.dual_mag_features, fill_value=0).fillna(0).values
-        mag = self.dual_mag_model.predict(X)
-        return pd.Series(np.maximum(mag, 0), index=features.index)
+        mag_sigma = np.maximum(self.dual_mag_model.predict(X), 0)
 
-    def predict(self, features: pd.DataFrame) -> pd.DataFrame:
+        # Convert σ-adjusted magnitude to return scale
+        if "realized_vol_20b" in features.columns:
+            rvol = features["realized_vol_20b"].values.astype(float)
+            rvol_median = np.nanmedian(rvol)
+            if np.isnan(rvol_median) or rvol_median <= 0:
+                rvol_median = 0.005
+            rvol = np.where(np.isnan(rvol) | (rvol <= 0), rvol_median, rvol)
+            mag = mag_sigma * rvol
+        else:
+            mag = mag_sigma * 0.005
+
+        return pd.Series(mag, index=features.index)
+
+    def predict(self, features: pd.DataFrame,
+                context_features: pd.DataFrame | None = None) -> pd.DataFrame:
         """
         Run prediction on feature DataFrame.
+
+        Parameters
+        ----------
+        features : DataFrame to predict on.
+        context_features : Optional larger DataFrame for regime calculation.
+            When predicting only a few new bars, pass the full feature history
+            so regime detection has enough data (needs 168+ bars).
 
         Returns DataFrame with: pred_return_4h, pred_direction,
         confidence_score, strength_score, bull_bear_power, regime
@@ -235,8 +260,15 @@ class IndicatorEngine:
             for c in missing:
                 features[c] = np.nan
 
-        # Regime detection (trailing-only)
-        regime = self._assign_regime(features)
+        # Regime detection (trailing-only) — use context if available
+        regime_source = context_features if context_features is not None else features
+        full_regime = self._assign_regime(regime_source)
+        if context_features is not None:
+            # Map regime from full context back to the prediction rows
+            regime_series = pd.Series(full_regime, index=regime_source.index)
+            regime = regime_series.reindex(features.index).fillna("CHOPPY").values
+        else:
+            regime = full_regime
 
         if self.mode == "dual":
             return self._predict_dual(features, regime)
@@ -273,28 +305,48 @@ class IndicatorEngine:
             for c in mag_missing:
                 features[c] = np.nan
         X_mag = features[self.dual_mag_features].fillna(0).values
-        mag_pred = self.dual_mag_model.predict(X_mag)
-        mag_pred = np.maximum(mag_pred, 0)  # magnitude ≥ 0
+        mag_pred_sigma = self.dual_mag_model.predict(X_mag)
+        mag_pred_sigma = np.maximum(mag_pred_sigma, 0)  # magnitude ≥ 0
+
+        # ── Convert σ-adjusted magnitude to return scale ──
+        # Model was trained on y_vol_adj_abs = |return_4h| / realized_vol,
+        # so output is in σ-units (~0.5-5). Multiply by realized_vol to get
+        # actual return-scale magnitude (~0.001-0.01).
+        if "realized_vol_20b" in features.columns:
+            rvol = features["realized_vol_20b"].values.astype(float)
+            rvol_median = np.nanmedian(rvol)
+            if np.isnan(rvol_median) or rvol_median <= 0:
+                rvol_median = 0.005  # conservative fallback
+            rvol = np.where(np.isnan(rvol) | (rvol <= 0), rvol_median, rvol)
+            mag_pred = mag_pred_sigma * rvol
+        else:
+            logger.warning("realized_vol_20b not in features, using fallback vol=0.005")
+            mag_pred = mag_pred_sigma * 0.005
 
         # ── Direction decision ──
         direction = np.full(n, "NEUTRAL", dtype=object)
         for i in range(n):
-            if dir_prob[i] > 0.60:
+            if dir_prob[i] > DUAL_DIR_UP_TH:
                 direction[i] = "UP"
-            elif dir_prob[i] < 0.40:
+            elif dir_prob[i] < DUAL_DIR_DN_TH:
                 direction[i] = "DOWN"
 
         # ── Synthetic pred_return_4h ──
-        # sign(direction) × magnitude
+        # Directional: sign × magnitude
+        # NEUTRAL: soft prediction = (dir_prob - 0.5) * 2 * magnitude
+        #   so IC sees a small directional lean instead of flat 0
         pred_return = np.zeros(n)
         for i in range(n):
             if direction[i] == "UP":
                 pred_return[i] = mag_pred[i]
             elif direction[i] == "DOWN":
                 pred_return[i] = -mag_pred[i]
+            else:
+                pred_return[i] = (dir_prob[i] - 0.5) * 2 * mag_pred[i]
 
         # ── Confidence = magnitude percentile ──
-        mag_score = self._compute_mag_score(mag_pred)
+        # Use σ-scale values for percentile (pred_history is in σ-scale)
+        mag_score = self._compute_mag_score(mag_pred_sigma)
 
         # Boost confidence when direction is strong
         confidence = np.full(n, np.nan)

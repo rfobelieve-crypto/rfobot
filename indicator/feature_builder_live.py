@@ -90,11 +90,18 @@ def build_live_features(klines: pd.DataFrame,
     _inject_coinglass(df, cg_data)
 
     # ── Momentum / slope / divergence features ─────────────────────────────
+    def _safe_slope(x):
+        if len(x) < 2 or np.isnan(x).any() or np.std(x) == 0:
+            return 0.0
+        try:
+            return np.polyfit(range(len(x)), x, 1)[0]
+        except (np.linalg.LinAlgError, ValueError):
+            return 0.0
+
     for col in ["cg_oi_delta", "cg_taker_delta", "cg_funding_close"]:
         if col in df.columns:
             df[f"{col}_slope_4h"] = df[col].rolling(4, min_periods=2).apply(
-                lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) >= 2 else 0,
-                raw=False,
+                _safe_slope, raw=False,
             )
             df[f"{col}_mom_1h"] = df[col] - df[col].shift(1)
 
@@ -172,7 +179,7 @@ def build_live_features(klines: pd.DataFrame,
         if "cg_liq_imbalance" in df.columns:
             df["cg_liq_imbalance_slope_4h"] = df["cg_liq_imbalance"].rolling(
                 SHORT_WIN, min_periods=2
-            ).apply(lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) >= 2 else 0, raw=False)
+            ).apply(_safe_slope, raw=False)
 
         # Liquidation vs volume ratio (market impact proxy)
         if "volume" in df.columns:

@@ -1,5 +1,7 @@
 {
   "feature_set": "expanded + liq_frag + post_absorption + toxicity",
+  "target": "y_vol_adj_abs",
+  "target_note": "Output is sigma-adjusted (|return|/realized_vol). Inference multiplies by realized_vol_20b to convert to return scale.",
   "n_features": 68,
   "n_samples": 3991,
   "oos_ic": 0.3571472821202253,

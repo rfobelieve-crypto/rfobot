@@ -364,8 +364,9 @@ def update_cycle() -> dict:
             new_features = features
 
         # 5. Predict new + gap bars
+        #    Pass full features as context so regime detection has 500 bars of history
         if len(new_features) > 0:
-            new_predictions = _engine.predict(new_features)
+            new_predictions = _engine.predict(new_features, context_features=features)
             if hasattr(new_predictions.index, 'as_unit'):
                 new_predictions.index = new_predictions.index.as_unit("ns")
             indicator_df = pd.concat([indicator_df, new_predictions])
@@ -381,7 +382,7 @@ def update_cycle() -> dict:
         #     so chart triangles match the original live predictions.
         overlap_idx = indicator_df.index.intersection(features.index)
         if len(overlap_idx) > 0:
-            repredicted = _engine.predict(features.loc[overlap_idx])
+            repredicted = _engine.predict(features.loc[overlap_idx], context_features=features)
             if hasattr(repredicted.index, 'as_unit'):
                 repredicted.index = repredicted.index.as_unit("ns")
             # Only update magnitude-related columns, preserve direction/strength
@@ -837,6 +838,8 @@ def indicator_performance():
         from scipy.stats import spearmanr
         import pandas as pd
 
+        from indicator.monitor_icir import DUAL_MODEL_START
+
         conn = get_db_conn()
         with conn.cursor() as cur:
             cur.execute("""
@@ -845,9 +848,10 @@ def indicator_performance():
                        COALESCE(mag_pred, 0) as mag_pred,
                        COALESCE(regime_code, 0) as regime_code
                 FROM indicator_history
+                WHERE dt >= %s
                 ORDER BY dt DESC
                 LIMIT 720
-            """)
+            """, (DUAL_MODEL_START,))
             rows = cur.fetchall()
         conn.close()
 
@@ -913,8 +917,10 @@ def indicator_performance():
         # ── Decay alerts ──
         alerts = []
         if ic_7d is not None:
-            if ic_7d < 0:
-                alerts.append("🔴 7 天 IC 為負 — 建議重訓模型")
+            if ic_7d < -0.05:
+                alerts.append("🔴 7 天 IC 顯著為負 — 建議重訓模型")
+            elif ic_7d < 0:
+                alerts.append("🟡 7 天 IC 接近零 — 密切觀察")
             elif ic_7d < 0.05:
                 alerts.append("🟡 7 天 IC 偏低 (< 0.05) — 密切觀察")
 
@@ -979,7 +985,7 @@ def indicator_performance():
 
         # ── Build report ──
         lines = [
-            "<b>📊 模型表現 (Live)</b>\n",
+            "<b>📊 模型表現 (Dual Model)</b>\n",
             f"評估期間: {len(eval_df)} 筆 ({(eval_df['dt'].iloc[0] + pd.Timedelta(hours=8)).strftime('%m/%d')} ~ {(eval_df['dt'].iloc[-1] + pd.Timedelta(hours=8)).strftime('%m/%d')})",
             f"\n<b>方向準確率 (近 30 天 tracked)</b>",
         ]
@@ -988,8 +994,8 @@ def indicator_performance():
         lines.extend(regime_lines if regime_lines else ["  數據不足"])
 
         # Rolling IC
-        lines.append(f"\n<b>Rolling IC</b>")
-        lines.append(f"  全期: {ic_all:.3f}")
+        lines.append(f"\n<b>Rolling IC (Dual Model)</b>")
+        lines.append(f"  全期: {ic_all:.3f} ({len(eval_df)} 筆, {DUAL_MODEL_START}~)")
         lines.append(f"  7 天: {ic_7d:.3f}" if ic_7d is not None else "  7 天: N/A (數據不足)")
         lines.append(f"  30 天: {ic_30d:.3f}" if ic_30d is not None else "  30 天: N/A (數據不足)")
         lines.append(f"  趨勢: {ic_trend}")
@@ -1105,10 +1111,11 @@ def _dashboard_old():
         mag_n = len(getattr(_engine, 'dual_mag_features', []))
         engine_info = f"{_engine.mode} | Dir={dir_n} feat | Mag={mag_n} feat"
 
-    # 2. Signal tracker stats
+    # 2. Signal tracker stats (dual model period only)
     sig_stats = {}
     try:
         from indicator.signal_tracker import _ensure_table, _get_db_conn, TABLE
+        from indicator.monitor_icir import DUAL_MODEL_START as _DM_START
         _ensure_table()
         sconn = _get_db_conn()
         with sconn.cursor() as cur:
@@ -1117,7 +1124,8 @@ def _dashboard_old():
                     SELECT COUNT(*) as t, SUM(filled) as f, SUM(correct) as w,
                            AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret
                     FROM `{TABLE}` WHERE strength = %s
-                """, (tier,))
+                      AND signal_time >= %s
+                """, (tier, _DM_START))
                 r = cur.fetchone()
                 tt, ff, ww = int(r["t"] or 0), int(r["f"] or 0), int(r["w"] or 0)
                 sig_stats[tier] = {

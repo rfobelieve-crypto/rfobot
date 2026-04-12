@@ -196,13 +196,15 @@ def backfill_outcomes():
 
 def get_performance_report() -> str:
     """Generate signal performance report for Telegram (Strong + Moderate)."""
+    from indicator.monitor_icir import DUAL_MODEL_START
+
     _ensure_table()
     conn = _get_db_conn()
     try:
         with conn.cursor() as cur:
-            lines = ["<b>📊 Signal Performance</b>\n"]
+            lines = ["<b>📊 Signal Performance (Dual Model)</b>\n"]
 
-            # Per-strength breakdown
+            # Per-strength breakdown (dual model period only)
             for tier in ["Strong", "Moderate"]:
                 cur.execute(f"""
                     SELECT COUNT(*) as total,
@@ -212,7 +214,8 @@ def get_performance_report() -> str:
                            MAX(CASE WHEN filled=1 THEN actual_return_4h END) as best,
                            MIN(CASE WHEN filled=1 THEN actual_return_4h END) as worst
                     FROM `{TABLE}` WHERE strength = %s
-                """, (tier,))
+                      AND signal_time >= %s
+                """, (tier, DUAL_MODEL_START))
                 s = cur.fetchone()
 
                 total = int(s["total"] or 0)
@@ -234,15 +237,16 @@ def get_performance_report() -> str:
                     lines.append(f"  等待結算: {pending} 筆")
                 lines.append("")
 
-            # Per-direction
+            # Per-direction (dual model period only)
             cur.execute(f"""
                 SELECT direction, strength,
                        COUNT(*) as cnt, SUM(correct) as wins,
                        AVG(actual_return_4h) as avg_ret
                 FROM `{TABLE}` WHERE filled = 1
+                  AND signal_time >= %s
                 GROUP BY direction, strength
                 ORDER BY strength, direction
-            """)
+            """, (DUAL_MODEL_START,))
             dir_rows = cur.fetchall()
             if dir_rows:
                 lines.append("<b>方向拆解</b>")

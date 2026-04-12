@@ -637,6 +637,7 @@ def _get_ic_trend(days: int = 7) -> dict:
     import numpy as np
     import pandas as pd
     from scipy.stats import spearmanr
+    from indicator.monitor_icir import DUAL_MODEL_START
 
     try:
         from shared.db import get_db_conn
@@ -649,9 +650,10 @@ def _get_ic_trend(days: int = 7) -> dict:
             cur.execute("""
                 SELECT dt, close, pred_return_4h, pred_direction_code
                 FROM indicator_history
-                WHERE dt >= DATE_SUB(NOW(), INTERVAL %s DAY)
+                WHERE dt >= %s
+                  AND dt >= DATE_SUB(NOW(), INTERVAL %s DAY)
                 ORDER BY dt ASC
-            """, (days + 1,))
+            """, (DUAL_MODEL_START, days + 1))
             rows = cur.fetchall()
     finally:
         conn.close()
