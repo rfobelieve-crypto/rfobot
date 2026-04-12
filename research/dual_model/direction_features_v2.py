@@ -61,6 +61,19 @@ OLD_DERIVED = [
     "vol_entropy", "squeeze_proxy",
 ]
 
+# ── Regime indicators + regime-conditioned features (2026-04-13) ──────
+# Direct regime indicators let XGB learn conditional splits naturally.
+# (1 - is_X) form preserves signal in 80%+ samples, masks noise in dead regime.
+# See .claude/rules/mistake.md 2026-04-13 entry: never use `feat × sparse_indicator`.
+REGIME_V1 = [
+    "is_trending_bull",          # regime indicator (XGB learns splits)
+    "is_trending_bear",          # regime indicator
+    "vol_kurt_non_bear",         # vol_kurtosis × (1 - is_bear), IC +0.054 STABLE
+    "oi_8h_non_bull",            # oi_close_pctchg_8h × (1 - is_bull), IC -0.0712
+    "long_liq_exhaustion_4h",    # regime-normalized long liq z-score, IC +0.0667
+    "cvd_persistence_12h",       # 12h CVD z-score mean-reversion, IC -0.0343
+]
+
 # ── Liquidity fragility (IC=-0.071, p=0.00002, time-stable) ──────────
 
 LIQUIDITY_FRAGILITY = [
@@ -77,7 +90,7 @@ POST_ABSORPTION = [
     "flow_trend_score",
 ]
 
-OLD_FEATURES = OLD_KLINE + OLD_CG + OLD_DERIVED
+OLD_FEATURES = OLD_KLINE + OLD_CG + OLD_DERIVED + REGIME_V1
 
 # ── New key 4 features (highest directional potential) ──────────────────
 

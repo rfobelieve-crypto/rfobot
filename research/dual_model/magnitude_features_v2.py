@@ -109,7 +109,17 @@ POST_ABSORPTION = [
     "flow_trend_score",
 ]
 
-EXPANDED_WITH_FRAGILITY = sorted(set(EXPANDED_MAGNITUDE + LIQUIDITY_FRAGILITY + POST_ABSORPTION))
+# ── Regime + liquidation exhaustion (2026-04-13) ──────────────────────
+# Regime indicators help magnitude model size moves conditionally.
+# long_liq_exhaustion_4h captures cascade exhaustion (volatility spike signal).
+REGIME_MAG_V1 = [
+    "is_trending_bull",
+    "is_trending_bear",
+    "long_liq_exhaustion_4h",
+    "vol_kurt_non_bear",
+]
+
+EXPANDED_WITH_FRAGILITY = sorted(set(EXPANDED_MAGNITUDE + LIQUIDITY_FRAGILITY + POST_ABSORPTION + REGIME_MAG_V1))
 
 # ── For Experiment 3 comparison ─────────────────────────────────────────
 
