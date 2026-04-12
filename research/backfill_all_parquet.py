@@ -50,7 +50,10 @@ def to_1h_df(rows, time_col="time"):
             continue
         df[col] = pd.to_numeric(df[col], errors="coerce")
     if time_col in df.columns:
-        df["dt"] = pd.to_datetime(df[time_col], unit="ms", utc=True)
+        # Auto-detect timestamp unit: 10 digits = seconds, 13 digits = milliseconds
+        sample_ts = df[time_col].dropna().iloc[0] if len(df) > 0 else 0
+        unit = "s" if sample_ts < 1e12 else "ms"
+        df["dt"] = pd.to_datetime(df[time_col], unit=unit, utc=True)
         df = df.set_index("dt").sort_index()
         df = df.drop(columns=[time_col], errors="ignore")
     return df
@@ -184,14 +187,22 @@ def run_backfill():
 
 
 def is_stale(max_age_hours: float = 6.0) -> bool:
-    """Check if parquet data is older than max_age_hours."""
-    klines_path = RAW / "binance_klines_1h.parquet"
-    if not klines_path.exists():
+    """Check if any parquet file is older than max_age_hours."""
+    now = pd.Timestamp.now(tz="UTC")
+    for pq in RAW.glob("*.parquet"):
+        try:
+            df = pd.read_parquet(pq)
+            if df.empty:
+                continue
+            age = (now - df.index.max()).total_seconds() / 3600
+            if age > max_age_hours:
+                return True
+        except Exception:
+            continue
+    # Also check klines exist
+    if not (RAW / "binance_klines_1h.parquet").exists():
         return True
-    df = pd.read_parquet(klines_path, columns=["close"])
-    latest = df.index.max()
-    age_hours = (pd.Timestamp.now(tz="UTC") - latest).total_seconds() / 3600
-    return age_hours > max_age_hours
+    return False
 
 
 def ensure_fresh(max_age_hours: float = 6.0):
@@ -206,11 +217,19 @@ def ensure_fresh(max_age_hours: float = 6.0):
 
 
 def _get_age_hours() -> float:
-    klines_path = RAW / "binance_klines_1h.parquet"
-    if not klines_path.exists():
-        return 999.0
-    df = pd.read_parquet(klines_path, columns=["close"])
-    return (pd.Timestamp.now(tz="UTC") - df.index.max()).total_seconds() / 3600
+    """Return the age of the STALEST parquet file."""
+    now = pd.Timestamp.now(tz="UTC")
+    max_age = 0.0
+    for pq in RAW.glob("*.parquet"):
+        try:
+            df = pd.read_parquet(pq)
+            if df.empty:
+                continue
+            age = (now - df.index.max()).total_seconds() / 3600
+            max_age = max(max_age, age)
+        except Exception:
+            continue
+    return max_age if max_age > 0 else 999.0
 
 
 if __name__ == "__main__":

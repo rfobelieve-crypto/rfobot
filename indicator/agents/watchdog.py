@@ -37,6 +37,11 @@ RULES = {
     "nan_rate_max_pct": 30.0,         # feature NaN > 30% → alarm
     "ic_7d_alarm_below": -0.05,       # 7d IC deeply negative → alarm
     "signal_winrate_alarm_below": 40, # Strong win rate < 40% → alarm
+    # New monitoring (2026-04-12)
+    "confidence_min_std": 3.0,        # confidence std < 3 → all values clustering (formula bug)
+    "strong_pct_max": 40.0,           # Strong signals >40% of total → threshold issue
+    "regime_stuck_max_h": 48,         # same regime for >48h → detection stuck
+    "feature_const_max_pct": 20.0,    # >20% features near-constant → data issue
 }
 
 
@@ -143,6 +148,149 @@ def _check_signal_health() -> dict:
         return {"ok": False, "reason": f"check failed: {e}"}
 
 
+# Cached predictions for gatekeeper — shared across confidence/regime checks
+_cached_preds = None  # pd.DataFrame or None
+
+
+def _get_cached_preds() -> pd.DataFrame:
+    """Build predictions once, reuse across confidence + regime checks."""
+    global _cached_preds
+    if _cached_preds is not None:
+        return _cached_preds
+    from indicator.agents.feature_guard import FeatureGuardAgent
+    agent = FeatureGuardAgent()
+    features = agent._get_features()
+    if features.empty:
+        return pd.DataFrame()
+    from indicator.inference import IndicatorEngine
+    engine = IndicatorEngine()
+    _cached_preds = engine.predict(features)
+    return _cached_preds
+
+
+def _check_confidence_health() -> dict:
+    """Check confidence formula produces reasonable distribution (no Claude)."""
+    try:
+        preds = _get_cached_preds()
+        if preds.empty:
+            return {"ok": True, "note": "no features"}
+
+        if "confidence_score" not in preds.columns:
+            return {"ok": False, "reason": "confidence_score column missing from predictions"}
+
+        conf = preds["confidence_score"].dropna()
+        if len(conf) < 20:
+            return {"ok": True, "note": "insufficient data"}
+
+        # Check 1: confidence std too low → formula might be broken (all same value)
+        conf_std = float(conf.std())
+        if conf_std < RULES["confidence_min_std"]:
+            return {"ok": False, "reason": f"confidence std={conf_std:.1f} (all clustering, formula bug?)"}
+
+        # Check 2: Strong signal proportion too high → thresholds may be wrong
+        strength = preds["strength_score"].dropna()
+        if len(strength) > 0:
+            strong_pct = (strength == "Strong").sum() / len(strength) * 100
+            if strong_pct > RULES["strong_pct_max"]:
+                return {"ok": False, "reason": f"Strong={strong_pct:.0f}% of signals (>{RULES['strong_pct_max']}%)"}
+
+        return {"ok": True, "conf_std": round(conf_std, 1),
+                "conf_mean": round(float(conf.mean()), 1)}
+    except Exception as e:
+        return {"ok": False, "reason": f"check failed: {e}"}
+
+
+def _check_regime_health() -> dict:
+    """Check regime detection isn't stuck in a single state (no Claude)."""
+    try:
+        preds = _get_cached_preds()
+        if preds.empty or len(preds) < 48:
+            return {"ok": True, "note": "insufficient data"}
+
+        if "regime" not in preds.columns:
+            return {"ok": False, "reason": "regime column missing"}
+
+        regime = preds["regime"].dropna()
+        if len(regime) < 48:
+            return {"ok": True, "note": "insufficient data"}
+
+        # Check last N hours: is regime stuck in one value?
+        max_h = RULES["regime_stuck_max_h"]
+        tail = regime.iloc[-max_h:]
+        unique = tail.unique()
+
+        # WARMUP in recent bars is always a problem (should be gone after 72 bars)
+        warmup_tail = (tail == "WARMUP").sum()
+        if warmup_tail > 0 and len(preds) > 72:
+            return {"ok": False, "reason": f"WARMUP in last {max_h}h ({warmup_tail} bars) despite {len(preds)} total bars"}
+
+        if len(unique) == 1:
+            return {"ok": False, "reason": f"regime stuck at '{unique[0]}' for last {max_h}h"}
+
+        # Distribution of regimes in last 48h
+        dist = {r: int((tail == r).sum()) for r in unique}
+        return {"ok": True, "last_48h": dist}
+    except Exception as e:
+        return {"ok": False, "reason": f"check failed: {e}"}
+
+
+def _check_feature_drift() -> dict:
+    """Check for features becoming constant or extreme outliers (no Claude)."""
+    try:
+        from indicator.agents.feature_guard import FeatureGuardAgent
+        agent = FeatureGuardAgent()
+        features = agent._get_features()
+        if features.empty or len(features) < 20:
+            return {"ok": True, "note": "insufficient data"}
+
+        # Check last 20 bars for near-constant features (std ≈ 0)
+        tail = features.iloc[-20:]
+        numeric = tail.select_dtypes(include="number")
+        stds = numeric.std()
+        near_const = (stds < 1e-10).sum()
+        total = len(stds)
+        const_pct = near_const / max(total, 1) * 100
+
+        issues = []
+        if const_pct > RULES["feature_const_max_pct"]:
+            # Find which features
+            const_feats = list(stds[stds < 1e-10].index[:5])
+            issues.append(f"{near_const}/{total} features constant ({const_pct:.0f}%): {const_feats}")
+
+        # Check for extreme z-scores in latest row (> 5 sigma)
+        last = features.iloc[-1]
+        means = numeric.mean()
+        sds = numeric.std().replace(0, float("nan"))
+        zscores = ((last[numeric.columns] - means) / sds).abs()
+        extreme = zscores[zscores > 5].dropna()
+        if len(extreme) > 5:
+            top = list(extreme.nlargest(3).index)
+            issues.append(f"{len(extreme)} features with |z|>5: {top}")
+
+        if issues:
+            return {"ok": False, "reason": "; ".join(issues)}
+        return {"ok": True, "const_feats": int(near_const), "extreme_z": int(len(extreme))}
+    except Exception as e:
+        return {"ok": False, "reason": f"check failed: {e}"}
+
+
+def _check_dual_model() -> dict:
+    """Check dual model artifacts are loaded, not silently falling back (no Claude)."""
+    try:
+        from indicator.inference import IndicatorEngine
+        engine = IndicatorEngine()
+        if engine.mode != "dual":
+            return {"ok": False, "reason": f"engine mode='{engine.mode}' (expected 'dual')"}
+        if not hasattr(engine, "dual_dir_model") or engine.dual_dir_model is None:
+            return {"ok": False, "reason": "direction model is None"}
+        if not hasattr(engine, "dual_mag_model") or engine.dual_mag_model is None:
+            return {"ok": False, "reason": "magnitude model is None"}
+        n_feats = len(getattr(engine, "dual_dir_features", []))
+        return {"ok": True, "mode": engine.mode, "dir_features": n_feats}
+    except Exception as e:
+        return {"ok": False, "reason": f"check failed: {e}"}
+
+
 # Gatekeeper check → agent mapping
 GATE_TO_AGENT = {
     "data": "DataCollector",
@@ -151,11 +299,21 @@ GATE_TO_AGENT = {
     "features": "FeatureGuard",
     "model": "ModelEval",
     "signals": "SignalTracker",
+    "confidence": "ModelEval",
+    "regime": "ModelEval",
+    "feature_drift": "FeatureGuard",
+    "dual_model": "Infra",
 }
 
 
 def run_gatekeeper() -> dict:
     """Run all gatekeeper checks. Returns which domains have issues."""
+    # Clear caches from previous run
+    global _cached_preds
+    _cached_preds = None
+    import indicator.agents.feature_guard as _fg
+    _fg._cached_features = None
+
     checks = {
         "data": _check_data_health,
         "db": _check_db_health,
@@ -163,6 +321,10 @@ def run_gatekeeper() -> dict:
         "features": _check_feature_health,
         "model": _check_model_health,
         "signals": _check_signal_health,
+        "confidence": _check_confidence_health,
+        "regime": _check_regime_health,
+        "feature_drift": _check_feature_drift,
+        "dual_model": _check_dual_model,
     }
 
     results = {}

@@ -52,6 +52,7 @@ _engine = None
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 
 
 def _make_reply_markup():
@@ -135,6 +136,46 @@ def _send_telegram_photo_to(chat_id: str, png: bytes, caption: str):
         }, timeout=30)
     except Exception as e:
         logger.error("Telegram photo send failed: %s", e)
+
+
+def _send_discord_photo(png: bytes, caption: str) -> str:
+    """Send chart PNG to Discord via webhook. Returns status string."""
+    if not DISCORD_WEBHOOK_URL:
+        return "skipped: DISCORD_WEBHOOK_URL not set"
+    if not png or len(png) < 100:
+        return f"skipped: png_empty ({len(png) if png else 0} bytes)"
+    try:
+        resp = requests.post(
+            DISCORD_WEBHOOK_URL,
+            data={"content": caption},
+            files={"file": ("indicator.png", png, "image/png")},
+            timeout=30,
+        )
+        if resp.ok:
+            logger.info("Discord photo sent OK")
+            return "ok"
+        else:
+            logger.error("Discord photo failed: %s %s", resp.status_code, resp.text[:200])
+            return f"failed: {resp.status_code}"
+    except Exception as e:
+        logger.error("Discord photo send failed: %s", e)
+        return f"error: {e}"
+
+
+def _send_discord_text(message: str) -> str:
+    """Send text message to Discord via webhook."""
+    if not DISCORD_WEBHOOK_URL:
+        return "skipped"
+    try:
+        resp = requests.post(
+            DISCORD_WEBHOOK_URL,
+            json={"content": message},
+            timeout=15,
+        )
+        return "ok" if resp.ok else f"failed: {resp.status_code}"
+    except Exception as e:
+        logger.error("Discord text send failed: %s", e)
+        return f"error: {e}"
 
 
 def _load_history() -> pd.DataFrame:
@@ -465,8 +506,9 @@ def update_cycle() -> dict:
             f"{risk_text}"
         )
         tg_result = _send_telegram_photo(png, caption)
+        dc_result = _send_discord_photo(png, caption)
 
-        # Strong signal alert (Telegram push for Strong only)
+        # Strong signal alert (Telegram + Discord push for Strong only)
         if strength == "Strong" and direction in ("UP", "DOWN"):
             regime = str(last_row.get("regime", "?"))
             if direction == "UP":
@@ -500,6 +542,9 @@ def update_cycle() -> dict:
                 f"\u23f0 {now_str}"
             )
             _send_telegram_text(alert)
+            # Discord uses plain text (no HTML tags)
+            dc_alert = alert.replace("<b>", "**").replace("</b>", "**")
+            _send_discord_text(dc_alert)
             logger.info("Strong signal alert sent: %s", direction)
 
         # Record Strong + Moderate signals for performance tracking
@@ -586,6 +631,7 @@ def update_cycle() -> dict:
             "chart_bytes": len(png),
             "direction": direction,
             "telegram_send": tg_result,
+            "discord_send": dc_result,
         }
 
     except Exception as e:
