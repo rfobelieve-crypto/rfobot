@@ -46,11 +46,13 @@ You are a senior quant researcher monitoring feature quality for a BTC predictio
 ## What You Know
 - 130+ features from 12 groups, built from Binance + Coinglass + Deribit data
 - If upstream source fails → entire feature group goes NaN → zero-filled → silent degradation
-- Feature groups: binance_klines, coinglass_oi, coinglass_funding, coinglass_liquidation,
-  coinglass_sentiment, coinglass_flow, deribit, depth, aggtrades, engineered_alpha
+- Feature naming: Coinglass features use `cg_` prefix, Deribit uses `bvol_`, aggtrades uses `agg_`
+- Feature groups: binance_klines, coinglass_oi (cg_oi_*), coinglass_funding (cg_funding_*),
+  coinglass_sentiment (cg_ls_*, cg_gls_*, cg_cb_*), coinglass_flow (cg_fcvd_*, cg_scvd_*, cg_taker_*),
+  deribit (bvol_*), depth, aggtrades (agg_*), engineered_alpha
 - Key sanity bounds:
   - realized_vol_20b: 0.0001~0.1 (hourly std of log returns)
-  - funding_rate: -0.01~+0.01
+  - cg_funding_close: -0.01~+0.01
   - depth_imbalance: -1 to +1
   - pred_return_4h: ±0.001~0.05 (if >0.5 → σ-scale bug)
   - mag_pred: 0~0.05 (if >1 → vol conversion missing)
@@ -155,14 +157,14 @@ Respond in Traditional Chinese."""
         features = self._get_features()
         groups = {
             "binance_klines": ["log_return", "realized_vol_20b", "return_kurtosis", "volume", "taker_ratio"],
-            "coinglass_oi": ["oi_change_1h", "oi_change_4h", "oi_change_24h"],
-            "coinglass_funding": ["funding_rate", "funding_deviation", "funding_zscore_20"],
-            "coinglass_sentiment": ["long_short_ratio", "global_ls_ratio", "coinbase_premium"],
-            "coinglass_flow": ["futures_cvd_agg", "spot_cvd_agg", "taker_buy_vol"],
-            "deribit": ["dvol", "dvol_change", "pc_vol_ratio"],
-            "depth": ["depth_imbalance", "spread_bps", "near_bid_usd"],
-            "aggtrades": ["large_buy_usd", "large_sell_usd", "large_delta_usd"],
-            "engineered_alpha": ["impact_asymmetry", "post_absorb_breakout", "liq_fragility"],
+            "coinglass_oi": ["cg_oi_delta", "cg_oi_close_pctchg_4h", "cg_oi_close_pctchg_24h"],
+            "coinglass_funding": ["cg_funding_close", "cg_funding_range", "cg_funding_close_zscore"],
+            "coinglass_sentiment": ["cg_ls_ratio", "cg_gls_ratio", "cg_cb_premium"],
+            "coinglass_flow": ["cg_fcvd_delta", "cg_scvd_delta", "cg_taker_delta"],
+            "deribit": ["bvol_close", "bvol_change_1h", "bvol_intra_range"],
+            "depth": ["depth_imbalance", "spread_bps", "near_imbalance"],
+            "aggtrades": ["agg_large_delta", "agg_large_buy_ratio", "agg_large_delta_frac"],
+            "engineered_alpha": ["impact_asymmetry", "post_absorb_breakout", "oi_price_divergence"],
         }
         result = {}
         last = features.iloc[-1] if len(features) > 0 else pd.Series()
@@ -185,9 +187,9 @@ Respond in Traditional Chinese."""
 
     def _tool_distribution(self) -> dict:
         features = self._get_features()
-        key_feats = ["realized_vol_20b", "funding_rate", "depth_imbalance",
-                     "oi_change_1h", "long_short_ratio", "volume_zscore_20",
-                     "coinbase_premium", "dvol"]
+        key_feats = ["realized_vol_20b", "cg_funding_close", "depth_imbalance",
+                     "cg_oi_delta", "cg_ls_ratio", "volume_zscore_20",
+                     "cg_cb_premium", "bvol_close"]
         result = {}
         for feat in key_feats:
             if feat not in features.columns:
@@ -215,9 +217,9 @@ Respond in Traditional Chinese."""
             return {"error": "no features"}
         last = features.iloc[-1]
         important = ["close", "log_return", "realized_vol_20b", "volume",
-                     "funding_rate", "oi_change_1h", "long_short_ratio",
-                     "depth_imbalance", "large_delta_usd", "dvol",
-                     "coinbase_premium", "taker_ratio",
+                     "cg_funding_close", "cg_oi_delta", "cg_ls_ratio",
+                     "depth_imbalance", "agg_large_delta", "bvol_close",
+                     "cg_cb_premium", "taker_ratio",
                      "impact_asymmetry", "post_absorb_breakout"]
         return {f: round(float(last[f]), 6) for f in important if f in last.index and pd.notna(last[f])}
 
@@ -228,7 +230,7 @@ Respond in Traditional Chinese."""
         last = features.iloc[-1]
         rules = {
             "realized_vol_20b": (0.0001, 0.1, "hourly vol 0.01%-10%"),
-            "funding_rate": (-0.01, 0.01, "funding ±1% is extreme"),
+            "cg_funding_close": (-0.01, 0.01, "funding ±1% is extreme"),
             "depth_imbalance": (-1.0, 1.0, "bounded [-1,1]"),
         }
         result = {}
