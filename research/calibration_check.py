@@ -71,6 +71,67 @@ def expected_calibration_error(probs: np.ndarray, outcomes: np.ndarray,
     return float(ece)
 
 
+def bootstrap_metrics(probs: np.ndarray, outcomes: np.ndarray,
+                      n_boot: int = 1000, seed: int = 42) -> dict:
+    """
+    Bootstrap 95% CI for Brier skill score and ECE.
+    With small n (~244), point estimates can look alarming but sit inside a
+    wide CI that overlaps zero. This tells us whether the miscalibration is
+    statistically real or sampling noise.
+    """
+    rng = np.random.default_rng(seed)
+    n = len(probs)
+    climatology_p = outcomes.mean()
+
+    brier_skills = []
+    eces = []
+    conf_gaps = []
+
+    for _ in range(n_boot):
+        idx = rng.integers(0, n, n)
+        p_b = probs[idx]
+        y_b = outcomes[idx]
+
+        brier_b = brier_score(p_b, y_b)
+        clim_b = brier_score(np.full_like(p_b, climatology_p), y_b)
+        if clim_b > 0:
+            brier_skills.append(1 - brier_b / clim_b)
+        eces.append(expected_calibration_error(p_b, y_b))
+
+        # Confidence gap at extreme bins
+        ext_mask = (p_b >= 0.60) | (p_b <= 0.40)
+        if ext_mask.sum() > 10:
+            ep = p_b[ext_mask]
+            ea = y_b[ext_mask]
+            acc = ((ep > 0.5).astype(int) == ea).mean()
+            conf = np.where(ep > 0.5, ep, 1 - ep).mean()
+            conf_gaps.append(conf - acc)
+
+    def ci(arr):
+        if len(arr) == 0:
+            return (None, None, None)
+        a = np.array(arr)
+        return (float(np.percentile(a, 2.5)),
+                float(np.median(a)),
+                float(np.percentile(a, 97.5)))
+
+    bs_lo, bs_med, bs_hi = ci(brier_skills)
+    ece_lo, ece_med, ece_hi = ci(eces)
+    cg_lo, cg_med, cg_hi = ci(conf_gaps)
+
+    return {
+        "n_boot": n_boot,
+        "brier_skill_ci": [bs_lo, bs_hi],
+        "brier_skill_median": bs_med,
+        "brier_skill_crosses_zero": bs_lo is not None and bs_lo <= 0 <= bs_hi,
+        "ece_ci": [ece_lo, ece_hi],
+        "ece_median": ece_med,
+        "confidence_gap_ci": [cg_lo, cg_hi],
+        "confidence_gap_median": cg_med,
+        "confidence_gap_crosses_zero": cg_lo is not None and cg_lo <= 0 <= cg_hi,
+    }
+
+
 def analyze(df: pd.DataFrame, label: str = "ALL") -> dict:
     """Build calibration metrics + bin-level data for plotting."""
     probs = df["dir_prob_up"].values
@@ -133,6 +194,9 @@ def analyze(df: pd.DataFrame, label: str = "ALL") -> dict:
         extreme_avg_confidence = None
         confidence_gap = None
 
+    # Bootstrap CIs
+    boot = bootstrap_metrics(probs, outcomes)
+
     return {
         "label": label,
         "n_samples": n,
@@ -147,6 +211,7 @@ def analyze(df: pd.DataFrame, label: str = "ALL") -> dict:
         "extreme_accuracy": extreme_accuracy,
         "extreme_avg_confidence": extreme_avg_confidence,
         "confidence_gap": confidence_gap,
+        "bootstrap": boot,
     }
 
 
@@ -252,6 +317,30 @@ def main():
               "(positive = beats climatology)")
         print(f"  ECE (lower=better):      {r['ece']:.4f}")
 
+        # Bootstrap 95% CIs
+        b = r.get("bootstrap", {})
+        if b:
+            bs_ci = b["brier_skill_ci"]
+            ece_ci = b["ece_ci"]
+            print(f"  Bootstrap 95% CI (n_boot={b['n_boot']}):")
+            print(f"    Brier skill:  [{bs_ci[0]:+.4f}, {bs_ci[1]:+.4f}]  ", end="")
+            if b["brier_skill_crosses_zero"]:
+                print("(CROSSES ZERO — not statistically distinguishable from climatology)")
+            elif bs_ci[1] < 0:
+                print("(entirely BELOW zero — significantly worse than climatology)")
+            else:
+                print("(entirely ABOVE zero — significantly better than climatology)")
+            print(f"    ECE:          [{ece_ci[0]:.4f}, {ece_ci[1]:.4f}]")
+            cg_ci = b["confidence_gap_ci"]
+            if cg_ci[0] is not None:
+                print(f"    Conf gap:     [{cg_ci[0]:+.4f}, {cg_ci[1]:+.4f}]  ", end="")
+                if b["confidence_gap_crosses_zero"]:
+                    print("(CROSSES ZERO — over/under confidence not statistically real)")
+                elif cg_ci[0] > 0:
+                    print("(significantly OVER-confident)")
+                else:
+                    print("(significantly UNDER-confident)")
+
         if r["confidence_gap"] is not None:
             print(f"  Extreme bins (p<=0.4 or p>=0.6): n={r['extreme_n']}")
             print(f"    Avg confidence:        {r['extreme_avg_confidence']:.3f}")
@@ -283,9 +372,20 @@ def main():
     print("VERDICT")
     print("=" * 80)
     overall = results[0]
-    if overall["brier_skill_vs_climatology"] <= 0:
+    boot = overall.get("bootstrap", {})
+    # If bootstrap CI crosses zero, downgrade FAIL to INCONCLUSIVE
+    if overall["brier_skill_vs_climatology"] <= 0 and boot.get("brier_skill_crosses_zero"):
+        print("  [INCONCLUSIVE] Brier skill point estimate is negative, but 95% CI")
+        print(f"                 [{boot['brier_skill_ci'][0]:+.4f}, {boot['brier_skill_ci'][1]:+.4f}] "
+              "crosses zero.")
+        print(f"                 With n={overall['n_samples']} samples, we cannot distinguish")
+        print("                 the model from climatology. Accumulate more outcome_tracker")
+        print("                 backfill (target n>=500) before concluding miscalibration.")
+    elif overall["brier_skill_vs_climatology"] <= 0:
         print("  [FAIL] Model does not beat climatology baseline.")
         print("         Predicting the historical UP rate constantly would be as good.")
+        print(f"         95% CI: [{boot['brier_skill_ci'][0]:+.4f}, {boot['brier_skill_ci'][1]:+.4f}]  "
+              "(entirely below zero)")
     elif overall["ece"] > 0.05:
         print(f"  [POOR] ECE = {overall['ece']:.4f} > 0.05 — model poorly calibrated.")
         print("         Consider Platt scaling or isotonic regression on dir_prob_up.")

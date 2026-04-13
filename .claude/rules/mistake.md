@@ -4,6 +4,35 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-04-13: 用混合模型版本的數據下 calibration 結論
+
+**What happened:**
+跑 `calibration_check.py` 看到 Brier skill -0.098、ECE 0.16、over-confident +0.197，bootstrap CI 全部顯著（[-0.184, -0.014] 整條在零下，conf_gap [+0.115, +0.285] 整條在零上），就據此推論「模型 miscalibration 是真的」並開始討論 Platt scaling / isotonic / rolling percentile threshold 等解法。
+
+然後往下挖才發現 244 個 valid 樣本全部來自 2026-04-02 → 2026-04-12 這 10 天，這個窗期：
+  - 2026-04-03 部署 dual v7 初版（88 特徵）
+  - 2026-04-09 切換成 pruned 29 特徵 + regime weighting
+  - 2026-04-12 又重訓一次
+  - 5.5 天 `cg_bfx_margin_ratio`（第 4 重要特徵）灌壞數據（2026-04-12 backfill bug）
+
+也就是說：calibration 測試基於 **三個不同模型的混合預測 + 重大特徵被污染一半時間**。bin-level 極端區的怪象（p≥0.70 actual=0.50）很可能只是模型切換那幾小時產的 transient，不代表任何一個模型的穩態。前面提出的所有解法都建立在錯誤的前提上。
+
+**Root cause:**
+看到統計顯著的壞結果就急著找解法，沒先問「這個測試數據對應的是哪個模型？數據本身是乾淨的嗎？」最基本的 data sanity check 被跳過了。更糟的是 bootstrap CI 讓我更有信心下結論——但 CI 只能量**抽樣不確定性**，量不到**數據污染**或**模型版本混合**這種系統性偏差。統計顯著 ≠ 結論可信。
+
+**Correct approach:**
+評估模型前必須確認：
+  1. **樣本範圍對應單一模型版本**：git log 查最新模型 deploy 時間，樣本必須在那之後。
+  2. **樣本範圍不含已知數據污染窗**：查 mistake log 看近期有沒有數據 bug。
+  3. **樣本數夠**：即使資料乾淨，n<100 的 calibration 點估計不穩定；n<500 做 isotonic 會 overfit。
+  4. **先看時間切片**：分月/分週跑同一個測試，如果每段結論都不同，整體測試就沒意義。
+
+已在 `calibration_check.py` 的 roadmap 加上 `--since` flag 和 model version guard（讀取最新 model mtime，樣本必須 >= 該時間），還沒實作。
+
+**Rule:** 評估任何模型的統計量前，第一件事是「確認這份評估樣本是從同一個模型 + 同一份乾淨數據產生的」。這個 sanity check 要**在看結果之前**做，不是看到壞結果才回去查。Bootstrap / permutation / 顯著性檢定全部都只能處理抽樣誤差，不能處理「你在量錯的東西」這種問題。看到「顯著的壞結果」第一反應應該是懷疑測試設計，不是懷疑模型。
+
+---
+
 ## 2026-03-28: price_change fallback over-engineering
 
 **What happened:**
