@@ -30,8 +30,17 @@ import numpy as np
 import pandas as pd
 
 HIST = Path("indicator/model_artifacts/indicator_history.parquet")
+MODEL_FILE = Path("indicator/model_artifacts/dual_model/direction_xgb.json")
 OUT_JSON = Path("research/results/calibration_check.json")
 OUT_PNG = Path("research/results/calibration_diagram.png")
+
+
+def get_model_deploy_time() -> pd.Timestamp | None:
+    """Return mtime of the current production direction model as a UTC Timestamp."""
+    if not MODEL_FILE.exists():
+        return None
+    mtime = MODEL_FILE.stat().st_mtime
+    return pd.Timestamp(mtime, unit="s", tz="UTC")
 
 
 def wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -276,18 +285,59 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--regime", type=str, default=None,
                     help="Filter to specific regime (e.g. TRENDING_BULL)")
+    ap.add_argument("--since", type=str, default=None,
+                    help="Only include samples on/after this UTC date (YYYY-MM-DD). "
+                         "Overrides auto model-version guard.")
+    ap.add_argument("--no-version-guard", action="store_true",
+                    help="Disable automatic model-version guard (NOT recommended).")
+    ap.add_argument("--min-samples", type=int, default=100,
+                    help="Minimum sample count required to run analysis (default 100)")
     args = ap.parse_args()
 
     print(f"Loading {HIST}...")
     df = pd.read_parquet(HIST)
     print(f"Raw: {len(df)} bars, {df.index[0]} -> {df.index[-1]}")
 
+    # Strip tz for comparison
+    if hasattr(df.index, "tz") and df.index.tz is not None:
+        df_idx_utc = df.index.tz_convert("UTC")
+    else:
+        df_idx_utc = df.index.tz_localize("UTC")
+
+    # Model version guard — determine effective cutoff
+    model_mtime = get_model_deploy_time()
+    cutoff: pd.Timestamp | None = None
+
+    if args.since:
+        cutoff = pd.Timestamp(args.since, tz="UTC")
+        print(f"Using --since filter: samples >= {cutoff}")
+    elif not args.no_version_guard and model_mtime is not None:
+        cutoff = model_mtime
+        print(f"Model version guard: {MODEL_FILE.name} mtime = {cutoff}")
+        print(f"  (samples before this date are from a DIFFERENT model version)")
+    elif args.no_version_guard:
+        print("WARNING: model version guard disabled. Results may mix model versions.")
+
+    if cutoff is not None:
+        before = len(df)
+        df = df[df_idx_utc >= cutoff]
+        print(f"  Filtered: {before} -> {len(df)} bars after {cutoff}")
+
     # Filter to realized predictions
     valid = df[df["actual_return_4h"].notna() & df["dir_prob_up"].notna()].copy()
     print(f"Valid (dir_prob_up + actual_return_4h): {len(valid)}")
 
-    if len(valid) < 100:
-        print("ERROR: insufficient valid samples (<100). Need more outcome_tracker backfill.")
+    if len(valid) < args.min_samples:
+        print(f"\n[INSUFFICIENT DATA] n={len(valid)} < min_samples={args.min_samples}")
+        print(f"  Calibration estimates with n<{args.min_samples} are too noisy to act on.")
+        if cutoff is not None:
+            days_since = (pd.Timestamp.now(tz="UTC") - cutoff).total_seconds() / 86400
+            print(f"  Hours since model deploy: {days_since*24:.0f}h "
+                  f"({days_since:.1f} days)")
+            # Rough estimate: indicator runs 1 pred/h, 4h forward → ~20/day after warmup
+            est_days_needed = max(1, (args.min_samples - len(valid)) / 20)
+            print(f"  Estimated wait time: ~{est_days_needed:.0f} more days to reach n={args.min_samples}")
+        print(f"  Use --since <earlier_date> to widen the window (WARNING: may mix models)")
         return
 
     # Overall calibration
