@@ -64,16 +64,42 @@ dir_labels = build_direction_labels(df, k=0.5)
 df["y_dir"] = dir_labels["y_dir"]
 df["dir_return_4h"] = dir_labels["return_4h"]
 
-# Use VIF-pruned features
-pruning_path = Path("research/results/auto_pruning.json")
-if pruning_path.exists():
+# Feature selection priority:
+#   1. ablation_study.json (PREFERRED) — honest baseline + forward selection
+#   2. auto_pruning.json     (fallback) — VIF/correlation pruning
+#   3. hardcoded full set    (last resort)
+#
+# Ablation is preferred because on 2026-04-13 we found that auto_pruner output
+# 80 features (many with negative contribution) trained to AUC 0.579, while
+# ablation found the correct 34-feature set trained to AUC 0.602.
+# See .claude/rules/mistake.md for context.
+ablation_path = Path("research/results/ablation_study.json")
+pruning_path  = Path("research/results/auto_pruning.json")
+
+if ablation_path.exists():
+    _abl = json.loads(ablation_path.read_text())
+    baseline_feats = _abl.get("baseline", {}).get("features", [])
+    keep_feats     = _abl.get("combined", {}).get("keep_features", [])
+    dir_feats = [f for f in (baseline_feats + keep_feats) if f in df.columns]
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    dir_feats = [f for f in dir_feats if not (f in seen or seen.add(f))]
+    abl_auc   = _abl.get("combined", {}).get("metrics", {}).get("auc", 0.0)
+    abl_d_auc = _abl.get("combined", {}).get("delta_auc", 0.0)
+    print(f"Features: {len(dir_feats)} (ablation: {len(baseline_feats)} baseline "
+          f"+ {len(keep_feats)} KEEP, validated AUC={abl_auc:.4f} delta={abl_d_auc:+.4f})")
+    if keep_feats:
+        print(f"  KEEP features added: {keep_feats}")
+elif pruning_path.exists():
     _pruning = json.loads(pruning_path.read_text())
     dir_feats = [f for f in _pruning["direction"]["features"] if f in df.columns]
-    print(f"Features: {len(dir_feats)} (VIF-pruned)")
+    print(f"Features: {len(dir_feats)} (VIF-pruned, no ablation)")
+    print(f"  WARNING: using VIF pruning. Run research/ablation_study.py for honest validation.")
 else:
     DIR_FEATURES = OLD_FEATURES + NEW_KEY_4 + LIQUIDITY_FRAGILITY + POST_ABSORPTION
     dir_feats = filter_available(DIR_FEATURES, list(df.columns))
-    print(f"Features: {len(dir_feats)} (unpruned)")
+    print(f"Features: {len(dir_feats)} (unpruned — no ablation or pruning available)")
+    print(f"  WARNING: using full feature set. Risk of overfitting.")
 
 # Regime weighting: TRENDING_BULL 4x, TRENDING_BEAR 2x
 BULL_WEIGHT = 4.0
