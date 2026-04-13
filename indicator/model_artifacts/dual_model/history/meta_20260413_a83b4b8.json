@@ -1,0 +1,52 @@
+{
+  "date": "20260413",
+  "sha": "a83b4b8",
+  "timestamp": "2026-04-13T10:33:39.132276",
+  "direction_config": {
+    "feature_set": "pruned_29_ic_filtered",
+    "n_features": 29,
+    "n_samples": 2937,
+    "up_rate": 0.4923391215526047,
+    "scale_pos_weight": 1.0311203319502074,
+    "oos_auc": 0.5971,
+    "oos_accuracy": 0.5814,
+    "oos_f1": 0.5888,
+    "oos_last10_auc": 0.6022,
+    "pruning_method": "univariate IC > 0.03 (p<0.05) + redundancy removal + structural features",
+    "params": {
+      "objective": "binary:logistic",
+      "eval_metric": "auc",
+      "max_depth": 4,
+      "learning_rate": 0.05,
+      "n_estimators": 300,
+      "subsample": 0.8,
+      "colsample_bytree": 0.7,
+      "min_child_weight": 10,
+      "reg_alpha": 0.1,
+      "reg_lambda": 1.0,
+      "random_state": 42,
+      "verbosity": 0
+    }
+  },
+  "magnitude_config": {
+    "feature_set": "expanded",
+    "n_features": 76,
+    "n_samples": 3995,
+    "y_mean": 0.0071566479968883535,
+    "y_std": 0.007877175442709413,
+    "params": {
+      "objective": "reg:squarederror",
+      "eval_metric": "mae",
+      "max_depth": 4,
+      "learning_rate": 0.05,
+      "n_estimators": 300,
+      "subsample": 0.8,
+      "colsample_bytree": 0.7,
+      "min_child_weight": 10,
+      "reg_alpha": 0.1,
+      "reg_lambda": 1.0,
+      "random_state": 42,
+      "verbosity": 0
+    }
+  }
+}
