@@ -111,6 +111,7 @@ class SignalExplainer:
     def __init__(self):
         self._explainer = None
         self._feature_cols = None
+        self._is_regression = False
 
     def _init_explainer(self):
         """Lazy init: load model + create TreeExplainer on first use."""
@@ -122,12 +123,18 @@ class SignalExplainer:
 
             model_path = DUAL_DIR / "direction_xgb.json"
             fc_path = DUAL_DIR / "direction_feature_cols.json"
+            reg_cfg_path = DUAL_DIR / "direction_reg_config.json"
 
             if not model_path.exists():
                 logger.warning("Direction model not found, SHAP disabled")
                 return False
 
-            model = xgb.XGBClassifier()
+            # Detect regression vs binary classifier by config presence.
+            self._is_regression = reg_cfg_path.exists()
+            if self._is_regression:
+                model = xgb.XGBRegressor()
+            else:
+                model = xgb.XGBClassifier()
             model.load_model(str(model_path))
 
             with open(fc_path) as f:
@@ -167,17 +174,23 @@ class SignalExplainer:
                 for col in self._feature_cols
             }])
 
-            # TreeSHAP: returns array of shape (1, n_features) for binary classifier
+            # TreeSHAP
             shap_values = self._explainer.shap_values(X)
 
-            # For binary classifier, shap_values may be a list [class0, class1]
-            if isinstance(shap_values, list):
-                # Use class 1 (UP) values
-                sv = shap_values[1][0] if direction == "UP" else shap_values[0][0]
-            elif shap_values.ndim == 3:
-                sv = shap_values[0, :, 1] if direction == "UP" else shap_values[0, :, 0]
-            else:
+            if self._is_regression:
+                # Regressor: single (1, n_features) array. Positive SHAP pushes
+                # pred_ret up (toward UP); flip signs for DOWN so "top positive"
+                # always means "drivers of this signal's direction".
                 sv = shap_values[0]
+                if direction == "DOWN":
+                    sv = -sv
+            else:
+                if isinstance(shap_values, list):
+                    sv = shap_values[1][0] if direction == "UP" else shap_values[0][0]
+                elif shap_values.ndim == 3:
+                    sv = shap_values[0, :, 1] if direction == "UP" else shap_values[0, :, 0]
+                else:
+                    sv = shap_values[0]
 
             # Pair feature names with SHAP values
             pairs = list(zip(self._feature_cols, sv))
@@ -223,9 +236,11 @@ class SignalExplainer:
                 "top_positive": top_pos,
                 "top_negative": top_neg,
                 "top_groups": top_groups,
-                "base_value": round(float(self._explainer.expected_value
-                                         if not isinstance(self._explainer.expected_value, list)
-                                         else self._explainer.expected_value[1]), 4),
+                "base_value": round(float(
+                    self._explainer.expected_value[1]
+                    if isinstance(self._explainer.expected_value, list)
+                    else self._explainer.expected_value
+                ), 4),
             }
             logger.info("SHAP explanation: top driver = %s (%s)",
                         top_pos[0]["feature"] if top_pos else "?",
