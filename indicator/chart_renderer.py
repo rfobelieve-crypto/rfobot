@@ -174,36 +174,27 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         DN_STRONG, DN_MOD, DN_WEAK = "#b71c1c", "#ef5350", "#f5b5b1"
         NEUTRAL_GREY = "#bdbdbd"
 
-        # Weak tier → grey (direction not confident enough to tier).
-        # Moderate/Strong → coloured by regression lean sign + tier shade.
-        mag_signed = np.zeros(n)
+        # All bars plot above 0; direction is encoded purely by colour.
+        mag_signed = np.abs(mag_raw).astype(float)
         mag_colors = []
         for i in range(n):
-            m = mag_raw[i]
             s = strength[i]
             sgn = sign_arr[i]
             if s not in ("Strong", "Moderate"):
-                # Direction has no tier-level conviction → always plot
-                # above 0 so grey never implies a direction.
-                mag_signed[i] = m
                 mag_colors.append(NEUTRAL_GREY)
             elif sgn > 0:
-                mag_signed[i] = m
                 mag_colors.append(UP_STRONG if s == "Strong" else UP_MOD)
             elif sgn < 0:
-                mag_signed[i] = -m
                 mag_colors.append(DN_STRONG if s == "Strong" else DN_MOD)
             else:
-                mag_signed[i] = m
                 mag_colors.append(NEUTRAL_GREY)
 
         ax_mag.bar(x, mag_signed, width=0.8, color=mag_colors, alpha=0.8, edgecolor="none")
-        ax_mag.axhline(0, color="black", linewidth=0.5)
 
         # Reference lines: 80th / 90th percentile of |mag| within the window.
         # p80 is where Direction Strong WR starts to lift (base 72.9% → 77.6%);
         # p90 marks the high-conviction tier.
-        abs_nonzero = np.abs(mag_signed)[np.abs(mag_signed) > 1e-9]
+        abs_nonzero = mag_signed[mag_signed > 1e-9]
         if abs_nonzero.size >= 10:
             p80 = float(np.quantile(abs_nonzero, 0.80))
             p90 = float(np.quantile(abs_nonzero, 0.90))
@@ -213,27 +204,18 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
             ]:
                 ax_mag.axhline(y, color=color, linewidth=0.8,
                                linestyle="--", alpha=0.7)
-                ax_mag.axhline(-y, color=color, linewidth=0.8,
-                               linestyle="--", alpha=0.7)
                 ax_mag.text(n - 0.5, y, f" {label}", fontsize=6,
                             color=color, va="center", ha="left")
 
         ax_mag.set_ylabel("Magnitude\n(%)", fontsize=9)
         ax_mag.set_xlim(-0.5, n - 0.5)
-        # Scale: pure data-driven — max(|mag|) × 1.1 so the tallest bar
-        # occupies ~90% of half-panel height. No arbitrary floor; this keeps
-        # small-magnitude regimes visible instead of getting squashed by a
-        # hardcoded minimum.
-        abs_mag = np.abs(mag_signed)
-        peak = float(np.nanmax(abs_mag)) if abs_mag.size else 0.0
+        # Scale: pure data-driven — max(mag) × 1.1.
+        peak = float(np.nanmax(mag_signed)) if mag_signed.size else 0.0
         mag_max = peak * 1.1 if peak > 1e-6 else 0.05
-        ax_mag.set_ylim(-mag_max, mag_max)
+        ax_mag.set_ylim(0, mag_max)
 
-        # Finer y-axis ticks: 9 symmetric ticks (~8 intervals) so small
-        # differences between bars are readable. Tick label precision
-        # adapts to the scale magnitude.
         from matplotlib.ticker import MaxNLocator, FuncFormatter
-        ax_mag.yaxis.set_major_locator(MaxNLocator(nbins=8, symmetric=True))
+        ax_mag.yaxis.set_major_locator(MaxNLocator(nbins=6))
         if mag_max < 0.1:
             fmt = lambda v, _: f"{v:.3f}"
         elif mag_max < 1.0:

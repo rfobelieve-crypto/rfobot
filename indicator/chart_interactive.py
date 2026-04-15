@@ -64,7 +64,8 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         # Prefer dir_pred_ret so every bar gets a directional colour; fall
         # back to pred_direction for legacy binary compat.
         if has_mag:
-            mag_val = float(row.get("mag_pred", 0) or 0) * 100
+            # Always positive; direction is encoded purely by colour.
+            mag_val = abs(float(row.get("mag_pred", 0) or 0)) * 100
             dpr = row.get("dir_pred_ret")
             if dpr is not None and pd.notna(dpr):
                 sgn = 1 if float(dpr) > 0 else (-1 if float(dpr) < 0 else 0)
@@ -72,14 +73,11 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                 d = str(row.get("pred_direction", "NEUTRAL"))
                 sgn = 1 if d == "UP" else (-1 if d == "DOWN" else 0)
             s = str(row.get("strength_score", "Weak"))
-            # Weak tier → grey, always plot above 0 so grey never
-            # implies a direction (direction has no tier conviction).
             if s not in ("Strong", "Moderate"):
                 mag_color = "#bdbdbd"
             elif sgn > 0:
                 mag_color = "#004d40" if s == "Strong" else "#26a69a"
             elif sgn < 0:
-                mag_val = -mag_val
                 mag_color = "#b71c1c" if s == "Strong" else "#ef5350"
             else:
                 mag_color = "#bdbdbd"
@@ -263,18 +261,16 @@ if (hasMag) {{
   }});
   magSeries.setData(magData);
 
-  // Reference lines: ±p80 / ±p90 of |mag| within the window.
-  const absMag = magData.map(d => Math.abs(d.value)).filter(v => v > 1e-9);
+  // Reference lines: p80 / p90 of mag within the window.
+  const absMag = magData.map(d => d.value).filter(v => v > 1e-9);
   if (absMag.length >= 10) {{
     absMag.sort((a, b) => a - b);
     const q = (arr, p) => arr[Math.floor(p * (arr.length - 1))];
     const p80 = q(absMag, 0.80);
     const p90 = q(absMag, 0.90);
     [
-      [ p80, '#f9a825', 'p80' ],
-      [-p80, '#f9a825', 'p80' ],
-      [ p90, '#ef6c00', 'p90' ],
-      [-p90, '#ef6c00', 'p90' ],
+      [p80, '#f9a825', 'p80'],
+      [p90, '#ef6c00', 'p90'],
     ].forEach(([price, color, title]) => {{
       magSeries.createPriceLine({{
         price: price,
