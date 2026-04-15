@@ -179,10 +179,13 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         ax_mag.axhline(0, color="black", linewidth=0.5)
         ax_mag.set_ylabel("Magnitude\n(%)", fontsize=9)
         ax_mag.set_xlim(-0.5, n - 0.5)
-        # Scale: use 95th-pct of |mag| × 1.3 so typical bars occupy ~75% of
-        # panel height; tiny 0.1% floor prevents collapse when all mag≈0.
+        # Scale: pure data-driven — max(|mag|) × 1.1 so the tallest bar
+        # occupies ~90% of half-panel height. No arbitrary floor; this keeps
+        # small-magnitude regimes visible instead of getting squashed by a
+        # hardcoded minimum.
         abs_mag = np.abs(mag_signed)
-        mag_max = max(float(np.nanpercentile(abs_mag, 95)) * 1.3, 0.1)
+        peak = float(np.nanmax(abs_mag)) if abs_mag.size else 0.0
+        mag_max = peak * 1.1 if peak > 1e-6 else 0.05
         ax_mag.set_ylim(-mag_max, mag_max)
         ax_mag.grid(True, alpha=0.15)
         ax_mag.set_xticks([])
