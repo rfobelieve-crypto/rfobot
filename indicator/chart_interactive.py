@@ -72,10 +72,9 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                 d = str(row.get("pred_direction", "NEUTRAL"))
                 sgn = 1 if d == "UP" else (-1 if d == "DOWN" else 0)
             s = str(row.get("strength_score", "Weak"))
-            # Weak tier → grey (direction not confident enough).
+            # Weak tier → grey, always plot above 0 so grey never
+            # implies a direction (direction has no tier conviction).
             if s not in ("Strong", "Moderate"):
-                if sgn < 0:
-                    mag_val = -mag_val
                 mag_color = "#bdbdbd"
             elif sgn > 0:
                 mag_color = "#004d40" if s == "Strong" else "#26a69a"

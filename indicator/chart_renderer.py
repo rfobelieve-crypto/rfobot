@@ -183,7 +183,9 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
             s = strength[i]
             sgn = sign_arr[i]
             if s not in ("Strong", "Moderate"):
-                mag_signed[i] = m if sgn >= 0 else -m
+                # Direction has no tier-level conviction → always plot
+                # above 0 so grey never implies a direction.
+                mag_signed[i] = m
                 mag_colors.append(NEUTRAL_GREY)
             elif sgn > 0:
                 mag_signed[i] = m
