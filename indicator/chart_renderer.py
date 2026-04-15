@@ -179,7 +179,10 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         ax_mag.axhline(0, color="black", linewidth=0.5)
         ax_mag.set_ylabel("Magnitude\n(%)", fontsize=9)
         ax_mag.set_xlim(-0.5, n - 0.5)
-        mag_max = max(abs(mag_signed).max() * 1.2, 0.5)
+        # Scale: use 95th-pct of |mag| × 1.3 so typical bars occupy ~75% of
+        # panel height; tiny 0.1% floor prevents collapse when all mag≈0.
+        abs_mag = np.abs(mag_signed)
+        mag_max = max(float(np.nanpercentile(abs_mag, 95)) * 1.3, 0.1)
         ax_mag.set_ylim(-mag_max, mag_max)
         ax_mag.grid(True, alpha=0.15)
         ax_mag.set_xticks([])

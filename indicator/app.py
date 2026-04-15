@@ -419,20 +419,20 @@ def update_cycle() -> dict:
         else:
             logger.info("No new bars to predict")
 
-        # 5b. Re-predict historical bars — ONLY update mag_pred (for magnitude panel)
-        #     Do NOT overwrite pred_direction, strength_score, confidence_score
-        #     so chart triangles match the original live predictions.
+        # 5b. Re-predict historical bars with the current model — full rescore
+        # (direction + strength + confidence + mag + bbp). Rationale: after any
+        # model swap (e.g. binary → regression) stale historical triangles
+        # otherwise linger in the 200-bar window for ~8 days.
         overlap_idx = indicator_df.index.intersection(features.index)
         if len(overlap_idx) > 0:
             repredicted = _engine.predict(features.loc[overlap_idx], context_features=features)
             if hasattr(repredicted.index, 'as_unit'):
                 repredicted.index = repredicted.index.as_unit("ns")
-            # Only update magnitude-related columns, preserve direction/strength
-            mag_cols = [c for c in repredicted.columns
-                        if c in ("mag_pred", "bull_bear_power")]
-            for col in mag_cols:
+            pred_cols = [c for c in repredicted.columns
+                         if c not in ("open", "high", "low", "close")]
+            for col in pred_cols:
                 indicator_df.loc[overlap_idx, col] = repredicted[col]
-            logger.info("Re-scored %d historical bars (mag_pred only)", len(overlap_idx))
+            logger.info("Re-scored %d historical bars with current model", len(overlap_idx))
 
         # 6. Render chart (last 200 bars that have OHLC data)
         chart_df = indicator_df.dropna(subset=["open", "high", "low", "close"])
