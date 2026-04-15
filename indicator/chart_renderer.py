@@ -174,22 +174,23 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         DN_STRONG, DN_MOD, DN_WEAK = "#b71c1c", "#ef5350", "#f5b5b1"
         NEUTRAL_GREY = "#bdbdbd"
 
+        # Weak tier → grey (direction not confident enough to tier).
+        # Moderate/Strong → coloured by regression lean sign + tier shade.
         mag_signed = np.zeros(n)
         mag_colors = []
         for i in range(n):
             m = mag_raw[i]
             s = strength[i]
             sgn = sign_arr[i]
-            if sgn > 0:
+            if s not in ("Strong", "Moderate"):
+                mag_signed[i] = m if sgn >= 0 else -m
+                mag_colors.append(NEUTRAL_GREY)
+            elif sgn > 0:
                 mag_signed[i] = m
-                mag_colors.append(UP_STRONG if s == "Strong"
-                                  else UP_MOD if s == "Moderate"
-                                  else UP_WEAK)
+                mag_colors.append(UP_STRONG if s == "Strong" else UP_MOD)
             elif sgn < 0:
                 mag_signed[i] = -m
-                mag_colors.append(DN_STRONG if s == "Strong"
-                                  else DN_MOD if s == "Moderate"
-                                  else DN_WEAK)
+                mag_colors.append(DN_STRONG if s == "Strong" else DN_MOD)
             else:
                 mag_signed[i] = m
                 mag_colors.append(NEUTRAL_GREY)
