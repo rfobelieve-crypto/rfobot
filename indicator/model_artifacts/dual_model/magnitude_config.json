@@ -1,9 +1,10 @@
 {
   "feature_set": "expanded",
+  "target": "y_vol_adj_abs",
   "n_features": 76,
-  "n_samples": 3995,
-  "y_mean": 0.0071566479968883535,
-  "y_std": 0.007877175442709413,
+  "n_samples": 3991,
+  "y_mean": 1.7349719276457718,
+  "y_std": 2.1609186266694973,
   "params": {
     "objective": "reg:squarederror",
     "eval_metric": "mae",
