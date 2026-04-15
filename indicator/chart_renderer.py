@@ -206,7 +206,21 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         peak = float(np.nanmax(abs_mag)) if abs_mag.size else 0.0
         mag_max = peak * 1.1 if peak > 1e-6 else 0.05
         ax_mag.set_ylim(-mag_max, mag_max)
-        ax_mag.grid(True, alpha=0.15)
+
+        # Finer y-axis ticks: 9 symmetric ticks (~8 intervals) so small
+        # differences between bars are readable. Tick label precision
+        # adapts to the scale magnitude.
+        from matplotlib.ticker import MaxNLocator, FuncFormatter
+        ax_mag.yaxis.set_major_locator(MaxNLocator(nbins=8, symmetric=True))
+        if mag_max < 0.1:
+            fmt = lambda v, _: f"{v:.3f}"
+        elif mag_max < 1.0:
+            fmt = lambda v, _: f"{v:.2f}"
+        else:
+            fmt = lambda v, _: f"{v:.1f}"
+        ax_mag.yaxis.set_major_formatter(FuncFormatter(fmt))
+        ax_mag.tick_params(axis="y", labelsize=7)
+        ax_mag.grid(True, alpha=0.2, axis="both", which="major")
         ax_mag.set_xticks([])
 
     # ── Panel: Bull/Bear Power (bottom) ──────────────────────────────────

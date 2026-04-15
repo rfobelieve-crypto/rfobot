@@ -60,17 +60,27 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
             conf_color = "#1a1a2e"
         conf_data.append({"time": ts, "value": conf_val / 100, "color": conf_color})
 
-        # Magnitude
+        # Magnitude — colour by regression lean sign + tier shade.
+        # Prefer dir_pred_ret so every bar gets a directional colour; fall
+        # back to pred_direction for legacy binary compat.
         if has_mag:
             mag_val = float(row.get("mag_pred", 0) or 0) * 100
-            d = str(row.get("pred_direction", "NEUTRAL"))
-            if d == "UP":
-                mag_color = "#004d40" if mag_val > 0.5 else "#26a69a"
-            elif d == "DOWN":
-                mag_val = -mag_val
-                mag_color = "#b71c1c" if abs(mag_val) > 0.5 else "#ef5350"
+            dpr = row.get("dir_pred_ret")
+            if dpr is not None and pd.notna(dpr):
+                sgn = 1 if float(dpr) > 0 else (-1 if float(dpr) < 0 else 0)
             else:
-                mag_color = "#9e9e9e"
+                d = str(row.get("pred_direction", "NEUTRAL"))
+                sgn = 1 if d == "UP" else (-1 if d == "DOWN" else 0)
+            s = str(row.get("strength_score", "Weak"))
+            if sgn > 0:
+                mag_color = ("#004d40" if s == "Strong"
+                             else "#26a69a" if s == "Moderate" else "#a5d6c9")
+            elif sgn < 0:
+                mag_val = -mag_val
+                mag_color = ("#b71c1c" if s == "Strong"
+                             else "#ef5350" if s == "Moderate" else "#f5b5b1")
+            else:
+                mag_color = "#bdbdbd"
             mag_data.append({"time": ts, "value": round(mag_val, 4), "color": mag_color})
 
         # BBP
@@ -243,7 +253,9 @@ let magSeries = null;
 if (hasMag) {{
   magChart = makeChart('chart-mag', magH);
   magSeries = magChart.addHistogramSeries({{
-    priceFormat: {{ type: 'custom', formatter: (v) => v.toFixed(2) + '%' }},
+    // Finer resolution: 3 decimals + 0.001 minMove so small mag bars
+    // and their y-axis ticks stay readable when typical |mag| < 0.5%.
+    priceFormat: {{ type: 'price', precision: 3, minMove: 0.001 }},
     priceLineVisible: false,
     lastValueVisible: false,
   }});
