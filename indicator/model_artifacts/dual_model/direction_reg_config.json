@@ -1,0 +1,24 @@
+{
+  "model_type": "regression",
+  "objective": "reg:squarederror",
+  "target": "y_path_ret_4h = mean(close[t+1..t+4])/close[t] - 1 (TWAP)",
+  "horizon_bars": 4,
+  "decoding": "rolling_percentile",
+  "percentile_window": 500,
+  "strong_top_frac": 0.05,
+  "moderate_top_frac": 0.15,
+  "warmup_bars": 100,
+  "fallback": {
+    "strong_up": 0.001747723639709875,
+    "strong_dn": -0.0018223256920464337,
+    "moderate_up": 0.0010487943654879928,
+    "moderate_dn": -0.0011789888085331768
+  },
+  "use_mag_gate": false,
+  "n_train_samples": 3995,
+  "n_features": 136,
+  "n_estimators": 250,
+  "trained_at": "2026-04-15T19:42:31.983522",
+  "in_sample_mae": 0.003498130786986323,
+  "in_sample_corr": 0.8363432884306018
+}
