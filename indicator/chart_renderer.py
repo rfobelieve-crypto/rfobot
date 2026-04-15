@@ -197,6 +197,25 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
 
         ax_mag.bar(x, mag_signed, width=0.8, color=mag_colors, alpha=0.8, edgecolor="none")
         ax_mag.axhline(0, color="black", linewidth=0.5)
+
+        # Reference lines: 80th / 90th percentile of |mag| within the window.
+        # p80 is where Direction Strong WR starts to lift (base 72.9% → 77.6%);
+        # p90 marks the high-conviction tier.
+        abs_nonzero = np.abs(mag_signed)[np.abs(mag_signed) > 1e-9]
+        if abs_nonzero.size >= 10:
+            p80 = float(np.quantile(abs_nonzero, 0.80))
+            p90 = float(np.quantile(abs_nonzero, 0.90))
+            for y, color, label in [
+                (p80, "#f9a825", "p80"),
+                (p90, "#ef6c00", "p90"),
+            ]:
+                ax_mag.axhline(y, color=color, linewidth=0.8,
+                               linestyle="--", alpha=0.7)
+                ax_mag.axhline(-y, color=color, linewidth=0.8,
+                               linestyle="--", alpha=0.7)
+                ax_mag.text(n - 0.5, y, f" {label}", fontsize=6,
+                            color=color, va="center", ha="left")
+
         ax_mag.set_ylabel("Magnitude\n(%)", fontsize=9)
         ax_mag.set_xlim(-0.5, n - 0.5)
         # Scale: pure data-driven — max(|mag|) × 1.1 so the tallest bar

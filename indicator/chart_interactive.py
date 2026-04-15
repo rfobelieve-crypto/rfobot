@@ -263,6 +263,30 @@ if (hasMag) {{
     lastValueVisible: false,
   }});
   magSeries.setData(magData);
+
+  // Reference lines: ±p80 / ±p90 of |mag| within the window.
+  const absMag = magData.map(d => Math.abs(d.value)).filter(v => v > 1e-9);
+  if (absMag.length >= 10) {{
+    absMag.sort((a, b) => a - b);
+    const q = (arr, p) => arr[Math.floor(p * (arr.length - 1))];
+    const p80 = q(absMag, 0.80);
+    const p90 = q(absMag, 0.90);
+    [
+      [ p80, '#f9a825', 'p80' ],
+      [-p80, '#f9a825', 'p80' ],
+      [ p90, '#ef6c00', 'p90' ],
+      [-p90, '#ef6c00', 'p90' ],
+    ].forEach(([price, color, title]) => {{
+      magSeries.createPriceLine({{
+        price: price,
+        color: color,
+        lineWidth: 1,
+        lineStyle: 2,  // dashed
+        axisLabelVisible: true,
+        title: title,
+      }});
+    }});
+  }}
 }}
 
 // ── BBP chart ──
