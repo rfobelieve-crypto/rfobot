@@ -153,27 +153,46 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     # Date labels — shared tick positions for all panels
     tick_pos = np.linspace(0, n - 1, min(12, n)).astype(int)
 
-    # ── Panel 3: Magnitude (predicted |return_4h|, signed by direction) ───
+    # ── Panel 3: Magnitude (predicted |return_4h|, signed by regression lean) ──
     if has_mag:
         ax_mag = fig.add_subplot(gs[panel_idx]); panel_idx += 1
         mag_raw = sig["mag_pred"].fillna(0).values.astype(float) * 100  # to %
-        mag_dirs = sig["pred_direction"].fillna("NEUTRAL").values
+        strength = sig["strength_score"].fillna("Weak").values
+        # Prefer regression lean (dir_pred_ret) so every bar gets a direction,
+        # not just the top-15% tiers. Fall back to pred_direction for the
+        # legacy binary path which has no dir_pred_ret column.
+        if "dir_pred_ret" in sig.columns:
+            lean = sig["dir_pred_ret"].fillna(0).values.astype(float)
+            sign_arr = np.sign(lean)
+        else:
+            dirs = sig["pred_direction"].fillna("NEUTRAL").values
+            sign_arr = np.where(dirs == "UP", 1.0,
+                                np.where(dirs == "DOWN", -1.0, 0.0))
 
-        # Sign by direction: UP = positive, DOWN = negative
+        # Tier → colour intensity. Strong=dark, Moderate=medium, Weak=pale.
+        UP_STRONG, UP_MOD, UP_WEAK = "#004d40", "#26a69a", "#a5d6c9"
+        DN_STRONG, DN_MOD, DN_WEAK = "#b71c1c", "#ef5350", "#f5b5b1"
+        NEUTRAL_GREY = "#bdbdbd"
+
         mag_signed = np.zeros(n)
         mag_colors = []
         for i in range(n):
-            d = mag_dirs[i]
             m = mag_raw[i]
-            if d == "UP":
+            s = strength[i]
+            sgn = sign_arr[i]
+            if sgn > 0:
                 mag_signed[i] = m
-                mag_colors.append("#004d40" if m > 0.5 else "#26a69a")
-            elif d == "DOWN":
+                mag_colors.append(UP_STRONG if s == "Strong"
+                                  else UP_MOD if s == "Moderate"
+                                  else UP_WEAK)
+            elif sgn < 0:
                 mag_signed[i] = -m
-                mag_colors.append("#b71c1c" if m > 0.5 else "#ef5350")
+                mag_colors.append(DN_STRONG if s == "Strong"
+                                  else DN_MOD if s == "Moderate"
+                                  else DN_WEAK)
             else:
-                mag_signed[i] = m  # NEUTRAL: show magnitude unsigned (above zero)
-                mag_colors.append("#9e9e9e")
+                mag_signed[i] = m
+                mag_colors.append(NEUTRAL_GREY)
 
         ax_mag.bar(x, mag_signed, width=0.8, color=mag_colors, alpha=0.8, edgecolor="none")
         ax_mag.axhline(0, color="black", linewidth=0.5)
