@@ -176,11 +176,85 @@ NEW_CG = {
 }
 
 
+DERIBIT_BASE = "https://www.deribit.com/api/v2/public"
+
+
+def backfill_dvol():
+    """Incremental backfill of Deribit BTC DVOL hourly OHLC."""
+    print("\n" + "=" * 60)
+    print("[4/4] Deribit DVOL 1h backfill")
+    print("=" * 60)
+
+    pq_path = RAW / "deribit_dvol_1h.parquet"
+    if pq_path.exists():
+        old = pd.read_parquet(pq_path)
+        start_ms = int(old.index.max().timestamp() * 1000) + 1
+        print(f"  Existing: {len(old)} bars, ends at {old.index.max()}")
+    else:
+        old = pd.DataFrame()
+        start_ms = int((pd.Timestamp.now("UTC") - pd.Timedelta(days=250)).timestamp() * 1000)
+        print("  No existing data, fetching 250 days")
+
+    end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    if start_ms >= end_ms:
+        print("  Already up to date")
+        return
+
+    all_rows = []
+    cursor_end = end_ms
+    for i in range(20):
+        try:
+            resp = requests.get(
+                DERIBIT_BASE + "/get_volatility_index_data",
+                params={
+                    "currency": "BTC",
+                    "start_timestamp": start_ms,
+                    "end_timestamp": cursor_end,
+                    "resolution": "3600",
+                },
+                timeout=30,
+            )
+            body = resp.json()
+        except Exception as e:
+            print(f"  iter {i}: request failed: {e}")
+            break
+
+        result = body.get("result", {})
+        rows = result.get("data", []) if isinstance(result, dict) else result
+        if not rows:
+            break
+
+        all_rows.extend(rows)
+        earliest = int(rows[0][0])
+        print(f"  iter {i}: +{len(rows)} rows, earliest={pd.to_datetime(earliest, unit='ms', utc=True)}")
+
+        cont = result.get("continuation") if isinstance(result, dict) else None
+        if cont is None or earliest <= start_ms:
+            break
+        cursor_end = earliest - 1
+        time.sleep(0.3)
+
+    if not all_rows:
+        print("  No new data")
+        return
+
+    df = pd.DataFrame(all_rows, columns=["ts", "open", "high", "low", "close"])
+    df["dt"] = pd.to_datetime(df["ts"].astype("int64"), unit="ms", utc=True)
+    df = df.set_index("dt").sort_index().drop(columns=["ts"])
+    df = df[~df.index.duplicated(keep="last")]
+    df.columns = ["dvol_open", "dvol_high", "dvol_low", "dvol_close"]
+
+    combined = merge_parquet(pq_path, df)
+    combined.to_parquet(pq_path)
+    print(f"  Updated: {len(combined)} bars, {combined.index.min()} -> {combined.index.max()}")
+
+
 def run_backfill():
-    """Run full backfill: Binance klines + all 14 CG endpoints."""
+    """Run full backfill: Binance klines + all 14 CG endpoints + Deribit DVOL."""
     backfill_klines()
-    backfill_cg(EXISTING_CG, "2/3 existing")
-    backfill_cg(NEW_CG, "3/3 new")
+    backfill_cg(EXISTING_CG, "2/4 existing")
+    backfill_cg(NEW_CG, "3/4 new")
+    backfill_dvol()
     print("\n" + "=" * 60)
     print("DONE - all parquet files updated")
     print("=" * 60)
