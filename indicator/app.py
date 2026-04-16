@@ -471,38 +471,14 @@ def update_cycle() -> dict:
         dir_prob = float(last_row.get("dir_prob_up", 0.5))
         mag = float(last_row.get("mag_pred", 0))
 
-        # Entropy risk assessment
         risk_text = ""
-        risk_score = 50.0
-        try:
-            from indicator.entropy_tools import EntropyRiskManager
-            _risk_mgr = EntropyRiskManager()
-            _risk = _risk_mgr.assess(
-                features, dir_prob_up=dir_prob, confidence=conf,
-                market_regime=str(last_row.get("regime", "")),
-            )
-            risk_score = _risk["risk_score"]
-            risk_icon = {"HIGH": "\u26a0\ufe0f", "MEDIUM": "", "LOW": ""}[_risk["risk_level"]]
-            if risk_score >= 75:
-                risk_note = "\u4fe1\u865f\u53ef\u4fe1\u5ea6\u4f4e"
-            elif risk_score >= 50:
-                risk_note = "\u6b63\u5e38\u8b39\u614e"
-            else:
-                risk_note = "\u4fe1\u865f\u53ef\u4fe1\u5ea6\u9ad8"
-            risk_text = f"\nRisk: {risk_score:.0f}/100 - {risk_note}"
-            if risk_icon:
-                risk_text += f" {risk_icon}"
-            logger.info("Entropy risk: %.0f/100 (%s) pos=%.0f%%",
-                        risk_score, _risk["risk_level"], _risk["position_scale"] * 100)
-        except Exception as e:
-            logger.warning("Entropy risk failed (non-critical): %s", e)
 
         arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
         caption = (
             f"{arrow} BTC 4h Indicator | {now_str}\n"
             f"Price: ${price:,.0f}\n"
             f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
-            f"P(UP): {dir_prob:.0%} | Mag: {mag:.2f}x | BBP: {bbp:+.2f}"
+            f"Mag: {mag*100:.3f}% | BBP: {bbp:+.2f}"
             f"{risk_text}"
         )
         tg_result = _send_telegram_photo(png, caption)
@@ -1204,30 +1180,7 @@ def _dashboard_old():
     except Exception as e:
         sig_stats["error"] = str(e)
 
-    # 3. Entropy risk
     risk_info = {}
-    try:
-        from indicator.entropy_tools import EntropyAnalyzer, EntropyRiskManager
-        with _lock:
-            features_df = _state.get("indicator_df")
-        if features_df is not None and not features_df.empty:
-            analyzer = EntropyAnalyzer()
-            me = analyzer._market_entropy(features_df)
-            risk_info["market_entropy"] = me.get("normalized", "N/A")
-            risk_info["market_entropy_zscore"] = me.get("zscore", "N/A")
-
-            risk_mgr = EntropyRiskManager()
-            r = risk_mgr.assess(
-                features_df,
-                dir_prob_up=pred.get("dir_prob_up", 0.5),
-                confidence=pred.get("confidence", 50),
-                market_regime=pred.get("regime", ""),
-            )
-            risk_info["risk_score"] = r["risk_score"]
-            risk_info["risk_level"] = r["risk_level"]
-            risk_info["position_scale"] = r["position_scale"]
-    except Exception as e:
-        risk_info["error"] = str(e)
 
     # 4. DB health
     db_health = {}

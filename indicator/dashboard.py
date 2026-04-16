@@ -477,27 +477,7 @@ def _get_signal_stats() -> dict:
 
 
 def _get_risk_info(indicator_df, pred) -> dict:
-    info = {}
-    try:
-        from indicator.entropy_tools import EntropyAnalyzer, EntropyRiskManager
-        if indicator_df is not None and not indicator_df.empty:
-            analyzer = EntropyAnalyzer()
-            me = analyzer._market_entropy(indicator_df)
-            info["market_entropy"] = f"{me.get('normalized', 0):.2f}" if me.get("normalized") else "N/A"
-            info["market_entropy_zscore"] = f"{me.get('zscore', 0):+.1f}" if me.get("zscore") else "?"
-
-            risk_mgr = EntropyRiskManager()
-            r = risk_mgr.assess(
-                indicator_df,
-                dir_prob_up=pred.get("dir_prob_up", 0.5),
-                confidence=pred.get("confidence", 50),
-                market_regime=pred.get("regime", ""),
-            )
-            info["risk_score"] = f"{r['risk_score']:.0f}"
-            info["risk_level"] = r["risk_level"]
-    except Exception as e:
-        info["error"] = str(e)
-    return info
+    return {}
 
 
 def _get_db_health() -> dict:
