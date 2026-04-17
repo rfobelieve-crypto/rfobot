@@ -77,7 +77,7 @@ def record_signal(signal_time: datetime, direction: str, strength: str,
     """Record a Strong or Moderate directional signal."""
     if direction not in ("UP", "DOWN"):
         return
-    if strength not in ("Strong", "Moderate"):
+    if strength != "Strong":
         return
 
     _ensure_table()
@@ -195,98 +195,81 @@ def backfill_outcomes():
 
 
 def get_performance_report() -> str:
-    """Generate signal performance report for Telegram (Strong + Moderate)."""
-    from indicator.monitor_icir import DUAL_MODEL_START
-
+    """Generate signal performance report for Telegram (Strong only)."""
     _ensure_table()
     conn = _get_db_conn()
     try:
         with conn.cursor() as cur:
-            lines = ["<b>📊 Signal Performance (Dual Model)</b>\n"]
+            lines = ["<b>📊 Signal Performance (Strong)</b>\n"]
 
-            # Per-strength breakdown (dual model period only)
-            for tier in ["Strong", "Moderate"]:
-                cur.execute(f"""
-                    SELECT COUNT(*) as total,
-                           SUM(filled) as filled,
-                           SUM(correct) as wins,
-                           AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret,
-                           MAX(CASE WHEN filled=1 THEN actual_return_4h END) as best,
-                           MIN(CASE WHEN filled=1 THEN actual_return_4h END) as worst
-                    FROM `{TABLE}` WHERE strength = %s
-                      AND signal_time >= %s
-                """, (tier, DUAL_MODEL_START))
-                s = cur.fetchone()
-
-                total = int(s["total"] or 0)
-                filled = int(s["filled"] or 0)
-                wins = int(s["wins"] or 0)
-                if total == 0:
-                    continue
-
-                icon = "🔥" if tier == "Strong" else "📈"
-                lines.append(f"{icon} <b>{tier}</b> ({filled} 結算 / {total} 總計)")
-                if filled > 0:
-                    wr = wins / filled * 100
-                    avg_r = float(s["avg_ret"] or 0) * 100
-                    lines.append(f"  勝率: {wr:.1f}% ({wins}W/{filled-wins}L) avg={avg_r:+.2f}%")
-                else:
-                    lines.append("  尚無結算")
-                pending = total - filled
-                if pending > 0:
-                    lines.append(f"  等待結算: {pending} 筆")
-                lines.append("")
-
-            # Per-direction (dual model period only)
             cur.execute(f"""
-                SELECT direction, strength,
+                SELECT COUNT(*) as total,
+                       SUM(filled) as filled,
+                       SUM(correct) as wins,
+                       AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret
+                FROM `{TABLE}` WHERE strength = 'Strong'
+            """)
+            s = cur.fetchone()
+
+            total = int(s["total"] or 0)
+            filled = int(s["filled"] or 0)
+            wins = int(s["wins"] or 0)
+            if filled > 0:
+                wr = wins / filled * 100
+                avg_r = float(s["avg_ret"] or 0) * 100
+                lines.append(f"🔥 <b>Strong</b> ({filled} 結算 / {total} 總計)")
+                lines.append(f"  勝率: {wr:.1f}% ({wins}W/{filled-wins}L) avg={avg_r:+.2f}%")
+            elif total > 0:
+                lines.append(f"🔥 <b>Strong</b> ({total} 筆，尚無結算)")
+            else:
+                lines.append("  尚無 Strong 信號")
+
+            # Per-direction
+            cur.execute(f"""
+                SELECT direction,
                        COUNT(*) as cnt, SUM(correct) as wins,
                        AVG(actual_return_4h) as avg_ret
-                FROM `{TABLE}` WHERE filled = 1
-                  AND signal_time >= %s
-                GROUP BY direction, strength
-                ORDER BY strength, direction
-            """, (DUAL_MODEL_START,))
+                FROM `{TABLE}` WHERE filled = 1 AND strength = 'Strong'
+                GROUP BY direction ORDER BY direction
+            """)
             dir_rows = cur.fetchall()
             if dir_rows:
-                lines.append("<b>方向拆解</b>")
+                lines.append("\n<b>方向拆解</b>")
                 for dr in dir_rows:
-                    d, st = dr["direction"], dr["strength"]
+                    d = dr["direction"]
                     cnt, w = int(dr["cnt"]), int(dr["wins"] or 0)
                     ar = float(dr["avg_ret"] or 0)
                     icon = "🟢" if d == "UP" else "🔴"
-                    lines.append(f"  {icon} {d} {st}: {w}/{cnt} ({w/cnt*100:.0f}%) avg={ar*100:+.2f}%")
-                lines.append("")
+                    lines.append(f"  {icon} {d}: {w}/{cnt} ({w/cnt*100:.0f}%) avg={ar*100:+.2f}%")
 
-            # Recent 10 signals
+            # Recent signals
             cur.execute(f"""
-                SELECT signal_time, direction, strength, confidence, entry_price,
-                       exit_price, actual_return_4h, correct, filled
+                SELECT signal_time, direction, confidence, entry_price,
+                       actual_return_4h, correct, filled
                 FROM `{TABLE}`
                 WHERE signal_time >= DATE_SUB(NOW(), INTERVAL 3 DAY)
-                ORDER BY signal_time DESC LIMIT 15
+                  AND strength = 'Strong'
+                ORDER BY signal_time DESC LIMIT 10
             """)
             recent = cur.fetchall()
             if recent:
-                lines.append("<b>最近信號</b>")
+                lines.append("\n<b>最近信號</b>")
                 for r in recent:
-                    # Convert UTC to UTC+8 for display
                     sig_utc = r["signal_time"]
                     if hasattr(sig_utc, 'replace'):
                         sig_utc = sig_utc.replace(tzinfo=timezone.utc)
                     sig_local = sig_utc.astimezone(TZ_TPE)
                     t = sig_local.strftime("%m-%d %H:%M")
                     d = r["direction"]
-                    st = r["strength"][0]  # S or M
                     icon = "🟢▲" if d == "UP" else "🔴▼"
                     entry = float(r["entry_price"])
                     conf = float(r["confidence"])
                     if r["filled"]:
                         ret = float(r["actual_return_4h"])
                         mark = "✅" if r["correct"] else "❌"
-                        lines.append(f"  {icon}[{st}] {t} ${entry:,.0f} c={conf:.0f} → {ret*100:+.2f}% {mark}")
+                        lines.append(f"  {icon} {t} ${entry:,.0f} c={conf:.0f} → {ret*100:+.2f}% {mark}")
                     else:
-                        lines.append(f"  {icon}[{st}] {t} ${entry:,.0f} c={conf:.0f} → ⏳")
+                        lines.append(f"  {icon} {t} ${entry:,.0f} c={conf:.0f} → ⏳")
 
             return "\n".join(lines)
     finally:

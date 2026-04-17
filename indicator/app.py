@@ -845,188 +845,178 @@ def indicator_db_stats():
 
 @app.route("/indicator-perf", methods=["GET"])
 def indicator_performance():
-    """API: comprehensive model performance for Telegram /perf command."""
+    """API: comprehensive model performance for Telegram /perf command.
+
+    Design principle: only show numbers that reflect actual OOS performance.
+    - Walk-forward OOS baseline = authoritative reference (updated on retrain)
+    - tracked_signals filtered to current model deploy = real live performance
+    - indicator_history IC is in-sample (re-predicted every cycle) → reference only
+    """
+    # Walk-forward OOS baseline — updated each time model is retrained.
+    # Source: research/dual_model/train_direction_reg_4h.py (77-fold expanding window)
+    OOS_BASELINE = {
+        "ic": 0.183,
+        "auc": 0.597,
+        "strong_wr": 69.2,
+        "strong_wr_ci": "[63-75%]",
+        "n_folds": 77,
+        "train_end": "2026-04-16",
+    }
+    # Signals before this date came from different model versions or
+    # contaminated rolling buffers — do not count toward current model perf.
+    CURRENT_MODEL_DEPLOY = "2026-04-17"
+
     try:
         from shared.db import get_db_conn
-        from scipy.stats import spearmanr
         import pandas as pd
 
-        from indicator.monitor_icir import DUAL_MODEL_START
-
         conn = get_db_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT dt, `close`, pred_return_4h, pred_direction_code,
-                       confidence_score, dir_prob_up,
-                       COALESCE(mag_pred, 0) as mag_pred,
-                       COALESCE(regime_code, 0) as regime_code
-                FROM indicator_history
-                WHERE dt >= %s
-                ORDER BY dt DESC
-                LIMIT 720
-            """, (DUAL_MODEL_START,))
-            rows = cur.fetchall()
+
+        # ── Section 1: Tracked signals (current model only) ──
+        strong_lines = []
+        strong_total = strong_filled = strong_wins = 0
+        alerts = []
+        try:
+            with conn.cursor() as cur:
+                # Current model signals
+                cur.execute("""
+                    SELECT direction, strength,
+                           COUNT(*) as total,
+                           SUM(filled) as filled_cnt,
+                           SUM(correct) as wins,
+                           AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret
+                    FROM tracked_signals
+                    WHERE signal_time >= %s AND strength = 'Strong'
+                    GROUP BY direction, strength
+                """, (CURRENT_MODEL_DEPLOY,))
+                cur_rows = cur.fetchall()
+
+                for r in cur_rows:
+                    d = r["direction"]
+                    total = int(r["total"] or 0)
+                    filled = int(r["filled_cnt"] or 0)
+                    wins = int(r["wins"] or 0)
+                    strong_total += total
+                    strong_filled += filled
+                    strong_wins += wins
+                    if filled > 0:
+                        wr = wins / filled * 100
+                        avg_r = float(r["avg_ret"] or 0) * 100
+                        icon = "🟢" if d == "UP" else "🔴"
+                        strong_lines.append(
+                            f"  {icon} {d}: {wr:.0f}% ({wins}W/{filled-wins}L, avg={avg_r:+.2f}%)")
+
+                # Pending (unfilled)
+                cur.execute("""
+                    SELECT COUNT(*) as cnt
+                    FROM tracked_signals
+                    WHERE signal_time >= %s AND strength = 'Strong' AND filled = 0
+                """, (CURRENT_MODEL_DEPLOY,))
+                pending = int(cur.fetchone()["cnt"] or 0)
+
+                # All-time Strong for alert threshold (need 20+ for significance)
+                cur.execute("""
+                    SELECT COUNT(*) as total, SUM(correct) as wins
+                    FROM tracked_signals WHERE filled = 1 AND strength = 'Strong'
+                      AND signal_time >= %s
+                """, (CURRENT_MODEL_DEPLOY,))
+                sr = cur.fetchone()
+                s_total_all = int(sr["total"] or 0)
+                s_wins_all = int(sr["wins"] or 0)
+                if s_total_all >= 20:
+                    s_wr_all = s_wins_all / s_total_all * 100
+                    if s_wr_all < 55:
+                        alerts.append(f"🔴 Strong 累積勝率 {s_wr_all:.0f}% (< 55%) — 建議重訓")
+
+        except Exception as e:
+            logger.warning("Tracked signals query failed: %s", e)
+
+        # ── Section 2: Recent signals list ──
+        recent_lines = []
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT signal_time, direction, strength, confidence, entry_price,
+                           exit_price, actual_return_4h, correct, filled
+                    FROM tracked_signals
+                    WHERE signal_time >= DATE_SUB(NOW(), INTERVAL 3 DAY)
+                      AND strength = 'Strong'
+                    ORDER BY signal_time DESC LIMIT 10
+                """)
+                recent = cur.fetchall()
+                from datetime import timezone as tz, timedelta as td
+                TZ8 = tz(td(hours=8))
+                for r in recent:
+                    sig_utc = r["signal_time"]
+                    if hasattr(sig_utc, 'replace'):
+                        sig_utc = sig_utc.replace(tzinfo=tz.utc)
+                    sig_local = sig_utc.astimezone(TZ8)
+                    t = sig_local.strftime("%m-%d %H:%M")
+                    d = r["direction"]
+                    icon = "🟢▲" if d == "UP" else "🔴▼"
+                    entry = float(r["entry_price"])
+                    conf = float(r["confidence"])
+                    if r["filled"]:
+                        ret = float(r["actual_return_4h"])
+                        mark = "✅" if r["correct"] else "❌"
+                        recent_lines.append(f"  {icon} {t} ${entry:,.0f} c={conf:.0f} → {ret*100:+.2f}% {mark}")
+                    else:
+                        recent_lines.append(f"  {icon} {t} ${entry:,.0f} c={conf:.0f} → ⏳")
+        except Exception as e:
+            logger.warning("Recent signals query failed: %s", e)
+
+        # ── Section 3: Current regime ──
+        current_regime = "UNKNOWN"
+        last_price = 0
+        last_dir_prob = 0.5
+        last_mag = 0
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT `close`, dir_prob_up, COALESCE(mag_pred, 0) as mag_pred,
+                           COALESCE(regime_code, 0) as regime_code
+                    FROM indicator_history ORDER BY dt DESC LIMIT 1
+                """)
+                last_row = cur.fetchone()
+                if last_row:
+                    regime_map = {2: "TRENDING_BULL", -2: "TRENDING_BEAR", 0: "CHOPPY", -99: "WARMUP"}
+                    current_regime = regime_map.get(int(last_row["regime_code"]), "UNKNOWN")
+                    last_price = float(last_row["close"])
+                    last_dir_prob = float(last_row["dir_prob_up"])
+                    last_mag = float(last_row["mag_pred"])
+        except Exception as e:
+            logger.warning("Latest prediction query failed: %s", e)
+
         conn.close()
 
-        if len(rows) < 5:
-            return jsonify({"text": "⏳ 數據不足（需至少 5 筆歷史紀錄）"})
-
-        df = pd.DataFrame(rows)
-        df["dt"] = pd.to_datetime(df["dt"])
-        df = df.sort_values("dt").reset_index(drop=True)
-
-        # Actual 4h returns
-        df["actual_4h"] = df["close"].shift(-4) / df["close"] - 1
-        eval_df = df.dropna(subset=["actual_4h"]).copy()
-
-        if len(eval_df) < 3:
-            return jsonify({"text": "⏳ 尚無足夠的已實現結果（需等待 4h+）"})
-
-        # Direction labels
-        eval_df["pred_dir"] = eval_df["pred_direction_code"].map(
-            {1: "UP", -1: "DOWN", 0: "NEUTRAL"})
-        eval_df["actual_dir"] = eval_df["actual_4h"].apply(
-            lambda x: "UP" if x > 0.001 else ("DOWN" if x < -0.001 else "NEUTRAL"))
-
-        active = eval_df[eval_df["pred_dir"] != "NEUTRAL"]
-        dir_acc = (active["pred_dir"] == active["actual_dir"]).mean() * 100 if len(active) > 0 else 0
-
-        # Strong signal accuracy
-        strong = eval_df[eval_df["confidence_score"] >= 80]
-        strong_active = strong[strong["pred_dir"] != "NEUTRAL"] if len(strong) > 0 else pd.DataFrame()
-        strong_acc = (strong_active["pred_dir"] == strong_active["actual_dir"]).mean() * 100 if len(strong_active) > 0 else 0
-
-        # Overall IC
-        ic_all, _ = spearmanr(eval_df["pred_return_4h"], eval_df["actual_4h"])
-
-        # Magnitude IC
-        mag_active = eval_df[eval_df["mag_pred"] > 0]
-        mag_ic_str = f"{spearmanr(mag_active['mag_pred'], mag_active['actual_4h'].abs())[0]:.3f}" if len(mag_active) >= 5 else "N/A"
-
-        # ── Rolling IC (7d / 30d) ──
-        def _rolling_ic(data, window_bars):
-            if len(data) < window_bars:
-                return None
-            recent = data.tail(window_bars)
-            if recent["pred_return_4h"].std() == 0 or recent["actual_4h"].std() == 0:
-                return None
-            val, _ = spearmanr(recent["pred_return_4h"], recent["actual_4h"])
-            return val
-
-        ic_7d = _rolling_ic(eval_df, 168)   # 7 * 24
-        ic_30d = _rolling_ic(eval_df, 720)  # 30 * 24
-
-        # IC trend: compare 7d vs 30d
-        if ic_7d is not None and ic_30d is not None:
-            if ic_7d > ic_30d + 0.03:
-                ic_trend = "📈 上升"
-            elif ic_7d < ic_30d - 0.03:
-                ic_trend = "📉 下降"
-            else:
-                ic_trend = "➡️ 持平"
-        else:
-            ic_trend = "—"
-
-        # ── Decay alerts ──
-        alerts = []
-        if ic_7d is not None:
-            if ic_7d < -0.05:
-                alerts.append("🔴 7 天 IC 顯著為負 — 建議重訓模型")
-            elif ic_7d < 0:
-                alerts.append("🟡 7 天 IC 接近零 — 密切觀察")
-            elif ic_7d < 0.05:
-                alerts.append("🟡 7 天 IC 偏低 (< 0.05) — 密切觀察")
-
-        # Signal win rate alert (need 20+ samples)
-        try:
-            from indicator.signal_tracker import _ensure_table, _get_db_conn, TABLE
-            _ensure_table()
-            sconn = _get_db_conn()
-            with sconn.cursor() as cur:
-                for tier in ["Strong", "Moderate"]:
-                    cur.execute(f"""
-                        SELECT COUNT(*) as total, SUM(correct) as wins
-                        FROM `{TABLE}` WHERE filled = 1 AND strength = %s
-                    """, (tier,))
-                    sr = cur.fetchone()
-                    s_total = int(sr["total"] or 0)
-                    s_wins = int(sr["wins"] or 0)
-                    if s_total >= 20:
-                        s_wr = s_wins / s_total * 100
-                        if s_wr < 55:
-                            alerts.append(f"🔴 {tier} 累積勝率 {s_wr:.0f}% (< 55%) — 建議重訓")
-            sconn.close()
-        except Exception:
-            pass
-
-        # ── Regime breakdown ──
-        regime_map = {2: "TRENDING_BULL", -2: "TRENDING_BEAR", 0: "CHOPPY", -99: "WARMUP"}
-        eval_df["regime"] = eval_df["regime_code"].map(regime_map).fillna("UNKNOWN")
-        current_regime = regime_map.get(int(df.iloc[-1].get("regime_code", 0)), "UNKNOWN")
-
-        regime_lines = []
-        for rn in ["TRENDING_BULL", "TRENDING_BEAR", "CHOPPY"]:
-            r_active = eval_df[(eval_df["regime"] == rn) & (eval_df["pred_dir"] != "NEUTRAL")]
-            if len(r_active) >= 2:
-                r_acc = (r_active["pred_dir"] == r_active["actual_dir"]).mean() * 100
-                r_label = {"TRENDING_BULL": "趨勢多", "TRENDING_BEAR": "趨勢空", "CHOPPY": "盤整"}[rn]
-                regime_lines.append(f"  {r_label}: {r_acc:.1f}% ({len(r_active)} 筆)")
-
-        # ── Live direction accuracy from tracked_signals (more reliable) ──
-        tracked_acc_lines = []
-        try:
-            from indicator.signal_tracker import _get_db_conn as _ts_conn, TABLE
-            tsconn = _ts_conn()
-            with tsconn.cursor() as tcur:
-                for tier in ["Strong", "Moderate"]:
-                    tcur.execute(f"""
-                        SELECT COUNT(*) as t, SUM(correct) as w,
-                               AVG(actual_return_4h) as avg_ret
-                        FROM `{TABLE}`
-                        WHERE filled = 1 AND strength = %s
-                          AND signal_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                    """, (tier,))
-                    tr = tcur.fetchone()
-                    tt, tw = int(tr["t"] or 0), int(tr["w"] or 0)
-                    if tt >= 3:
-                        wr = tw / tt * 100
-                        ar = float(tr["avg_ret"] or 0) * 100
-                        tracked_acc_lines.append(f"  {tier}: {wr:.1f}% ({tw}W/{tt-tw}L, avg={ar:+.2f}%)")
-            tsconn.close()
-        except Exception:
-            pass
-
         # ── Build report ──
-        lines = [
-            "<b>📊 模型表現 (Dual Model)</b>\n",
-            f"評估期間: {len(eval_df)} 筆 ({(eval_df['dt'].iloc[0] + pd.Timedelta(hours=8)).strftime('%m/%d')} ~ {(eval_df['dt'].iloc[-1] + pd.Timedelta(hours=8)).strftime('%m/%d')})",
-            f"\n<b>方向準確率 (近 30 天 tracked)</b>",
-        ]
-        lines.extend(tracked_acc_lines if tracked_acc_lines else [f"  全部: {dir_acc:.1f}% ({len(active)} 筆)"])
-        lines.append(f"\n<b>Regime 拆解</b> (當前: {current_regime})")
-        lines.extend(regime_lines if regime_lines else ["  數據不足"])
+        lines = ["<b>📊 模型表現 (Dual Model)</b>\n"]
 
-        # Rolling IC
-        lines.append(f"\n<b>Rolling IC (Dual Model)</b>")
-        lines.append(f"  全期: {ic_all:.3f} ({len(eval_df)} 筆, {DUAL_MODEL_START}~)")
-        lines.append(f"  7 天: {ic_7d:.3f}" if ic_7d is not None else "  7 天: N/A (數據不足)")
-        lines.append(f"  30 天: {ic_30d:.3f}" if ic_30d is not None else "  30 天: N/A (數據不足)")
-        lines.append(f"  趨勢: {ic_trend}")
-        lines.append(f"  Magnitude IC: {mag_ic_str}")
+        # OOS baseline
+        lines.append("<b>Walk-Forward OOS 基準</b> (權威參考)")
+        lines.append(f"  IC: {OOS_BASELINE['ic']:.3f} | AUC: {OOS_BASELINE['auc']:.3f}")
+        lines.append(f"  Strong 勝率: {OOS_BASELINE['strong_wr']:.1f}% {OOS_BASELINE['strong_wr_ci']}")
+        lines.append(f"  ({OOS_BASELINE['n_folds']} folds, 訓練截止 {OOS_BASELINE['train_end']})")
 
-        # Signal tracker (Strong + Moderate)
-        try:
-            from indicator.signal_tracker import get_performance_report
-            sig_report = get_performance_report()
-            sig_lines = sig_report.split("\n")
-            sig_body = [l for l in sig_lines if not l.startswith("<b>📊")]
-            if sig_body:
-                lines.append(f"\n<b>信號追蹤 (Strong + Moderate)</b>")
-                lines.extend(sig_body)
-        except Exception as e:
-            logger.warning("Signal tracker report failed: %s", e)
+        # Live tracked performance (current model)
+        lines.append(f"\n<b>部署後實戰</b> (Strong, {CURRENT_MODEL_DEPLOY}~)")
+        if strong_filled > 0:
+            total_wr = strong_wins / strong_filled * 100
+            lines.append(f"  總計: {total_wr:.0f}% ({strong_wins}W/{strong_filled-strong_wins}L)")
+            lines.extend(strong_lines)
+        elif strong_total > 0:
+            lines.append(f"  {strong_total} 筆信號，尚無結算")
+        else:
+            lines.append("  尚無信號 (模型剛部署)")
+        if pending > 0:
+            lines.append(f"  等待結算: {pending} 筆")
 
-        # SHAP cumulative stats
+        # Recent signals
+        if recent_lines:
+            lines.append(f"\n<b>最近信號</b>")
+            lines.extend(recent_lines)
+
+        # SHAP stats
         try:
             from indicator.signal_explainer import get_shap_stats_report
             shap_stats = get_shap_stats_report()
@@ -1041,16 +1031,13 @@ def indicator_performance():
             lines.extend(f"  {a}" for a in alerts)
 
         # Latest prediction
-        last = df.iloc[-1]
-        mag_val = float(last.get("mag_pred", 0))
-        # mag_pred is vol-adjusted; multiply by realized_vol to get approx %
-        mag_display = f"{mag_val:.2f}σ" if mag_val > 0 else ""
-        lines.extend([
-            f"\n<b>最新預測</b>",
-            f"  Price: ${last['close']:,.0f}",
-            f"  P(UP): {last['dir_prob_up']:.2f}",
-            f"  Mag: {mag_display}" if mag_display else "",
-        ])
+        mag_display = f"{last_mag:.2f}σ" if last_mag > 0 else ""
+        lines.append(f"\n<b>最新預測</b> (Regime: {current_regime})")
+        lines.append(f"  Price: ${last_price:,.0f}")
+        lines.append(f"  P(UP): {last_dir_prob:.2f}")
+        if mag_display:
+            lines.append(f"  Mag: {mag_display}")
+
         lines = [l for l in lines if l]
         return jsonify({"text": "\n".join(lines)})
     except Exception as e:
