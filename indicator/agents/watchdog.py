@@ -164,7 +164,7 @@ def _get_cached_preds() -> pd.DataFrame:
         return pd.DataFrame()
     from indicator.inference import IndicatorEngine
     engine = IndicatorEngine()
-    _cached_preds = engine.predict(features)
+    _cached_preds = engine.predict(features, update_history=False)
     return _cached_preds
 
 

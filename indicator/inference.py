@@ -332,7 +332,8 @@ class IndicatorEngine:
         return pd.Series(mag, index=features.index)
 
     def predict(self, features: pd.DataFrame,
-                context_features: pd.DataFrame | None = None) -> pd.DataFrame:
+                context_features: pd.DataFrame | None = None,
+                update_history: bool = True) -> pd.DataFrame:
         """
         Run prediction on feature DataFrame.
 
@@ -342,6 +343,9 @@ class IndicatorEngine:
         context_features : Optional larger DataFrame for regime calculation.
             When predicting only a few new bars, pass the full feature history
             so regime detection has enough data (needs 168+ bars).
+        update_history : If True, append predictions to rolling buffers
+            (dir_pred_history, pred_history). Set False for re-scoring
+            historical bars to avoid contaminating the buffers.
 
         Returns DataFrame with: pred_return_4h, pred_direction,
         confidence_score, strength_score, bull_bear_power, regime
@@ -364,7 +368,8 @@ class IndicatorEngine:
             regime = full_regime
 
         if self.mode == "dual":
-            return self._predict_dual(features, regime)
+            return self._predict_dual(features, regime,
+                                      update_history=update_history)
         elif self.mode == "regime":
             return self._predict_regime(features, None, regime)
         else:
@@ -374,7 +379,8 @@ class IndicatorEngine:
     # ── Dual-model prediction (v7) ──────────────────────────────────────
 
     def _predict_dual(self, features: pd.DataFrame,
-                      regime: np.ndarray) -> pd.DataFrame:
+                      regime: np.ndarray,
+                      update_history: bool = True) -> pd.DataFrame:
         """
         Dual-model inference: independent direction + magnitude pipelines.
 
@@ -427,7 +433,8 @@ class IndicatorEngine:
 
         # Magnitude score is computed up-front for both modes (used in
         # confidence display only — regression mode does NOT gate Strong on it).
-        mag_score = self._compute_mag_score(mag_pred_sigma)
+        mag_score = self._compute_mag_score(mag_pred_sigma,
+                                                update_history=update_history)
 
         direction = np.full(n, "NEUTRAL", dtype=object)
         strength_tier = np.full(n, "Weak", dtype=object)
@@ -454,7 +461,9 @@ class IndicatorEngine:
 
                 # Update rolling buffer BEFORE computing the cutoff so that
                 # "now" is included — consistent with mag_score expanding pctile.
-                self.dir_pred_history.append(p)
+                # Skip when re-scoring historical bars to avoid buffer contamination.
+                if update_history:
+                    self.dir_pred_history.append(p)
                 buf_len = len(self.dir_pred_history)
 
                 if buf_len < warmup:
@@ -863,7 +872,8 @@ class IndicatorEngine:
 
     # ── Mag score (expanding percentile) ──────────────────────────────────
 
-    def _compute_mag_score(self, pred: np.ndarray) -> np.ndarray:
+    def _compute_mag_score(self, pred: np.ndarray,
+                           update_history: bool = True) -> np.ndarray:
         """Percentile of |pred| in expanding history. Range: 0-100."""
         abs_pred = np.abs(pred)
         mag_score = np.full(len(pred), np.nan)
@@ -871,7 +881,8 @@ class IndicatorEngine:
         for i in range(len(pred)):
             if np.isnan(pred[i]):
                 continue
-            self.pred_history.append(float(abs_pred[i]))
+            if update_history:
+                self.pred_history.append(float(abs_pred[i]))
 
             if len(self.pred_history) < MIN_MAG_HISTORY:
                 continue

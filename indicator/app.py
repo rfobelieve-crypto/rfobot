@@ -425,7 +425,8 @@ def update_cycle() -> dict:
         # otherwise linger in the 200-bar window for ~8 days.
         overlap_idx = indicator_df.index.intersection(features.index)
         if len(overlap_idx) > 0:
-            repredicted = _engine.predict(features.loc[overlap_idx], context_features=features)
+            repredicted = _engine.predict(features.loc[overlap_idx], context_features=features,
+                                             update_history=False)
             if hasattr(repredicted.index, 'as_unit'):
                 repredicted.index = repredicted.index.as_unit("ns")
             pred_cols = [c for c in repredicted.columns
@@ -507,7 +508,7 @@ def update_cycle() -> dict:
             except Exception as e:
                 logger.warning("SHAP explanation failed (non-critical): %s", e)
 
-            risk_line = f"\nRisk: {risk_score:.0f}/100" if risk_score > 0 else ""
+            risk_line = ""
             alert = (
                 f"{icon} <b>{label} SIGNAL</b>\n\n"
                 f"BTC ${price:,.0f}\n"
