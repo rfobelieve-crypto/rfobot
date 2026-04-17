@@ -524,8 +524,8 @@ def update_cycle() -> dict:
             _send_discord_text(dc_alert)
             logger.info("Strong signal alert sent: %s", direction)
 
-        # Record Strong + Moderate signals for performance tracking
-        if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
+        # Record Strong signals for performance tracking
+        if strength == "Strong" and direction in ("UP", "DOWN"):
             try:
                 from indicator.signal_tracker import record_signal
                 sig_time = indicator_df.index[-1]

@@ -73,12 +73,12 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                 d = str(row.get("pred_direction", "NEUTRAL"))
                 sgn = 1 if d == "UP" else (-1 if d == "DOWN" else 0)
             s = str(row.get("strength_score", "Weak"))
-            if s not in ("Strong", "Moderate"):
+            if s != "Strong":
                 mag_color = "#bdbdbd"
             elif sgn > 0:
-                mag_color = "#004d40" if s == "Strong" else "#26a69a"
+                mag_color = "#004d40"
             elif sgn < 0:
-                mag_color = "#b71c1c" if s == "Strong" else "#ef5350"
+                mag_color = "#b71c1c"
             else:
                 mag_color = "#bdbdbd"
             mag_data.append({"time": ts, "value": round(mag_val, 4), "color": mag_color})
@@ -88,29 +88,27 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         bbp_color = "#26a69a" if bbp_val > 0 else "#ef5350"
         bbp_data.append({"time": ts, "value": round(bbp_val, 4), "color": bbp_color})
 
-        # Direction markers (Moderate + Strong)
+        # Direction markers (Strong only)
         strength = str(row.get("strength_score", ""))
         direction = str(row.get("pred_direction", ""))
-        if strength in ("Moderate", "Strong") and direction in ("UP", "DOWN"):
-            conf_score = float(row.get("confidence_score", 0) or 0)
-            mag_pct = float(row.get("mag_pred", 0) or 0) * 100
+        if strength == "Strong" and direction in ("UP", "DOWN"):
             if direction == "UP":
                 markers.append({
                     "time": ts,
                     "position": "belowBar",
-                    "color": "#004d40" if strength == "Strong" else "#26a69a",
+                    "color": "#004d40",
                     "shape": "arrowUp",
                     "text": "",
-                    "size": 2 if strength == "Strong" else 1,
+                    "size": 2,
                 })
             else:
                 markers.append({
                     "time": ts,
                     "position": "aboveBar",
-                    "color": "#b71c1c" if strength == "Strong" else "#ef5350",
+                    "color": "#b71c1c",
                     "shape": "arrowDown",
                     "text": "",
-                    "size": 2 if strength == "Strong" else 1,
+                    "size": 2,
                 })
 
     last_dt = sig.index[-1]

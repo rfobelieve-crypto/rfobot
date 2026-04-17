@@ -101,7 +101,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_price.vlines(x[up], lows[up], highs[up], color="#26a69a", linewidth=0.5)
     ax_price.vlines(x[down], lows[down], highs[down], color="#ef5350", linewidth=0.5)
 
-    # Direction triangles — Moderate and Strong signals
+    # Direction triangles — Strong signals only
     price_range = highs.max() - lows.min()
     offset = price_range * 0.02
 
@@ -110,8 +110,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         c = sig.iloc[i]["confidence_score"]
         s = sig.iloc[i]["strength_score"]
 
-        # Filter: skip NEUTRAL, Weak, and NaN
-        if d == "NEUTRAL" or pd.isna(c) or s == "Weak":
+        if d == "NEUTRAL" or pd.isna(c) or s != "Strong":
             continue
 
         alpha = max(0.5, min(c / 100, 1.0))
@@ -119,19 +118,15 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         if d == "UP":
             y_pos = lows[i] - offset
             marker = "^"
-            color = "#004d40" if s == "Strong" else "#26a69a"
+            color = "#004d40"
         else:
             y_pos = highs[i] + offset
             marker = "v"
-            color = "#b71c1c" if s == "Strong" else "#ef5350"
+            color = "#b71c1c"
 
-        # Strong: bigger + white edge
-        sz = 13 if s == "Strong" else 10
-        edge = "white" if s == "Strong" else "none"
-        lw = 1.2 if s == "Strong" else 0
-        ax_price.scatter(i, y_pos, marker=marker, s=sz**2,
-                         color=color, alpha=alpha, edgecolors=edge,
-                         linewidths=lw, zorder=5)
+        ax_price.scatter(i, y_pos, marker=marker, s=13**2,
+                         color=color, alpha=alpha, edgecolors="white",
+                         linewidths=1.2, zorder=5)
 
     ax_price.set_ylabel("Price (USD)", fontsize=10)
     ax_price.grid(True, alpha=0.15)
@@ -142,13 +137,11 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     legend_elements = [
         plt.scatter([], [], marker="^", color="#004d40", s=169, edgecolors="white",
                     linewidths=1.2, label="Strong UP"),
-        plt.scatter([], [], marker="^", color="#26a69a", s=100, label="Moderate UP"),
-        plt.scatter([], [], marker="v", color="#ef5350", s=100, label="Moderate DOWN"),
         plt.scatter([], [], marker="v", color="#b71c1c", s=169, edgecolors="white",
                     linewidths=1.2, label="Strong DOWN"),
     ]
     ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
-                    framealpha=0.8, ncol=4)
+                    framealpha=0.8, ncol=2)
 
     # Date labels — shared tick positions for all panels
     tick_pos = np.linspace(0, n - 1, min(12, n)).astype(int)
@@ -169,9 +162,9 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
             sign_arr = np.where(dirs == "UP", 1.0,
                                 np.where(dirs == "DOWN", -1.0, 0.0))
 
-        # Tier → colour intensity. Strong=dark, Moderate=medium, Weak=pale.
-        UP_STRONG, UP_MOD, UP_WEAK = "#004d40", "#26a69a", "#a5d6c9"
-        DN_STRONG, DN_MOD, DN_WEAK = "#b71c1c", "#ef5350", "#f5b5b1"
+        # Tier → colour intensity. Strong=dark, others=grey.
+        UP_STRONG = "#004d40"
+        DN_STRONG = "#b71c1c"
         NEUTRAL_GREY = "#bdbdbd"
 
         # All bars plot above 0; direction is encoded purely by colour.
@@ -180,12 +173,12 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         for i in range(n):
             s = strength[i]
             sgn = sign_arr[i]
-            if s not in ("Strong", "Moderate"):
+            if s != "Strong":
                 mag_colors.append(NEUTRAL_GREY)
             elif sgn > 0:
-                mag_colors.append(UP_STRONG if s == "Strong" else UP_MOD)
+                mag_colors.append(UP_STRONG)
             elif sgn < 0:
-                mag_colors.append(DN_STRONG if s == "Strong" else DN_MOD)
+                mag_colors.append(DN_STRONG)
             else:
                 mag_colors.append(NEUTRAL_GREY)
 
