@@ -1031,12 +1031,11 @@ def indicator_performance():
             lines.extend(f"  {a}" for a in alerts)
 
         # Latest prediction
-        mag_display = f"{last_mag:.2f}σ" if last_mag > 0 else ""
         lines.append(f"\n<b>最新預測</b> (Regime: {current_regime})")
         lines.append(f"  Price: ${last_price:,.0f}")
         lines.append(f"  P(UP): {last_dir_prob:.2f}")
-        if mag_display:
-            lines.append(f"  Mag: {mag_display}")
+        if last_mag > 0:
+            lines.append(f"  Mag: {last_mag:.2%}")
 
         lines = [l for l in lines if l]
         return jsonify({"text": "\n".join(lines)})
