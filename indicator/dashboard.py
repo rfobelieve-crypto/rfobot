@@ -96,7 +96,7 @@ def render_dashboard(state: dict, engine) -> str:
             ok = "&#10003;" if r["correct"] else "&#10007;"
             recent_html += f'<tr><td>{t}</td><td>[{s}]</td><td style="color:{dc}">{icon} {d}</td><td>{r["confidence"]:.0f}</td><td>${r["entry_price"]:,.0f}</td><td style="color:{oc}">{ret:+.2f}% {ok}</td></tr>'
         else:
-            recent_html += f'<tr><td>{t}</td><td>[{s}]</td><td style="color:{dc}">{icon} {d}</td><td>{r["confidence"]:.0f}</td><td>${r["entry_price"]:,.0f}</td><td style="color:#666">pending</td></tr>'
+            recent_html += f'<tr><td>{t}</td><td>[{s}]</td><td style="color:{dc}">{icon} {d}</td><td>{r["confidence"]:.0f}</td><td>${r["entry_price"]:,.0f}</td><td style="color:#666">等待中</td></tr>'
 
     # 24h distribution bar
     up_n = dist_24h.get("UP", 0)
@@ -124,7 +124,7 @@ def render_dashboard(state: dict, engine) -> str:
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Quant Dashboard</title>
+<title>量化儀表板</title>
 <meta http-equiv="refresh" content="300">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
@@ -168,24 +168,24 @@ function toggle(id) {{
 }}
 </script>
 </head><body>
-<h1>Quant Dashboard</h1>
-<div class="subtitle">{now} | auto-refresh 5min</div>
+<h1>量化儀表板</h1>
+<div class="subtitle">{now} | 自動刷新 5 分鐘</div>
 
 <div class="grid">
-  {_card("Status",
+  {_card("狀態",
          _dot(overall_health in ("healthy","unknown")) + " " + overall_health.upper(),
          (last_update[:19] if last_update != "N/A" else "N/A"),
          {"healthy":"#4caf50","degraded":"#ff9800","critical":"#f44336"}.get(overall_health, "#999"))}
-  {_card("Direction", pred.get("direction","?"), f'P(UP)={pred.get("dir_prob_up",0):.0%} | {pred.get("strength","?")}',
+  {_card("方向", pred.get("direction","?"), f'P(UP)={pred.get("dir_prob_up",0):.0%} | {pred.get("strength","?")}',
          "#4caf50" if pred.get("direction")=="UP" else "#f44336" if pred.get("direction")=="DOWN" else "#999")}
-  {_card("Confidence", f'{pred.get("confidence",0):.0f}', f'${pred.get("close",0):,.0f}')}
-  {_card("Risk", f'{risk_info.get("risk_score","?")}/100', risk_info.get("risk_level","?"), risk_color)}
-  {_card("Entropy", f'{risk_info.get("market_entropy","N/A")}', f'z={risk_info.get("market_entropy_zscore","?")}')}
-  {_card("Model", "Dual v7", f'Dir={dir_n}f Mag={mag_n}f')}
+  {_card("信心", f'{pred.get("confidence",0):.0f}', f'${pred.get("close",0):,.0f}')}
+  {_card("風險", f'{risk_info.get("risk_score","?")}/100', risk_info.get("risk_level","?"), risk_color)}
+  {_card("熵值", f'{risk_info.get("market_entropy","N/A")}', f'z={risk_info.get("market_entropy_zscore","?")}')}
+  {_card("模型", "Dual v7", f'Dir={dir_n}f Mag={mag_n}f')}
 </div>
 
-{_section("24h Prediction", "dist24", True, f'''
-  <div style="color:#8b949e;font-size:11px;margin-bottom:4px;">Last 24 bars direction distribution</div>
+{_section("24h 預測分佈", "dist24", True, f'''
+  <div style="color:#8b949e;font-size:11px;margin-bottom:4px;">最近 24 根 bar 方向分佈</div>
   <div class="dist-bar">
     <div style="background:#4caf50;flex:{up_pct:.0f}">UP {up_n}</div>
     <div style="background:#666;flex:{nt_pct:.0f}">N {nt_n}</div>
@@ -193,22 +193,22 @@ function toggle(id) {{
   </div>
 ''')}
 
-{_section("Regime Timeline", "regime", True, f'''
-  <div style="color:#8b949e;font-size:11px;margin-bottom:4px;">Last 48h regime changes</div>
-  <div class="regime-row">{regime_html if regime_html else '<div style="color:#666">No data</div>'}</div>
+{_section("市場狀態時間軸", "regime", True, f'''
+  <div style="color:#8b949e;font-size:11px;margin-bottom:4px;">最近 48h 狀態變化</div>
+  <div class="regime-row">{regime_html if regime_html else '<div style="color:#666">無數據</div>'}</div>
 ''')}
 
-{_section("Signal Performance", "signals", True, _build_signal_html(sig_stats, recent_html))}
+{_section("信號績效", "signals", True, _build_signal_html(sig_stats, recent_html))}
 
-{_section("IC / Win Rate Trend (7 days)", "ictrend", True, _build_ic_trend_html(ic_trend))}
+{_section("IC / 勝率趨勢 (7 天)", "ictrend", True, _build_ic_trend_html(ic_trend))}
 
-{_section("Prediction vs Actual (24h)", "predva", True, _build_pred_vs_actual_html(pred_vs_actual))}
+{_section("預測 vs 實際 (24h)", "predva", True, _build_pred_vs_actual_html(pred_vs_actual))}
 
-{_section("Alert History (7 days)", "alerts", False, _build_alert_history_html(alert_history))}
+{_section("警報歷史 (7 天)", "alerts", False, _build_alert_history_html(alert_history))}
 
-{_section("Data Freshness", "fresh", False, _build_freshness_html(freshness))}
+{_section("數據新鮮度", "fresh", False, _build_freshness_html(freshness))}
 
-{_section("System Health", "syshealth", True, _build_health_html(
+{_section("系統健康", "syshealth", True, _build_health_html(
     overall_health, health_checks, db_health, cg_text, engine, engine_info, error))}
 
 </body></html>"""
@@ -220,7 +220,7 @@ def _build_signal_html(sig_stats, recent_html):
     s_m = sig_stats.get("Moderate", {})
     return f'''
   <table>
-    <tr><th>Tier</th><th>Total</th><th>Filled</th><th>Win Rate</th><th>Avg Ret</th></tr>
+    <tr><th>等級</th><th>總計</th><th>已結算</th><th>勝率</th><th>平均收益</th></tr>
     <tr><td>Strong</td><td>{s_s.get("total",0)}</td><td>{s_s.get("filled",0)}</td>
         <td>{s_s.get("wr","N/A")}</td><td>{s_s.get("avg_ret","N/A")}</td></tr>
     <tr><td>Moderate</td><td>{s_m.get("total",0)}</td><td>{s_m.get("filled",0)}</td>
@@ -228,7 +228,7 @@ def _build_signal_html(sig_stats, recent_html):
   </table>
   <div style="margin-top:10px">
     <table>
-      <tr><th>Time</th><th>Tier</th><th>Dir</th><th>Conf</th><th>Entry</th><th>Result</th></tr>
+      <tr><th>時間</th><th>等級</th><th>方向</th><th>信心</th><th>入場價</th><th>結果</th></tr>
       {recent_html}
     </table>
   </div>
@@ -255,7 +255,7 @@ def _dot(ok):
 def _build_ic_trend_html(trend_data):
     """Build IC + win rate trend chart using Chart.js."""
     if not trend_data or not trend_data.get("labels"):
-        return '<div style="color:#666">Insufficient data for trend</div>'
+        return '<div style="color:#666">數據不足</div>'
 
     import json as _json
     labels_json = _json.dumps(trend_data["labels"])
@@ -273,7 +273,7 @@ def _build_ic_trend_html(trend_data):
       labels: {labels_json},
       datasets: [
         {{
-          label: 'Rolling IC (24h)',
+          label: '滾動 IC (24h)',
           data: {ic_json},
           borderColor: '#58a6ff',
           backgroundColor: 'rgba(88,166,255,0.1)',
@@ -281,7 +281,7 @@ def _build_ic_trend_html(trend_data):
           tension: 0.3,
         }},
         {{
-          label: 'Win Rate % (24h)',
+          label: '勝率 % (24h)',
           data: {wr_json},
           borderColor: '#4caf50',
           backgroundColor: 'rgba(76,175,80,0.1)',
@@ -297,7 +297,7 @@ def _build_ic_trend_html(trend_data):
       scales: {{
         x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }} }},
         y: {{ position: 'left', ticks: {{ color: '#58a6ff', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }}, title: {{ display: true, text: 'IC', color: '#58a6ff' }} }},
-        y1: {{ position: 'right', ticks: {{ color: '#4caf50', font: {{ size: 9 }} }}, grid: {{ drawOnChartArea: false }}, title: {{ display: true, text: 'Win %', color: '#4caf50' }} }}
+        y1: {{ position: 'right', ticks: {{ color: '#4caf50', font: {{ size: 9 }} }}, grid: {{ drawOnChartArea: false }}, title: {{ display: true, text: '勝率', color: '#4caf50' }} }}
       }}
     }}
   }});
@@ -309,7 +309,7 @@ def _build_ic_trend_html(trend_data):
 def _build_pred_vs_actual_html(data):
     """Build prediction direction vs actual price chart."""
     if not data or not data.get("labels"):
-        return '<div style="color:#666">Insufficient data</div>'
+        return '<div style="color:#666">數據不足</div>'
 
     import json as _json
     labels_json = _json.dumps(data["labels"])
@@ -322,7 +322,7 @@ def _build_pred_vs_actual_html(data):
   <canvas id="predChart"></canvas>
 </div>
 <div style="color:#8b949e;font-size:10px;margin-top:4px">
-  Dots: UP=green, DOWN=red, NEUTRAL=gray. Larger=Strong.
+  點: UP=綠, DOWN=紅, NEUTRAL=灰. 大點=Strong.
 </div>
 <script>
 (function() {{
@@ -332,7 +332,7 @@ def _build_pred_vs_actual_html(data):
     data: {{
       labels: {labels_json},
       datasets: [{{
-        label: 'BTC Price',
+        label: 'BTC 價格',
         data: {price_json},
         borderColor: '#58a6ff',
         backgroundColor: 'rgba(88,166,255,0.1)',
@@ -360,9 +360,9 @@ def _build_pred_vs_actual_html(data):
 def _build_alert_history_html(alerts):
     """Build alert history table."""
     if not alerts:
-        return '<div style="color:#4caf50">No alerts in past 7 days</div>'
+        return '<div style="color:#4caf50">過去 7 天無警報</div>'
 
-    lines = ['<table><tr><th>Time</th><th>Type</th><th>Alert</th></tr>']
+    lines = ['<table><tr><th>時間</th><th>類型</th><th>警報</th></tr>']
     for a in alerts[:20]:  # Most recent 20
         t = a.get("time", "?")
         atype = a.get("type", "?")
@@ -375,12 +375,12 @@ def _build_alert_history_html(alerts):
     # Summary count
     total = len(alerts)
     critical = sum(1 for a in alerts if a.get("severity") == "critical")
-    summary = f'<div style="color:#8b949e;font-size:11px;margin-bottom:6px">Total: {total} alerts ({critical} critical) in past 7 days</div>'
+    summary = f'<div style="color:#8b949e;font-size:11px;margin-bottom:6px">總計: {total} 則警報 ({critical} 嚴重) 過去 7 天</div>'
     return summary + "\n".join(lines)
 
 
 def _build_freshness_html(freshness):
-    lines = ['<table><tr><th>Source</th><th>Age</th><th>Last Update</th></tr>']
+    lines = ['<table><tr><th>來源</th><th>延遲</th><th>最後更新</th></tr>']
     for f in freshness:
         age = f["age_min"]
         fc = "#4caf50" if age < 120 else "#ff9800" if age < 360 else "#f44336"
@@ -398,7 +398,7 @@ def _build_health_html(overall, checks, db_health, cg_text, engine, engine_info,
     lines.append(f'<div style="margin-bottom:8px">')
     lines.append(f'  Overall: <span style="color:{overall_color}">{overall.upper()}</span>')
     lines.append(f'</div>')
-    lines.append('<table><tr><th>Check</th><th>Status</th><th>Detail</th></tr>')
+    lines.append('<table><tr><th>檢查項目</th><th>狀態</th><th>詳情</th></tr>')
 
     if checks:
         for c in checks:
@@ -408,11 +408,11 @@ def _build_health_html(overall, checks, db_health, cg_text, engine, engine_info,
             detail = c.get("detail", "")[:80]
             lines.append(f'<tr><td>{name}</td><td>{dot} {sev}</td><td>{detail}</td></tr>')
     else:
-        lines.append('<tr><td colspan="3" style="color:#666">Waiting for first update cycle...</td></tr>')
+        lines.append('<tr><td colspan="3" style="color:#666">等待首次更新...</td></tr>')
 
     lines.append('</table>')
     lines.append('<div style="margin-top:8px"><table>')
-    lines.append('<tr><th>Component</th><th>Status</th><th>Detail</th></tr>')
+    lines.append('<tr><th>組件</th><th>狀態</th><th>詳情</th></tr>')
 
     db_ok = db_health.get("status") == "OK"
     db_detail = f'history: {db_health.get("indicator_history", "?")} | signals: {db_health.get("tracked_signals", "?")}'
@@ -421,7 +421,7 @@ def _build_health_html(overall, checks, db_health, cg_text, engine, engine_info,
     cg_ok = "OK" in cg_text or "/" in cg_text
     lines.append(f'<tr><td>Coinglass</td><td>{_dot(cg_ok)} {cg_text}</td><td></td></tr>')
 
-    lines.append(f'<tr><td>Engine</td><td>{_dot(engine is not None)} Loaded</td><td>{engine_info}</td></tr>')
+    lines.append(f'<tr><td>Engine</td><td>{_dot(engine is not None)} 已載入</td><td>{engine_info}</td></tr>')
 
     err_text = "None" if error is None else str(error)[:80]
     lines.append(f'<tr><td>Error</td><td>{_dot(error is None)} {err_text}</td><td></td></tr>')
