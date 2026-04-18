@@ -318,9 +318,11 @@ def _build_pred_vs_actual_html(data):
     point_sizes_json = _json.dumps(data["point_sizes"])
 
     return f'''
-<canvas id="predChart" height="120"></canvas>
+<div style="position:relative;height:160px;">
+  <canvas id="predChart"></canvas>
+</div>
 <div style="color:#8b949e;font-size:10px;margin-top:4px">
-  Dots: UP=green, DOWN=red, NEUTRAL=gray. Larger=Strong, medium=Moderate.
+  Dots: UP=green, DOWN=red, NEUTRAL=gray. Larger=Strong.
 </div>
 <script>
 (function() {{
