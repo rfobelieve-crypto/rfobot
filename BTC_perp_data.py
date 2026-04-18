@@ -253,7 +253,7 @@ def send_message(chat_id: str, text: str) -> None:
     try:
         resp = requests.post(
             f"{API_URL}/sendMessage",
-            data={"chat_id": chat_id, "text": text},
+            data={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
             timeout=10
         )
         if resp.status_code != 200:
