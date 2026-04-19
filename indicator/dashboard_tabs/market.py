@@ -163,7 +163,9 @@ def _build_mag_vs_realized() -> str:
             "高估" if ratio > 1.3 else "低估" if ratio < 0.7 else "校準良好",
             "#ff9800" if abs(ratio - 1) > 0.3 else "#4caf50")}
     </div>
-    <canvas id="magVolChart" height="130"></canvas>
+    <div style="position:relative;height:180px">
+      <canvas id="magVolChart"></canvas>
+    </div>
     <script>
     (function() {{
       new Chart(document.getElementById('magVolChart').getContext('2d'), {{
@@ -249,7 +251,9 @@ def _build_funding_env() -> str:
       {card("24h 均值", f'{avg_24h:.4f}%', "")}
       {card("歷史百分位", f'{pctile:.0f}%', "72h 窗口")}
     </div>
-    <canvas id="fundingChart" height="100"></canvas>
+    <div style="position:relative;height:150px">
+      <canvas id="fundingChart"></canvas>
+    </div>
     <script>
     (function() {{
       new Chart(document.getElementById('fundingChart').getContext('2d'), {{
@@ -324,7 +328,9 @@ def _build_oi_section() -> str:
       {card("24h 變化", f'{chg_24h:+.2f}%', "",
             "#4caf50" if chg_24h > 0 else "#f44336")}
     </div>
-    <canvas id="oiChart" height="110"></canvas>
+    <div style="position:relative;height:160px">
+      <canvas id="oiChart"></canvas>
+    </div>
     <script>
     (function() {{
       new Chart(document.getElementById('oiChart').getContext('2d'), {{
@@ -403,7 +409,9 @@ def _build_ls_ratio() -> str:
       {card("48h 最高", f'{df["ls"].max():.3f}', "")}
       {card("48h 最低", f'{df["ls"].min():.3f}', "")}
     </div>
-    <canvas id="lsChart" height="110"></canvas>
+    <div style="position:relative;height:160px">
+      <canvas id="lsChart"></canvas>
+    </div>
     <script>
     (function() {{
       new Chart(document.getElementById('lsChart').getContext('2d'), {{
