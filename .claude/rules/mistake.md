@@ -257,3 +257,43 @@ BEAR 只佔 18% 樣本（724/4000）。`feature × is_bear` 等於：
 3. **inter-feature correlation matrix 必須當成標準驗證步驟**，跟 train/test split、rolling IC 同等重要。如果一群本應獨立的特徵互相相關 > 0.9，那不是訊號，是 indicator pattern leakage。
 
 **Rule:** 設計 interaction feature 時，**永遠不要寫 `feat × sparse_indicator`**——當 indicator 的非零比例 < 30%，乘出來的特徵會被 sparsity pattern 主導，跟其他用同一 indicator 乘的特徵高度相關，IC 也會 collapse。如果要做 regime conditioning：(a) 把 indicator 直接當 feature，讓 XGB 自己學 split；(b) 只在「base feature 在某 regime 完全死掉」的情況下用 `feat × (1 - is_dead_regime)` 形式屏蔽噪音。設計完任何 interaction 都要先跑 inter-feature correlation matrix。
+
+---
+
+## 2026-04-19: 多個腳本覆寫同一個 JSON 導致 warmup buffer 被清空
+
+**What happened:**
+系統連續產出大量 DOWN 信號，比例明顯不合理。排查後發現 `training_stats.json` 裡的 `dir_pred_history`（Direction model 的 500 筆 warmup 預測）是空的。沒有 warmup buffer，系統永遠用固定 fallback 閾值解碼方向——這些閾值是歷史均值，無法適應當前 bearish regime，結果只要模型預測稍微偏負就觸發 DOWN。
+
+事件鏈：
+1. 4/15 `export_direction_reg_model.py` 正確寫入 500 筆 `dir_pred_history` ✅
+2. 4/16 `deploy_new_models.py` 重訓 Magnitude model，用 `json.dump` **整個覆寫** `training_stats.json`，只寫了 `pred_history`（mag 的 warmup），`dir_pred_history` 被洗掉 ❌
+3. 之後每次 Railway 重啟（git push 觸發），buffer 歸零，永遠不到 100 根 warmup 門檻
+4. 系統永遠用 fallback 閾值 → bearish 市場下 DOWN 信號爆量
+
+**Root cause:**
+三個腳本寫同一個檔案，但寫法不一致：
+- `export_direction_reg_model.py`：先讀再寫（read-then-update）✅
+- `deploy_new_models.py`：直接 `json.dump` 覆寫 ❌
+- `export_production_models.py`：直接 `json.dump` 覆寫 ❌
+
+後面兩個腳本沒有意識到這個檔案是**共用的**，裡面有別的腳本存的資料。這是最基本的共用資源協調問題。
+
+**Correct approach:**
+寫入已存在的 JSON/config 檔案時，永遠用 read-then-update 模式：
+```python
+if stats_path.exists():
+    with open(stats_path) as f:
+        stats = json.load(f)
+else:
+    stats = {}
+stats["my_key"] = my_value  # 只更新自己負責的 key
+with open(stats_path, "w") as f:
+    json.dump(stats, f, indent=2)
+```
+
+額外加了兩層防護：
+1. `app.py` 每次 update cycle 結束後持久化 `dir_pred_history`，這樣 Railway 重啟不會失去已累積的 warmup
+2. 修復了 `deploy_new_models.py` 和 `export_production_models.py` 的寫法
+
+**Rule:** 寫入任何共用檔案前，第一步是 `grep` 看還有誰也在寫這個檔案。如果有多個寫入者，必須用 read-then-update 模式，只動自己負責的 key。直接 `json.dump` 覆寫整個檔案等於對其他寫入者說「你存的東西我不在乎」——這在單一寫入者時沒問題，多個寫入者時是資料刪除。
