@@ -9,10 +9,10 @@
   "moderate_top_frac": 0.15,
   "warmup_bars": 100,
   "fallback": {
-    "strong_up": 0.001747723639709875,
-    "strong_dn": -0.0018223256920464337,
-    "moderate_up": 0.0010487943654879928,
-    "moderate_dn": -0.0011789888085331768
+    "strong_up": 0.005864151474088422,
+    "strong_dn": -0.006244711391627788,
+    "moderate_up": 0.0035746496869251162,
+    "moderate_dn": -0.0037431347533129155
   },
   "use_mag_gate": false,
   "n_train_samples": 3995,
