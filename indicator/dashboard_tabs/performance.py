@@ -127,7 +127,9 @@ def _build_ic_trend() -> str:
         wrs.append(round(float(wr), 1) if wr is not None else None)
 
     return f"""
-    <canvas id="icTrendChart" height="140"></canvas>
+    <div style="position:relative;height:180px">
+      <canvas id="icTrendChart"></canvas>
+    </div>
     <script>
     (function() {{
       var ctx = document.getElementById('icTrendChart').getContext('2d');
@@ -219,7 +221,9 @@ def _build_equity_curve() -> str:
       {card("勝率", f"{wr:.1f}%", "", "#4caf50" if wr >= 60 else "#ff9800")}
       {card("累計回報", f"{total:+.1f}%", "方向性 paper return", final_color)}
     </div>
-    <canvas id="equityChart" height="120"></canvas>
+    <div style="position:relative;height:160px">
+      <canvas id="equityChart"></canvas>
+    </div>
     <script>
     (function() {{
       new Chart(document.getElementById('equityChart').getContext('2d'), {{
@@ -287,7 +291,9 @@ def _build_confidence_dist() -> str:
     <div style="color:#8b949e;font-size:11px;margin-bottom:6px">
       平均: {avg:.1f} | 中位數: {median:.1f} | 樣本: {len(scores)}
     </div>
-    <canvas id="confDistChart" height="100"></canvas>
+    <div style="position:relative;height:140px">
+      <canvas id="confDistChart"></canvas>
+    </div>
     <script>
     (function() {{
       new Chart(document.getElementById('confDistChart').getContext('2d'), {{
