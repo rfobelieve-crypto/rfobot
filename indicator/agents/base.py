@@ -27,7 +27,7 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import anthropic
 
@@ -410,3 +410,94 @@ class BaseAgent(ABC):
             turns_used=turn + 1,
             duration_s=duration,
         )
+
+    # ── Scheduled execution wrapper ────────────────────────────────────
+
+    def run_with_logging(self) -> AgentResult:
+        """Execute agent with automatic DB logging and failure alerting."""
+        run_id = _log_agent_start(self.name)
+        try:
+            result = self.run()
+            _log_agent_finish(run_id, "success", result.summary[:2000])
+            return result
+        except Exception as e:
+            _log_agent_finish(run_id, "failed", error_message=str(e)[:2000])
+            self.send_alert(f"❌ <b>{self.name}</b> 排程執行失敗:\n<code>{e}</code>")
+            raise
+
+
+# ── agent_runs DB helpers ──────────────────────────────────────────────
+
+_agent_runs_ensured = False
+
+
+def _ensure_agent_runs_table():
+    global _agent_runs_ensured
+    if _agent_runs_ensured:
+        return
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS `agent_runs` (
+                        `id` INT AUTO_INCREMENT PRIMARY KEY,
+                        `agent_name` VARCHAR(50) NOT NULL,
+                        `started_at` DATETIME NOT NULL,
+                        `finished_at` DATETIME DEFAULT NULL,
+                        `status` ENUM('running', 'success', 'failed') NOT NULL,
+                        `output_summary` TEXT DEFAULT NULL,
+                        `error_message` TEXT DEFAULT NULL,
+                        INDEX `idx_agent_name` (`agent_name`),
+                        INDEX `idx_started_at` (`started_at`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """)
+            _agent_runs_ensured = True
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error("Failed to ensure agent_runs table: %s", e)
+
+
+def _log_agent_start(agent_name: str) -> Optional[int]:
+    """Insert a 'running' row and return its id."""
+    _ensure_agent_runs_table()
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO `agent_runs` (agent_name, started_at, status) "
+                    "VALUES (%s, UTC_TIMESTAMP(), 'running')",
+                    (agent_name,),
+                )
+                cur.execute("SELECT LAST_INSERT_ID() AS id")
+                return cur.fetchone()["id"]
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error("agent_runs log_start failed: %s", e)
+        return None
+
+
+def _log_agent_finish(run_id: Optional[int], status: str,
+                      output_summary: str = "", error_message: str = ""):
+    """Update the row with finish time and status."""
+    if run_id is None:
+        return
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE `agent_runs` SET finished_at=UTC_TIMESTAMP(), "
+                    "status=%s, output_summary=%s, error_message=%s WHERE id=%s",
+                    (status, output_summary or None, error_message or None, run_id),
+                )
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error("agent_runs log_finish failed: %s", e)

@@ -1694,6 +1694,23 @@ def _handle_indicator_perf(chat_id: str):
         send_message(chat_id, f"❌ 取得模型表現失敗: {e}")
 
 
+def _handle_alpha_decay(chat_id: str):
+    """Fetch alpha decay monitor from Indicator service."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/alpha-decay", timeout=30)
+        if resp.status_code != 200:
+            send_message(chat_id, f"❌ Indicator 服務未就緒 ({resp.status_code})")
+            return
+        data = resp.json()
+        send_message(chat_id, data.get("text", "N/A"))
+    except Exception as e:
+        logger.exception("alpha decay error: %s", e)
+        send_message(chat_id, f"❌ Alpha decay 檢查失敗: {e}")
+
+
 def _handle_signal_perf(chat_id: str):
     """Fetch Strong signal performance report from Indicator service."""
     if not INDICATOR_SERVICE_URL:
@@ -1777,7 +1794,7 @@ def _send_help(chat_id: str):
         "/status - Bot 狀態\n"
         "\n<b>--- 事件追蹤 ---</b>\n"
         "/event_status - 進行中事件\n"
-        "/sweep_status - 掃蕩追蹤狀態\n"
+        "/decay - Alpha Decay 監控\n"
         "/snap - 最新事件快照\n"
         "/score - 最近事件評分\n"
         "/history - 事件歷史\n"
@@ -1798,7 +1815,7 @@ def _send_help(chat_id: str):
         ],
         [
             {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
-            {"text": "\U0001f9f9 Sweep", "callback_data": "sweep"},
+            {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
             {"text": "\u2753 Help", "callback_data": "help"},
         ],
     ]})
@@ -1858,8 +1875,8 @@ def webhook():
                         f"功能: 放大縮小 / 拖曳平移 / 十字線游標")
                 else:
                     send_message(cb_chat_id, "INDICATOR_SERVICE_URL 未設定")
-            elif cb_data == "sweep":
-                send_message(cb_chat_id, outcome_tracker.format_active_trackers_report())
+            elif cb_data == "decay":
+                threading.Thread(target=_handle_alpha_decay, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "meeting":
                 send_message(cb_chat_id, "\U0001f4cb AI Meeting 啟動中... 5 個 agent 正在調查系統狀態，完成後會發送報告。")
                 threading.Thread(target=_handle_meeting, args=(cb_chat_id,), daemon=True).start()
@@ -1943,6 +1960,9 @@ def webhook():
 
         elif cmd == "/perf":
             threading.Thread(target=_handle_indicator_perf, args=(chat_id,), daemon=True).start()
+
+        elif cmd == "/decay":
+            threading.Thread(target=_handle_alpha_decay, args=(chat_id,), daemon=True).start()
 
         elif cmd == "/update":
             threading.Thread(target=_handle_force_update, args=(chat_id,), daemon=True).start()

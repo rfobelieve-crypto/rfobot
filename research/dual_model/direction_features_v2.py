@@ -54,6 +54,9 @@ OLD_CG = [
     "cg_taker_delta_slope_4h", "cg_taker_delta_mom_1h",
     "cg_funding_close_slope_4h", "cg_funding_close_mom_1h",
     "oi_price_divergence", "funding_taker_align",
+    # Second-order difference (acceleration) — regime-shift capture
+    "cg_oi_delta_accel", "cg_taker_delta_accel", "cg_funding_close_accel",
+    "cg_funding_regime_shift",
 ]
 
 OLD_DERIVED = [

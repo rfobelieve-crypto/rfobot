@@ -4,6 +4,77 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-04-14: 把 Strong 勝率目標寫成 95%（從策略系統沿用未更新）
+
+**What happened:**
+CLAUDE.md 長期寫「Strong 信號勝率目標 > 95%」，花了一整天嘗試各種方法提升 Direction model 都碰天花板，才回頭檢查這個目標本身是否合理。跑 `research/topk_precision_sweep.py` 用 2726 筆 walk-forward OOS 預測做 bidirectional top-k：
+
+| k | precision | CI | signals/月 |
+|---|---|---|---|
+| top 1% | 59.3% | [40.7, 75.5] | 5 |
+| top 2% | 63.6% | [50.4, 75.1] | 11 |
+| **top 5%** | **67.6%** | **[59.4, 74.9]** | **27** |
+| top 10% | 65.6% | [59.8, 71.0] | 53 |
+| top 20% | 60.2% | [56.0, 64.2] | 106 |
+
+峰值 67.6%。AUC 0.57 的理論 top-5% precision 上限 68-72%，代表**已經貼著數學天花板**。95% 在這個 AUC 結構下永遠達不到，那是 AUC 0.80+ 的模型才談的數字。
+
+**Root cause:**
+95% 是從早期策略系統（有 TP/SL、能過濾掉不利情境）沿用到指標系統，沒人重新校準。而指標系統的訊號是「原始預測」，不過濾，所以上限直接由模型 AUC 決定。把策略目標搬到指標系統等於給自己設一個數學上不存在的目標。
+
+**Correct approach:**
+precision 目標必須從**模型 AUC 反推**，不是拍腦袋定。公式約等於：
+- 給定 AUC，top-k precision 上限 ≈ 0.5 + (AUC - 0.5) × kernel(k)
+- AUC 0.57 + k=5% → 理論 ~0.70，實測 0.676（非常接近）
+- 如果要求 0.95，需要 AUC ≥ 0.85
+
+現在 CLAUDE.md 已改為「point estimate ≥ 65%，stretch 70%」。未來任何討論 Strong 勝率時，第一句話要問「當前模型 AUC 是多少，這個目標在結構上可達嗎」，不是「為什麼還沒達到」。
+
+**Rule:** 設定任何 precision/recall 目標前，先用當前模型的 AUC/IC 反推理論天花板。如果目標高於天花板就是錯的目標，改目標而不是追目標。絕對不要從不同系統（策略 vs 指標）沿用績效目標——運作機制不同，天花板也不同。
+
+---
+
+## 2026-04-13: 用 in-sample 月份 IC 判斷訊號健康度（高估 0.5 AUC 級別）
+
+**What happened:**
+為了診斷 Magnitude IC 衰退，寫 `diagnose_mag_decay.py` 用**當前生產模型**去預測過去每個月的 `|ret_4h|`，得到 Nov 0.60 / Dec 0.51 / Jan 0.57 / Feb 0.53 / Mar **0.60** / Apr 0.47。看起來訊號完全沒衰退、近月甚至還很強，幾乎下結論「Mag 訊號穩定，問題不在這」。
+
+後來跑乾淨 walk-forward（`mag_level_feat_swap.py`，每個測試窗只用之前的資料訓練）得到真實 OOS IC：Nov 0.31 / Dec 0.36 / Jan 0.24 / Feb 0.20 / Mar **0.10** / Apr 0.12。**Mar 差距 0.50 IC，Apr 差距 0.35 IC**。真實情況是 Mag 從 Feb/Mar 交界發生 concept drift，IC 腰斬。
+
+也就是說，我的第一版診斷**用了訓練集預測訓練集**——生產模型訓練時吃了全部 4000 bars，對任何歷史月份做預測都是 in-sample，結果無法反映 model 是否能從歷史學到新規律。
+
+**Root cause:**
+沒區分「model fit」和「model generalization」。生產模型的 IC 是在**全部資料訓練完**才算的，拿它去預測過去月份天生是作弊。這跟 Kaggle 新手用 `cross_val_score` 之後又用全資料重訓再看 train loss 是同一個錯誤——只是換了個包裝。更糟的是，月份切片讓我以為這是「time-slicing 驗證」，實際上完全沒做 time-based split。
+
+**Correct approach:**
+任何「模型是否仍然 work」的評估都必須是**嚴格 walk-forward**：每個測試點的模型只能看到該點之前的資料。生產模型的 in-sample 預測**永遠不能拿來回答「訊號是否衰退」「特徵是否還有效」「regime 是否改變」這類問題。能用 in-sample 回答的問題只有：「訓練收斂了沒」「在完整資料上 model 的 upper bound 在哪」。
+
+**Rule:** 診斷 IC/AUC 衰退時，第一句 assert 必須是「這個預測是 walk-forward 還是 in-sample」。in-sample 的結果在「診斷衰退」這個 task 下**零資訊量**，不管數字多漂亮都等於沒測。如果檢查清單裡的測試方法是「用生產模型預測過去月份」，那就是錯的測試方法，換掉。
+
+---
+
+## 2026-04-13: Regime-specific 子模型在小樣本下退化成比隨機還差
+
+**What happened:**
+為了試圖突破 Direction model 天花板，訓練 bull/bear/chop 三個 regime-specific 子模型（`regime_specific_direction.py`）。假設是「每個 regime 的特徵→方向關係不同，獨立訓練應該贏過全局模型」。
+
+結果全局模型在三個 regime 上的 AUC 分別是 CHOP 0.548 / BULL 0.500 / BEAR 0.497，regime 子模型是 CHOP 0.550 / BULL 0.440 / **BEAR 0.378**。BEAR 子模型 AUC 顯著低於 0.5，意味著它**系統性預測反方向**。
+
+原因：BEAR 整個 4000 bar 資料集只有 724 筆，扣掉 walk-forward test + NaN，每個 split 的訓練集只剩 50-100 筆。XGB 在這個樣本數下嚴重 overfit 訓練集的雜訊方向，預測出來的機率跟實際 label 反相關。BULL 也有 16 個 split 因為訓練樣本不足 < 50 直接跳過，等於是選擇性覆蓋。
+
+**Root cause:**
+沒評估「資料切片後每個 regime 的有效樣本數是否夠訓練」。少於 ~500 的小樣本訓練 gradient boosting 會 overfit 到雜訊，而且資料越少 overfit 越嚴重，甚至可能學到完全相反的方向。把這當成「子模型比較弱」來解讀是錯的——這些子模型根本沒進入「能學東西」的 regime。
+
+**Correct approach:**
+切片訓練前先算 min(regime_sample_count) 是否 > 500（gradient boosting 的大略安全線）。如果不夠：
+1. **退一步用 regime dummies 當 feature** 讓全局模型自己學 conditional split（這是 XGB 設計本來就能處理的）
+2. 或用 `sample_weight` 在全局訓練時加權少數 regime，**不要**切開訓練
+3. 如果真要切，只切樣本充足的 regime（這個資料集只有 CHOP 有 2000+ 筆，結論是：沒得切）
+
+**Rule:** 分群訓練前，每群的有效訓練樣本數必須 > 500（至少要 > 300），否則不如用單一模型 + 分群特徵。小樣本下 gradient boosting 不會變「局部專家」，會變「雜訊放大器」。如果樣本數不夠，把分群改成 feature 而不是改成 partition。
+
+---
+
 ## 2026-04-13: 用混合模型版本的數據下 calibration 結論
 
 **What happened:**

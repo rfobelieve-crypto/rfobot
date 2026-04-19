@@ -152,9 +152,26 @@ def walk_forward_splits(
     initial_train: int = 288,
     test_size: int = 48,
     step: int = 48,
+    purge: int = 4,
+    embargo: int = 4,
 ) -> list[tuple[list[int], list[int]]]:
     """
-    Generate walk-forward expanding-window train/test index splits.
+    Generate walk-forward expanding-window train/test index splits with
+    purge + embargo to prevent label leakage under forward-looking labels.
+
+    Background
+    ----------
+    Labels in this system are built from `close[t+horizon] / close[t] - 1`
+    with horizon = 4 bars (4h). Without purge, the last `horizon` samples
+    in the train window have label windows that extend INTO the test region
+    — the model trains on labels that already contain test-period prices.
+    Without embargo, volatility clustering and serial correlation between
+    the tail of the train set and the head of the test set inflate OOS
+    metrics even after purge.
+
+    Defaults are set to horizon=4 (purge) + 4 (embargo) to match the
+    production Dual Model horizon. Set both to 0 to reproduce pre-fix
+    behaviour; any new research should leave them at the defaults.
 
     Parameters
     ----------
@@ -162,25 +179,39 @@ def walk_forward_splits(
     initial_train : Minimum training window (bars). 288 = 12 days.
     test_size : Test window size (bars). 48 = 2 days.
     step : Step between folds (bars). 48 = 2 days.
+    purge : Number of bars to drop from the TAIL of each train fold.
+        Must be >= label horizon to fully remove leakage. Default 4.
+    embargo : Number of bars to skip between train_end and test_start.
+        Default 4.
 
     Returns
     -------
-    List of (train_indices, test_indices) tuples.
-    No overlap; test is always strictly after train.
+    List of (train_indices, test_indices) tuples. Within each fold:
+        train = [0, train_end - purge)
+        test  = [train_end + embargo, train_end + embargo + test_size)
+    train_end advances by `step` between folds.
     """
+    if purge < 0 or embargo < 0:
+        raise ValueError(f"purge/embargo must be >= 0, got {purge}/{embargo}")
+
     splits = []
     train_end = initial_train
-    while train_end + test_size <= n_samples:
-        train_idx = list(range(train_end))
-        test_idx = list(range(train_end, train_end + test_size))
+    while train_end + embargo + test_size <= n_samples:
+        train_stop = train_end - purge
+        if train_stop <= 0:
+            train_end += step
+            continue
+        train_idx = list(range(train_stop))
+        test_start = train_end + embargo
+        test_idx = list(range(test_start, test_start + test_size))
         splits.append((train_idx, test_idx))
         train_end += step
     if not splits:
-        logger.warning("Not enough data for walk-forward: n=%d, init=%d, test=%d",
-                       n_samples, initial_train, test_size)
+        logger.warning("Not enough data for walk-forward: n=%d, init=%d, test=%d, purge=%d, embargo=%d",
+                       n_samples, initial_train, test_size, purge, embargo)
     else:
-        logger.info("Walk-forward: %d folds, train=%d..%d, test=%d bars each",
-                     len(splits), initial_train, train_end - step, test_size)
+        logger.info("Walk-forward: %d folds, init_train=%d, test=%d, step=%d, purge=%d, embargo=%d",
+                     len(splits), initial_train, test_size, step, purge, embargo)
     return splits
 
 

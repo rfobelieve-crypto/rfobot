@@ -71,7 +71,7 @@ def _make_reply_markup():
         ],
         [
             {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
-            {"text": "\U0001f9f9 Sweep", "callback_data": "sweep"},
+            {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
             {"text": "\U0001f4cb Meeting", "callback_data": "meeting"},
         ],
     ]})
@@ -1044,6 +1044,19 @@ def indicator_performance():
         return jsonify({"text": f"❌ 表現計算失敗: {e}"}), 500
 
 
+@app.route("/alpha-decay", methods=["GET"])
+def alpha_decay_api():
+    """API: Alpha decay monitor — 5 early-warning signals."""
+    try:
+        from indicator.alpha_decay_monitor import run_full_check, format_telegram_report
+        results = run_full_check()
+        report = format_telegram_report(results)
+        return jsonify({"text": report, "data": results})
+    except Exception as e:
+        logger.exception("Alpha decay check failed")
+        return jsonify({"text": f"❌ Alpha decay 檢查失敗: {e}"}), 500
+
+
 @app.route("/signal-perf", methods=["GET"])
 def signal_perf_api():
     """API: Strong signal performance report for Telegram."""
@@ -1331,23 +1344,155 @@ def _run_watchdog_full():
     """Gatekeeper + periodic model/signal deep check."""
     try:
         from indicator.agents.watchdog import run_full_sweep
-        run_full_sweep()
+        result = run_full_sweep()
+        # Task 3: if watchdog found issues, trigger repair_actions
+        _maybe_trigger_repair(result)
     except Exception as e:
         logger.error("Watchdog full sweep failed: %s", e)
+
+
+def _maybe_trigger_repair(watchdog_result: dict):
+    """Trigger repair_actions agent if watchdog found degraded/critical domains."""
+    if not watchdog_result:
+        return
+    agent_results = watchdog_result.get("agent_results", {})
+    has_issues = any(
+        r.get("status") in ("degraded", "critical")
+        for r in agent_results.values()
+    )
+    if not has_issues:
+        return
+    try:
+        logger.info("Watchdog found issues — triggering repair_actions agent")
+        from indicator.agents.repair_actions import execute_repair_tool
+        # repair_actions doesn't have a BaseAgent subclass; it's invoked by
+        # other agents via their tool-use loop. The Meeting agent is the one
+        # with cross-domain authority. Trigger a meeting instead.
+        _run_agent_scheduled("Meeting")
+    except Exception as e:
+        logger.error("Repair trigger failed: %s", e)
+
+
+# ── Scheduled agent runners ───────────────────────────────────────────
+
+def _run_agent_scheduled(agent_name: str):
+    """Run a single agent with DB logging. Used by APScheduler jobs."""
+    try:
+        agent = _get_agent_instance(agent_name)
+        if agent is None:
+            logger.error("Unknown agent for scheduling: %s", agent_name)
+            return
+        agent.run_with_logging()
+    except Exception as e:
+        logger.error("Scheduled agent %s failed: %s", agent_name, e)
+
+
+def _get_agent_instance(agent_name: str):
+    """Lazy-import and instantiate an agent by name."""
+    if agent_name == "DataCollector":
+        from indicator.agents.data_collector import DataCollectorAgent
+        return DataCollectorAgent()
+    elif agent_name == "Infra":
+        from indicator.agents.infra import InfraAgent
+        return InfraAgent()
+    elif agent_name == "FeatureGuard":
+        from indicator.agents.feature_guard import FeatureGuardAgent
+        return FeatureGuardAgent()
+    elif agent_name == "ModelEval":
+        from indicator.agents.model_eval import ModelEvalAgent
+        return ModelEvalAgent()
+    elif agent_name == "SignalTracker":
+        from indicator.agents.signal_tracker import SignalTrackerAgent
+        return SignalTrackerAgent()
+    elif agent_name == "Meeting":
+        from indicator.agents.meeting import MeetingAgent
+        return MeetingAgent()  # no domain_results = it'll call get_domain_reports tool
+    return None
+
+
+def _run_meeting_scheduled():
+    """Meeting agent: run all domain agents first, then cross-correlate."""
+    try:
+        from indicator.agents.coordinator import AgentCoordinator
+        from indicator.agents.meeting import MeetingAgent
+        coordinator = AgentCoordinator()
+        domain_results = coordinator.run_all()
+        meeting = MeetingAgent(domain_results=domain_results)
+        meeting.run_with_logging()
+    except Exception as e:
+        logger.error("Scheduled Meeting agent failed: %s", e)
 
 
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
     scheduler = BackgroundScheduler()
-    scheduler.add_job(update_cycle, "cron", minute="2", misfire_grace_time=300)
+
+    # ── Core jobs (existing) ──
+    scheduler.add_job(update_cycle, "cron", minute="2",
+                      misfire_grace_time=300, max_instances=1,
+                      id="update_cycle")
 
     # Agent watchdog: quick sweep every hour at :15, full sweep every 4h at :20
-    scheduler.add_job(_run_watchdog_quick, "cron", minute="15", misfire_grace_time=300)
-    scheduler.add_job(_run_watchdog_full, "cron", hour="*/4", minute="20", misfire_grace_time=600)
+    scheduler.add_job(_run_watchdog_quick, "cron", minute="15",
+                      misfire_grace_time=300, max_instances=1,
+                      id="watchdog_quick")
+    scheduler.add_job(_run_watchdog_full, "cron", hour="*/4", minute="20",
+                      misfire_grace_time=600, max_instances=1,
+                      id="watchdog_full")
+
+    # ── Scheduled agents ──
+    # data_collector: every 2h at :30
+    scheduler.add_job(_run_agent_scheduled, "cron", args=["DataCollector"],
+                      hour="*/2", minute="30",
+                      misfire_grace_time=3600, max_instances=1,
+                      id="agent_data_collector")
+
+    # infra: every 6h at :45
+    scheduler.add_job(_run_agent_scheduled, "cron", args=["Infra"],
+                      hour="*/6", minute="45",
+                      misfire_grace_time=3600, max_instances=1,
+                      id="agent_infra")
+
+    # feature_guard: every 6h at :15 (offset from infra)
+    scheduler.add_job(_run_agent_scheduled, "cron", args=["FeatureGuard"],
+                      hour="1,7,13,19", minute="15",
+                      misfire_grace_time=3600, max_instances=1,
+                      id="agent_feature_guard")
+
+    # model_eval: daily 03:00 UTC
+    scheduler.add_job(_run_agent_scheduled, "cron", args=["ModelEval"],
+                      hour="3", minute="0",
+                      misfire_grace_time=3600, max_instances=1,
+                      id="agent_model_eval")
+
+    # signal_tracker: every hour at :30
+    scheduler.add_job(_run_agent_scheduled, "cron", args=["SignalTracker"],
+                      minute="30",
+                      misfire_grace_time=3600, max_instances=1,
+                      id="agent_signal_tracker")
+
+    # meeting: daily 09:00 UTC (runs all domain agents + cross-correlation)
+    scheduler.add_job(_run_meeting_scheduled, "cron",
+                      hour="9", minute="0",
+                      misfire_grace_time=3600, max_instances=1,
+                      id="agent_meeting")
+
+    # ── Weekly summary ──
+    from indicator.agents._summary import weekly_agent_summary
+    scheduler.add_job(weekly_agent_summary, "cron",
+                      day_of_week="sun", hour="2", minute="0",
+                      misfire_grace_time=3600, max_instances=1,
+                      id="weekly_agent_summary")
 
     scheduler.start()
-    logger.info("Scheduler started: updates at :02, watchdog quick at :15, full every 4h at :20")
+    logger.info(
+        "Scheduler started: %d jobs registered — "
+        "update :02, watchdog :15/4h:20, "
+        "agents (DC 2h:30, Infra 6h:45, FG 6h:15, ME 03:00, ST :30, Meeting 09:00), "
+        "weekly summary Sun 02:00",
+        len(scheduler.get_jobs()),
+    )
 
     # Run first update immediately
     threading.Thread(target=update_cycle, daemon=True).start()

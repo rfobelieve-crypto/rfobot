@@ -104,6 +104,19 @@ def build_live_features(klines: pd.DataFrame,
                 _safe_slope, raw=False,
             )
             df[f"{col}_mom_1h"] = df[col] - df[col].shift(1)
+            # Second-order difference = discrete acceleration.
+            # Captures regime-shift moments that first-order features miss.
+            df[f"{col}_accel"] = df[col] - 2 * df[col].shift(1) + df[col].shift(2)
+
+    # Funding-specific regime-shift indicator: mom sign flips within the 4h window.
+    # Captures "funding was trending one way but just turned" moments, which
+    # historically precede positioning unwinds.
+    if "cg_funding_close_mom_1h" in df.columns:
+        _fmom = df["cg_funding_close_mom_1h"]
+        df["cg_funding_regime_shift"] = (
+            (np.sign(_fmom).fillna(0) != np.sign(_fmom.shift(4)).fillna(0))
+            & _fmom.notna() & _fmom.shift(4).notna()
+        ).astype(float)
 
     if "cg_oi_delta_zscore" in df.columns:
         ret_cum = df["log_return"].rolling(4, min_periods=2).sum()
@@ -453,8 +466,145 @@ def build_live_features(klines: pd.DataFrame,
     except Exception as e:
         logger.warning("Toxicity features failed (non-critical): %s", e)
 
+    # ── Alt-source historical features (ETF flow / F&G / DVOL) ────────
+    try:
+        _inject_alt_historical(df)
+    except Exception as e:
+        logger.warning("Alt historical injection failed (non-critical): %s", e)
+
+    # ── Initiation-model features (breakout / funding accel / OI divergence) ──
+    try:
+        from indicator.initiation_features import add_initiation_features
+        add_initiation_features(df)
+    except Exception as e:
+        logger.warning("Initiation features failed (non-critical): %s", e)
+
     logger.info("Live features: %d bars x %d columns", len(df), len(df.columns))
     return df
+
+
+def _inject_alt_historical(df: pd.DataFrame) -> None:
+    """
+    Merge historical alt-source parquets (ETF flow, F&G, DVOL) into df in-place.
+
+    ETF flow + F&G are daily → merge_asof backward (carries through each 1h bar).
+    DVOL is hourly → merge_asof backward, same-hour match.
+
+    All derived features (deltas, z-scores, multi-day sums) are computed on
+    trailing windows to preserve the no-look-ahead guarantee.
+    """
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1] / "market_data" / "raw_data"
+
+    df_idx = df.index
+    if not isinstance(df_idx, pd.DatetimeIndex):
+        return
+
+    # ── ETF flow (daily, 2024-01-11+) ──────────────────────────────
+    etf_path = root / "cg_etf_flow_daily.parquet"
+    if etf_path.exists():
+        etf = pd.read_parquet(etf_path).sort_index()
+        if not etf.empty:
+            if etf.index.tz is None:
+                etf.index = etf.index.tz_localize("UTC")
+            # Trailing derived: 3d/7d sums, 30d zscore, sign persistence
+            etf["etf_flow_3d_sum"] = etf["etf_net_flow_usd"].rolling(3, min_periods=1).sum()
+            etf["etf_flow_7d_sum"] = etf["etf_net_flow_usd"].rolling(7, min_periods=1).sum()
+            roll30 = etf["etf_net_flow_usd"].rolling(30, min_periods=5)
+            etf["etf_flow_zscore_30d"] = (
+                (etf["etf_net_flow_usd"] - roll30.mean()) / roll30.std()
+            )
+            sign = np.sign(etf["etf_net_flow_usd"].fillna(0))
+            etf["etf_flow_sign_persistence"] = (
+                sign.groupby((sign != sign.shift()).cumsum()).cumcount() + 1
+            ) * sign
+            etf["etf_flow_delta_1d"] = etf["etf_net_flow_usd"].diff()
+
+            etf_reset = etf.reset_index().rename(columns={etf.index.name or "index": "dt"})
+            if "dt" not in etf_reset.columns:
+                etf_reset = etf_reset.rename(columns={etf_reset.columns[0]: "dt"})
+            df_reset = df.reset_index().rename(columns={df.index.name or "index": "dt"})
+            merged = pd.merge_asof(
+                df_reset[["dt"]], etf_reset,
+                on="dt", direction="backward",
+            )
+            for col in [
+                "etf_net_flow_usd", "etf_btc_price",
+                "etf_flow_ibit", "etf_flow_fbtc", "etf_flow_gbtc",
+                "etf_flow_3d_sum", "etf_flow_7d_sum",
+                "etf_flow_zscore_30d", "etf_flow_sign_persistence",
+                "etf_flow_delta_1d",
+            ]:
+                if col in merged.columns:
+                    df[col] = merged[col].values
+            logger.info("ETF flow merged: %d cols", 10)
+
+    # ── Fear & Greed (daily, 2018+) ────────────────────────────────
+    fg_path = root / "cg_fear_greed_daily.parquet"
+    if fg_path.exists():
+        fg = pd.read_parquet(fg_path).sort_index()
+        if not fg.empty:
+            if fg.index.tz is None:
+                fg.index = fg.index.tz_localize("UTC")
+            fg["fg_delta_1d"] = fg["fear_greed_value"].diff()
+            fg["fg_delta_7d"] = fg["fear_greed_value"].diff(7)
+            fg["fg_extreme_fear"] = (fg["fear_greed_value"] < 20).astype(float)
+            fg["fg_extreme_greed"] = (fg["fear_greed_value"] > 80).astype(float)
+
+            fg_reset = fg.reset_index().rename(columns={fg.index.name or "index": "dt"})
+            if "dt" not in fg_reset.columns:
+                fg_reset = fg_reset.rename(columns={fg_reset.columns[0]: "dt"})
+            df_reset = df.reset_index().rename(columns={df.index.name or "index": "dt"})
+            merged = pd.merge_asof(
+                df_reset[["dt"]], fg_reset,
+                on="dt", direction="backward",
+            )
+            for col in [
+                "fear_greed_value", "fg_delta_1d", "fg_delta_7d",
+                "fg_extreme_fear", "fg_extreme_greed",
+            ]:
+                if col in merged.columns:
+                    df[col] = merged[col].values
+            logger.info("F&G merged: 5 cols")
+
+    # ── Deribit DVOL (hourly) ──────────────────────────────────────
+    dvol_path = root / "deribit_dvol_1h.parquet"
+    if dvol_path.exists():
+        dvol = pd.read_parquet(dvol_path).sort_index()
+        if not dvol.empty:
+            if dvol.index.tz is None:
+                dvol.index = dvol.index.tz_localize("UTC")
+            dvol["dvol_ma_24h"] = dvol["dvol_close"].rolling(24, min_periods=6).mean()
+            dvol["dvol_change_4h"] = dvol["dvol_close"].pct_change(4)
+            dvol["dvol_change_24h"] = dvol["dvol_close"].pct_change(24)
+            roll72 = dvol["dvol_close"].rolling(72, min_periods=24)
+            dvol["dvol_zscore_72h"] = (
+                (dvol["dvol_close"] - roll72.mean()) / roll72.std()
+            )
+
+            dvol_reset = dvol.reset_index().rename(columns={dvol.index.name or "index": "dt"})
+            if "dt" not in dvol_reset.columns:
+                dvol_reset = dvol_reset.rename(columns={dvol_reset.columns[0]: "dt"})
+            df_reset = df.reset_index().rename(columns={df.index.name or "index": "dt"})
+            merged = pd.merge_asof(
+                df_reset[["dt"]], dvol_reset,
+                on="dt", direction="backward",
+            )
+            for col in [
+                "dvol_close", "dvol_open", "dvol_high", "dvol_low",
+                "dvol_ma_24h", "dvol_change_4h", "dvol_change_24h",
+                "dvol_zscore_72h",
+            ]:
+                if col in merged.columns:
+                    df[col] = merged[col].values
+
+            # DVOL vs realized vol spread (requires realized_vol_20b already computed)
+            if "realized_vol_20b" in df.columns and "dvol_close" in df.columns:
+                # dvol_close is annualised % (e.g. 50 = 50%), realized_vol_20b is stdev of log returns
+                # Convert realized to annualised %: sqrt(24*365) * rv * 100
+                rv_ann = df["realized_vol_20b"] * np.sqrt(24 * 365) * 100
+                df["dvol_rv_spread"] = df["dvol_close"] - rv_ann
+            logger.info("DVOL merged: 8 cols + spread")
 
 
 def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):

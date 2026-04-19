@@ -142,13 +142,18 @@ def export_magnitude_model(df: pd.DataFrame):
     for col in labels.columns:
         df[col] = labels[col]
 
-    target = "y_abs_return"
+    # Target = y_vol_adj_abs (|ret_4h| / realized_vol).
+    # Inference layer (indicator/inference.py ~L347-363) already multiplies
+    # model output by realized_vol, so the sigma-scale target matches.
+    # Walk-forward comparison 2026-04-14: vol_adj lifts Apr IC 0.13 → 0.25,
+    # ICIR 1.11 → 1.54 (see research/results/mag_target_voladj_test.json).
+    target = "y_vol_adj_abs"
     mask = df[target].notna()
     X = df.loc[mask, features].fillna(0)
     y = df.loc[mask, target].values
 
-    logger.info("Magnitude: %d samples, %d features, y_mean=%.6f",
-                len(y), len(features), y.mean())
+    logger.info("Magnitude: %d samples, %d features, target=%s, y_mean=%.4f",
+                len(y), len(features), target, y.mean())
 
     model = xgb.XGBRegressor(**MAG_PARAMS)
     model.fit(X, y, verbose=False)
@@ -167,6 +172,7 @@ def export_magnitude_model(df: pd.DataFrame):
     # Config
     config = {
         "feature_set": MAGNITUDE_FEATURE_SET,
+        "target": target,
         "n_features": len(features),
         "n_samples": len(y),
         "y_mean": float(y.mean()),

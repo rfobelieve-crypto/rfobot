@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+import warnings
 from pathlib import Path
 
 import matplotlib
@@ -29,10 +31,128 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+warnings.filterwarnings("ignore")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 HIST = Path("indicator/model_artifacts/indicator_history.parquet")
 MODEL_FILE = Path("indicator/model_artifacts/dual_model/direction_xgb.json")
+PROD_DIR_FEATS = Path("indicator/model_artifacts/dual_model/direction_feature_cols.json")
+ABLATION_JSON = Path("research/results/ablation_study.json")
 OUT_JSON = Path("research/results/calibration_check.json")
 OUT_PNG = Path("research/results/calibration_diagram.png")
+
+# Direction model params — keep in sync with permutation_test.py and deploy_new_models.py
+DIR_PARAMS = {
+    "objective": "binary:logistic", "eval_metric": "auc",
+    "max_depth": 4, "learning_rate": 0.05, "n_estimators": 200,
+    "subsample": 0.8, "colsample_bytree": 0.7, "min_child_weight": 10,
+    "reg_alpha": 0.1, "reg_lambda": 1.0, "random_state": 42,
+    "verbosity": 0,
+}
+
+
+def load_walkforward_predictions(use_ablation: bool = False) -> pd.DataFrame:
+    """
+    Run walk-forward CV using the same logic as permutation_test.py, collect
+    all OOS predictions and realized outcomes. Returns a DataFrame matching
+    the production indicator_history format (so the rest of this script
+    doesn't need to branch).
+
+    Columns: dir_prob_up, actual_return_4h, regime
+    Index:   test-bar timestamps
+    """
+    import xgboost as xgb
+    from research.dual_model.shared_data import load_and_cache_data, walk_forward_splits
+    from research.dual_model.build_direction_labels import build_direction_labels
+
+    print("Loading feature cache...")
+    df = load_and_cache_data(limit=4000, force_refresh=False, max_stale_hours=12.0)
+    labels = build_direction_labels(df, k=0.5)
+    df["y_dir"] = labels["y_dir"]
+    df["dir_return_4h"] = labels["return_4h"]
+
+    # Feature set — match the production model
+    with open(PROD_DIR_FEATS) as f:
+        base = json.load(f)
+    base = [c for c in base if c in df.columns]
+
+    if use_ablation and ABLATION_JSON.exists():
+        abl = json.loads(ABLATION_JSON.read_text())
+        keep = abl.get("combined", {}).get("keep_features", [])
+        feats = base + [k for k in keep if k not in base and k in df.columns]
+        label = f"walkforward_ablation_{len(feats)}"
+    else:
+        feats = base
+        label = f"walkforward_baseline_{len(feats)}"
+
+    print(f"Feature set: {label}")
+
+    # Regime weights (production-matched)
+    log_ret = np.log(df["close"] / df["close"].shift(1))
+    ret_24h = df["close"].pct_change(24)
+    vol_24h = log_ret.rolling(24).std()
+    vol_pct = vol_24h.expanding(min_periods=168).rank(pct=True)
+    weights = np.ones(len(df))
+    bull_mask = ((vol_pct > 0.6) & (ret_24h > 0.005)).fillna(False).values
+    bear_mask = ((vol_pct > 0.6) & (ret_24h < -0.005)).fillna(False).values
+    weights[bull_mask] = 4.0
+    weights[bear_mask] = 2.0
+
+    # Regime label for per-regime breakdown
+    regime = np.where(bull_mask, "TRENDING_BULL",
+                      np.where(bear_mask, "TRENDING_BEAR", "CHOPPY"))
+
+    y = df["y_dir"].values.astype(float)
+    rets = df["dir_return_4h"].values.astype(float)
+
+    splits = walk_forward_splits(len(df), initial_train=288, test_size=48, step=48)
+    print(f"Walk-forward: {len(splits)} folds")
+
+    # Collect OOS predictions
+    oos_probs: list[float] = []
+    oos_outcomes: list[float] = []  # realized return_4h
+    oos_idx: list[int] = []
+
+    for fold_i, (tr_idx, te_idx) in enumerate(splits):
+        tr_mask = ~np.isnan(y[tr_idx])
+        te_mask = ~np.isnan(y[te_idx])
+        if tr_mask.sum() < 50 or te_mask.sum() < 5:
+            continue
+
+        X_tr = df.iloc[tr_idx][feats].fillna(0).values[tr_mask]
+        y_tr = y[tr_idx][tr_mask].astype(int)
+        X_te = df.iloc[te_idx][feats].fillna(0).values[te_mask]
+        sw = weights[tr_idx][tr_mask]
+
+        up = y_tr.mean()
+        p = DIR_PARAMS.copy()
+        p["scale_pos_weight"] = (1 - up) / up if up > 0 else 1.0
+
+        m = xgb.XGBClassifier(**p)
+        m.fit(X_tr, y_tr, sample_weight=sw, verbose=False)
+        prob = m.predict_proba(X_te)[:, 1]
+
+        # Align predictions to test-bar global indices
+        te_global = np.array(te_idx)[te_mask]
+        oos_probs.extend(prob.tolist())
+        oos_outcomes.extend(rets[te_global].tolist())
+        oos_idx.extend(te_global.tolist())
+
+        if (fold_i + 1) % 10 == 0:
+            print(f"  fold {fold_i+1}/{len(splits)}: collected {len(oos_probs)} OOS predictions")
+
+    print(f"Total OOS predictions: {len(oos_probs)}")
+
+    # Build DataFrame matching indicator_history schema
+    wf_df = pd.DataFrame({
+        "dir_prob_up": oos_probs,
+        "actual_return_4h": oos_outcomes,
+        "regime": regime[oos_idx],
+    }, index=df.index[oos_idx])
+
+    # Drop NaN outcomes (shouldn't happen due to tr_mask but just in case)
+    wf_df = wf_df.dropna(subset=["dir_prob_up", "actual_return_4h"])
+    return wf_df
 
 
 def get_model_deploy_time() -> pd.Timestamp | None:
@@ -283,17 +403,51 @@ def plot_reliability(results: list[dict], out: Path):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--source", choices=["production", "walkforward"],
+                    default="production",
+                    help="Source of predictions: 'production' reads indicator_history.parquet "
+                         "(small n, needs version guard), 'walkforward' runs CV on cache "
+                         "(large n, always clean, same model hyperparams as production).")
+    ap.add_argument("--use-ablation", action="store_true",
+                    help="Walkforward only: use the ablation-validated 34-feature set "
+                         "instead of the production 29-feature set")
     ap.add_argument("--regime", type=str, default=None,
                     help="Filter to specific regime (e.g. TRENDING_BULL)")
     ap.add_argument("--since", type=str, default=None,
-                    help="Only include samples on/after this UTC date (YYYY-MM-DD). "
-                         "Overrides auto model-version guard.")
+                    help="Production only: only include samples on/after this UTC date "
+                         "(YYYY-MM-DD). Overrides auto model-version guard.")
     ap.add_argument("--no-version-guard", action="store_true",
-                    help="Disable automatic model-version guard (NOT recommended).")
+                    help="Production only: disable automatic model-version guard.")
     ap.add_argument("--min-samples", type=int, default=100,
                     help="Minimum sample count required to run analysis (default 100)")
     args = ap.parse_args()
 
+    # ─────────────────────────────────────────────
+    # Walk-forward mode: run CV and return early
+    # ─────────────────────────────────────────────
+    if args.source == "walkforward":
+        print("=" * 70)
+        print("WALK-FORWARD CALIBRATION (OOS predictions from cache)")
+        print("=" * 70)
+        wf_df = load_walkforward_predictions(use_ablation=args.use_ablation)
+        print(f"OOS predictions collected: {len(wf_df)}")
+        if len(wf_df) < args.min_samples:
+            print(f"[INSUFFICIENT] n={len(wf_df)} < {args.min_samples}")
+            return
+
+        valid = wf_df
+        results = [analyze(valid, "WALKFORWARD_ALL")]
+        if "regime" in valid.columns:
+            for regime in ["CHOPPY", "TRENDING_BULL", "TRENDING_BEAR"]:
+                sub = valid[valid["regime"] == regime]
+                if len(sub) >= 50:
+                    results.append(analyze(sub, f"WALKFORWARD_{regime}"))
+        _print_and_save_results(results, args)
+        return
+
+    # ─────────────────────────────────────────────
+    # Production mode: read indicator_history
+    # ─────────────────────────────────────────────
     print(f"Loading {HIST}...")
     df = pd.read_parquet(HIST)
     print(f"Raw: {len(df)} bars, {df.index[0]} -> {df.index[-1]}")
@@ -350,6 +504,10 @@ def main():
             if len(sub) >= 50:
                 results.append(analyze(sub, regime))
 
+    _print_and_save_results(results, args)
+
+
+def _print_and_save_results(results: list[dict], args):
     # Report
     print("\n" + "=" * 80)
     print("CALIBRATION REPORT")

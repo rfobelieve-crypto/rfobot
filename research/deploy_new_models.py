@@ -64,42 +64,34 @@ dir_labels = build_direction_labels(df, k=0.5)
 df["y_dir"] = dir_labels["y_dir"]
 df["dir_return_4h"] = dir_labels["return_4h"]
 
-# Feature selection priority:
-#   1. ablation_study.json (PREFERRED) — honest baseline + forward selection
-#   2. auto_pruning.json     (fallback) — VIF/correlation pruning
-#   3. hardcoded full set    (last resort)
+# Feature selection priority (revised 2026-04-13 after walk-forward leakage fix):
+#   1. FULL_DIRECTION (PREFERRED, 105+ features) — no pruning
+#   2. ablation_study.json (fallback) — honest baseline + forward selection
+#   3. auto_pruning.json   (last resort) — VIF/correlation pruning
 #
-# Ablation is preferred because on 2026-04-13 we found that auto_pruner output
-# 80 features (many with negative contribution) trained to AUC 0.579, while
-# ablation found the correct 34-feature set trained to AUC 0.602.
-# See .claude/rules/mistake.md for context.
+# Why full is preferred now: after fixing walk_forward_splits label leakage
+# (purge=4, embargo=4 default), a clean post-fix comparison on the SAME data +
+# SAME methodology showed:
+#   105 unpruned  : IC 0.164  AUC 0.611  (auto_pruner before)
+#   80 VIF-pruned : IC 0.136  AUC 0.589  (auto_pruner after)
+#   35 ablation   : IC 0.147  AUC 0.600  (ablation baseline + 6 KEEP)
+#   29 production : IC 0.048  (previously deployed)
+# XGBoost with colsample_bytree=0.7 already handles multicollinearity via
+# per-tree feature sampling, so VIF pruning strictly discards signal for tree
+# models. The prior ablation-wins-over-auto_pruner finding was measured against
+# the 80-pruned set, not against unpruned 105 — the true ordering is 105 > 35
+# > 80. See .claude/rules/mistake.md 2026-04-13 "用混合模型版本的數據下 calibration
+# 結論" entry and the walk-forward purge fix of the same date.
 ablation_path = Path("research/results/ablation_study.json")
 pruning_path  = Path("research/results/auto_pruning.json")
 
-if ablation_path.exists():
-    _abl = json.loads(ablation_path.read_text())
-    baseline_feats = _abl.get("baseline", {}).get("features", [])
-    keep_feats     = _abl.get("combined", {}).get("keep_features", [])
-    dir_feats = [f for f in (baseline_feats + keep_feats) if f in df.columns]
-    # Deduplicate while preserving order
-    seen: set[str] = set()
-    dir_feats = [f for f in dir_feats if not (f in seen or seen.add(f))]
-    abl_auc   = _abl.get("combined", {}).get("metrics", {}).get("auc", 0.0)
-    abl_d_auc = _abl.get("combined", {}).get("delta_auc", 0.0)
-    print(f"Features: {len(dir_feats)} (ablation: {len(baseline_feats)} baseline "
-          f"+ {len(keep_feats)} KEEP, validated AUC={abl_auc:.4f} delta={abl_d_auc:+.4f})")
-    if keep_feats:
-        print(f"  KEEP features added: {keep_feats}")
-elif pruning_path.exists():
-    _pruning = json.loads(pruning_path.read_text())
-    dir_feats = [f for f in _pruning["direction"]["features"] if f in df.columns]
-    print(f"Features: {len(dir_feats)} (VIF-pruned, no ablation)")
-    print(f"  WARNING: using VIF pruning. Run research/ablation_study.py for honest validation.")
-else:
-    DIR_FEATURES = OLD_FEATURES + NEW_KEY_4 + LIQUIDITY_FRAGILITY + POST_ABSORPTION
-    dir_feats = filter_available(DIR_FEATURES, list(df.columns))
-    print(f"Features: {len(dir_feats)} (unpruned — no ablation or pruning available)")
-    print(f"  WARNING: using full feature set. Risk of overfitting.")
+# Use the full unpruned feature set by default.
+_DIR_FULL = OLD_FEATURES + NEW_KEY_4 + LIQUIDITY_FRAGILITY + POST_ABSORPTION
+dir_feats = filter_available(_DIR_FULL, list(df.columns))
+# Dedup while preserving order (OLD_FEATURES and NEW_KEY_4 overlap on cg_cb_premium etc.)
+_seen_dir: set[str] = set()
+dir_feats = [f for f in dir_feats if not (f in _seen_dir or _seen_dir.add(f))]
+print(f"Features: {len(dir_feats)} (FULL unpruned — all OLD + NEW_KEY_4 + LIQUIDITY_FRAGILITY + POST_ABSORPTION)")
 
 # Regime weighting: TRENDING_BULL 4x, TRENDING_BEAR 2x
 BULL_WEIGHT = 4.0
@@ -213,9 +205,12 @@ mag_labels = build_magnitude_labels(df)
 df["y_abs_return"] = mag_labels["y_abs_return"]
 df["y_vol_adj_abs"] = mag_labels["y_vol_adj_abs"]
 
-# Use VIF-pruned magnitude features
+# Use VIF-pruned magnitude features. Load auto_pruning.json independently of the
+# direction-model branch above — the direction branch may have gone through ablation,
+# leaving `_pruning` undefined, but magnitude still uses VIF pruning.
 if pruning_path.exists():
-    mag_feats = [f for f in _pruning["magnitude"]["features"] if f in df.columns]
+    _mag_pruning = json.loads(pruning_path.read_text())
+    mag_feats = [f for f in _mag_pruning["magnitude"]["features"] if f in df.columns]
     print(f"Features: {len(mag_feats)} (VIF-pruned)")
 else:
     TOXICITY_MAG = ["tox_pressure", "tox_accum_zscore", "tox_bv_vpin_zscore", "tox_div_taker"]

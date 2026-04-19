@@ -1,0 +1,31 @@
+{
+  "strong": {
+    "prob_long_threshold": 0.15357705950737,
+    "prob_short_threshold": 0.1982230581343174,
+    "mag_percentile_min": 0.8,
+    "require_breakout": true
+  },
+  "moderate": {
+    "prob_long_threshold": 0.1312125325202942,
+    "prob_short_threshold": 0.15492229163646698,
+    "mag_percentile_min": 0.65,
+    "require_breakout": true
+  },
+  "metadata": {
+    "calibration_source": "walk_forward_OOS",
+    "k_pct": 0.008,
+    "horizon_bars": 4,
+    "breakout_lookback": 20,
+    "breakout_variant": "V5_close_from_inside",
+    "label_type": "first_touch",
+    "strong_top_frac": 0.05,
+    "moderate_top_frac": 0.1,
+    "replay_strong_wr": 0.680,
+    "replay_strong_ci": [0.582, 0.765],
+    "replay_strong_n": 97,
+    "replay_moderate_wr": 0.440,
+    "replay_moderate_n": 175,
+    "walk_forward_source": "research/initiation_replay.py @ 2026-04-15",
+    "note": "V5 breakout = open<=prior_high AND close>prior_high (filters gap-through breakouts). Sweep source: research/breakout_gate_sweep.py."
+  }
+}
