@@ -601,6 +601,12 @@ def update_cycle() -> dict:
         except Exception as ic_err:
             logger.debug("IC monitor skipped: %s", ic_err)
 
+        # Persist direction prediction buffer so restarts don't lose warmup
+        try:
+            _persist_pred_buffer(_engine)
+        except Exception as buf_err:
+            logger.debug("Buffer persist skipped: %s", buf_err)
+
         return {
             "engine_mode": _engine.mode if _engine else "?",
             "bars_predicted": len(new_features) if 'new_features' in dir() else 0,
@@ -617,6 +623,25 @@ def update_cycle() -> dict:
             _state["status"] = "error"
             _state["error"] = str(e)
         raise
+
+
+def _persist_pred_buffer(engine):
+    """Save engine's dir_pred_history to training_stats.json for restart resilience."""
+    if engine is None:
+        return
+    buf = getattr(engine, 'dir_pred_history', None)
+    if not buf or len(buf) < 10:
+        return
+    import json as _json
+    stats_path = Path("indicator/model_artifacts/dual_model/training_stats.json")
+    if not stats_path.exists():
+        return
+    with open(stats_path) as f:
+        stats = _json.load(f)
+    stats["dir_pred_history"] = [float(x) for x in buf]
+    with open(stats_path, "w") as f:
+        _json.dump(stats, f, indent=2)
+    logger.debug("Persisted dir_pred_history: %d values", len(buf))
 
 
 def _is_nan(v):

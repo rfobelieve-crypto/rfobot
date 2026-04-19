@@ -293,15 +293,20 @@ with open(ARTIFACT_DIR / "magnitude_config.json", "w") as f:
         "params": final_mag_params,
     }, f, indent=2)
 
-# Training stats (pred history for warmup)
+# Training stats (pred history for warmup) — MERGE, don't overwrite
 all_preds = mag_model.predict(X_all)
 pred_history = [float(x) for x in all_preds[-300:]]
-with open(ARTIFACT_DIR / "training_stats.json", "w") as f:
-    json.dump({
-        "pred_history": pred_history,
-        "n_bars": n_bars,
-        "date_range": f"{df.index[0]} ~ {df.index[-1]}",
-    }, f, indent=2)
+stats_path = ARTIFACT_DIR / "training_stats.json"
+if stats_path.exists():
+    with open(stats_path) as f:
+        existing_stats = json.load(f)
+else:
+    existing_stats = {}
+existing_stats["pred_history"] = pred_history
+existing_stats["n_bars"] = n_bars
+existing_stats["date_range"] = f"{df.index[0]} ~ {df.index[-1]}"
+with open(stats_path, "w") as f:
+    json.dump(existing_stats, f, indent=2)
 
 print(f"  OOS IC:   {mag_ic:+.4f}")
 print(f"  OOS ICIR: {mag_icir:+.3f}")

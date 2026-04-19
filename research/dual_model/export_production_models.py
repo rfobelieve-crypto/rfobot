@@ -202,12 +202,17 @@ def build_pred_history(df: pd.DataFrame, dir_model, dir_features,
     # Save last 300 bars of |mag_pred| for expanding percentile warmup
     history = [float(abs(m)) for m in mag_pred[-300:] if not np.isnan(m)]
 
-    stats = {
-        "pred_history": history,
-        "n_bars": len(df),
-        "date_range": f"{df.index[0]} ~ {df.index[-1]}",
-    }
-    with open(EXPORT_DIR / "training_stats.json", "w") as f:
+    # MERGE into existing stats — preserve dir_pred_history
+    stats_path = EXPORT_DIR / "training_stats.json"
+    if stats_path.exists():
+        with open(stats_path) as f:
+            stats = json.load(f)
+    else:
+        stats = {}
+    stats["pred_history"] = history
+    stats["n_bars"] = len(df)
+    stats["date_range"] = f"{df.index[0]} ~ {df.index[-1]}"
+    with open(stats_path, "w") as f:
         json.dump(stats, f, indent=2)
 
     logger.info("Pred history saved: %d bars for warmup", len(history))
