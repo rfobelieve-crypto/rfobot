@@ -19,7 +19,7 @@ def render_performance() -> str:
     parts = [
         section("Alpha Decay Monitor", "decay", True, _build_alpha_decay()),
         section("IC / 勝率趨勢 (7 天)", "ictrend", True, _build_ic_trend()),
-        section("Strong 信號累計曲線", "equity", True, _build_equity_curve()),
+        section("信號累計曲線", "equity", True, _build_equity_curve()),
         section("信心分佈 (48h)", "confdist", True, _build_confidence_dist()),
         section("預測 vs 實際 (24h)", "predva", True, _build_pred_vs_actual()),
         section("連續錯誤追蹤", "drawdown", True, _build_drawdown()),
@@ -180,7 +180,7 @@ def _build_equity_curve() -> str:
             cur.execute("""
                 SELECT signal_time, direction, actual_return_4h, correct, confidence
                 FROM tracked_signals
-                WHERE filled = 1 AND strength = 'Strong'
+                WHERE filled = 1 AND strength IN ('Strong', 'Moderate')
                 ORDER BY signal_time ASC
             """)
             rows = cur.fetchall()
@@ -189,7 +189,7 @@ def _build_equity_curve() -> str:
         return f'<div style="color:#666">數據載入失敗: {e}</div>'
 
     if len(rows) < 3:
-        return '<div style="color:#666">Strong 信號不足 3 筆</div>'
+        return '<div style="color:#666">信號不足 3 筆</div>'
 
     labels, cum_ret = [], []
     total = 0
@@ -356,7 +356,7 @@ def _build_pred_vs_actual() -> str:
       <canvas id="predChart"></canvas>
     </div>
     <div style="color:#8b949e;font-size:10px;margin-top:4px">
-      點: UP=綠, DOWN=紅, NEUTRAL=灰 | 大點=Strong
+      點: UP=綠, DOWN=紅, NEUTRAL=灰 | 大點=Strong, 中點=Moderate
     </div>
     <script>
     (function() {{

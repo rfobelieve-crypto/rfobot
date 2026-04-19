@@ -913,7 +913,7 @@ def indicator_performance():
                            SUM(correct) as wins,
                            AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret
                     FROM tracked_signals
-                    WHERE signal_time >= %s AND strength = 'Strong'
+                    WHERE signal_time >= %s AND strength IN ('Strong', 'Moderate')
                     GROUP BY direction, strength
                 """, (CURRENT_MODEL_DEPLOY,))
                 cur_rows = cur.fetchall()
@@ -937,14 +937,14 @@ def indicator_performance():
                 cur.execute("""
                     SELECT COUNT(*) as cnt
                     FROM tracked_signals
-                    WHERE signal_time >= %s AND strength = 'Strong' AND filled = 0
+                    WHERE signal_time >= %s AND strength IN ('Strong', 'Moderate') AND filled = 0
                 """, (CURRENT_MODEL_DEPLOY,))
                 pending = int(cur.fetchone()["cnt"] or 0)
 
                 # All-time Strong for alert threshold (need 20+ for significance)
                 cur.execute("""
                     SELECT COUNT(*) as total, SUM(correct) as wins
-                    FROM tracked_signals WHERE filled = 1 AND strength = 'Strong'
+                    FROM tracked_signals WHERE filled = 1 AND strength IN ('Strong', 'Moderate')
                       AND signal_time >= %s
                 """, (CURRENT_MODEL_DEPLOY,))
                 sr = cur.fetchone()
@@ -953,7 +953,7 @@ def indicator_performance():
                 if s_total_all >= 20:
                     s_wr_all = s_wins_all / s_total_all * 100
                     if s_wr_all < 55:
-                        alerts.append(f"🔴 Strong 累積勝率 {s_wr_all:.0f}% (< 55%) — 建議重訓")
+                        alerts.append(f"🔴 信號累積勝率 {s_wr_all:.0f}% (< 55%) — 建議重訓")
 
         except Exception as e:
             logger.warning("Tracked signals query failed: %s", e)
@@ -967,7 +967,7 @@ def indicator_performance():
                            exit_price, actual_return_4h, correct, filled
                     FROM tracked_signals
                     WHERE signal_time >= DATE_SUB(NOW(), INTERVAL 3 DAY)
-                      AND strength = 'Strong'
+                      AND strength IN ('Strong', 'Moderate')
                     ORDER BY signal_time DESC LIMIT 10
                 """)
                 recent = cur.fetchall()

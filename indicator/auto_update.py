@@ -341,14 +341,15 @@ def run_once(indicator_df: pd.DataFrame) -> pd.DataFrame:
 
     send_telegram(png, caption)
 
-    # Strong signal alert
-    if strength == "Strong" and direction in ("UP", "DOWN"):
+    # Signal alert (Strong + Moderate)
+    if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
+        is_strong = (strength == "Strong")
         if direction == "UP":
-            icon = "\U0001f7e2\u25b2"  # 🟢▲
-            label = "STRONG BULLISH"
+            icon = "\U0001f7e2\u25b2" if is_strong else "\U0001f7e2\u25b3"
+            label = "STRONG BULLISH" if is_strong else "MODERATE BULLISH"
         else:
-            icon = "\U0001f534\u25bc"  # 🔴▼
-            label = "STRONG BEARISH"
+            icon = "\U0001f534\u25bc" if is_strong else "\U0001f534\u25bd"
+            label = "STRONG BEARISH" if is_strong else "MODERATE BEARISH"
         alert = (
             f"{icon} <b>{label} SIGNAL</b>\n\n"
             f"BTC ${price:,.0f}\n"
@@ -358,7 +359,7 @@ def run_once(indicator_df: pd.DataFrame) -> pd.DataFrame:
             f"⏰ {now}"
         )
         send_telegram_alert(alert)
-        logger.info("Strong signal alert sent: %s", direction)
+        logger.info("%s signal alert sent: %s", strength, direction)
 
     save_history(indicator_df)
     return indicator_df

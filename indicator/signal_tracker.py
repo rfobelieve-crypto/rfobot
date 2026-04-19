@@ -203,7 +203,7 @@ def get_performance_report() -> str:
                        SUM(filled) as filled,
                        SUM(correct) as wins,
                        AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret
-                FROM `{TABLE}` WHERE strength = 'Strong'
+                FROM `{TABLE}` WHERE strength IN ('Strong', 'Moderate')
             """)
             s = cur.fetchone()
 
@@ -213,19 +213,19 @@ def get_performance_report() -> str:
             if filled > 0:
                 wr = wins / filled * 100
                 avg_r = float(s["avg_ret"] or 0) * 100
-                lines.append(f"🔥 <b>Strong</b> ({filled} 結算 / {total} 總計)")
+                lines.append(f"🔥 <b>Strong + Moderate</b> ({filled} 結算 / {total} 總計)")
                 lines.append(f"  勝率: {wr:.1f}% ({wins}W/{filled-wins}L) avg={avg_r:+.2f}%")
             elif total > 0:
-                lines.append(f"🔥 <b>Strong</b> ({total} 筆，尚無結算)")
+                lines.append(f"🔥 <b>Strong + Moderate</b> ({total} 筆，尚無結算)")
             else:
-                lines.append("  尚無 Strong 信號")
+                lines.append("  尚無信號紀錄")
 
             # Per-direction
             cur.execute(f"""
                 SELECT direction,
                        COUNT(*) as cnt, SUM(correct) as wins,
                        AVG(actual_return_4h) as avg_ret
-                FROM `{TABLE}` WHERE filled = 1 AND strength = 'Strong'
+                FROM `{TABLE}` WHERE filled = 1 AND strength IN ('Strong', 'Moderate')
                 GROUP BY direction ORDER BY direction
             """)
             dir_rows = cur.fetchall()
@@ -244,7 +244,7 @@ def get_performance_report() -> str:
                        actual_return_4h, correct, filled
                 FROM `{TABLE}`
                 WHERE signal_time >= DATE_SUB(NOW(), INTERVAL 3 DAY)
-                  AND strength = 'Strong'
+                  AND strength IN ('Strong', 'Moderate')
                 ORDER BY signal_time DESC LIMIT 10
             """)
             recent = cur.fetchall()

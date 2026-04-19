@@ -231,7 +231,7 @@ def check_confidence_wr_decoupling() -> dict:
                 cur.execute("""
                     SELECT confidence, correct, actual_return_4h, direction
                     FROM tracked_signals
-                    WHERE filled = 1 AND strength = 'Strong'
+                    WHERE filled = 1 AND strength IN ('Strong', 'Moderate')
                       AND signal_time >= %s
                     ORDER BY signal_time ASC
                 """, (CURRENT_MODEL_DEPLOY,))
@@ -241,7 +241,7 @@ def check_confidence_wr_decoupling() -> dict:
 
         if len(rows) < 20:
             return {"status": "insufficient_data",
-                    "detail": f"只有 {len(rows)} 筆 filled Strong signals，需要 20+"}
+                    "detail": f"只有 {len(rows)} 筆 filled signals，需要 20+"}
 
         df = pd.DataFrame(rows)
         df["confidence"] = df["confidence"].astype(float)
