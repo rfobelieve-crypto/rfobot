@@ -1026,7 +1026,7 @@ def indicator_performance():
         lines.append(f"  ({OOS_BASELINE['n_folds']} folds, 訓練截止 {OOS_BASELINE['train_end']})")
 
         # Live tracked performance (current model)
-        lines.append(f"\n<b>部署後實戰</b> (Strong, {CURRENT_MODEL_DEPLOY}~)")
+        lines.append(f"\n<b>部署後實戰</b> (Strong+Moderate, {CURRENT_MODEL_DEPLOY}~)")
         if strong_filled > 0:
             total_wr = strong_wins / strong_filled * 100
             lines.append(f"  總計: {total_wr:.0f}% ({strong_wins}W/{strong_filled-strong_wins}L)")
