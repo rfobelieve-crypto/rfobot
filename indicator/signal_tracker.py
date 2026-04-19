@@ -115,10 +115,12 @@ def record_strong_signal(signal_time, direction, p_up, mag_pred,
 
 def backfill_outcomes():
     """
-    Backfill 4h outcomes for unfilled signals.
+    Backfill 4h TWAP outcomes for unfilled signals.
 
     Called every update cycle. For each unfilled signal older than 4h,
-    looks up the close price at +4h from indicator_history and marks result.
+    looks up close prices at +1h, +2h, +3h, +4h from indicator_history,
+    computes TWAP return = mean(close[t+1..t+4]) / entry - 1.
+    This matches the training target (y_path_ret_4h).
     """
     _ensure_table()
     conn = _get_db_conn()
@@ -142,34 +144,28 @@ def backfill_outcomes():
                 direction = row["direction"]
                 entry = row["entry_price"]
 
-                # Find close price 4h after signal
+                # Fetch close prices at +1h, +2h, +3h, +4h for TWAP
                 cur.execute("""
                     SELECT `close` FROM `indicator_history`
-                    WHERE dt >= DATE_ADD(%s, INTERVAL 4 HOUR)
+                    WHERE dt > %s AND dt <= DATE_ADD(%s, INTERVAL 4 HOUR)
                     ORDER BY dt ASC
-                    LIMIT 1
-                """, (sig_time,))
-                exit_row = cur.fetchone()
+                """, (sig_time, sig_time))
+                path_rows = cur.fetchall()
 
-                if not exit_row:
-                    # Try alternate: use the bar exactly 4h later
-                    cur.execute("""
-                        SELECT `close` FROM `indicator_history`
-                        WHERE dt = DATE_ADD(%s, INTERVAL 4 HOUR)
-                    """, (sig_time,))
-                    exit_row = cur.fetchone()
-
-                if not exit_row:
-                    # Log once per unfilled signal if it's been >8h (should have data by now)
+                if len(path_rows) < 4:
+                    # Not enough bars yet — need all 4
                     from datetime import datetime as dt_cls
                     age_h = (dt_cls.now(timezone.utc) - sig_time.replace(tzinfo=timezone.utc)).total_seconds() / 3600
                     if age_h > 8:
-                        logger.warning("Signal %s at %s: no +4h bar after %.0fh, skipping",
-                                       row["strength"], sig_time, age_h)
+                        logger.warning("Signal %s at %s: only %d/4 bars after %.0fh, skipping",
+                                       row["strength"], sig_time, len(path_rows), age_h)
                     continue
 
-                exit_price = float(exit_row["close"])
-                actual_ret = (exit_price - entry) / entry
+                # TWAP: mean of the 4 close prices
+                path_closes = [float(r["close"]) for r in path_rows[:4]]
+                twap = sum(path_closes) / len(path_closes)
+                actual_ret = (twap - entry) / entry
+                exit_price = path_closes[-1]  # store last close for reference
                 correct = 1 if (
                     (direction == "UP" and actual_ret > 0) or
                     (direction == "DOWN" and actual_ret < 0)
@@ -181,15 +177,15 @@ def backfill_outcomes():
                     WHERE id = %s
                 """, (exit_price, actual_ret, correct, sig_id))
 
-                logger.info("%s outcome: %s %s entry=$%.0f exit=$%.0f ret=%.2f%% %s",
+                logger.info("%s outcome: %s %s entry=$%.0f twap=$%.0f ret=%.2f%% %s",
                             row["strength"], direction, sig_time,
-                            entry, exit_price, actual_ret * 100,
+                            entry, twap, actual_ret * 100,
                             "CORRECT" if correct else "WRONG")
                 filled_count += 1
 
         conn.commit()
         if filled_count:
-            logger.info("Backfilled %d signal outcomes", filled_count)
+            logger.info("Backfilled %d signal outcomes (TWAP)", filled_count)
     finally:
         conn.close()
 
