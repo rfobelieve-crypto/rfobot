@@ -900,12 +900,14 @@ def indicator_performance():
         conn = get_db_conn()
 
         # ── Section 1: Tracked signals (current model only) ──
-        strong_lines = []
-        strong_total = strong_filled = strong_wins = 0
+        # Per-tier stats: { "Strong": { "UP": {...}, "DOWN": {...} }, "Moderate": { ... } }
+        tier_stats = {"Strong": {}, "Moderate": {}}
+        tier_totals = {"Strong": [0, 0, 0], "Moderate": [0, 0, 0]}  # [total, filled, wins]
+        all_total = all_filled = all_wins = 0
+        pending = 0
         alerts = []
         try:
             with conn.cursor() as cur:
-                # Current model signals
                 cur.execute("""
                     SELECT direction, strength,
                            COUNT(*) as total,
@@ -916,44 +918,37 @@ def indicator_performance():
                     WHERE signal_time >= %s AND strength IN ('Strong', 'Moderate')
                     GROUP BY direction, strength
                 """, (CURRENT_MODEL_DEPLOY,))
-                cur_rows = cur.fetchall()
-
-                for r in cur_rows:
+                for r in cur.fetchall():
                     d = r["direction"]
+                    s = r["strength"]
                     total = int(r["total"] or 0)
                     filled = int(r["filled_cnt"] or 0)
                     wins = int(r["wins"] or 0)
-                    strong_total += total
-                    strong_filled += filled
-                    strong_wins += wins
-                    if filled > 0:
-                        wr = wins / filled * 100
-                        avg_r = float(r["avg_ret"] or 0) * 100
-                        icon = "🟢" if d == "UP" else "🔴"
-                        strong_lines.append(
-                            f"  {icon} {d}: {wr:.0f}% ({wins}W/{filled-wins}L, avg={avg_r:+.2f}%)")
+                    avg_r = float(r["avg_ret"] or 0)
+                    if s in tier_stats:
+                        tier_stats[s][d] = {"total": total, "filled": filled, "wins": wins, "avg_ret": avg_r}
+                        tier_totals[s][0] += total
+                        tier_totals[s][1] += filled
+                        tier_totals[s][2] += wins
+                    all_total += total
+                    all_filled += filled
+                    all_wins += wins
 
                 # Pending (unfilled)
                 cur.execute("""
-                    SELECT COUNT(*) as cnt
+                    SELECT strength, COUNT(*) as cnt
                     FROM tracked_signals
                     WHERE signal_time >= %s AND strength IN ('Strong', 'Moderate') AND filled = 0
+                    GROUP BY strength
                 """, (CURRENT_MODEL_DEPLOY,))
-                pending = int(cur.fetchone()["cnt"] or 0)
+                pending_rows = {r["strength"]: int(r["cnt"]) for r in cur.fetchall()}
+                pending = sum(pending_rows.values())
 
-                # All-time Strong for alert threshold (need 20+ for significance)
-                cur.execute("""
-                    SELECT COUNT(*) as total, SUM(correct) as wins
-                    FROM tracked_signals WHERE filled = 1 AND strength IN ('Strong', 'Moderate')
-                      AND signal_time >= %s
-                """, (CURRENT_MODEL_DEPLOY,))
-                sr = cur.fetchone()
-                s_total_all = int(sr["total"] or 0)
-                s_wins_all = int(sr["wins"] or 0)
-                if s_total_all >= 20:
-                    s_wr_all = s_wins_all / s_total_all * 100
-                    if s_wr_all < 55:
-                        alerts.append(f"🔴 信號累積勝率 {s_wr_all:.0f}% (< 55%) — 建議重訓")
+                # Alert threshold (need 20+ for significance)
+                if all_filled >= 20:
+                    all_wr = all_wins / all_filled * 100
+                    if all_wr < 55:
+                        alerts.append(f"🔴 信號累積勝率 {all_wr:.0f}% (< 55%) — 建議重訓")
 
         except Exception as e:
             logger.warning("Tracked signals query failed: %s", e)
@@ -980,15 +975,17 @@ def indicator_performance():
                     sig_local = sig_utc.astimezone(TZ8)
                     t = sig_local.strftime("%m-%d %H:%M")
                     d = r["direction"]
+                    s = r["strength"]
+                    tier_tag = "S" if s == "Strong" else "M"
                     icon = "🟢▲" if d == "UP" else "🔴▼"
                     entry = float(r["entry_price"])
                     conf = float(r["confidence"])
                     if r["filled"]:
                         ret = float(r["actual_return_4h"])
                         mark = "✅" if r["correct"] else "❌"
-                        recent_lines.append(f"  {icon} {t} ${entry:,.0f} c={conf:.0f} → {ret*100:+.2f}% {mark}")
+                        recent_lines.append(f"  {icon}[{tier_tag}] {t} ${entry:,.0f} c={conf:.0f} → {ret*100:+.2f}% {mark}")
                     else:
-                        recent_lines.append(f"  {icon} {t} ${entry:,.0f} c={conf:.0f} → ⏳")
+                        recent_lines.append(f"  {icon}[{tier_tag}] {t} ${entry:,.0f} c={conf:.0f} → ⏳")
         except Exception as e:
             logger.warning("Recent signals query failed: %s", e)
 
@@ -1026,17 +1023,27 @@ def indicator_performance():
         lines.append(f"  ({OOS_BASELINE['n_folds']} folds, 訓練截止 {OOS_BASELINE['train_end']})")
 
         # Live tracked performance (current model)
-        lines.append(f"\n<b>部署後實戰</b> (Strong+Moderate, {CURRENT_MODEL_DEPLOY}~)")
-        if strong_filled > 0:
-            total_wr = strong_wins / strong_filled * 100
-            lines.append(f"  總計: {total_wr:.0f}% ({strong_wins}W/{strong_filled-strong_wins}L)")
-            lines.extend(strong_lines)
-        elif strong_total > 0:
-            lines.append(f"  {strong_total} 筆信號，尚無結算")
-        else:
-            lines.append("  尚無信號 (模型剛部署)")
-        if pending > 0:
-            lines.append(f"  等待結算: {pending} 筆")
+        lines.append(f"\n<b>部署後實戰</b> ({CURRENT_MODEL_DEPLOY}~)")
+        for tier in ["Strong", "Moderate"]:
+            t, f, w = tier_totals[tier]
+            tier_icon = "🔥" if tier == "Strong" else "📊"
+            tier_pending = pending_rows.get(tier, 0)
+            if f > 0:
+                wr = w / f * 100
+                lines.append(f"\n{tier_icon} <b>{tier}</b>: {wr:.0f}% ({w}W/{f-w}L)")
+                for d in ("UP", "DOWN"):
+                    ds = tier_stats[tier].get(d)
+                    if ds and ds["filled"] > 0:
+                        dwr = ds["wins"] / ds["filled"] * 100
+                        davg = ds["avg_ret"] * 100
+                        icon = "🟢" if d == "UP" else "🔴"
+                        lines.append(f"  {icon} {d}: {dwr:.0f}% ({ds['wins']}W/{ds['filled']-ds['wins']}L, avg={davg:+.2f}%)")
+            elif t > 0:
+                lines.append(f"\n{tier_icon} <b>{tier}</b>: {t} 筆信號，尚無結算")
+            else:
+                lines.append(f"\n{tier_icon} <b>{tier}</b>: 尚無信號")
+            if tier_pending > 0:
+                lines.append(f"  等待結算: {tier_pending} 筆")
 
         # Recent signals
         if recent_lines:

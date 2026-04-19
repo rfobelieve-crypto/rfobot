@@ -196,51 +196,52 @@ def get_performance_report() -> str:
     conn = _get_db_conn()
     try:
         with conn.cursor() as cur:
-            lines = ["<b>📊 Signal Performance (Strong)</b>\n"]
+            lines = ["<b>📊 Signal Performance</b>\n"]
 
-            cur.execute(f"""
-                SELECT COUNT(*) as total,
-                       SUM(filled) as filled,
-                       SUM(correct) as wins,
-                       AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret
-                FROM `{TABLE}` WHERE strength IN ('Strong', 'Moderate')
-            """)
-            s = cur.fetchone()
+            # Per-tier stats
+            for tier in ["Strong", "Moderate"]:
+                tier_icon = "🔥" if tier == "Strong" else "📊"
+                cur.execute(f"""
+                    SELECT COUNT(*) as total,
+                           SUM(filled) as filled,
+                           SUM(correct) as wins,
+                           AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret
+                    FROM `{TABLE}` WHERE strength = %s
+                """, (tier,))
+                s = cur.fetchone()
+                total = int(s["total"] or 0)
+                filled = int(s["filled"] or 0)
+                wins = int(s["wins"] or 0)
+                if filled > 0:
+                    wr = wins / filled * 100
+                    avg_r = float(s["avg_ret"] or 0) * 100
+                    lines.append(f"{tier_icon} <b>{tier}</b> ({filled} 結算 / {total} 總計)")
+                    lines.append(f"  勝率: {wr:.1f}% ({wins}W/{filled-wins}L) avg={avg_r:+.2f}%")
+                elif total > 0:
+                    lines.append(f"{tier_icon} <b>{tier}</b> ({total} 筆，尚無結算)")
+                else:
+                    lines.append(f"{tier_icon} <b>{tier}</b>: 尚無信號")
 
-            total = int(s["total"] or 0)
-            filled = int(s["filled"] or 0)
-            wins = int(s["wins"] or 0)
-            if filled > 0:
-                wr = wins / filled * 100
-                avg_r = float(s["avg_ret"] or 0) * 100
-                lines.append(f"🔥 <b>Strong + Moderate</b> ({filled} 結算 / {total} 總計)")
-                lines.append(f"  勝率: {wr:.1f}% ({wins}W/{filled-wins}L) avg={avg_r:+.2f}%")
-            elif total > 0:
-                lines.append(f"🔥 <b>Strong + Moderate</b> ({total} 筆，尚無結算)")
-            else:
-                lines.append("  尚無信號紀錄")
-
-            # Per-direction
-            cur.execute(f"""
-                SELECT direction,
-                       COUNT(*) as cnt, SUM(correct) as wins,
-                       AVG(actual_return_4h) as avg_ret
-                FROM `{TABLE}` WHERE filled = 1 AND strength IN ('Strong', 'Moderate')
-                GROUP BY direction ORDER BY direction
-            """)
-            dir_rows = cur.fetchall()
-            if dir_rows:
-                lines.append("\n<b>方向拆解</b>")
+                # Per-direction for this tier
+                cur.execute(f"""
+                    SELECT direction,
+                           COUNT(*) as cnt, SUM(correct) as wins,
+                           AVG(actual_return_4h) as avg_ret
+                    FROM `{TABLE}` WHERE filled = 1 AND strength = %s
+                    GROUP BY direction ORDER BY direction
+                """, (tier,))
+                dir_rows = cur.fetchall()
                 for dr in dir_rows:
                     d = dr["direction"]
                     cnt, w = int(dr["cnt"]), int(dr["wins"] or 0)
                     ar = float(dr["avg_ret"] or 0)
                     icon = "🟢" if d == "UP" else "🔴"
                     lines.append(f"  {icon} {d}: {w}/{cnt} ({w/cnt*100:.0f}%) avg={ar*100:+.2f}%")
+                lines.append("")  # blank line between tiers
 
             # Recent signals
             cur.execute(f"""
-                SELECT signal_time, direction, confidence, entry_price,
+                SELECT signal_time, direction, strength, confidence, entry_price,
                        actual_return_4h, correct, filled
                 FROM `{TABLE}`
                 WHERE signal_time >= DATE_SUB(NOW(), INTERVAL 3 DAY)
@@ -249,7 +250,7 @@ def get_performance_report() -> str:
             """)
             recent = cur.fetchall()
             if recent:
-                lines.append("\n<b>最近信號</b>")
+                lines.append("<b>最近信號</b>")
                 for r in recent:
                     sig_utc = r["signal_time"]
                     if hasattr(sig_utc, 'replace'):
@@ -257,15 +258,16 @@ def get_performance_report() -> str:
                     sig_local = sig_utc.astimezone(TZ_TPE)
                     t = sig_local.strftime("%m-%d %H:%M")
                     d = r["direction"]
+                    tier_tag = "S" if r["strength"] == "Strong" else "M"
                     icon = "🟢▲" if d == "UP" else "🔴▼"
                     entry = float(r["entry_price"])
                     conf = float(r["confidence"])
                     if r["filled"]:
                         ret = float(r["actual_return_4h"])
                         mark = "✅" if r["correct"] else "❌"
-                        lines.append(f"  {icon} {t} ${entry:,.0f} c={conf:.0f} → {ret*100:+.2f}% {mark}")
+                        lines.append(f"  {icon}[{tier_tag}] {t} ${entry:,.0f} c={conf:.0f} → {ret*100:+.2f}% {mark}")
                     else:
-                        lines.append(f"  {icon} {t} ${entry:,.0f} c={conf:.0f} → ⏳")
+                        lines.append(f"  {icon}[{tier_tag}] {t} ${entry:,.0f} c={conf:.0f} → ⏳")
 
             return "\n".join(lines)
     finally:
