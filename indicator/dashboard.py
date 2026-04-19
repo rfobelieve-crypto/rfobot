@@ -1,14 +1,8 @@
 """
-System diagnostic dashboard — single page HTML.
+System diagnostic dashboard — tabbed multi-page layout.
 
-Renders a dark-theme responsive dashboard with:
-  - Key metric cards (prediction, risk, model)
-  - Signal performance table (Strong + Moderate)
-  - 24h prediction distribution (UP/DOWN/NEUTRAL)
-  - Regime timeline
-  - Data freshness (API last update times)
-  - System health
-  - Collapsible sections for mobile
+Serves a static shell with 5 tabs, each loaded via AJAX.
+Tab content is rendered server-side as HTML fragments.
 """
 from __future__ import annotations
 
@@ -20,751 +14,287 @@ logger = logging.getLogger(__name__)
 TZ8 = timezone(timedelta(hours=8))
 
 
-def render_dashboard(state: dict, engine) -> str:
-    """Build full dashboard HTML from app state and engine."""
-    import pandas as pd
-
+def render_dashboard_shell() -> str:
+    """Return the outer shell HTML (tabs + JS router). Content loads via AJAX."""
     now = datetime.now(TZ8).strftime("%Y-%m-%d %H:%M UTC+8")
 
-    pred = state.get("last_prediction", {})
-    status = state.get("status", "unknown")
-    last_update = state.get("last_update", "N/A")
-    error = state.get("error")
-    cg_status = state.get("cg_status")
-    indicator_df = state.get("indicator_df")
-
-    # ── Engine info ──
-    engine_info = "N/A"
-    dir_n, mag_n = "?", "?"
-    if engine:
-        dir_n = len(getattr(engine, 'dual_dir_features', getattr(engine, 'dir_feature_cols', [])))
-        mag_n = len(getattr(engine, 'dual_mag_features', []))
-        engine_info = f"{engine.mode} | Dir={dir_n} feat | Mag={mag_n} feat"
-
-    # ── Signal tracker ──
-    sig_stats = _get_signal_stats()
-
-    # ── Entropy risk ──
-    risk_info = _get_risk_info(indicator_df, pred)
-
-    # ── DB health ──
-    db_health = _get_db_health()
-
-    # ── CG status ──
-    cg_text = _format_cg_status(cg_status)
-
-    # ── System health (from health_monitor) ──
-    health = state.get("health", {})
-    health_checks = health.get("checks", [])
-    overall_health = health.get("overall_status", "unknown")
-
-    # ── 24h prediction distribution ──
-    dist_24h = _get_24h_distribution()
-
-    # ── Regime timeline ──
-    regime_timeline = _get_regime_timeline()
-
-    # ── Data freshness ──
-    freshness = _get_data_freshness()
-
-    # ── IC / Win rate trend (7 days) ──
-    ic_trend = _get_ic_trend(days=7)
-
-    # ── Recent 24h predictions vs actual ──
-    pred_vs_actual = _get_pred_vs_actual(hours=24)
-
-    # ── Health alert history (7 days) ──
-    alert_history = _get_alert_history(days=7)
-
-    # ── Build HTML ──
-    risk_color = {"HIGH": "#f44336", "MEDIUM": "#ff9800", "LOW": "#4caf50"}.get(
-        risk_info.get("risk_level", ""), "#999")
-
-    # Recent signals rows
-    recent_html = ""
-    for r in sig_stats.get("recent", []):
-        t = r["signal_time"]
-        if hasattr(t, "replace"):
-            t = t.replace(tzinfo=timezone.utc).astimezone(TZ8).strftime("%m/%d %H:%M")
-        d = r["direction"]
-        s = r["strength"][0]
-        dc = "#4caf50" if d == "UP" else "#f44336"
-        icon = "&#9650;" if d == "UP" else "&#9660;"
-        if r["filled"]:
-            ret = float(r["actual_return_4h"]) * 100
-            oc = "#4caf50" if r["correct"] else "#f44336"
-            ok = "&#10003;" if r["correct"] else "&#10007;"
-            recent_html += f'<tr><td>{t}</td><td>[{s}]</td><td style="color:{dc}">{icon} {d}</td><td>{r["confidence"]:.0f}</td><td>${r["entry_price"]:,.0f}</td><td style="color:{oc}">{ret:+.2f}% {ok}</td></tr>'
-        else:
-            recent_html += f'<tr><td>{t}</td><td>[{s}]</td><td style="color:{dc}">{icon} {d}</td><td>{r["confidence"]:.0f}</td><td>${r["entry_price"]:,.0f}</td><td style="color:#666">等待中</td></tr>'
-
-    # 24h distribution bar
-    up_n = dist_24h.get("UP", 0)
-    dn_n = dist_24h.get("DOWN", 0)
-    nt_n = dist_24h.get("NEUTRAL", 0)
-    total_24 = max(up_n + dn_n + nt_n, 1)
-    up_pct = up_n / total_24 * 100
-    dn_pct = dn_n / total_24 * 100
-    nt_pct = nt_n / total_24 * 100
-
-    # Regime timeline rows
-    regime_html = ""
-    for rt in regime_timeline:
-        rc = {"BULL": "#4caf50", "BEAR": "#f44336", "CHOPPY": "#ff9800", "WARMUP": "#666"}.get(rt["regime"], "#999")
-        hrs = rt["hours"]
-        rname = rt["regime"]
-        regime_html += f'<div class="regime-block" style="background:{rc};flex:{hrs}" title="{rname} ({hrs}h)">{rname[:4]}</div>'
-
-    # Freshness rows
-    fresh_html = ""
-    for f in freshness:
-        age = f["age_min"]
-        fc = "#4caf50" if age < 120 else "#ff9800" if age < 360 else "#f44336"
-        fresh_html += f'<tr><td>{f["source"]}</td><td style="color:{fc}">{f["age_text"]}</td><td>{f["last_time"]}</td></tr>'
-
-    html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>量化儀表板</title>
-<meta http-equiv="refresh" content="300">
+    return f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BTC Indicator Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
-  body {{ background:#0d1117; color:#c9d1d9; font-family:-apple-system,BlinkMacSystemFont,sans-serif; padding:12px; font-size:13px; }}
-  h1 {{ color:#58a6ff; font-size:18px; margin-bottom:2px; }}
-  .subtitle {{ color:#8b949e; font-size:11px; margin-bottom:12px; }}
+  body {{ background:#0d1117; color:#c9d1d9; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:13px; }}
+
+  /* ── Top bar ── */
+  .topbar {{
+    background:#161b22; border-bottom:1px solid #30363d;
+    padding:10px 20px; display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:100;
+  }}
+  .topbar h1 {{ color:#58a6ff; font-size:16px; font-weight:700; }}
+  .topbar .meta {{ color:#8b949e; font-size:11px; }}
+
+  /* ── Tab bar ── */
+  .tab-bar {{
+    background:#161b22; border-bottom:1px solid #30363d;
+    display:flex; gap:0; overflow-x:auto; padding:0 16px;
+    position:sticky; top:41px; z-index:99;
+  }}
+  .tab {{
+    background:transparent; border:none; border-bottom:2px solid transparent;
+    color:#8b949e; padding:10px 18px; cursor:pointer; font-size:12px;
+    font-weight:500; white-space:nowrap; transition:all 0.15s;
+  }}
+  .tab:hover {{ color:#c9d1d9; background:rgba(88,166,255,0.04); }}
+  .tab.active {{
+    color:#58a6ff; border-bottom-color:#58a6ff; font-weight:600;
+  }}
+  .tab .tab-icon {{ margin-right:5px; }}
+
+  /* ── Content area ── */
+  .content {{ max-width:1200px; margin:0 auto; padding:16px 20px; min-height:70vh; }}
+
+  /* ── Loading ── */
+  .loading {{
+    display:flex; align-items:center; justify-content:center;
+    min-height:200px; color:#8b949e;
+  }}
+  .spinner {{
+    width:20px; height:20px; border:2px solid #30363d; border-top-color:#58a6ff;
+    border-radius:50%; animation:spin 0.8s linear infinite; margin-right:10px;
+  }}
+  @keyframes spin {{ to {{ transform:rotate(360deg) }} }}
+  @keyframes blink {{ 50% {{ opacity:0.3 }} }}
+
+  /* ── Cards ── */
   .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-bottom:14px; }}
+  .grid-3 {{ grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); }}
+  .grid-4 {{ grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); }}
   .card {{ background:#161b22; border:1px solid #30363d; border-radius:8px; padding:10px; }}
   .card-title {{ color:#8b949e; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; }}
-  .card-value {{ font-size:22px; font-weight:700; margin:2px 0; }}
+  .card-value {{ font-size:20px; font-weight:700; margin:2px 0; }}
   .card-sub {{ color:#8b949e; font-size:10px; }}
+
+  /* ── Sections ── */
   .section {{ background:#161b22; border:1px solid #30363d; border-radius:8px; margin-bottom:12px; overflow:hidden; }}
-  .section-header {{ padding:10px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }}
-  .section-header:active {{ background:#1c2129; }}
+  .section-header {{
+    padding:10px 14px; cursor:pointer; display:flex;
+    justify-content:space-between; align-items:center;
+    user-select:none;
+  }}
+  .section-header:hover {{ background:#1c2129; }}
   .section-title {{ color:#58a6ff; font-size:13px; font-weight:600; }}
-  .section-toggle {{ color:#8b949e; font-size:16px; }}
+  .section-toggle {{ color:#8b949e; font-size:14px; }}
   .section-body {{ padding:0 14px 12px; }}
+
+  /* ── Tables ── */
   table {{ width:100%; border-collapse:collapse; font-size:12px; }}
-  th {{ text-align:left; color:#8b949e; padding:5px 6px; border-bottom:1px solid #30363d; font-size:10px; text-transform:uppercase; }}
+  th {{ text-align:left; color:#8b949e; padding:5px 6px; border-bottom:1px solid #30363d;
+        font-size:10px; text-transform:uppercase; }}
   td {{ padding:5px 6px; border-bottom:1px solid #21262d; }}
-  .dist-bar {{ display:flex; height:24px; border-radius:4px; overflow:hidden; margin:6px 0; }}
-  .dist-bar div {{ display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:600; color:#fff; }}
-  .regime-row {{ display:flex; gap:2px; height:20px; border-radius:4px; overflow:hidden; margin:6px 0; }}
-  .regime-block {{ display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:600; color:#fff; border-radius:3px; min-width:30px; }}
-  .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }}
+
+  /* ── Misc ── */
+  .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }}
   .dot-ok {{ background:#4caf50; }}
   .dot-err {{ background:#f44336; }}
-</style>
-<script>
-function toggle(id) {{
-  var el = document.getElementById(id);
-  var arrow = document.getElementById(id + '_arrow');
-  if (el.style.display === 'none') {{
-    el.style.display = 'block';
-    arrow.textContent = '\\u25BC';
-  }} else {{
-    el.style.display = 'none';
-    arrow.textContent = '\\u25B6';
+  .badge {{
+    display:inline-block; padding:2px 8px; border-radius:10px;
+    font-size:10px; font-weight:600; color:#fff;
   }}
-}}
-</script>
-</head><body>
-<h1>量化儀表板</h1>
-<div class="subtitle">{now} | 自動刷新 5 分鐘</div>
+  .dist-bar {{ display:flex; height:24px; border-radius:4px; overflow:hidden; margin:6px 0; }}
+  .dist-bar div {{ display:flex; align-items:center; justify-content:center;
+                   font-size:10px; font-weight:600; color:#fff; }}
+  .regime-row {{ display:flex; gap:2px; height:22px; border-radius:4px; overflow:hidden; margin:6px 0; }}
+  .regime-block {{
+    display:flex; align-items:center; justify-content:center;
+    font-size:9px; font-weight:600; color:#fff; border-radius:3px; min-width:30px;
+  }}
+  .two-col {{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }}
+  code {{ background:#21262d; padding:1px 4px; border-radius:3px; font-size:11px; }}
 
-<div class="grid">
-  {_card("狀態",
-         _dot(overall_health in ("healthy","unknown")) + " " + overall_health.upper(),
-         (last_update[:19] if last_update != "N/A" else "N/A"),
-         {"healthy":"#4caf50","degraded":"#ff9800","critical":"#f44336"}.get(overall_health, "#999"))}
-  {_card("方向", pred.get("direction","?"), f'P(UP)={pred.get("dir_prob_up",0):.0%} | {pred.get("strength","?")}',
-         "#4caf50" if pred.get("direction")=="UP" else "#f44336" if pred.get("direction")=="DOWN" else "#999")}
-  {_card("信心", f'{pred.get("confidence",0):.0f}', f'${pred.get("close",0):,.0f}')}
-  {_card("風險", f'{risk_info.get("risk_score","?")}/100', risk_info.get("risk_level","?"), risk_color)}
-  {_card("熵值", f'{risk_info.get("market_entropy","N/A")}', f'z={risk_info.get("market_entropy_zscore","?")}')}
-  {_card("模型", "Dual v7", f'Dir={dir_n}f Mag={mag_n}f')}
+  /* ── Heatmap ── */
+  .heatmap-grid {{
+    display:grid; grid-template-columns:repeat(24,1fr); gap:2px;
+  }}
+  .heatmap-labels {{
+    display:grid; grid-template-columns:repeat(24,1fr); gap:2px;
+    color:#8b949e; font-size:9px; text-align:center; margin-top:2px;
+  }}
+  .hm-cell {{
+    aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    border-radius:3px; font-size:9px; font-weight:600; color:#fff;
+  }}
+
+  /* ── Latency bars ── */
+  .latency-bar {{ display:flex; align-items:center; margin:4px 0; }}
+  .latency-label {{ width:80px; font-size:11px; color:#8b949e; }}
+  .latency-track {{ flex:1; height:10px; background:#21262d; border-radius:4px; overflow:hidden; margin:0 8px; }}
+  .latency-fill {{ height:100%; border-radius:4px; transition:width 0.3s; }}
+  .latency-val {{ width:50px; text-align:right; font-size:11px; font-family:monospace; }}
+
+  /* ── Gauge bars ── */
+  .gauge-wrap {{ display:flex; align-items:center; margin:3px 0; }}
+  .gauge-label {{ width:100px; font-size:11px; color:#8b949e; }}
+  .gauge-track {{ flex:1; height:8px; background:#21262d; border-radius:4px; overflow:hidden; margin:0 8px; }}
+  .gauge-fill {{ height:100%; border-radius:4px; }}
+  .gauge-val {{ width:40px; text-align:right; font-size:11px; }}
+
+  /* ── Footer ── */
+  .footer {{ text-align:center; color:#484f58; font-size:10px; padding:20px 0; }}
+
+  /* ── Responsive ── */
+  @media (max-width:640px) {{
+    .tab {{ padding:8px 12px; font-size:11px; }}
+    .content {{ padding:10px 12px; }}
+    .two-col {{ grid-template-columns:1fr; }}
+    .card-value {{ font-size:18px; }}
+    .topbar {{ padding:8px 12px; }}
+    .topbar h1 {{ font-size:14px; }}
+  }}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>BTC Indicator Dashboard</h1>
+  <div class="meta">
+    <span id="update-time">{now}</span>
+    <span id="refresh-indicator" style="margin-left:8px;color:#4caf50;font-size:9px">&#9679;</span>
+  </div>
 </div>
 
-{_section("24h 預測分佈", "dist24", True, f'''
-  <div style="color:#8b949e;font-size:11px;margin-bottom:4px;">最近 24 根 bar 方向分佈</div>
-  <div class="dist-bar">
-    <div style="background:#4caf50;flex:{up_pct:.0f}">UP {up_n}</div>
-    <div style="background:#666;flex:{nt_pct:.0f}">N {nt_n}</div>
-    <div style="background:#f44336;flex:{dn_pct:.0f}">DN {dn_n}</div>
-  </div>
-''')}
+<div class="tab-bar">
+  <button class="tab active" data-tab="overview">
+    <span class="tab-icon">&#128200;</span>Overview
+  </button>
+  <button class="tab" data-tab="performance">
+    <span class="tab-icon">&#128202;</span>Model Perf
+  </button>
+  <button class="tab" data-tab="market">
+    <span class="tab-icon">&#128176;</span>Market Intel
+  </button>
+  <button class="tab" data-tab="health">
+    <span class="tab-icon">&#9881;</span>System
+  </button>
+  <button class="tab" data-tab="agents">
+    <span class="tab-icon">&#129302;</span>Agents
+  </button>
+</div>
 
-{_section("市場狀態時間軸", "regime", True, f'''
-  <div style="color:#8b949e;font-size:11px;margin-bottom:4px;">最近 48h 狀態變化</div>
-  <div class="regime-row">{regime_html if regime_html else '<div style="color:#666">無數據</div>'}</div>
-''')}
+<div class="content" id="tab-content">
+  <div class="loading"><div class="spinner"></div>載入中...</div>
+</div>
 
-{_section("信號績效", "signals", True, _build_signal_html(sig_stats, recent_html))}
+<div class="footer">BTC Market Intelligence Indicator &middot; Dual v7 &middot; Auto-refresh 5 min</div>
 
-{_section("IC / 勝率趨勢 (7 天)", "ictrend", True, _build_ic_trend_html(ic_trend))}
+<script>
+(function() {{
+  var currentTab = 'overview';
+  var refreshTimer = null;
+  var tabs = document.querySelectorAll('.tab');
 
-{_section("預測 vs 實際 (24h)", "predva", True, _build_pred_vs_actual_html(pred_vs_actual))}
+  tabs.forEach(function(btn) {{
+    btn.addEventListener('click', function() {{
+      loadTab(btn.dataset.tab);
+    }});
+  }});
 
-{_section("警報歷史 (7 天)", "alerts", False, _build_alert_history_html(alert_history))}
+  function loadTab(name) {{
+    currentTab = name;
+    tabs.forEach(function(b) {{
+      b.classList.toggle('active', b.dataset.tab === name);
+    }});
 
-{_section("數據新鮮度", "fresh", False, _build_freshness_html(freshness))}
+    var content = document.getElementById('tab-content');
+    content.innerHTML = '<div class="loading"><div class="spinner"></div>載入中...</div>';
 
-{_section("系統健康", "syshealth", True, _build_health_html(
-    overall_health, health_checks, db_health, cg_text, engine, engine_info, error))}
+    fetch('/dashboard/tab/' + name)
+      .then(function(r) {{ return r.text(); }})
+      .then(function(html) {{
+        content.innerHTML = html;
+        // Re-execute inline scripts (Chart.js etc.)
+        content.querySelectorAll('script').forEach(function(old) {{
+          var ns = document.createElement('script');
+          ns.textContent = old.textContent;
+          old.parentNode.replaceChild(ns, old);
+        }});
+        // Update timestamp
+        document.getElementById('update-time').textContent =
+          new Date().toLocaleString('zh-TW', {{timeZone:'Asia/Taipei'}});
+      }})
+      .catch(function(err) {{
+        content.innerHTML = '<div class="loading" style="color:#f44336">載入失敗: ' + err + '</div>';
+      }});
 
+    // Reset refresh timer
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(function() {{ loadTab(currentTab); }}, 300000);
+  }}
+
+  // Section toggle (used by tab content)
+  window.toggle = function(id) {{
+    var el = document.getElementById(id);
+    var arrow = document.getElementById(id + '_arrow');
+    if (!el) return;
+    if (el.style.display === 'none') {{
+      el.style.display = 'block';
+      if (arrow) arrow.innerHTML = '&#9660;';
+    }} else {{
+      el.style.display = 'none';
+      if (arrow) arrow.innerHTML = '&#9654;';
+    }}
+  }};
+
+  // Initial load
+  loadTab('overview');
+
+  // Keyboard shortcuts: 1-5 for tabs
+  document.addEventListener('keydown', function(e) {{
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    var tabMap = {{'1':'overview','2':'performance','3':'market','4':'health','5':'agents'}};
+    if (tabMap[e.key]) loadTab(tabMap[e.key]);
+  }});
+}})();
+</script>
 </body></html>"""
-    return html
 
 
-def _build_signal_html(sig_stats, recent_html):
-    s_s = sig_stats.get("Strong", {})
-    s_m = sig_stats.get("Moderate", {})
-    return f'''
-  <table>
-    <tr><th>等級</th><th>總計</th><th>已結算</th><th>勝率</th><th>平均收益</th></tr>
-    <tr><td>Strong</td><td>{s_s.get("total",0)}</td><td>{s_s.get("filled",0)}</td>
-        <td>{s_s.get("wr","N/A")}</td><td>{s_s.get("avg_ret","N/A")}</td></tr>
-    <tr><td>Moderate</td><td>{s_m.get("total",0)}</td><td>{s_m.get("filled",0)}</td>
-        <td>{s_m.get("wr","N/A")}</td><td>{s_m.get("avg_ret","N/A")}</td></tr>
-  </table>
-  <div style="margin-top:10px">
-    <table>
-      <tr><th>時間</th><th>等級</th><th>方向</th><th>信心</th><th>入場價</th><th>結果</th></tr>
-      {recent_html}
-    </table>
-  </div>
-'''
-
-
-# ═══════════════════════════════════════════════════════════════════
-# HTML helpers
-# ═══════════════════════════════════════════════════════════════════
-
-def _card(title, value, subtitle="", color="#4fc3f7"):
-    return f"""<div class="card">
-      <div class="card-title">{title}</div>
-      <div class="card-value" style="color:{color}">{value}</div>
-      <div class="card-sub">{subtitle}</div>
-    </div>"""
-
-
-def _dot(ok):
-    cls = "dot-ok" if ok else "dot-err"
-    return f'<span class="{cls} dot"></span>'
-
-
-def _build_ic_trend_html(trend_data):
-    """Build IC + win rate trend chart using Chart.js."""
-    if not trend_data or not trend_data.get("labels"):
-        return '<div style="color:#666">數據不足</div>'
-
-    import json as _json
-    labels_json = _json.dumps(trend_data["labels"])
-    ic_json = _json.dumps(trend_data["ic_values"])
-    wr_json = _json.dumps(trend_data["win_rates"])
-
-    return f'''
-<canvas id="icTrendChart" height="120"></canvas>
-<script>
-(function() {{
-  var ctx = document.getElementById('icTrendChart').getContext('2d');
-  new Chart(ctx, {{
-    type: 'line',
-    data: {{
-      labels: {labels_json},
-      datasets: [
-        {{
-          label: '滾動 IC (24h)',
-          data: {ic_json},
-          borderColor: '#58a6ff',
-          backgroundColor: 'rgba(88,166,255,0.1)',
-          yAxisID: 'y',
-          tension: 0.3,
-        }},
-        {{
-          label: '勝率 % (24h)',
-          data: {wr_json},
-          borderColor: '#4caf50',
-          backgroundColor: 'rgba(76,175,80,0.1)',
-          yAxisID: 'y1',
-          tension: 0.3,
-        }}
-      ]
-    }},
-    options: {{
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {{ legend: {{ labels: {{ color: '#c9d1d9', font: {{ size: 10 }} }} }} }},
-      scales: {{
-        x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }} }},
-        y: {{ position: 'left', ticks: {{ color: '#58a6ff', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }}, title: {{ display: true, text: 'IC', color: '#58a6ff' }} }},
-        y1: {{ position: 'right', ticks: {{ color: '#4caf50', font: {{ size: 9 }} }}, grid: {{ drawOnChartArea: false }}, title: {{ display: true, text: '勝率', color: '#4caf50' }} }}
-      }}
-    }}
-  }});
-}})();
-</script>
-'''
-
-
-def _build_pred_vs_actual_html(data):
-    """Build prediction direction vs actual price chart."""
-    if not data or not data.get("labels"):
-        return '<div style="color:#666">數據不足</div>'
-
-    import json as _json
-    labels_json = _json.dumps(data["labels"])
-    price_json = _json.dumps(data["prices"])
-    point_colors_json = _json.dumps(data["point_colors"])
-    point_sizes_json = _json.dumps(data["point_sizes"])
-
-    return f'''
-<div style="position:relative;height:160px;">
-  <canvas id="predChart"></canvas>
-</div>
-<div style="color:#8b949e;font-size:10px;margin-top:4px">
-  點: UP=綠, DOWN=紅, NEUTRAL=灰. 大點=Strong.
-</div>
-<script>
-(function() {{
-  var ctx = document.getElementById('predChart').getContext('2d');
-  new Chart(ctx, {{
-    type: 'line',
-    data: {{
-      labels: {labels_json},
-      datasets: [{{
-        label: 'BTC 價格',
-        data: {price_json},
-        borderColor: '#58a6ff',
-        backgroundColor: 'rgba(88,166,255,0.1)',
-        pointBackgroundColor: {point_colors_json},
-        pointRadius: {point_sizes_json},
-        pointHoverRadius: 6,
-        tension: 0.3,
-      }}]
-    }},
-    options: {{
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {{ legend: {{ display: false }} }},
-      scales: {{
-        x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }} }},
-        y: {{ ticks: {{ color: '#c9d1d9', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }} }}
-      }}
-    }}
-  }});
-}})();
-</script>
-'''
-
-
-def _build_alert_history_html(alerts):
-    """Build alert history table."""
-    if not alerts:
-        return '<div style="color:#4caf50">過去 7 天無警報</div>'
-
-    lines = ['<table><tr><th>時間</th><th>類型</th><th>警報</th></tr>']
-    for a in alerts[:20]:  # Most recent 20
-        t = a.get("time", "?")
-        atype = a.get("type", "?")
-        detail = a.get("detail", "")[:80]
-        sev = a.get("severity", "warn")
-        color = "#f44336" if sev == "critical" else "#ff9800"
-        lines.append(f'<tr><td>{t}</td><td style="color:{color}">{atype}</td><td>{detail}</td></tr>')
-    lines.append('</table>')
-
-    # Summary count
-    total = len(alerts)
-    critical = sum(1 for a in alerts if a.get("severity") == "critical")
-    summary = f'<div style="color:#8b949e;font-size:11px;margin-bottom:6px">總計: {total} 則警報 ({critical} 嚴重) 過去 7 天</div>'
-    return summary + "\n".join(lines)
-
-
-def _build_freshness_html(freshness):
-    lines = ['<table><tr><th>來源</th><th>延遲</th><th>最後更新</th></tr>']
-    for f in freshness:
-        age = f["age_min"]
-        fc = "#4caf50" if age < 120 else "#ff9800" if age < 360 else "#f44336"
-        lines.append(f'<tr><td>{f["source"]}</td><td style="color:{fc}">{f["age_text"]}</td><td>{f["last_time"]}</td></tr>')
-    lines.append('</table>')
-    return "\n".join(lines)
-
-
-def _build_health_html(overall, checks, db_health, cg_text, engine, engine_info, error):
-    """Build health section HTML (avoids f-string escaping issues)."""
-    color_map = {"healthy": "#4caf50", "degraded": "#ff9800", "critical": "#f44336"}
-    overall_color = color_map.get(overall, "#999")
-
-    lines = []
-    lines.append(f'<div style="margin-bottom:8px">')
-    lines.append(f'  Overall: <span style="color:{overall_color}">{overall.upper()}</span>')
-    lines.append(f'</div>')
-    lines.append('<table><tr><th>檢查項目</th><th>狀態</th><th>詳情</th></tr>')
-
-    if checks:
-        for c in checks:
-            name = c.get("name", "?")
-            dot = _dot(c.get("ok", False))
-            sev = c.get("severity", "?").upper()
-            detail = c.get("detail", "")[:80]
-            lines.append(f'<tr><td>{name}</td><td>{dot} {sev}</td><td>{detail}</td></tr>')
-    else:
-        lines.append('<tr><td colspan="3" style="color:#666">等待首次更新...</td></tr>')
-
-    lines.append('</table>')
-    lines.append('<div style="margin-top:8px"><table>')
-    lines.append('<tr><th>組件</th><th>狀態</th><th>詳情</th></tr>')
-
-    db_ok = db_health.get("status") == "OK"
-    db_detail = f'history: {db_health.get("indicator_history", "?")} | signals: {db_health.get("tracked_signals", "?")}'
-    lines.append(f'<tr><td>MySQL</td><td>{_dot(db_ok)} {db_health.get("status", "?")}</td><td>{db_detail}</td></tr>')
-
-    cg_ok = "OK" in cg_text or "/" in cg_text
-    lines.append(f'<tr><td>Coinglass</td><td>{_dot(cg_ok)} {cg_text}</td><td></td></tr>')
-
-    lines.append(f'<tr><td>Engine</td><td>{_dot(engine is not None)} 已載入</td><td>{engine_info}</td></tr>')
-
-    err_text = "None" if error is None else str(error)[:80]
-    lines.append(f'<tr><td>Error</td><td>{_dot(error is None)} {err_text}</td><td></td></tr>')
-
-    lines.append('</table></div>')
-    return "\n".join(lines)
-
-
-def _section(title, sec_id, open_default, body):
-    display = "block" if open_default else "none"
-    arrow_char = "&#9660;" if open_default else "&#9654;"
-    return f"""<div class="section">
-      <div class="section-header" onclick="toggle('{sec_id}')">
-        <span class="section-title">{title}</span>
-        <span class="section-toggle" id="{sec_id}_arrow">{arrow_char}</span>
-      </div>
-      <div class="section-body" id="{sec_id}" style="display:{display}">{body}</div>
-    </div>"""
-
-
-# ═══════════════════════════════════════════════════════════════════
-# Data collectors
-# ═══════════════════════════════════════════════════════════════════
-
-def _get_signal_stats() -> dict:
-    stats = {}
+def render_tab(tab_name: str, state: dict, engine) -> str:
+    """Render a single tab's HTML fragment."""
     try:
-        from indicator.signal_tracker import _ensure_table, _get_db_conn, TABLE
-        _ensure_table()
-        conn = _get_db_conn()
-        with conn.cursor() as cur:
-            for tier in ["Strong", "Moderate"]:
-                cur.execute(f"""
-                    SELECT COUNT(*) as t, SUM(filled) as f, SUM(correct) as w,
-                           AVG(CASE WHEN filled=1 THEN actual_return_4h END) as avg_ret
-                    FROM `{TABLE}` WHERE strength = %s
-                """, (tier,))
-                r = cur.fetchone()
-                tt, ff, ww = int(r["t"] or 0), int(r["f"] or 0), int(r["w"] or 0)
-                stats[tier] = {
-                    "total": tt, "filled": ff, "wins": ww,
-                    "wr": f"{ww/ff*100:.0f}%" if ff > 0 else "N/A",
-                    "avg_ret": f"{float(r['avg_ret'] or 0)*100:+.2f}%" if ff > 0 else "N/A",
-                }
-            cur.execute(f"""
-                SELECT signal_time, direction, strength, confidence, entry_price,
-                       actual_return_4h, correct, filled
-                FROM `{TABLE}` ORDER BY signal_time DESC LIMIT 5
-            """)
-            stats["recent"] = cur.fetchall()
-        conn.close()
+        if tab_name == "overview":
+            from indicator.dashboard_tabs.overview import render_overview
+            return render_overview(state, engine)
+        elif tab_name == "performance":
+            from indicator.dashboard_tabs.performance import render_performance
+            return render_performance()
+        elif tab_name == "market":
+            from indicator.dashboard_tabs.market import render_market
+            return render_market(state, engine)
+        elif tab_name == "health":
+            from indicator.dashboard_tabs.health import render_health
+            return render_health(state, engine)
+        elif tab_name == "agents":
+            from indicator.dashboard_tabs.agents import render_agents
+            return render_agents()
+        else:
+            return f'<div style="color:#f44336">未知的 Tab: {tab_name}</div>'
     except Exception as e:
-        stats["error"] = str(e)
-    return stats
+        logger.exception("Dashboard tab %s render failed", tab_name)
+        return (
+            f'<div style="color:#f44336;padding:20px">'
+            f'<b>Tab "{tab_name}" 渲染失敗</b><br>'
+            f'<code>{type(e).__name__}: {e}</code></div>'
+        )
 
 
-def _get_risk_info(indicator_df, pred) -> dict:
-    return {}
+# ── Legacy compatibility ─────────────────────────────────────────────
+# Keep render_dashboard() so existing code doesn't break.
+# It now redirects to the new shell.
 
-
-def _get_db_health() -> dict:
-    health = {}
-    try:
-        from shared.db import get_db_conn
-        conn = get_db_conn()
-        with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) as n FROM indicator_history")
-            health["indicator_history"] = cur.fetchone()["n"]
-            try:
-                cur.execute("SELECT COUNT(*) as n FROM tracked_signals")
-                health["tracked_signals"] = cur.fetchone()["n"]
-            except Exception:
-                health["tracked_signals"] = "N/A"
-        conn.close()
-        health["status"] = "OK"
-    except Exception as e:
-        health["status"] = f"ERR: {str(e)[:40]}"
-    return health
-
-
-def _format_cg_status(cg_status) -> str:
-    if cg_status and isinstance(cg_status, dict):
-        total = len(cg_status)
-        ok_count = sum(1 for v in cg_status.values()
-                       if isinstance(v, dict) and not v.get("empty", True))
-        return f"{ok_count}/{total} endpoints OK"
-    elif cg_status and isinstance(cg_status, str):
-        return cg_status
-    return "N/A"
-
-
-def _get_24h_distribution() -> dict:
-    """Get direction distribution for last 24 bars from indicator_history."""
-    dist = {"UP": 0, "DOWN": 0, "NEUTRAL": 0}
-    try:
-        from shared.db import get_db_conn
-        conn = get_db_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT pred_direction_code, COUNT(*) as cnt
-                FROM indicator_history
-                WHERE dt >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-                GROUP BY pred_direction_code
-            """)
-            for r in cur.fetchall():
-                code = int(r["pred_direction_code"] or 0)
-                name = {1: "UP", -1: "DOWN", 0: "NEUTRAL"}.get(code, "NEUTRAL")
-                dist[name] = int(r["cnt"])
-        conn.close()
-    except Exception:
-        pass
-    return dist
-
-
-def _get_regime_timeline() -> list[dict]:
-    """Get regime changes over last 48h."""
-    timeline = []
-    try:
-        from shared.db import get_db_conn
-        conn = get_db_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT dt, regime_code FROM indicator_history
-                WHERE dt >= DATE_SUB(NOW(), INTERVAL 48 HOUR)
-                ORDER BY dt ASC
-            """)
-            rows = cur.fetchall()
-        conn.close()
-
-        if not rows:
-            return timeline
-
-        regime_map = {2: "BULL", -2: "BEAR", 0: "CHOPPY", -99: "WARMUP"}
-        current_regime = regime_map.get(int(rows[0]["regime_code"] or 0), "?")
-        current_start = rows[0]["dt"]
-
-        for r in rows[1:]:
-            reg = regime_map.get(int(r["regime_code"] or 0), "?")
-            if reg != current_regime:
-                hours = max(1, int((r["dt"] - current_start).total_seconds() / 3600))
-                timeline.append({"regime": current_regime, "hours": hours})
-                current_regime = reg
-                current_start = r["dt"]
-
-        # Last segment
-        hours = max(1, int((rows[-1]["dt"] - current_start).total_seconds() / 3600))
-        timeline.append({"regime": current_regime, "hours": hours})
-    except Exception:
-        pass
-    return timeline
-
-
-def _get_data_freshness() -> list[dict]:
-    """Check how fresh each data source is."""
-    items = []
-    now_utc = datetime.now(timezone.utc)
-
-    # indicator_history
-    try:
-        from shared.db import get_db_conn
-        conn = get_db_conn()
-        with conn.cursor() as cur:
-            cur.execute("SELECT MAX(dt) as last_dt FROM indicator_history")
-            r = cur.fetchone()
-            if r and r["last_dt"]:
-                last = r["last_dt"].replace(tzinfo=timezone.utc)
-                age = (now_utc - last).total_seconds() / 60
-                items.append({
-                    "source": "Indicator History",
-                    "age_min": age,
-                    "age_text": f"{age:.0f}min" if age < 120 else f"{age/60:.1f}h",
-                    "last_time": last.astimezone(TZ8).strftime("%m/%d %H:%M"),
-                })
-
-            cur.execute(f"SELECT MAX(signal_time) as last_dt FROM tracked_signals")
-            r = cur.fetchone()
-            if r and r["last_dt"]:
-                last = r["last_dt"].replace(tzinfo=timezone.utc)
-                age = (now_utc - last).total_seconds() / 60
-                items.append({
-                    "source": "Last Signal",
-                    "age_min": age,
-                    "age_text": f"{age:.0f}min" if age < 120 else f"{age/60:.1f}h",
-                    "last_time": last.astimezone(TZ8).strftime("%m/%d %H:%M"),
-                })
-        conn.close()
-    except Exception:
-        items.append({"source": "DB", "age_min": 9999, "age_text": "ERROR", "last_time": ""})
-
-    return items
-
-
-def _get_ic_trend(days: int = 7) -> dict:
-    """Compute rolling IC and win rate trend from indicator_history + tracked_signals."""
-    import numpy as np
-    import pandas as pd
-    from scipy.stats import spearmanr
-    from indicator.monitor_icir import DUAL_MODEL_START
-
-    try:
-        from shared.db import get_db_conn
-        conn = get_db_conn()
-    except Exception:
-        return {}
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT dt, close, pred_return_4h, pred_direction_code
-                FROM indicator_history
-                WHERE dt >= %s
-                  AND dt >= DATE_SUB(NOW(), INTERVAL %s DAY)
-                ORDER BY dt ASC
-            """, (DUAL_MODEL_START, days + 1))
-            rows = cur.fetchall()
-    finally:
-        conn.close()
-
-    if not rows or len(rows) < 30:
-        return {}
-
-    df = pd.DataFrame(rows)
-    df["dt"] = pd.to_datetime(df["dt"])
-    df = df.sort_values("dt").reset_index(drop=True)
-    df["actual_4h"] = df["close"].shift(-4) / df["close"] - 1
-    df = df.dropna(subset=["actual_4h", "pred_return_4h"])
-
-    if len(df) < 30:
-        return {}
-
-    # Rolling 24-bar window
-    labels, ics, wrs = [], [], []
-    window = 24
-    for i in range(window, len(df), 6):  # step every 6 hours
-        chunk = df.iloc[i - window:i]
-        if chunk["pred_return_4h"].std() < 1e-10:
-            continue
-        ic, _ = spearmanr(chunk["pred_return_4h"], chunk["actual_4h"])
-
-        # Win rate: direction accuracy for non-neutral signals
-        active = chunk[chunk["pred_direction_code"] != 0]
-        if len(active) > 0:
-            correct = ((active["pred_direction_code"] == 1) & (active["actual_4h"] > 0)) | \
-                      ((active["pred_direction_code"] == -1) & (active["actual_4h"] < 0))
-            wr = correct.mean() * 100
-        else:
-            wr = None
-
-        labels.append(chunk["dt"].iloc[-1].strftime("%m/%d %H:%M"))
-        ics.append(round(float(ic), 3) if not np.isnan(ic) else 0)
-        wrs.append(round(float(wr), 1) if wr is not None else None)
-
-    return {"labels": labels, "ic_values": ics, "win_rates": wrs}
-
-
-def _get_pred_vs_actual(hours: int = 24) -> dict:
-    """Get price + prediction markers for last N hours."""
-    import pandas as pd
-
-    try:
-        from shared.db import get_db_conn
-        conn = get_db_conn()
-    except Exception:
-        return {}
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT dt, close, pred_direction_code, strength_code, confidence_score
-                FROM indicator_history
-                WHERE dt >= DATE_SUB(NOW(), INTERVAL %s HOUR)
-                ORDER BY dt ASC
-            """, (hours,))
-            rows = cur.fetchall()
-    finally:
-        conn.close()
-
-    if not rows:
-        return {}
-
-    labels, prices, point_colors, point_sizes = [], [], [], []
-    for r in rows:
-        dt = r["dt"]
-        if hasattr(dt, "replace"):
-            dt_local = dt.replace(tzinfo=timezone.utc).astimezone(TZ8)
-        else:
-            dt_local = dt
-        labels.append(dt_local.strftime("%H:%M"))
-        prices.append(round(float(r["close"]), 0))
-
-        dir_code = int(r["pred_direction_code"] or 0)
-        str_code = int(r["strength_code"] or 1)
-
-        # Color by direction
-        if dir_code == 1:
-            color = "#4caf50"
-        elif dir_code == -1:
-            color = "#f44336"
-        else:
-            color = "#666"
-
-        # Size by strength: Strong=6, Moderate=4, Weak=2
-        size = 6 if str_code == 3 else 4 if str_code == 2 else 2
-
-        point_colors.append(color)
-        point_sizes.append(size)
-
-    return {
-        "labels": labels,
-        "prices": prices,
-        "point_colors": point_colors,
-        "point_sizes": point_sizes,
-    }
-
-
-def _get_alert_history(days: int = 7) -> list[dict]:
-    """Read alert history from research/monitor_alerts.csv."""
-    import pandas as pd
-    from pathlib import Path
-
-    alert_file = Path("research/monitor_alerts.csv")
-    if not alert_file.exists():
-        return []
-
-    try:
-        df = pd.read_csv(alert_file)
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        df = df[df["timestamp"] >= cutoff]
-        df = df.sort_values("timestamp", ascending=False)
-
-        alerts = []
-        for _, row in df.iterrows():
-            t_local = row["timestamp"].tz_convert(TZ8) if row["timestamp"].tz else row["timestamp"]
-            alert_type = str(row.get("alert_type", "unknown"))
-            # Extract severity from alert text (common format)
-            severity = "critical" if "CRITICAL" in alert_type or "🔴" in alert_type else "warn"
-            alerts.append({
-                "time": t_local.strftime("%m/%d %H:%M"),
-                "type": alert_type.split(":")[0][:30],
-                "detail": alert_type[:120],
-                "severity": severity,
-            })
-        return alerts
-    except Exception:
-        return []
+def render_dashboard(state: dict, engine) -> str:
+    """Legacy entry point — returns the new tabbed shell."""
+    return render_dashboard_shell()

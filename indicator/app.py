@@ -1114,11 +1114,18 @@ def force_update():
 
 @app.route("/dashboard")
 def dashboard_route():
-    """System diagnostic dashboard."""
-    from indicator.dashboard import render_dashboard
+    """System diagnostic dashboard — tabbed shell."""
+    from indicator.dashboard import render_dashboard_shell
+    return Response(render_dashboard_shell(), mimetype="text/html")
+
+
+@app.route("/dashboard/tab/<tab_name>")
+def dashboard_tab(tab_name):
+    """Render a single dashboard tab as HTML fragment (AJAX)."""
+    from indicator.dashboard import render_tab
     with _lock:
         state = dict(_state)
-    html = render_dashboard(state, _engine)
+    html = render_tab(tab_name, state, _engine)
     return Response(html, mimetype="text/html")
 
 
