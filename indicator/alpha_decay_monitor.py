@@ -63,8 +63,9 @@ def check_ic_trend() -> dict:
         ic_30d, _ = spearmanr(df["pred_return_4h"], df["actual_ret"])
 
         # 7d IC
-        cutoff_7d = datetime.now(timezone.utc) - timedelta(days=7)
-        recent = df[pd.to_datetime(df["dt"]) >= cutoff_7d]
+        df["dt_parsed"] = pd.to_datetime(df["dt"])
+        cutoff_7d = pd.Timestamp.now("UTC").tz_localize(None) - timedelta(days=7)
+        recent = df[df["dt_parsed"] >= cutoff_7d]
         ic_7d = None
         if len(recent) >= 20:
             ic_7d, _ = spearmanr(recent["pred_return_4h"], recent["actual_ret"])

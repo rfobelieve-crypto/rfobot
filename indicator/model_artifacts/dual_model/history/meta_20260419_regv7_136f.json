@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-19T17:47:14.764574",
+  "model_version": "dual_v7_regressor",
+  "dir_features": 136,
+  "note": "Baseline snapshot for v7 regressor model after retrain"
+}
