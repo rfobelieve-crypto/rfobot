@@ -168,9 +168,11 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
             sign_arr = np.where(dirs == "UP", 1.0,
                                 np.where(dirs == "DOWN", -1.0, 0.0))
 
-        # Tier → colour intensity. Strong=dark, others=grey.
+        # Tier → colour intensity. Strong=dark, Moderate=light, others=grey.
         UP_STRONG = "#004d40"
+        UP_MODERATE = "#66bb6a"
         DN_STRONG = "#b71c1c"
+        DN_MODERATE = "#ef5350"
         NEUTRAL_GREY = "#bdbdbd"
 
         # All bars plot above 0; direction is encoded purely by colour.
@@ -179,12 +181,20 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         for i in range(n):
             s = strength[i]
             sgn = sign_arr[i]
-            if s != "Strong":
-                mag_colors.append(NEUTRAL_GREY)
-            elif sgn > 0:
-                mag_colors.append(UP_STRONG)
-            elif sgn < 0:
-                mag_colors.append(DN_STRONG)
+            if s == "Strong":
+                if sgn > 0:
+                    mag_colors.append(UP_STRONG)
+                elif sgn < 0:
+                    mag_colors.append(DN_STRONG)
+                else:
+                    mag_colors.append(NEUTRAL_GREY)
+            elif s == "Moderate":
+                if sgn > 0:
+                    mag_colors.append(UP_MODERATE)
+                elif sgn < 0:
+                    mag_colors.append(DN_MODERATE)
+                else:
+                    mag_colors.append(NEUTRAL_GREY)
             else:
                 mag_colors.append(NEUTRAL_GREY)
 

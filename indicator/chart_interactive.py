@@ -73,12 +73,10 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                 d = str(row.get("pred_direction", "NEUTRAL"))
                 sgn = 1 if d == "UP" else (-1 if d == "DOWN" else 0)
             s = str(row.get("strength_score", "Weak"))
-            if s != "Strong":
-                mag_color = "#bdbdbd"
-            elif sgn > 0:
-                mag_color = "#004d40"
-            elif sgn < 0:
-                mag_color = "#b71c1c"
+            if s == "Strong":
+                mag_color = "#004d40" if sgn > 0 else ("#b71c1c" if sgn < 0 else "#bdbdbd")
+            elif s == "Moderate":
+                mag_color = "#66bb6a" if sgn > 0 else ("#ef5350" if sgn < 0 else "#bdbdbd")
             else:
                 mag_color = "#bdbdbd"
             mag_data.append({"time": ts, "value": round(mag_val, 4), "color": mag_color})
