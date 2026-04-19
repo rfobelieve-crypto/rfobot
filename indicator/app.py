@@ -485,28 +485,30 @@ def update_cycle() -> dict:
         tg_result = _send_telegram_photo(png, caption)
         dc_result = _send_discord_photo(png, caption)
 
-        # Strong signal alert (Telegram + Discord push for Strong only)
-        if strength == "Strong" and direction in ("UP", "DOWN"):
+        # Signal alert (Telegram + Discord push for Strong + Moderate)
+        if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
             regime = str(last_row.get("regime", "?"))
+            is_strong = (strength == "Strong")
             if direction == "UP":
-                icon = "\U0001f7e2\u25b2"  # 🟢▲
-                label = "STRONG BULLISH"
+                icon = "\U0001f7e2\u25b2" if is_strong else "\U0001f7e2\u25b3"  # 🟢▲ / 🟢△
+                label = "STRONG BULLISH" if is_strong else "MODERATE BULLISH"
             else:
-                icon = "\U0001f534\u25bc"  # 🔴▼
-                label = "STRONG BEARISH"
-            # SHAP explanation for this Strong signal
+                icon = "\U0001f534\u25bc" if is_strong else "\U0001f534\u25bd"  # 🔴▼ / 🔴▽
+                label = "STRONG BEARISH" if is_strong else "MODERATE BEARISH"
+            # SHAP explanation for Strong signals only
             shap_text = ""
             shap_json_str = ""
-            try:
-                from indicator.signal_explainer import explain_strong_signal, format_shap_for_telegram
-                import json as _json
-                last_features = features.iloc[-1].to_dict() if len(features) > 0 else {}
-                shap_result = explain_strong_signal(last_features, direction)
-                if shap_result:
-                    shap_text = format_shap_for_telegram(shap_result, direction)
-                    shap_json_str = _json.dumps(shap_result, ensure_ascii=False)
-            except Exception as e:
-                logger.warning("SHAP explanation failed (non-critical): %s", e)
+            if is_strong:
+                try:
+                    from indicator.signal_explainer import explain_strong_signal, format_shap_for_telegram
+                    import json as _json
+                    last_features = features.iloc[-1].to_dict() if len(features) > 0 else {}
+                    shap_result = explain_strong_signal(last_features, direction)
+                    if shap_result:
+                        shap_text = format_shap_for_telegram(shap_result, direction)
+                        shap_json_str = _json.dumps(shap_result, ensure_ascii=False)
+                except Exception as e:
+                    logger.warning("SHAP explanation failed (non-critical): %s", e)
 
             risk_line = ""
             alert = (
@@ -522,10 +524,10 @@ def update_cycle() -> dict:
             # Discord uses plain text (no HTML tags)
             dc_alert = alert.replace("<b>", "**").replace("</b>", "**")
             _send_discord_text(dc_alert)
-            logger.info("Strong signal alert sent: %s", direction)
+            logger.info("%s signal alert sent: %s", strength, direction)
 
-        # Record Strong signals for performance tracking
-        if strength == "Strong" and direction in ("UP", "DOWN"):
+        # Record Strong + Moderate signals for performance tracking
+        if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
             try:
                 from indicator.signal_tracker import record_signal
                 sig_time = indicator_df.index[-1]

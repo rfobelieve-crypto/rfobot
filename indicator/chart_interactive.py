@@ -88,27 +88,28 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         bbp_color = "#26a69a" if bbp_val > 0 else "#ef5350"
         bbp_data.append({"time": ts, "value": round(bbp_val, 4), "color": bbp_color})
 
-        # Direction markers (Strong only)
+        # Direction markers (Strong + Moderate)
         strength = str(row.get("strength_score", ""))
         direction = str(row.get("pred_direction", ""))
-        if strength == "Strong" and direction in ("UP", "DOWN"):
+        if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
+            is_strong = (strength == "Strong")
             if direction == "UP":
                 markers.append({
                     "time": ts,
                     "position": "belowBar",
-                    "color": "#004d40",
+                    "color": "#004d40" if is_strong else "#66bb6a",
                     "shape": "arrowUp",
                     "text": "",
-                    "size": 2,
+                    "size": 2 if is_strong else 1,
                 })
             else:
                 markers.append({
                     "time": ts,
                     "position": "aboveBar",
-                    "color": "#b71c1c",
+                    "color": "#b71c1c" if is_strong else "#ef5350",
                     "shape": "arrowDown",
                     "text": "",
-                    "size": 2,
+                    "size": 2 if is_strong else 1,
                 })
 
     last_dt = sig.index[-1]

@@ -101,7 +101,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_price.vlines(x[up], lows[up], highs[up], color="#26a69a", linewidth=0.5)
     ax_price.vlines(x[down], lows[down], highs[down], color="#ef5350", linewidth=0.5)
 
-    # Direction triangles — Strong signals only
+    # Direction triangles — Strong + Moderate signals
     price_range = highs.max() - lows.min()
     offset = price_range * 0.02
 
@@ -110,23 +110,25 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         c = sig.iloc[i]["confidence_score"]
         s = sig.iloc[i]["strength_score"]
 
-        if d == "NEUTRAL" or pd.isna(c) or s != "Strong":
+        if d == "NEUTRAL" or pd.isna(c) or s not in ("Strong", "Moderate"):
             continue
 
-        alpha = max(0.5, min(c / 100, 1.0))
+        is_strong = (s == "Strong")
+        tri_size = 13**2 if is_strong else 9**2
+        alpha = max(0.5, min(c / 100, 1.0)) if is_strong else max(0.35, min(c / 100, 0.7))
 
         if d == "UP":
             y_pos = lows[i] - offset
             marker = "^"
-            color = "#004d40"
+            color = "#004d40" if is_strong else "#66bb6a"
         else:
             y_pos = highs[i] + offset
             marker = "v"
-            color = "#b71c1c"
+            color = "#b71c1c" if is_strong else "#ef5350"
 
-        ax_price.scatter(i, y_pos, marker=marker, s=13**2,
+        ax_price.scatter(i, y_pos, marker=marker, s=tri_size,
                          color=color, alpha=alpha, edgecolors="white",
-                         linewidths=1.2, zorder=5)
+                         linewidths=1.2 if is_strong else 0.8, zorder=5)
 
     ax_price.set_ylabel("Price (USD)", fontsize=10)
     ax_price.grid(True, alpha=0.15)
@@ -139,9 +141,13 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
                     linewidths=1.2, label="Strong UP"),
         plt.scatter([], [], marker="v", color="#b71c1c", s=169, edgecolors="white",
                     linewidths=1.2, label="Strong DOWN"),
+        plt.scatter([], [], marker="^", color="#66bb6a", s=81, edgecolors="white",
+                    linewidths=0.8, label="Moderate UP"),
+        plt.scatter([], [], marker="v", color="#ef5350", s=81, edgecolors="white",
+                    linewidths=0.8, label="Moderate DOWN"),
     ]
     ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
-                    framealpha=0.8, ncol=2)
+                    framealpha=0.8, ncol=4)
 
     # Date labels — shared tick positions for all panels
     tick_pos = np.linspace(0, n - 1, min(12, n)).astype(int)

@@ -77,7 +77,7 @@ def record_signal(signal_time: datetime, direction: str, strength: str,
     """Record a Strong or Moderate directional signal."""
     if direction not in ("UP", "DOWN"):
         return
-    if strength != "Strong":
+    if strength not in ("Strong", "Moderate"):
         return
 
     _ensure_table()
