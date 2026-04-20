@@ -1482,56 +1482,36 @@ def start_scheduler():
                       misfire_grace_time=600, max_instances=1,
                       id="watchdog_full")
 
-    # ── Scheduled agents ──
-    # data_collector: every 2h at :30
-    scheduler.add_job(_run_agent_scheduled, "cron", args=["DataCollector"],
-                      hour="*/2", minute="30",
-                      misfire_grace_time=3600, max_instances=1,
-                      id="agent_data_collector")
-
-    # infra: every 6h at :45
-    scheduler.add_job(_run_agent_scheduled, "cron", args=["Infra"],
-                      hour="*/6", minute="45",
-                      misfire_grace_time=3600, max_instances=1,
-                      id="agent_infra")
-
-    # feature_guard: every 6h at :15 (offset from infra)
-    scheduler.add_job(_run_agent_scheduled, "cron", args=["FeatureGuard"],
-                      hour="1,7,13,19", minute="15",
-                      misfire_grace_time=3600, max_instances=1,
-                      id="agent_feature_guard")
-
-    # model_eval: daily 03:00 UTC
-    scheduler.add_job(_run_agent_scheduled, "cron", args=["ModelEval"],
-                      hour="3", minute="0",
-                      misfire_grace_time=3600, max_instances=1,
-                      id="agent_model_eval")
-
-    # signal_tracker: every hour at :30
-    scheduler.add_job(_run_agent_scheduled, "cron", args=["SignalTracker"],
-                      minute="30",
-                      misfire_grace_time=3600, max_instances=1,
-                      id="agent_signal_tracker")
-
-    # meeting: daily 09:00 UTC (runs all domain agents + cross-correlation)
-    scheduler.add_job(_run_meeting_scheduled, "cron",
-                      hour="9", minute="0",
-                      misfire_grace_time=3600, max_instances=1,
-                      id="agent_meeting")
-
-    # ── Weekly summary ──
-    from indicator.agents._summary import weekly_agent_summary
-    scheduler.add_job(weekly_agent_summary, "cron",
-                      day_of_week="sun", hour="2", minute="0",
-                      misfire_grace_time=3600, max_instances=1,
-                      id="weekly_agent_summary")
+    # ── Scheduled agents (disabled — AGENT_API_KEY not configured) ──
+    # To re-enable: set AGENT_API_KEY in Railway env, then uncomment below.
+    # scheduler.add_job(_run_agent_scheduled, "cron", args=["DataCollector"],
+    #                   hour="*/2", minute="30", misfire_grace_time=3600,
+    #                   max_instances=1, id="agent_data_collector")
+    # scheduler.add_job(_run_agent_scheduled, "cron", args=["Infra"],
+    #                   hour="*/6", minute="45", misfire_grace_time=3600,
+    #                   max_instances=1, id="agent_infra")
+    # scheduler.add_job(_run_agent_scheduled, "cron", args=["FeatureGuard"],
+    #                   hour="1,7,13,19", minute="15", misfire_grace_time=3600,
+    #                   max_instances=1, id="agent_feature_guard")
+    # scheduler.add_job(_run_agent_scheduled, "cron", args=["ModelEval"],
+    #                   hour="3", minute="0", misfire_grace_time=3600,
+    #                   max_instances=1, id="agent_model_eval")
+    # scheduler.add_job(_run_agent_scheduled, "cron", args=["SignalTracker"],
+    #                   minute="30", misfire_grace_time=3600,
+    #                   max_instances=1, id="agent_signal_tracker")
+    # scheduler.add_job(_run_meeting_scheduled, "cron",
+    #                   hour="9", minute="0", misfire_grace_time=3600,
+    #                   max_instances=1, id="agent_meeting")
+    # from indicator.agents._summary import weekly_agent_summary
+    # scheduler.add_job(weekly_agent_summary, "cron",
+    #                   day_of_week="sun", hour="2", minute="0",
+    #                   misfire_grace_time=3600, max_instances=1,
+    #                   id="weekly_agent_summary")
 
     scheduler.start()
     logger.info(
         "Scheduler started: %d jobs registered — "
-        "update :02, watchdog :15/4h:20, "
-        "agents (DC 2h:30, Infra 6h:45, FG 6h:15, ME 03:00, ST :30, Meeting 09:00), "
-        "weekly summary Sun 02:00",
+        "update :02, watchdog :15/4h:20 (agents disabled)",
         len(scheduler.get_jobs()),
     )
 
