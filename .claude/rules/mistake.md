@@ -297,3 +297,30 @@ with open(stats_path, "w") as f:
 2. 修復了 `deploy_new_models.py` 和 `export_production_models.py` 的寫法
 
 **Rule:** 寫入任何共用檔案前，第一步是 `grep` 看還有誰也在寫這個檔案。如果有多個寫入者，必須用 read-then-update 模式，只動自己負責的 key。直接 `json.dump` 覆寫整個檔案等於對其他寫入者說「你存的東西我不在乎」——這在單一寫入者時沒問題，多個寫入者時是資料刪除。
+
+---
+
+## 2026-04-19: 用 WF OOS fold 模型的預測初始化 rolling percentile buffer（分佈差 3.5 倍）
+
+**What happened:**
+修復 buffer 被覆寫的問題後，重新 seed `dir_pred_history` 時，從 walk-forward OOS parquet 的 `pred_ret` 欄位取了 500 筆預測作為 warmup buffer。部署後圖表上幾乎**所有 bar 都是紅色 DOWN 三角形**。
+
+排查發現：WF OOS fold 模型的預測 std=0.0008，但生產模型（用全部資料訓練）的預測 std=0.003，**差了 3.5 倍**。用小範圍的 buffer 去校準大範圍的預測，rolling percentile 的 DOWN 門檻大約在 -0.0006，而生產模型的正常預測值動輒 -0.002~-0.005，幾乎所有 bar 都超過 DOWN 門檻 → 全部是 DOWN 信號。
+
+**Root cause:**
+WF OOS 的 `pred_ret` 是每個 fold 的子模型產生的，每個 fold 只用部分資料訓練。子模型因為訓練資料少，學到的 pattern 弱，預測值集中在零附近，variance 小。生產模型用全部資料訓練，學到更多 pattern，預測值的 variance 明顯更大。
+
+這是 walk-forward 驗證的根本特性：fold 模型和生產模型的預測分佈**不在同一個尺度**。拿 fold 模型的輸出去校準生產模型的閾值，等於用錯誤的尺去量。
+
+事件鏈：
+1. 第一次修 buffer：從 WF OOS parquet 取 500 筆 `pred_ret`，buffer std=0.0008
+2. 部署後生產模型預測 std=0.003，幾乎所有預測都落在 buffer 的極端尾部
+3. Rolling percentile 把正常預測解碼成 Strong DOWN
+4. 圖表全紅，Telegram 每根 bar 都推 DOWN 信號
+
+**Correct approach:**
+每次重訓方向模型後，用**生產模型本身**在訓練資料上跑一次 predict，取最後 500 筆作為 `dir_pred_history`。同時用全部預測更新 `direction_reg_config.json` 的 fallback thresholds（2.5%/7.5% 分位數）。
+
+驗證方式：比較 buffer std 和生產模型最近 200 筆的 std，ratio 應在 0.5~2.0 之間。最終修復後 ratio = 0.74x，信號分佈回到 5.5% UP / 88% NEUTRAL / 6.5% DOWN，符合 ~10%/80%/10% 的設計目標。
+
+**Rule:** Rolling percentile buffer 的初始化**只能用生產模型的預測**，不能用 WF OOS fold 模型的預測。WF OOS 的預測只能拿來評估模型泛化能力（IC、AUC），不能拿來校準生產閾值——它們的分佈不在同一個尺度。每次 seed buffer 後，必須比較 buffer std vs 生產模型 std，ratio 偏離 0.5~2.0 就是 red flag。
