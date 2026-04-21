@@ -179,6 +179,9 @@ def render_dashboard_shell() -> str:
   <button class="tab" data-tab="health">
     <span class="tab-icon">&#9881;</span>System
   </button>
+  <button class="tab" data-tab="analytics">
+    <span class="tab-icon">&#128202;</span>Analytics
+  </button>
   <button class="tab" data-tab="agents">
     <span class="tab-icon">&#129302;</span>Agents
   </button>
@@ -254,7 +257,7 @@ def render_dashboard_shell() -> str:
   // Keyboard shortcuts: 1-5 for tabs
   document.addEventListener('keydown', function(e) {{
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-    var tabMap = {{'1':'overview','2':'performance','3':'market','4':'health','5':'agents'}};
+    var tabMap = {{'1':'overview','2':'performance','3':'market','4':'health','5':'analytics','6':'agents'}};
     if (tabMap[e.key]) loadTab(tabMap[e.key]);
   }});
 }})();
@@ -277,6 +280,9 @@ def render_tab(tab_name: str, state: dict, engine) -> str:
         elif tab_name == "health":
             from indicator.dashboard_tabs.health import render_health
             return render_health(state, engine)
+        elif tab_name == "analytics":
+            from indicator.dashboard_tabs.analytics import render_analytics
+            return render_analytics(state, engine)
         elif tab_name == "agents":
             from indicator.dashboard_tabs.agents import render_agents
             return render_agents()
