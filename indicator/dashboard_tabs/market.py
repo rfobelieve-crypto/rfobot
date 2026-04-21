@@ -41,7 +41,7 @@ def _build_top_features(state: dict, engine) -> str:
         top5 = []
 
     if not top5:
-        return '<div style="color:#666">無法載入特徵重要性</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">無法載入特徵重要性</div>'
 
     # Try to get current feature values from engine's last prediction state
     pred = state.get("last_prediction", {})
@@ -69,7 +69,7 @@ def _build_top_features(state: dict, engine) -> str:
 
         # Z-score placeholder — compute from indicator_history if column exists
         z_str = "N/A"
-        z_color = "#8b949e"
+        z_color = "rgba(0,240,255,0.5)"
 
         if feat in existing_cols and val is not None:
             try:
@@ -86,7 +86,7 @@ def _build_top_features(state: dict, engine) -> str:
                 if r and r["m"] is not None and r["s"] and float(r["s"]) > 1e-10:
                     z = (val - float(r["m"])) / float(r["s"])
                     z_str = f"{z:+.2f}"
-                    z_color = "#f44336" if abs(z) > 2 else "#ff9800" if abs(z) > 1 else "#4caf50"
+                    z_color = "#FF00FF" if abs(z) > 2 else "#C300FF" if abs(z) > 1 else "#00CC80"
             except Exception:
                 pass
 
@@ -99,14 +99,14 @@ def _build_top_features(state: dict, engine) -> str:
             f"<code>{feat}</code></td>"
             f"<td style='text-align:right;font-family:monospace'>{val_str}</td>"
             f"<td style='text-align:right;color:{z_color};font-family:monospace'>{z_str}</td>"
-            f"<td><div style='background:#58a6ff;height:8px;width:{bar_w}px;"
+            f"<td><div style='background:#00F0FF;height:8px;width:{bar_w}px;"
             f"border-radius:3px;opacity:0.7'></div></td>"
-            f"<td style='text-align:right;color:#8b949e;font-size:10px'>{imp_str}</td>"
+            f"<td style='text-align:right;color:rgba(0,240,255,0.5);font-size:10px'>{imp_str}</td>"
             f"</tr>"
         )
 
     return f"""
-    <div style="color:#8b949e;font-size:11px;margin-bottom:6px">
+    <div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:6px">
       Direction Model 前 5 重要特徵 — 當前值 + 7 天 Z-Score
     </div>
     <table>
@@ -131,10 +131,10 @@ def _build_mag_vs_realized() -> str:
             rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">{e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">{e}</div>'
 
     if len(rows) < 10:
-        return '<div style="color:#666">數據不足</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">數據不足</div>'
 
     df = pd.DataFrame(rows)
     df["dt"] = pd.to_datetime(df["dt"])
@@ -144,7 +144,7 @@ def _build_mag_vs_realized() -> str:
     df = df.dropna(subset=["realized_4h"])
 
     if len(df) < 5:
-        return '<div style="color:#666">等待 4h 回填中</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">等待 4h 回填中</div>'
 
     labels = [dt.strftime("%m/%d %H:%M") for dt in df["dt"]]
     mag_preds = [round(float(v) * 100, 3) for v in df["mag_pred"]]
@@ -161,7 +161,7 @@ def _build_mag_vs_realized() -> str:
       {card("實際均值", f'{real_mean:.3f}%', "")}
       {card("預測/實際", f'{ratio:.2f}x',
             "高估" if ratio > 1.3 else "低估" if ratio < 0.7 else "校準良好",
-            "#ff9800" if abs(ratio - 1) > 0.3 else "#4caf50")}
+            "#C300FF" if abs(ratio - 1) > 0.3 else "#00CC80")}
     </div>
     <div style="position:relative;height:180px">
       <canvas id="magVolChart"></canvas>
@@ -174,19 +174,19 @@ def _build_mag_vs_realized() -> str:
           labels: {_json.dumps(labels)},
           datasets: [
             {{ label: 'Mag 預測 %', data: {_json.dumps(mag_preds)},
-               borderColor: '#58a6ff', borderWidth: 2, pointRadius: 1, tension: 0.3 }},
+               borderColor: '#00F0FF', borderWidth: 2, pointRadius: 1, tension: 0.3 }},
             {{ label: '實際 |ret| %', data: {_json.dumps(realized)},
-               borderColor: '#ff9800', borderWidth: 2, pointRadius: 1, tension: 0.3 }}
+               borderColor: '#C300FF', borderWidth: 2, pointRadius: 1, tension: 0.3 }}
           ]
         }},
         options: {{
           responsive: true, maintainAspectRatio: false,
-          plugins: {{ legend: {{ labels: {{ color: '#c9d1d9', font: {{ size: 10 }} }} }} }},
+          plugins: {{ legend: {{ labels: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 10 }} }} }} }},
           scales: {{
-            x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }}, maxRotation: 45 }},
-                  grid: {{ color: '#21262d' }} }},
-            y: {{ ticks: {{ color: '#c9d1d9', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }},
-                  title: {{ display: true, text: '|return| %', color: '#8b949e' }} }}
+            x: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 9 }}, maxRotation: 45 }},
+                  grid: {{ color: 'rgba(0,240,255,0.08)' }} }},
+            y: {{ ticks: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
+                  title: {{ display: true, text: '|return| %', color: 'rgba(0,240,255,0.5)' }} }}
           }}
         }}
       }});
@@ -210,10 +210,10 @@ def _build_funding_env() -> str:
             rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">{e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">{e}</div>'
 
     if not rows:
-        return '<div style="color:#666">無 Funding 數據</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">無 Funding 數據</div>'
 
     df = pd.DataFrame(rows)
     df["funding_pct"] = df["cg_funding_close"].astype(float) * 100
@@ -226,19 +226,19 @@ def _build_funding_env() -> str:
     # Determine sentiment
     if current > 0.02:
         sentiment = "極度做多"
-        sent_color = "#f44336"
+        sent_color = "#FF00FF"
     elif current > 0.005:
         sentiment = "偏多"
-        sent_color = "#ff9800"
+        sent_color = "#C300FF"
     elif current < -0.02:
         sentiment = "極度做空"
-        sent_color = "#4caf50"
+        sent_color = "#00CC80"
     elif current < -0.005:
         sentiment = "偏空"
-        sent_color = "#58a6ff"
+        sent_color = "#00F0FF"
     else:
         sentiment = "中性"
-        sent_color = "#8b949e"
+        sent_color = "rgba(0,240,255,0.5)"
 
     labels = [r["dt"].strftime("%m/%d %H:%M") if hasattr(r["dt"], "strftime")
               else str(r["dt"])[:16] for _, r in df.iterrows()]
@@ -261,7 +261,7 @@ def _build_funding_env() -> str:
         data: {{
           labels: {_json.dumps(labels)},
           datasets: [{{ data: {_json.dumps(values)},
-            borderColor: '#ff9800', backgroundColor: 'rgba(255,152,0,0.05)',
+            borderColor: '#C300FF', backgroundColor: 'rgba(195,0,255,0.05)',
             fill: true, tension: 0.3, borderWidth: 2, pointRadius: 0 }}]
         }},
         options: {{
@@ -270,14 +270,14 @@ def _build_funding_env() -> str:
             legend: {{ display: false }},
             annotation: {{ annotations: {{
               zero: {{ type: 'line', yMin: 0, yMax: 0,
-                       borderColor: '#666', borderWidth: 1, borderDash: [4,4] }}
+                       borderColor: 'rgba(0,240,255,0.3)', borderWidth: 1, borderDash: [4,4] }}
             }} }}
           }},
           scales: {{
-            x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }}, maxRotation: 45 }},
-                  grid: {{ color: '#21262d' }} }},
-            y: {{ ticks: {{ color: '#ff9800', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }},
-                  title: {{ display: true, text: 'Funding %', color: '#ff9800' }} }}
+            x: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 9 }}, maxRotation: 45 }},
+                  grid: {{ color: 'rgba(0,240,255,0.08)' }} }},
+            y: {{ ticks: {{ color: '#C300FF', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
+                  title: {{ display: true, text: 'Funding %', color: '#C300FF' }} }}
           }}
         }}
       }});
@@ -301,10 +301,10 @@ def _build_oi_section() -> str:
             rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">{e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">{e}</div>'
 
     if len(rows) < 5:
-        return '<div style="color:#666">數據不足</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">數據不足</div>'
 
     df = pd.DataFrame(rows)
     df["dt"] = pd.to_datetime(df["dt"])
@@ -324,9 +324,9 @@ def _build_oi_section() -> str:
     <div class="grid grid-3">
       {card("當前 OI", f'{current_oi/1e9:.2f}B', "")}
       {card("4h 變化", f'{chg_4h:+.2f}%', "",
-            "#4caf50" if chg_4h > 0 else "#f44336")}
+            "#00CC80" if chg_4h > 0 else "#FF00FF")}
       {card("24h 變化", f'{chg_24h:+.2f}%', "",
-            "#4caf50" if chg_24h > 0 else "#f44336")}
+            "#00CC80" if chg_24h > 0 else "#FF00FF")}
     </div>
     <div style="position:relative;height:160px">
       <canvas id="oiChart"></canvas>
@@ -338,17 +338,17 @@ def _build_oi_section() -> str:
         data: {{
           labels: {_json.dumps(labels)},
           datasets: [{{ label: 'OI (B)', data: {_json.dumps(oi_vals)},
-            borderColor: '#e040fb', backgroundColor: 'rgba(224,64,251,0.05)',
+            borderColor: '#C300FF', backgroundColor: 'rgba(195,0,255,0.05)',
             fill: true, tension: 0.3, borderWidth: 2, pointRadius: 0 }}]
         }},
         options: {{
           responsive: true, maintainAspectRatio: false,
           plugins: {{ legend: {{ display: false }} }},
           scales: {{
-            x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }}, maxRotation: 45 }},
-                  grid: {{ color: '#21262d' }} }},
-            y: {{ ticks: {{ color: '#e040fb', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }},
-                  title: {{ display: true, text: 'OI (Billion)', color: '#e040fb' }} }}
+            x: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 9 }}, maxRotation: 45 }},
+                  grid: {{ color: 'rgba(0,240,255,0.08)' }} }},
+            y: {{ ticks: {{ color: '#C300FF', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
+                  title: {{ display: true, text: 'OI (Billion)', color: '#C300FF' }} }}
           }}
         }}
       }});
@@ -371,10 +371,10 @@ def _build_ls_ratio() -> str:
             rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">{e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">{e}</div>'
 
     if not rows:
-        return '<div style="color:#666">無數據</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">無數據</div>'
 
     df = pd.DataFrame(rows)
     df["dt"] = pd.to_datetime(df["dt"])
@@ -383,7 +383,7 @@ def _build_ls_ratio() -> str:
     has_top = "cg_top_trader_ls" in df.columns and df["cg_top_trader_ls"].notna().any()
 
     if not has_ls:
-        return '<div style="color:#666">多空比數據不可用</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">多空比數據不可用</div>'
 
     df["ls"] = df["cg_ls_ratio"].astype(float)
     current_ls = df["ls"].iloc[-1]
@@ -392,16 +392,16 @@ def _build_ls_ratio() -> str:
     ls_vals = df["ls"].round(3).tolist()
 
     datasets = f"""{{ label: 'L/S Ratio', data: {_json.dumps(ls_vals)},
-        borderColor: '#58a6ff', borderWidth: 2, pointRadius: 0, tension: 0.3 }}"""
+        borderColor: '#00F0FF', borderWidth: 2, pointRadius: 0, tension: 0.3 }}"""
 
     if has_top:
         df["top_ls"] = df["cg_top_trader_ls"].astype(float)
         top_vals = df["top_ls"].round(3).tolist()
         datasets += f""",{{ label: '大戶 L/S', data: {_json.dumps(top_vals)},
-            borderColor: '#ff9800', borderWidth: 2, pointRadius: 0, tension: 0.3 }}"""
+            borderColor: '#C300FF', borderWidth: 2, pointRadius: 0, tension: 0.3 }}"""
 
     ls_sentiment = "偏多" if current_ls > 1.05 else "偏空" if current_ls < 0.95 else "均衡"
-    ls_color = "#4caf50" if current_ls > 1.05 else "#f44336" if current_ls < 0.95 else "#8b949e"
+    ls_color = "#00CC80" if current_ls > 1.05 else "#FF00FF" if current_ls < 0.95 else "rgba(0,240,255,0.5)"
 
     return f"""
     <div class="grid grid-3">
@@ -420,16 +420,16 @@ def _build_ls_ratio() -> str:
         options: {{
           responsive: true, maintainAspectRatio: false,
           plugins: {{
-            legend: {{ labels: {{ color: '#c9d1d9', font: {{ size: 10 }} }} }},
+            legend: {{ labels: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 10 }} }} }},
             annotation: {{ annotations: {{
               eq: {{ type: 'line', yMin: 1, yMax: 1,
-                     borderColor: '#666', borderWidth: 1, borderDash: [4,4] }}
+                     borderColor: 'rgba(0,240,255,0.3)', borderWidth: 1, borderDash: [4,4] }}
             }} }}
           }},
           scales: {{
-            x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }}, maxRotation: 45 }},
-                  grid: {{ color: '#21262d' }} }},
-            y: {{ ticks: {{ color: '#58a6ff', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }} }}
+            x: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 9 }}, maxRotation: 45 }},
+                  grid: {{ color: 'rgba(0,240,255,0.08)' }} }},
+            y: {{ ticks: {{ color: '#00F0FF', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }} }}
           }}
         }}
       }});
@@ -453,10 +453,10 @@ def _build_cross_timeframe() -> str:
             rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">{e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">{e}</div>'
 
     if len(rows) < 24:
-        return '<div style="color:#666">數據不足 (需 24h)</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">數據不足 (需 24h)</div>'
 
     df = pd.DataFrame(rows)
     df["close"] = df["close"].astype(float)
@@ -479,13 +479,13 @@ def _build_cross_timeframe() -> str:
 
     def _arrow(val):
         if val > 0.3:
-            return '<span style="color:#4caf50;font-size:16px">&#9650;</span> UP'
+            return '<span style="color:#00CC80;font-size:16px">&#9650;</span> UP'
         elif val < -0.3:
-            return '<span style="color:#f44336;font-size:16px">&#9660;</span> DOWN'
-        return '<span style="color:#8b949e">&#9644;</span> NEUTRAL'
+            return '<span style="color:#FF00FF;font-size:16px">&#9660;</span> DOWN'
+        return '<span style="color:rgba(0,240,255,0.5)">&#9644;</span> NEUTRAL'
 
     def _ret_color(val):
-        return "#4caf50" if val > 0 else "#f44336"
+        return "#00CC80" if val > 0 else "#FF00FF"
 
     # Consistency check
     signs = [np.sign(ret_1h), np.sign(ret_4h), np.sign(ret_24h)]
@@ -497,11 +497,11 @@ def _build_cross_timeframe() -> str:
 
     consistency_score = sum([price_consistent, model_consistent, price_model_agree])
     cons_label = {3: "高度一致", 2: "部分一致", 1: "分歧", 0: "強烈分歧"}
-    cons_color = {3: "#4caf50", 2: "#ff9800", 1: "#f44336", 0: "#f44336"}
+    cons_color = {3: "#00CC80", 2: "#C300FF", 1: "#FF00FF", 0: "#FF00FF"}
 
     return f"""
     <div style="margin-bottom:8px">
-      一致性: <span style="color:{cons_color.get(consistency_score, '#666')};font-weight:600">
+      一致性: <span style="color:{cons_color.get(consistency_score, 'rgba(0,240,255,0.3)')};font-weight:600">
         {cons_label.get(consistency_score, '?')}</span>
     </div>
     <table>
@@ -516,6 +516,6 @@ def _build_cross_timeframe() -> str:
           <td style="color:{_ret_color(ret_24h)}">{ret_24h:+.2f}%</td>
           <td>{_arrow(last_24_avg)}</td></tr>
     </table>
-    <div style="color:#8b949e;font-size:10px;margin-top:6px">
+    <div style="color:rgba(0,240,255,0.5);font-size:10px;margin-top:6px">
       模型方向 = 該時段內預測方向的平均值
     </div>"""

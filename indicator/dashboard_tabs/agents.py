@@ -32,7 +32,7 @@ def _build_agent_status() -> str:
                   AND TABLE_SCHEMA = DATABASE()
             """)
             if not cur.fetchone():
-                return '<div style="color:#666">agent_runs 表尚未建立（等待首次 agent 排程執行）</div>'
+                return '<div style="color:rgba(0,240,255,0.3)">agent_runs 表尚未建立（等待首次 agent 排程執行）</div>'
 
             # Per-agent latest run
             cur.execute("""
@@ -60,10 +60,10 @@ def _build_agent_status() -> str:
             running = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">{e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">{e}</div>'
 
     if not agents:
-        return '<div style="color:#666">過去 7 天無 agent 執行記錄</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">過去 7 天無 agent 執行記錄</div>'
 
     # Summary cards
     total = sum(int(a["total_runs"] or 0) for a in agents)
@@ -76,7 +76,7 @@ def _build_agent_status() -> str:
     if running:
         names = ", ".join(r["agent_name"] for r in running)
         running_html = (
-            f'<div style="background:#1c2129;border:1px solid #30363d;'
+            f'<div style="background:#0D0D0D;border:1px solid #1A1A2E;'
             f'border-radius:6px;padding:8px;margin-bottom:10px">'
             f'<span class="dot dot-ok" style="animation:blink 1s infinite"></span> '
             f'正在執行: <b>{names}</b></div>'
@@ -98,13 +98,13 @@ def _build_agent_status() -> str:
             last_local = last_run.replace(tzinfo=timezone.utc).astimezone(TZ8)
             last_str = last_local.strftime("%m/%d %H:%M")
 
-        rate_color = "#4caf50" if rate >= 90 else "#ff9800" if rate >= 70 else "#f44336"
+        rate_color = "#00CC80" if rate >= 90 else "#C300FF" if rate >= 70 else "#FF00FF"
 
         # Error detail
         err_html = ""
         if fail > 0 and a["last_error"]:
             err = str(a["last_error"])[:60]
-            err_html = f'<div style="color:#f44336;font-size:10px;margin-top:2px"><code>{err}</code></div>'
+            err_html = f'<div style="color:#FF00FF;font-size:10px;margin-top:2px"><code>{err}</code></div>'
 
         rows.append(
             f"<tr>"
@@ -121,9 +121,9 @@ def _build_agent_status() -> str:
     <div class="grid grid-4" style="margin-bottom:10px">
       {card("總執行", str(total), "過去 7 天")}
       {card("成功率", f'{overall_rate:.0f}%', f'{total_ok} ok / {total_fail} fail',
-            "#4caf50" if overall_rate >= 90 else "#ff9800")}
+            "#00CC80" if overall_rate >= 90 else "#C300FF")}
       {card("失敗數", str(total_fail), "",
-            "#4caf50" if total_fail == 0 else "#f44336")}
+            "#00CC80" if total_fail == 0 else "#FF00FF")}
       {card("Agent 數", str(len(agents)), "")}
     </div>
     {running_html}
@@ -171,7 +171,7 @@ def _build_signal_perf() -> str:
             recent = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">{e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">{e}</div>'
 
     # Direction breakdown table
     dir_table_rows = []
@@ -183,8 +183,8 @@ def _build_signal_perf() -> str:
         wr = wins / filled * 100 if filled > 0 else 0
         avg_ret = float(r["avg_ret"] or 0) * 100
 
-        dc = "#4caf50" if direction == "UP" else "#f44336"
-        wc = "#4caf50" if wr >= 60 else "#ff9800" if wr >= 50 else "#f44336"
+        dc = "#00CC80" if direction == "UP" else "#FF00FF"
+        wc = "#00CC80" if wr >= 60 else "#C300FF" if wr >= 50 else "#FF00FF"
 
         dir_table_rows.append(
             f"<tr><td>{strength}</td>"
@@ -201,16 +201,16 @@ def _build_signal_perf() -> str:
         if hasattr(t, "replace"):
             t = t.replace(tzinfo=timezone.utc).astimezone(TZ8).strftime("%m/%d %H:%M")
         d = r["direction"]
-        dc = "#4caf50" if d == "UP" else "#f44336"
+        dc = "#00CC80" if d == "UP" else "#FF00FF"
         icon = "&#9650;" if d == "UP" else "&#9660;"
 
         if r["filled"]:
             ret = float(r["actual_return_4h"]) * 100
-            oc = "#4caf50" if r["correct"] else "#f44336"
+            oc = "#00CC80" if r["correct"] else "#FF00FF"
             ok = "&#10003;" if r["correct"] else "&#10007;"
             result = f'<span style="color:{oc}">{ret:+.2f}% {ok}</span>'
         else:
-            result = '<span style="color:#666">等待中</span>'
+            result = '<span style="color:rgba(0,240,255,0.3)">等待中</span>'
 
         recent_rows.append(
             f"<tr><td>{t}</td>"
@@ -222,7 +222,7 @@ def _build_signal_perf() -> str:
         )
 
     return f"""
-    <div style="color:#58a6ff;font-size:12px;font-weight:600;margin-bottom:6px">
+    <div style="color:#00F0FF;font-size:12px;font-weight:600;margin-bottom:6px">
       方向拆分績效
     </div>
     <table>
@@ -230,7 +230,7 @@ def _build_signal_perf() -> str:
       {''.join(dir_table_rows)}
     </table>
 
-    <div style="color:#58a6ff;font-size:12px;font-weight:600;margin:14px 0 6px">
+    <div style="color:#00F0FF;font-size:12px;font-weight:600;margin:14px 0 6px">
       最近信號 (100 筆)
     </div>
     <table>

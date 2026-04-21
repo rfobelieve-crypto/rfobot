@@ -31,9 +31,9 @@ def render_overview(state: dict, engine) -> str:
     # ── Key metrics ──
     risk_color = "#999"
     direction = pred.get("direction", "?")
-    dir_color = "#4caf50" if direction == "UP" else "#f44336" if direction == "DOWN" else "#999"
-    health_color = {"healthy": "#4caf50", "degraded": "#ff9800",
-                    "critical": "#f44336"}.get(overall_health, "#999")
+    dir_color = "#00CC80" if direction == "UP" else "#FF00FF" if direction == "DOWN" else "rgba(0,240,255,0.3)"
+    health_color = {"healthy": "#00CC80", "degraded": "#C300FF",
+                    "critical": "#FF00FF"}.get(overall_health, "rgba(0,240,255,0.3)")
 
     metrics_html = f"""<div class="grid">
       {card("狀態",
@@ -72,17 +72,17 @@ def render_overview(state: dict, engine) -> str:
     if strong_n or mod_n:
         parts = []
         if strong_n:
-            parts.append(f'<span style="color:#f44336;font-weight:600">Strong {strong_n}</span>')
+            parts.append(f'<span style="color:#FF00FF;font-weight:600">Strong {strong_n}</span>')
         if mod_n:
-            parts.append(f'<span style="color:#ff9800;font-weight:600">Moderate {mod_n}</span>')
+            parts.append(f'<span style="color:#C300FF;font-weight:600">Moderate {mod_n}</span>')
         sig_summary = f'<div style="font-size:11px;margin-top:4px">信號: {" | ".join(parts)}</div>'
 
     dist_html = f"""
-      <div style="color:#8b949e;font-size:11px;margin-bottom:4px;">最近 24 根 bar 方向分佈</div>
+      <div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:4px;">最近 24 根 bar 方向分佈</div>
       <div class="dist-bar">
-        <div style="background:#4caf50;flex:{up_pct:.0f}">UP {up_n}</div>
-        <div style="background:#666;flex:{nt_pct:.0f}">N {nt_n}</div>
-        <div style="background:#f44336;flex:{dn_pct:.0f}">DN {dn_n}</div>
+        <div style="background:#00CC80;flex:{up_pct:.0f}">UP {up_n}</div>
+        <div style="background:rgba(0,240,255,0.3);flex:{nt_pct:.0f}">N {nt_n}</div>
+        <div style="background:#FF00FF;flex:{dn_pct:.0f}">DN {dn_n}</div>
       </div>{sig_summary}"""
 
     # ── Regime timeline ──
@@ -104,7 +104,7 @@ def render_overview(state: dict, engine) -> str:
 def _build_prediction_detail(pred: dict, engine) -> str:
     """Show detailed breakdown of current prediction + SHAP top drivers."""
     if not pred:
-        return '<div style="color:#666">等待首次預測...</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">等待首次預測...</div>'
 
     rows = []
     fields = [
@@ -120,7 +120,7 @@ def _build_prediction_detail(pred: dict, engine) -> str:
     for key, label, fmt in fields:
         val = pred.get(key)
         if val is not None:
-            rows.append(f"<tr><td style='color:#8b949e'>{label}</td>"
+            rows.append(f"<tr><td style='color:rgba(0,240,255,0.5)'>{label}</td>"
                         f"<td style='font-weight:600'>{fmt(val)}</td></tr>")
 
     detail_table = f"<table style='width:auto'>{chr(10).join(rows)}</table>"
@@ -134,7 +134,7 @@ def _build_prediction_detail(pred: dict, engine) -> str:
             name = d.get("feature", d.get("name", "?"))
             impact = d.get("impact", d.get("shap_value", 0))
             value = d.get("value", "")
-            bar_color = "#4caf50" if impact > 0 else "#f44336"
+            bar_color = "#00CC80" if impact > 0 else "#FF00FF"
             bar_w = min(abs(impact) * 500, 80)
             shap_rows.append(
                 f"<tr><td style='font-size:11px'>{name}</td>"
@@ -145,7 +145,7 @@ def _build_prediction_detail(pred: dict, engine) -> str:
             )
         shap_html = (
             "<div style='margin-top:12px'>"
-            "<div style='color:#58a6ff;font-size:12px;font-weight:600;margin-bottom:6px'>"
+            "<div style='color:#00F0FF;font-size:12px;font-weight:600;margin-bottom:6px'>"
             "SHAP Top-5 驅動因子</div>"
             f"<table>{''.join(shap_rows)}</table></div>"
         )
@@ -153,13 +153,13 @@ def _build_prediction_detail(pred: dict, engine) -> str:
     # Signal badge (Strong / Moderate)
     strength_val = pred.get("strength", "Weak")
     if strength_val == "Strong":
-        badge = '<div style="background:#f44336;color:white;display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:8px">STRONG SIGNAL</div>'
+        badge = '<div style="background:#FF00FF;color:white;display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:8px">強烈信號</div>'
     elif strength_val == "Moderate":
-        badge = '<div style="background:#ff9800;color:white;display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:8px">MODERATE SIGNAL</div>'
+        badge = '<div style="background:#C300FF;color:white;display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:8px">中等信號</div>'
     else:
         badge = ''
 
-    shap_fallback = '<div style="color:#666;font-size:11px">SHAP 數據在 Strong 信號時觸發</div>'
+    shap_fallback = '<div style="color:rgba(0,240,255,0.3);font-size:11px">SHAP 數據在 Strong 信號時觸發</div>'
 
     return f"""<div class="two-col">
       <div>{badge}{detail_table}</div>
@@ -226,7 +226,7 @@ def _build_regime_timeline() -> str:
         conn.close()
 
         if not rows:
-            return '<div style="color:#666">無數據</div>'
+            return '<div style="color:rgba(0,240,255,0.3)">無數據</div>'
 
         regime_map = {2: "BULL", -2: "BEAR", 0: "CHOPPY", -99: "WARMUP"}
         segments = []
@@ -247,8 +247,8 @@ def _build_regime_timeline() -> str:
         total_h = sum(s["hours"] for s in segments)
         regime_blocks = ""
         for s in segments:
-            rc = {"BULL": "#4caf50", "BEAR": "#f44336", "CHOPPY": "#ff9800",
-                  "WARMUP": "#666"}.get(s["regime"], "#999")
+            rc = {"BULL": "#00CC80", "BEAR": "#FF00FF", "CHOPPY": "#C300FF",
+                  "WARMUP": "rgba(0,240,255,0.3)"}.get(s["regime"], "rgba(0,240,255,0.3)")
             pct = s["hours"] / total_h * 100
             regime_blocks += (
                 f'<div class="regime-block" style="background:{rc};flex:{s["hours"]}"'
@@ -266,11 +266,11 @@ def _build_regime_timeline() -> str:
         summary = " | ".join(summary_parts)
 
         return f"""
-          <div style="color:#8b949e;font-size:11px;margin-bottom:4px">最近 48h | {summary}</div>
+          <div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:4px">最近 48h | {summary}</div>
           <div class="regime-row">{regime_blocks}</div>
         """
     except Exception:
-        return '<div style="color:#666">無數據</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">無數據</div>'
 
 
 def _build_market_overview() -> str:
@@ -295,7 +295,7 @@ def _build_market_overview() -> str:
         conn.close()
 
         if not latest:
-            return '<div style="color:#666">無數據</div>'
+            return '<div style="color:rgba(0,240,255,0.3)">無數據</div>'
 
         def _safe(row, col, default=0):
             v = row.get(col) if row else None
@@ -314,16 +314,16 @@ def _build_market_overview() -> str:
         items = f"""
         <div class="grid grid-4">
           {card("Funding Rate", f'{funding*100:.4f}%' if funding else "N/A",
-                "8h 資金費率", "#ff9800" if abs(funding or 0) > 0.0001 else "#4caf50")}
+                "8h 資金費率", "#C300FF" if abs(funding or 0) > 0.0001 else "#00CC80")}
           {card("OI 變化 (24h)", f'{oi_change_pct:+.1f}%',
                 f'OI: {oi_close/1e9:.2f}B' if oi_close > 1e6 else f'OI: {oi_close:,.0f}',
-                "#4caf50" if oi_change_pct > 0 else "#f44336")}
+                "#00CC80" if oi_change_pct > 0 else "#FF00FF")}
           {card("多空比", f'{ls_ratio:.3f}' if ls_ratio else "N/A",
                 "Long/Short Ratio",
-                "#4caf50" if (ls_ratio or 1) > 1 else "#f44336")}
+                "#00CC80" if (ls_ratio or 1) > 1 else "#FF00FF")}
           {card("DVOL", f'{dvol:.1f}' if dvol else "N/A",
-                "Deribit 波動率指數", "#ff9800" if (dvol or 0) > 60 else "#4caf50")}
+                "Deribit 波動率指數", "#C300FF" if (dvol or 0) > 60 else "#00CC80")}
         </div>"""
         return items
     except Exception as e:
-        return f'<div style="color:#666">數據載入失敗: {e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'

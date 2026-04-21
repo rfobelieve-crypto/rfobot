@@ -42,21 +42,21 @@ def _build_pipeline_latency(state: dict) -> str:
         # Try to extract from state
         last_update = state.get("last_update", "N/A")
         return f"""
-        <div style="color:#8b949e;font-size:11px;margin-bottom:6px">
+        <div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:6px">
           上次更新: {last_update}
         </div>
-        <div style="color:#666">詳細延遲數據將在下次更新後可用。</div>
-        <div style="color:#8b949e;font-size:10px;margin-top:8px">
+        <div style="color:rgba(0,240,255,0.3)">詳細延遲數據將在下次更新後可用。</div>
+        <div style="color:rgba(0,240,255,0.5);font-size:10px;margin-top:8px">
           Pipeline 階段: 數據抓取 → 特徵計算 → 模型預測 → 圖表生成 → DB 寫入
         </div>"""
 
     stages = [
-        ("data_fetch", "數據抓取", "#58a6ff"),
-        ("feature_build", "特徵計算", "#4caf50"),
-        ("model_predict", "模型預測", "#ff9800"),
-        ("chart_render", "圖表生成", "#e040fb"),
-        ("db_write", "DB 寫入", "#f44336"),
-        ("telegram_send", "推送通知", "#8b949e"),
+        ("data_fetch", "數據抓取", "#00F0FF"),
+        ("feature_build", "特徵計算", "#00CC80"),
+        ("model_predict", "模型預測", "#C300FF"),
+        ("chart_render", "圖表生成", "#FF00FF"),
+        ("db_write", "DB 寫入", "#FF00FF"),
+        ("telegram_send", "推送通知", "rgba(0,240,255,0.5)"),
     ]
 
     total = sum(timing.get(k, 0) for k, _, _ in stages)
@@ -76,10 +76,10 @@ def _build_pipeline_latency(state: dict) -> str:
             )
 
     return f"""
-    <div style="color:#8b949e;font-size:11px;margin-bottom:8px">
+    <div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:8px">
       總耗時: {total:.1f}s
     </div>
-    {''.join(bars) if bars else '<div style="color:#666">無延遲數據</div>'}
+    {''.join(bars) if bars else '<div style="color:rgba(0,240,255,0.3)">無延遲數據</div>'}
     """
 
 
@@ -133,16 +133,16 @@ def _build_api_response_times() -> str:
     rows = []
     for name, lat, ok in apis:
         if not ok:
-            color = "#f44336"
+            color = "#FF00FF"
             lat_str = "FAILED"
             bar_w = 0
         else:
             if lat < 200:
-                color = "#4caf50"
+                color = "#00CC80"
             elif lat < 500:
-                color = "#ff9800"
+                color = "#C300FF"
             else:
-                color = "#f44336"
+                color = "#FF00FF"
             lat_str = f"{lat:.0f}ms"
             bar_w = min(lat / 10, 100)
 
@@ -156,7 +156,7 @@ def _build_api_response_times() -> str:
         )
 
     return f"""
-    <div style="color:#8b949e;font-size:11px;margin-bottom:6px">即時連通性測試</div>
+    <div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:6px">即時連通性測試</div>
     <table>
       <tr><th>API</th><th>延遲</th><th></th></tr>
       {''.join(rows)}
@@ -180,10 +180,10 @@ def _build_feature_health() -> str:
             all_cols = [r["Field"] for r in cur.fetchall()]
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">{e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">{e}</div>'
 
     if not latest:
-        return '<div style="color:#666">無數據</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">無數據</div>'
 
     # Feature columns (skip metadata columns)
     skip = {"id", "dt", "close", "open", "high", "low", "volume",
@@ -207,7 +207,7 @@ def _build_feature_health() -> str:
     nan_n = len(nan_features)
     ok_n = len(ok_features)
 
-    health_color = "#4caf50" if nan_n == 0 else "#ff9800" if nan_n < 5 else "#f44336"
+    health_color = "#00CC80" if nan_n == 0 else "#C300FF" if nan_n < 5 else "#FF00FF"
 
     # Group NaN features by prefix
     nan_groups = {}
@@ -222,18 +222,18 @@ def _build_feature_health() -> str:
             if len(feats) <= 3:
                 group_items.append(
                     f"<div style='margin:2px 0'>"
-                    f"<code style='color:#f44336'>{', '.join(feats)}</code></div>"
+                    f"<code style='color:#FF00FF'>{', '.join(feats)}</code></div>"
                 )
             else:
                 group_items.append(
                     f"<div style='margin:2px 0'>"
-                    f"<code style='color:#f44336'>{prefix}_* ({len(feats)} 個)</code>"
-                    f"<span style='color:#8b949e;font-size:10px;margin-left:4px'>"
+                    f"<code style='color:#FF00FF'>{prefix}_* ({len(feats)} 個)</code>"
+                    f"<span style='color:rgba(0,240,255,0.5);font-size:10px;margin-left:4px'>"
                     f"{', '.join(feats[:3])}...</span></div>"
                 )
         nan_detail = (
             "<div style='margin-top:8px'>"
-            "<div style='color:#ff9800;font-size:11px;font-weight:600;margin-bottom:4px'>"
+            "<div style='color:#C300FF;font-size:11px;font-weight:600;margin-bottom:4px'>"
             "NaN 特徵:</div>"
             + "".join(group_items) + "</div>"
         )
@@ -241,7 +241,7 @@ def _build_feature_health() -> str:
     return f"""
     <div class="grid grid-3">
       {card("特徵總數", str(total), "")}
-      {card("正常", str(ok_n), "", "#4caf50")}
+      {card("正常", str(ok_n), "", "#00CC80")}
       {card("NaN", str(nan_n), "", health_color)}
     </div>
     {nan_detail}"""
@@ -288,6 +288,7 @@ def _build_freshness() -> str:
     except Exception:
         items.append(_fresh_row("DB", 9999, None))
 
+
     rows = "".join(
         f"<tr><td>{i['source']}</td>"
         f"<td style='color:{i['color']}'>{i['age_text']}</td>"
@@ -300,8 +301,8 @@ def _build_freshness() -> str:
 def _fresh_row(source: str, age_min: float, last_dt) -> dict:
     if age_min > 9000:
         return {"source": source, "age_text": "ERROR", "last_time": "",
-                "color": "#f44336"}
-    color = "#4caf50" if age_min < 120 else "#ff9800" if age_min < 360 else "#f44336"
+                "color": "#FF00FF"}
+    color = "#00CC80" if age_min < 120 else "#C300FF" if age_min < 360 else "#FF00FF"
     age_text = f"{age_min:.0f}min" if age_min < 120 else f"{age_min/60:.1f}h"
     last_time = ""
     if last_dt:
@@ -313,7 +314,7 @@ def _fresh_row(source: str, age_min: float, last_dt) -> dict:
 # ── System Health ────────────────────────────────────────────────────
 
 def _build_system_health(overall, checks, cg_status, engine, error) -> str:
-    color_map = {"healthy": "#4caf50", "degraded": "#ff9800", "critical": "#f44336"}
+    color_map = {"healthy": "#00CC80", "degraded": "#C300FF", "critical": "#FF00FF"}
     overall_color = color_map.get(overall, "#999")
 
     dir_n, mag_n = "?", "?"
@@ -393,7 +394,7 @@ def _build_alert_history() -> str:
 
     alert_file = Path("research/monitor_alerts.csv")
     if not alert_file.exists():
-        return '<div style="color:#4caf50">過去 7 天無警報</div>'
+        return '<div style="color:#00CC80">過去 7 天無警報</div>'
 
     try:
         df = pd.read_csv(alert_file)
@@ -403,14 +404,14 @@ def _build_alert_history() -> str:
         df = df.sort_values("timestamp", ascending=False)
 
         if df.empty:
-            return '<div style="color:#4caf50">過去 7 天無警報</div>'
+            return '<div style="color:#00CC80">過去 7 天無警報</div>'
 
         total = len(df)
         alerts = []
         for _, row in df.head(20).iterrows():
             alert_type = str(row.get("alert_type", "unknown"))
             severity = "critical" if "CRITICAL" in alert_type or "🔴" in alert_type else "warn"
-            color = "#f44336" if severity == "critical" else "#ff9800"
+            color = "#FF00FF" if severity == "critical" else "#C300FF"
             t = row["timestamp"]
             if hasattr(t, "strftime"):
                 t = t.strftime("%m/%d %H:%M")
@@ -422,10 +423,10 @@ def _build_alert_history() -> str:
                        if "CRITICAL" in str(r.get("alert_type", "")))
 
         return (
-            f'<div style="color:#8b949e;font-size:11px;margin-bottom:6px">'
+            f'<div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:6px">'
             f'總計: {total} 則警報 ({critical} 嚴重)</div>'
             f'<table><tr><th>時間</th><th>類型</th><th>詳情</th></tr>'
             f'{"".join(alerts)}</table>'
         )
     except Exception:
-        return '<div style="color:#666">警報讀取失敗</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">警報讀取失敗</div>'
