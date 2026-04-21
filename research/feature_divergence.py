@@ -24,8 +24,9 @@ from scipy.stats import spearmanr
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from research.dual_model.shared_data import load_and_cache_data
 from research.dual_model.build_direction_labels import build_direction_labels
+
+CACHE = Path(__file__).resolve().parent / "dual_model" / ".cache" / "features_all.parquet"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -207,7 +208,13 @@ def main():
     print("=" * 70)
 
     # Load data
-    df = load_and_cache_data()
+    if not CACHE.exists():
+        print(f"ERROR: Cache not found at {CACHE}. Run shared_data.py first.")
+        sys.exit(1)
+    df = pd.read_parquet(CACHE)
+    if "dt" in df.columns:
+        df["dt"] = pd.to_datetime(df["dt"])
+        df = df.set_index("dt").sort_index()
     print(f"\nData: {len(df)} bars x {len(df.columns)} cols")
     print(f"Range: {df.index.min()} -> {df.index.max()}")
 
