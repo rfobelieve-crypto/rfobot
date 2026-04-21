@@ -12,6 +12,7 @@ scipy
 python-dotenv
 pyarrow
 pymysql
+yfinance
 plotly
 shap
 anthropic
