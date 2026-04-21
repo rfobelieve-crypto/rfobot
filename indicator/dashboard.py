@@ -99,7 +99,7 @@ def render_dashboard_shell() -> str:
 
   /* ── Misc ── */
   .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }}
-  .dot-ok {{ background:#00FF9F; }}
+  .dot-ok {{ background:#00CC80; }}
   .dot-err {{ background:#FF00FF; }}
   .badge {{
     display:inline-block; padding:2px 8px; border-radius:10px;
@@ -163,7 +163,7 @@ def render_dashboard_shell() -> str:
   <h1>BTC 預測指標控制台</h1>
   <div class="meta">
     <span id="update-time">{now}</span>
-    <span id="refresh-indicator" style="margin-left:8px;color:#00FF9F;font-size:9px">&#9679;</span>
+    <span id="refresh-indicator" style="margin-left:8px;color:#00CC80;font-size:9px">&#9679;</span>
   </div>
 </div>
 

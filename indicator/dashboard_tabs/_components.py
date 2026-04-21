@@ -34,7 +34,7 @@ def section(title: str, sec_id: str, open_default: bool, body: str) -> str:
 def status_dot(status: str) -> str:
     """Return colored dot for status strings like healthy/warning/critical."""
     colors = {
-        "healthy": "#00FF9F", "warning": "#C300FF", "critical": "#FF00FF",
+        "healthy": "#00CC80", "warning": "#C300FF", "critical": "#FF00FF",
         "error": "#FF00FF", "insufficient_data": "rgba(0,240,255,0.3)", "no_history": "rgba(0,240,255,0.3)",
     }
     c = colors.get(status, "rgba(0,240,255,0.3)")
@@ -43,7 +43,7 @@ def status_dot(status: str) -> str:
 
 def status_badge(status: str) -> str:
     colors = {
-        "healthy": "#00FF9F", "warning": "#C300FF", "critical": "#FF00FF",
+        "healthy": "#00CC80", "warning": "#C300FF", "critical": "#FF00FF",
         "error": "#FF00FF", "insufficient_data": "rgba(0,240,255,0.3)",
     }
     c = colors.get(status, "rgba(0,240,255,0.3)")

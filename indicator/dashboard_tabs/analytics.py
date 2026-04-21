@@ -119,11 +119,11 @@ def _build_signal_price_chart() -> str:
                fill: true, tension: 0.3, borderWidth: 2, pointRadius: 0, order: 2 }},
             {{ label: 'UP 強', type: 'scatter',
                data: {_json.dumps(up_strong)},
-               backgroundColor: '#00FF9F', pointRadius: 8,
+               backgroundColor: '#00CC80', pointRadius: 8,
                pointStyle: 'triangle', order: 1 }},
             {{ label: 'UP 中', type: 'scatter',
                data: {_json.dumps(up_mod)},
-               backgroundColor: 'rgba(0,255,159,0.6)', pointRadius: 5,
+               backgroundColor: 'rgba(0,204,128,0.6)', pointRadius: 5,
                pointStyle: 'triangle', order: 1 }},
             {{ label: 'DN 強', type: 'scatter',
                data: {_json.dumps(dn_strong)},
@@ -192,9 +192,9 @@ def _build_gauges() -> str:
         </div>"""
 
     bbp_pct = (bbp + 1) / 2 * 100  # -1..+1 -> 0..100
-    bbp_color = "#00FF9F" if bbp > 0.1 else "#FF00FF" if bbp < -0.1 else "rgba(0,240,255,0.5)"
+    bbp_color = "#00CC80" if bbp > 0.1 else "#FF00FF" if bbp < -0.1 else "rgba(0,240,255,0.5)"
 
-    conf_color = "#00FF9F" if confidence >= 75 else "#C300FF" if confidence >= 60 else "rgba(0,240,255,0.5)"
+    conf_color = "#00CC80" if confidence >= 75 else "#C300FF" if confidence >= 60 else "rgba(0,240,255,0.5)"
 
     dir_pct = dir_prob * 100
     dir_color = "#00F0FF" if dir_prob > 0.55 else "#FF00FF" if dir_prob < 0.45 else "rgba(0,240,255,0.5)"
@@ -204,7 +204,7 @@ def _build_gauges() -> str:
 
     ret_display = f"{pred_ret*100:+.3f}%"
     ret_pct = min(abs(pred_ret) / 0.005 * 50 + 50, 100)  # center at 50
-    ret_color = "#00FF9F" if pred_ret > 0 else "#FF00FF" if pred_ret < 0 else "rgba(0,240,255,0.5)"
+    ret_color = "#00CC80" if pred_ret > 0 else "#FF00FF" if pred_ret < 0 else "rgba(0,240,255,0.5)"
 
     bars = [
         _bar("BBP (Bull Bear Power)", bbp, f"{bbp:+.3f}", bbp_pct, bbp_color),
@@ -271,9 +271,9 @@ def _build_equity_by_tier() -> str:
     return f"""
     <div class="grid grid-3" style="margin-bottom:8px">
       {card("Strong", f'{cum_s:+.2f}%', f'{n_s} 筆',
-            "#00FF9F" if cum_s >= 0 else "#FF00FF")}
+            "#00CC80" if cum_s >= 0 else "#FF00FF")}
       {card("Moderate", f'{cum_m:+.2f}%', f'{n_m} 筆',
-            "#00FF9F" if cum_m >= 0 else "#FF00FF")}
+            "#00CC80" if cum_m >= 0 else "#FF00FF")}
       {card("總計", str(len(rows)), "")}
     </div>
     <div style="position:relative;height:180px;overflow:hidden">
@@ -413,43 +413,27 @@ def _build_scatter() -> str:
     try:
         conn = get_db_conn()
         with conn.cursor() as cur:
-            # First check total row count to decide query range
-            cur.execute("SELECT COUNT(*) as cnt FROM indicator_history WHERE pred_return_4h IS NOT NULL")
-            total_rows = cur.fetchone()["cnt"]
-
-            # Use 14 days so older bars have their +4h outcome available;
-            # if total data is small (<500 rows), use all available data
-            if total_rows < 500:
-                cur.execute("""
-                    SELECT dt, close, pred_return_4h, strength_code
-                    FROM indicator_history
-                    WHERE pred_return_4h IS NOT NULL
-                    ORDER BY dt ASC
-                """)
-            else:
-                cur.execute("""
-                    SELECT dt, close, pred_return_4h, strength_code
-                    FROM indicator_history
-                    WHERE dt >= DATE_SUB(NOW(), INTERVAL 14 DAY)
-                      AND pred_return_4h IS NOT NULL
-                    ORDER BY dt ASC
-                """)
+            # JOIN to get actual 4h forward close directly (avoids shift gaps)
+            cur.execute("""
+                SELECT a.pred_return_4h, a.strength_code,
+                       (b.close / a.close - 1) as actual_4h
+                FROM indicator_history a
+                JOIN indicator_history b ON b.dt = DATE_ADD(a.dt, INTERVAL 4 HOUR)
+                WHERE a.pred_return_4h IS NOT NULL
+                ORDER BY a.dt ASC
+            """)
             rows = cur.fetchall()
         conn.close()
     except Exception as e:
         return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'
 
-    if len(rows) < 10:
-        return '<div style="color:rgba(0,240,255,0.3)">數據不足</div>'
+    if len(rows) < 5:
+        return '<div style="color:rgba(0,240,255,0.3)">數據不足 (需要 5+ 筆有 4h 結果)</div>'
 
     df = pd.DataFrame(rows)
-    df["dt"] = pd.to_datetime(df["dt"])
-    df = df.sort_values("dt").reset_index(drop=True)
-    df["close"] = df["close"].astype(float)
     df["pred_return_4h"] = df["pred_return_4h"].astype(float)
+    df["actual_4h"] = df["actual_4h"].astype(float)
     df["strength_code"] = df["strength_code"].fillna(1).astype(int)
-    df["actual_4h"] = df["close"].shift(-4) / df["close"] - 1
-    df = df.dropna(subset=["actual_4h"])
 
     if len(df) < 5:
         return '<div style="color:rgba(0,240,255,0.3)">等待 4h 回填中</div>'
@@ -513,73 +497,63 @@ def _build_scatter() -> str:
 # ── 6. Feature Radar ─────────────────────────────────────────────────
 
 def _build_feature_radar(state: dict, engine) -> str:
-    # Use ONLY columns confirmed to exist in indicator_history
-    groups = {
-        "動量 (Price)": "close",
-        "多空力道 (BBP)": "bull_bear_power",
-        "方向機率 (P_UP)": "dir_prob_up",
-        "波動預測 (Mag)": "mag_pred",
-        "預測收益 (Pred)": "pred_return_4h",
-    }
+    # All computation in SQL to avoid type/column issues
+    axes = [
+        ("動量", "close"),
+        ("多空力道", "bull_bear_power"),
+        ("方向機率", "dir_prob_up"),
+        ("波動預測", "mag_pred"),
+        ("預測收益", "pred_return_4h"),
+    ]
 
     try:
         conn = get_db_conn()
         with conn.cursor() as cur:
-            cur.execute("SHOW COLUMNS FROM indicator_history")
-            existing_cols = {r["Field"] for r in cur.fetchall()}
-
-            cur.execute("SELECT * FROM indicator_history ORDER BY dt DESC LIMIT 1")
-            latest = cur.fetchone()
-
-            stats = {}
-            for label, col in groups.items():
-                if col in existing_cols:
+            # Get latest values + 7d stats in one pass per column
+            radar_labels, radar_values = [], []
+            for label, col in axes:
+                try:
                     cur.execute(f"""
-                        SELECT AVG(`{col}`) as m, STDDEV(`{col}`) as s,
-                               MIN(`{col}`) as mn, MAX(`{col}`) as mx
+                        SELECT
+                          (SELECT `{col}` FROM indicator_history ORDER BY dt DESC LIMIT 1) as cur_val,
+                          AVG(`{col}`) as mean_val,
+                          STDDEV(`{col}`) as std_val,
+                          MIN(`{col}`) as min_val,
+                          MAX(`{col}`) as max_val
                         FROM indicator_history
                         WHERE dt >= DATE_SUB(NOW(), INTERVAL 7 DAY)
                           AND `{col}` IS NOT NULL
                     """)
                     r = cur.fetchone()
-                    if r and r["m"] is not None:
-                        std_val = float(r["s"]) if r["s"] else 0.0
-                        mn_val = float(r["mn"]) if r["mn"] is not None else 0.0
-                        mx_val = float(r["mx"]) if r["mx"] is not None else 0.0
-                        stats[col] = {
-                            "mean": float(r["m"]),
-                            "std": std_val,
-                            "min": mn_val,
-                            "max": mx_val,
-                        }
+                except Exception:
+                    radar_labels.append(label)
+                    radar_values.append(50.0)
+                    continue
+
+                val = 50.0
+                if r and r["cur_val"] is not None and r["mean_val"] is not None:
+                    cur_v = float(r["cur_val"])
+                    mean_v = float(r["mean_val"])
+                    std_v = float(r["std_val"] or 0)
+                    min_v = float(r["min_val"] or 0)
+                    max_v = float(r["max_val"] or 0)
+
+                    if std_v > 1e-10:
+                        z = (cur_v - mean_v) / std_v
+                        z = max(-3.0, min(3.0, z))
+                        val = round((z + 3) / 6 * 100, 1)
+                    elif (max_v - min_v) > 1e-10:
+                        val = round((cur_v - min_v) / (max_v - min_v) * 100, 1)
+                        val = max(0.0, min(100.0, val))
+
+                radar_labels.append(label)
+                radar_values.append(val)
         conn.close()
     except Exception as e:
         return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'
 
-    if not latest:
+    if not radar_labels:
         return '<div style="color:rgba(0,240,255,0.3)">無數據</div>'
-
-    radar_labels, radar_values = [], []
-    for label, col in groups.items():
-        val = 50.0  # default center
-        if col in existing_cols and latest.get(col) is not None and col in stats:
-            cur_val = float(latest[col])
-            s = stats[col]
-            if s["std"] > 1e-10:
-                # Z-score method
-                z = (cur_val - s["mean"]) / s["std"]
-                z = max(-3.0, min(3.0, z))
-                val = round((z + 3) / 6 * 100, 1)
-            else:
-                # Fallback: normalize raw value to 0-100 using min/max
-                rng = s["max"] - s["min"]
-                if rng > 1e-10:
-                    val = round((cur_val - s["min"]) / rng * 100, 1)
-                    val = max(0.0, min(100.0, val))
-                else:
-                    val = 50.0
-        radar_labels.append(label)
-        radar_values.append(val)
 
     return f"""
     <div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:6px">
@@ -652,7 +626,7 @@ def _build_regime_signals() -> str:
         return '<div style="color:rgba(0,240,255,0.3)">數據不足</div>'
 
     regime_colors_map = {
-        2: "#00FF9F", -2: "#FF00FF", 0: "#C300FF", -99: "rgba(0,240,255,0.3)"
+        2: "#00CC80", -2: "#FF00FF", 0: "#C300FF", -99: "rgba(0,240,255,0.3)"
     }
     regime_names = {2: "BULL", -2: "BEAR", 0: "CHOPPY", -99: "WARMUP"}
 
@@ -688,7 +662,7 @@ def _build_regime_signals() -> str:
 
         is_up = s["direction"] == "UP"
         is_strong = s["strength"] == "Strong"
-        color = "#00FF9F" if is_up else "#FF00FF"
+        color = "#00CC80" if is_up else "#FF00FF"
         size = 10 if is_strong else 6
         symbol = "&#9650;" if is_up else "&#9660;"
 
@@ -708,7 +682,7 @@ def _build_regime_signals() -> str:
       {''.join(sig_markers)}
     </div>
     <div style="display:flex;gap:12px;margin-top:8px">
-      <span style="font-size:10px"><span style="color:#00FF9F">&#9632;</span> BULL</span>
+      <span style="font-size:10px"><span style="color:#00CC80">&#9632;</span> BULL</span>
       <span style="font-size:10px"><span style="color:#FF00FF">&#9632;</span> BEAR</span>
       <span style="font-size:10px"><span style="color:#C300FF">&#9632;</span> CHOPPY</span>
     </div>"""
@@ -751,14 +725,14 @@ def _build_signal_heatmap() -> str:
         correct = bool(r["correct"]) if filled else None
 
         if correct is True:
-            bg = "#00FF9F"
+            bg = "#00CC80"
         elif correct is False:
             bg = "#FF00FF"
         else:
             bg = "#333"
 
         arrow = "&#9650;" if r["direction"] == "UP" else "&#9660;"
-        d_color = "#00FF9F" if r["direction"] == "UP" else "#FF00FF"
+        d_color = "#00CC80" if r["direction"] == "UP" else "#FF00FF"
 
         if date_str not in date_map:
             date_map[date_str] = []
