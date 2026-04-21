@@ -975,22 +975,56 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
         _ls_acc = _ls_vel - _ls_vel.shift(4)  # 8h acceleration (second derivative)
         df["ls_acceleration_8h"] = _ls_acc
 
-    # --- LS-Funding Divergence (IC=+0.043, 67% monthly stability) ---
-    # When LS says bullish but funding is negative (or vice versa).
-    if _ls_col and _funding_col:
-        _ls_div = df[_ls_col].ffill().astype(float)
-        _f_div = df[_funding_col].fillna(0).astype(float)
-        _raw_div = (_ls_div - 1.0) * (-_f_div) * 1000
-        df["ls_funding_divergence"] = _zscore(_raw_div, 168)
+    # ls_funding_divergence: REMOVED — WF OOS = WEAK (test IC=+0.018, not significant)
+    # taker_oi_divergence: REMOVED — WF OOS = FLIP (train -0.042, test +0.068)
 
-    # --- Taker-OI Divergence (IC=-0.037, 83% monthly stability) ---
-    # Takers buying but OI decreasing = closing shorts, not opening longs.
-    _taker_col = next((c for c in ["cg_taker_delta", "cg_taker_buy_sell_ratio"]
-                       if c in df.columns), None)
+    # ── Cross-market features (WF validated 2026-04-21) ─────────────────
+    # All PASS walk-forward 70/30 split. Daily data forward-filled to hourly.
+    if cross_market:
+        for mkt_name in ["SPX", "DXY", "US10Y"]:
+            mkt_series = cross_market.get(mkt_name)
+            if mkt_series is None or len(mkt_series) < 2:
+                continue
+            mkt_hourly = mkt_series.reindex(df.index, method="ffill")
 
-    if _taker_col and _oi_col:
-        _tk = df[_taker_col].fillna(0).astype(float)
-        _oi_div = df[_oi_col].ffill().astype(float)
-        _oi_pct_1h = _oi_div.pct_change(1).clip(-0.1, 0.1)
-        _raw_tk_oi = _tk * (-_oi_pct_1h)
-        df["taker_oi_divergence"] = _zscore(_raw_tk_oi, 168)
+            # return_1d: SPX IC=-0.054 STABLE, DXY IC=+0.036 STABLE, US10Y IC=+0.023 STABLE
+            df[f"{mkt_name}_return_1d"] = mkt_hourly.pct_change(24)
+
+            # zscore_20d: SPX IC=-0.027 STABLE, US10Y IC=+0.021 STABLE
+            if mkt_name in ("SPX", "US10Y"):
+                _mu = mkt_hourly.rolling(20 * 24, min_periods=5 * 24).mean()
+                _sd = mkt_hourly.rolling(20 * 24, min_periods=5 * 24).std().replace(0, np.nan)
+                df[f"{mkt_name}_zscore_20d"] = (mkt_hourly - _mu) / _sd
+
+        # risk_on_composite: IC=-0.058 STABLE (SPX_ret - DXY_ret)
+        _spx_r = df.get("SPX_return_1d")
+        _dxy_r = df.get("DXY_return_1d")
+        if _spx_r is not None and _dxy_r is not None:
+            df["risk_on_composite"] = _spx_r.fillna(0) - _dxy_r.fillna(0)
+
+    # DXY_zscore_20d: REMOVED — WF FLIP (train -0.020, test +0.006)
+    # GOLD_*: NOT TESTED in WF — excluded
+    # US10Y_return_5d: REMOVED — WF WEAK (test IC=+0.006)
+
+    # ── On-chain proxy features (WF validated) ──────────────────────────
+    _oi_col2 = next((c for c in ["cg_oi_close", "cg_oi_agg_close"]
+                     if c in df.columns), None)
+    if _oi_col2 and "volume" in df.columns:
+        _oi2 = df[_oi_col2].ffill().astype(float)
+        _vol2 = df["volume"].astype(float)
+
+        # exchange_flow_8h: Direction IC=-0.075 STABLE
+        _oi_chg2 = _oi2.diff(1)
+        _vol_z2 = _zscore(_vol2, 24)
+        _flow = np.sign(_oi_chg2) * _vol_z2
+        df["exchange_flow_8h"] = _flow.rolling(8, min_periods=4).sum()
+
+        # oi_to_volume_zscore: Magnitude IC=-0.531 STABLE (Direction FLIP — Mag only)
+        _oi_vol_ratio = _oi2 / _vol2.replace(0, np.nan)
+        df["oi_to_volume_zscore"] = _zscore(_oi_vol_ratio, 168)
+
+    # ── Fear & Greed (WF Direction PASS, IC=+0.033 STABLE) ─────────────
+    if fear_greed is not None and len(fear_greed) > 0:
+        df["fng_value"] = fear_greed.reindex(df.index, method="ffill")
+
+    # dvol_oi_interaction: SKIPPED — could not compute in WF (DVOL column mismatch)
