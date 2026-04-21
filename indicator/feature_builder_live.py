@@ -37,7 +37,9 @@ def build_live_features(klines: pd.DataFrame,
                         cg_data: dict[str, pd.DataFrame],
                         depth: dict | None = None,
                         aggtrades: dict | None = None,
-                        options_data: dict | None = None) -> pd.DataFrame:
+                        options_data: dict | None = None,
+                        cross_market: dict | None = None,
+                        fear_greed: pd.Series | None = None) -> pd.DataFrame:
     """
     Build feature DataFrame from live 1h API data.
 
@@ -47,6 +49,8 @@ def build_live_features(klines: pd.DataFrame,
         depth: dict from fetch_binance_depth() (order book snapshot, optional)
         aggtrades: dict from fetch_binance_aggtrades() (large trade stats, optional)
         options_data: dict from fetch_deribit_dvol() + fetch_deribit_options_summary() (optional)
+        cross_market: dict from fetch_cross_market() {name: Series of daily closes} (optional)
+        fear_greed: Series from fetch_fear_greed() daily FNG values 0-100 (optional)
 
     Returns:
         DataFrame indexed by datetime with all features.
@@ -478,6 +482,71 @@ def build_live_features(klines: pd.DataFrame,
         add_initiation_features(df)
     except Exception as e:
         logger.warning("Initiation features failed (non-critical): %s", e)
+
+    # ── Cross-market features (2026-04-21, IC validated) ────────────────
+    # SPX_return_1d IC=+0.115 (100% monthly), strongest feature in system
+    # Requires daily cross-market data forward-filled to hourly
+    if cross_market:
+        for mkt_name, mkt_series in cross_market.items():
+            if mkt_series is None or len(mkt_series) < 2:
+                continue
+            # Forward-fill daily to hourly index
+            mkt_hourly = mkt_series.reindex(df.index, method="ffill")
+            # 1d return (24h)
+            df[f"{mkt_name}_return_1d"] = mkt_hourly.pct_change(24)
+            # 20d z-score
+            mu = mkt_hourly.rolling(20 * 24, min_periods=5 * 24).mean()
+            sd = mkt_hourly.rolling(20 * 24, min_periods=5 * 24).std().replace(0, np.nan)
+            df[f"{mkt_name}_zscore_20d"] = (mkt_hourly - mu) / sd
+
+        # risk_on_composite: SPX + Gold - DXY (requires all three)
+        spx_ret = df.get("SPX_return_1d")
+        gold_ret = df.get("GOLD_return_1d")
+        dxy_ret = df.get("DXY_return_1d")
+        if spx_ret is not None and gold_ret is not None and dxy_ret is not None:
+            df["risk_on_composite"] = spx_ret.fillna(0) + gold_ret.fillna(0) - dxy_ret.fillna(0)
+
+        # US10Y specific: 5d return
+        if "US10Y" in cross_market and cross_market["US10Y"] is not None:
+            us10y_hourly = cross_market["US10Y"].reindex(df.index, method="ffill")
+            df["US10Y_return_5d"] = us10y_hourly.pct_change(5 * 24)
+
+    # ── On-chain proxy features ────────────────────────────────────────
+    # exchange_flow_8h IC=-0.055 (STABLE), oi_to_volume_zscore IC=-0.060
+    _oi_col2 = next((c for c in ["cg_oi_close", "cg_oi_agg_close"] if c in df.columns), None)
+    if _oi_col2 and "volume" in df.columns:
+        _oi2 = df[_oi_col2].ffill().astype(float)
+        _vol2 = df["volume"].astype(float)
+
+        # exchange_flow_proxy: sign(oi_change) * volume_zscore
+        _oi_chg = _oi2.diff(1)
+        _vol_z = _zscore(_vol2, 24)
+        _flow = np.sign(_oi_chg) * _vol_z
+        df["exchange_flow_8h"] = _flow.rolling(8, min_periods=4).sum()
+
+        # oi_to_volume_ratio and zscore
+        _oi_vol_ratio = _oi2 / _vol2.replace(0, np.nan)
+        df["oi_to_volume_zscore"] = _zscore(_oi_vol_ratio, 168)
+
+    # ── DVOL x OI interaction ──────────────────────────────────────────
+    # dvol_oi_interaction IC=-0.036, 67% monthly, low correlation with existing
+    _dvol_z_col = next((c for c in ["bvol_zscore_72h", "dvol_zscore_24h", "deribit_dvol"]
+                        if c in df.columns), None)
+    _oi_z_col = next((c for c in ["cg_oi_close_zscore", "cg_oi_delta_zscore"]
+                      if c in df.columns), None)
+    if _dvol_z_col and _oi_z_col:
+        _dz = df[_dvol_z_col].fillna(0).astype(float)
+        _oz = df[_oi_z_col].fillna(0).astype(float)
+        # If using raw DVOL, z-score it first
+        if _dvol_z_col == "deribit_dvol":
+            _dz = _zscore(_dz, 72)
+        df["dvol_oi_interaction"] = _dz * _oz
+
+    # ── Fear & Greed ───────────────────────────────────────────────────
+    # fng_value IC=-0.036, STABLE, low correlation with existing features
+    if fear_greed is not None and len(fear_greed) > 0:
+        fng_hourly = fear_greed.reindex(df.index, method="ffill")
+        df["fng_value"] = fng_hourly
 
     logger.info("Live features: %d bars x %d columns", len(df), len(df.columns))
     return df

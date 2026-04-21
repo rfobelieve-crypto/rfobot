@@ -271,6 +271,7 @@ def update_cycle() -> dict:
         fetch_cg_fear_greed, fetch_cg_etf_aum,
         fetch_cg_futures_netflow, fetch_cg_spot_netflow,
         fetch_cg_hl_whale_positions,
+        fetch_cross_market, fetch_fear_greed,
     )
     from indicator.feature_builder_live import build_live_features
     from indicator.inference import IndicatorEngine, reload_config
@@ -339,6 +340,23 @@ def update_cycle() -> dict:
         if sentiment_data:
             logger.info("Sentiment data: %d fields", len(sentiment_data))
 
+        # Fetch cross-market data (SPX, DXY, Gold, US10Y) and Fear & Greed
+        cross_market_data = None
+        try:
+            cross_market_data = fetch_cross_market()
+            if cross_market_data:
+                logger.info("Cross-market data: %d series", len(cross_market_data))
+        except Exception as e:
+            logger.warning("Cross-market fetch failed: %s", e)
+
+        fear_greed_data = None
+        try:
+            fear_greed_data = fetch_fear_greed()
+            if fear_greed_data is not None:
+                logger.info("Fear & Greed data: %d days", len(fear_greed_data))
+        except Exception as e:
+            logger.warning("Fear & Greed fetch failed: %s", e)
+
         # Diagnose Coinglass data quality
         cg_status = {}
         for name, df in cg_data.items():
@@ -356,7 +374,9 @@ def update_cycle() -> dict:
 
         # 2. Build features for ALL fetched bars
         features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades,
-                                       options_data=options_data)
+                                       options_data=options_data,
+                                       cross_market=cross_market_data,
+                                       fear_greed=fear_greed_data)
 
         # 2b. NaN guard — check feature quality before prediction
         try:

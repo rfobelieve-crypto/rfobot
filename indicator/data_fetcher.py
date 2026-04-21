@@ -635,6 +635,193 @@ def fetch_deribit_dvol() -> dict:
         return {}
 
 
+def fetch_cross_market() -> dict:
+    """
+    Fetch daily SPX, DXY, Gold, US10Y from yfinance.
+
+    Returns dict of {name: pd.Series} with daily close prices (last 30 days).
+    Cached to .data_cache/cross_market.parquet with 6h TTL.
+    Returns cached data or empty dict on failure.
+    """
+    cache_path = CACHE_DIR / "cross_market.parquet"
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Check cache TTL (6 hours)
+    if cache_path.exists():
+        try:
+            age_h = (time.time() - cache_path.stat().st_mtime) / 3600
+            if age_h < 6:
+                cached = pd.read_parquet(cache_path)
+                result = {}
+                for col in cached.columns:
+                    result[col] = cached[col].dropna()
+                logger.info("Cross-market: loaded from cache (%d cols, %.1fh old)", len(result), age_h)
+                return result
+        except Exception:
+            pass
+
+    # Lazy import — may not be installed everywhere
+    try:
+        import yfinance as yf
+    except ImportError:
+        logger.warning("yfinance not installed — cross-market data unavailable")
+        # Try returning cached data even if stale
+        if cache_path.exists():
+            try:
+                cached = pd.read_parquet(cache_path)
+                return {col: cached[col].dropna() for col in cached.columns}
+            except Exception:
+                pass
+        return {}
+
+    tickers = {
+        "SPX": "^GSPC",
+        "DXY": "DX-Y.NYB",
+        "GOLD": "GC=F",
+        "US10Y": "^TNX",
+    }
+
+    try:
+        symbols = list(tickers.values())
+        data = yf.download(symbols, period="30d", interval="1d",
+                           progress=False, threads=True)
+
+        if data.empty:
+            logger.warning("yfinance: empty response")
+            if cache_path.exists():
+                cached = pd.read_parquet(cache_path)
+                return {col: cached[col].dropna() for col in cached.columns}
+            return {}
+
+        result = {}
+        combined = pd.DataFrame()
+
+        for name, ticker in tickers.items():
+            try:
+                if isinstance(data.columns, pd.MultiIndex):
+                    col_data = data["Close"][ticker]
+                else:
+                    col_data = data["Close"]
+                series = col_data.dropna()
+                if len(series) > 0:
+                    # Localize index to UTC if needed
+                    if series.index.tz is None:
+                        series.index = series.index.tz_localize("UTC")
+                    elif str(series.index.tz) != "UTC":
+                        series.index = series.index.tz_convert("UTC")
+                    result[name] = series
+                    combined[name] = series
+            except Exception as e:
+                logger.warning("Cross-market %s parse failed: %s", name, e)
+
+        # Save cache
+        if not combined.empty:
+            try:
+                combined.to_parquet(cache_path)
+            except Exception:
+                pass
+
+        logger.info("Cross-market: fetched %d series via yfinance", len(result))
+        return result
+
+    except Exception as e:
+        logger.error("Cross-market fetch failed: %s", e)
+        if cache_path.exists():
+            try:
+                cached = pd.read_parquet(cache_path)
+                return {col: cached[col].dropna() for col in cached.columns}
+            except Exception:
+                pass
+        return {}
+
+
+def fetch_fear_greed() -> pd.Series | None:
+    """
+    Fetch BTC Fear & Greed index from alternative.me API.
+
+    Returns a Series indexed by date (UTC) with values 0-100 (last 30 days).
+    Cached to .data_cache/fear_greed.json with 6h TTL.
+    """
+    import json as _json
+
+    cache_path = CACHE_DIR / "fear_greed.json"
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    def _parse_fng(data_list: list) -> pd.Series | None:
+        """Parse alternative.me FNG response into a datetime-indexed Series."""
+        records = []
+        for item in data_list:
+            try:
+                ts = int(item["timestamp"])
+                val = int(item["value"])
+                dt = pd.Timestamp(ts, unit="s", tz="UTC")
+                records.append((dt, val))
+            except (KeyError, ValueError):
+                continue
+        if not records:
+            return None
+        s = pd.Series(
+            [r[1] for r in records],
+            index=pd.DatetimeIndex([r[0] for r in records], name="dt"),
+            dtype=float,
+            name="fng_value",
+        ).sort_index()
+        return s
+
+    # Check cache TTL (6 hours)
+    if cache_path.exists():
+        try:
+            age_h = (time.time() - cache_path.stat().st_mtime) / 3600
+            if age_h < 6:
+                with open(cache_path) as f:
+                    cached = _json.load(f)
+                s = _parse_fng(cached)
+                if s is not None:
+                    logger.info("Fear & Greed: loaded from cache (%d days, %.1fh old)", len(s), age_h)
+                    return s
+        except Exception:
+            pass
+
+    # Fetch from API
+    url = "https://api.alternative.me/fng/?limit=30&format=json"
+    try:
+        resp = _retry_request("GET", url)
+        body = resp.json()
+        data_list = body.get("data", [])
+
+        if not data_list:
+            logger.warning("Fear & Greed: empty response")
+            # Fallback to cache
+            if cache_path.exists():
+                with open(cache_path) as f:
+                    cached = _json.load(f)
+                return _parse_fng(cached)
+            return None
+
+        # Save cache
+        try:
+            with open(cache_path, "w") as f:
+                _json.dump(data_list, f)
+        except Exception:
+            pass
+
+        s = _parse_fng(data_list)
+        if s is not None:
+            logger.info("Fear & Greed: fetched %d days (latest=%d)", len(s), int(s.iloc[-1]))
+        return s
+
+    except Exception as e:
+        logger.error("Fear & Greed fetch failed: %s", e)
+        if cache_path.exists():
+            try:
+                with open(cache_path) as f:
+                    cached = _json.load(f)
+                return _parse_fng(cached)
+            except Exception:
+                pass
+        return None
+
+
 def fetch_deribit_options_summary() -> dict:
     """
     Fetch Deribit BTC options summary — compute put/call ratio and IV skew.
