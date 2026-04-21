@@ -53,9 +53,9 @@ def _build_pipeline_latency(state: dict) -> str:
     stages = [
         ("data_fetch", "數據抓取", "#00F0FF"),
         ("feature_build", "特徵計算", "#00CC80"),
-        ("model_predict", "模型預測", "#C300FF"),
-        ("chart_render", "圖表生成", "#FF00FF"),
-        ("db_write", "DB 寫入", "#FF00FF"),
+        ("model_predict", "模型預測", "#CC4444"),
+        ("chart_render", "圖表生成", "#FF3366"),
+        ("db_write", "DB 寫入", "#FF3366"),
         ("telegram_send", "推送通知", "rgba(0,240,255,0.5)"),
     ]
 
@@ -133,16 +133,16 @@ def _build_api_response_times() -> str:
     rows = []
     for name, lat, ok in apis:
         if not ok:
-            color = "#FF00FF"
+            color = "#FF3366"
             lat_str = "FAILED"
             bar_w = 0
         else:
             if lat < 200:
                 color = "#00CC80"
             elif lat < 500:
-                color = "#C300FF"
+                color = "#CC4444"
             else:
-                color = "#FF00FF"
+                color = "#FF3366"
             lat_str = f"{lat:.0f}ms"
             bar_w = min(lat / 10, 100)
 
@@ -207,7 +207,7 @@ def _build_feature_health() -> str:
     nan_n = len(nan_features)
     ok_n = len(ok_features)
 
-    health_color = "#00CC80" if nan_n == 0 else "#C300FF" if nan_n < 5 else "#FF00FF"
+    health_color = "#00CC80" if nan_n == 0 else "#CC4444" if nan_n < 5 else "#FF3366"
 
     # Group NaN features by prefix
     nan_groups = {}
@@ -222,18 +222,18 @@ def _build_feature_health() -> str:
             if len(feats) <= 3:
                 group_items.append(
                     f"<div style='margin:2px 0'>"
-                    f"<code style='color:#FF00FF'>{', '.join(feats)}</code></div>"
+                    f"<code style='color:#FF3366'>{', '.join(feats)}</code></div>"
                 )
             else:
                 group_items.append(
                     f"<div style='margin:2px 0'>"
-                    f"<code style='color:#FF00FF'>{prefix}_* ({len(feats)} 個)</code>"
+                    f"<code style='color:#FF3366'>{prefix}_* ({len(feats)} 個)</code>"
                     f"<span style='color:rgba(0,240,255,0.5);font-size:10px;margin-left:4px'>"
                     f"{', '.join(feats[:3])}...</span></div>"
                 )
         nan_detail = (
             "<div style='margin-top:8px'>"
-            "<div style='color:#C300FF;font-size:11px;font-weight:600;margin-bottom:4px'>"
+            "<div style='color:#CC4444;font-size:11px;font-weight:600;margin-bottom:4px'>"
             "NaN 特徵:</div>"
             + "".join(group_items) + "</div>"
         )
@@ -301,8 +301,8 @@ def _build_freshness() -> str:
 def _fresh_row(source: str, age_min: float, last_dt) -> dict:
     if age_min > 9000:
         return {"source": source, "age_text": "ERROR", "last_time": "",
-                "color": "#FF00FF"}
-    color = "#00CC80" if age_min < 120 else "#C300FF" if age_min < 360 else "#FF00FF"
+                "color": "#FF3366"}
+    color = "#00CC80" if age_min < 120 else "#CC4444" if age_min < 360 else "#FF3366"
     age_text = f"{age_min:.0f}min" if age_min < 120 else f"{age_min/60:.1f}h"
     last_time = ""
     if last_dt:
@@ -314,7 +314,7 @@ def _fresh_row(source: str, age_min: float, last_dt) -> dict:
 # ── System Health ────────────────────────────────────────────────────
 
 def _build_system_health(overall, checks, cg_status, engine, error) -> str:
-    color_map = {"healthy": "#00CC80", "degraded": "#C300FF", "critical": "#FF00FF"}
+    color_map = {"healthy": "#00CC80", "degraded": "#CC4444", "critical": "#FF3366"}
     overall_color = color_map.get(overall, "#999")
 
     dir_n, mag_n = "?", "?"
@@ -411,7 +411,7 @@ def _build_alert_history() -> str:
         for _, row in df.head(20).iterrows():
             alert_type = str(row.get("alert_type", "unknown"))
             severity = "critical" if "CRITICAL" in alert_type or "🔴" in alert_type else "warn"
-            color = "#FF00FF" if severity == "critical" else "#C300FF"
+            color = "#FF3366" if severity == "critical" else "#CC4444"
             t = row["timestamp"]
             if hasattr(t, "strftime"):
                 t = t.strftime("%m/%d %H:%M")

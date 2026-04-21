@@ -98,13 +98,13 @@ def _build_agent_status() -> str:
             last_local = last_run.replace(tzinfo=timezone.utc).astimezone(TZ8)
             last_str = last_local.strftime("%m/%d %H:%M")
 
-        rate_color = "#00CC80" if rate >= 90 else "#C300FF" if rate >= 70 else "#FF00FF"
+        rate_color = "#00CC80" if rate >= 90 else "#CC4444" if rate >= 70 else "#FF3366"
 
         # Error detail
         err_html = ""
         if fail > 0 and a["last_error"]:
             err = str(a["last_error"])[:60]
-            err_html = f'<div style="color:#FF00FF;font-size:10px;margin-top:2px"><code>{err}</code></div>'
+            err_html = f'<div style="color:#FF3366;font-size:10px;margin-top:2px"><code>{err}</code></div>'
 
         rows.append(
             f"<tr>"
@@ -121,9 +121,9 @@ def _build_agent_status() -> str:
     <div class="grid grid-4" style="margin-bottom:10px">
       {card("總執行", str(total), "過去 7 天")}
       {card("成功率", f'{overall_rate:.0f}%', f'{total_ok} ok / {total_fail} fail',
-            "#00CC80" if overall_rate >= 90 else "#C300FF")}
+            "#00CC80" if overall_rate >= 90 else "#CC4444")}
       {card("失敗數", str(total_fail), "",
-            "#00CC80" if total_fail == 0 else "#FF00FF")}
+            "#00CC80" if total_fail == 0 else "#FF3366")}
       {card("Agent 數", str(len(agents)), "")}
     </div>
     {running_html}
@@ -183,8 +183,8 @@ def _build_signal_perf() -> str:
         wr = wins / filled * 100 if filled > 0 else 0
         avg_ret = float(r["avg_ret"] or 0) * 100
 
-        dc = "#00CC80" if direction == "UP" else "#FF00FF"
-        wc = "#00CC80" if wr >= 60 else "#C300FF" if wr >= 50 else "#FF00FF"
+        dc = "#00CC80" if direction == "UP" else "#FF3366"
+        wc = "#00CC80" if wr >= 60 else "#CC4444" if wr >= 50 else "#FF3366"
 
         dir_table_rows.append(
             f"<tr><td>{strength}</td>"
@@ -201,12 +201,12 @@ def _build_signal_perf() -> str:
         if hasattr(t, "replace"):
             t = t.replace(tzinfo=timezone.utc).astimezone(TZ8).strftime("%m/%d %H:%M")
         d = r["direction"]
-        dc = "#00CC80" if d == "UP" else "#FF00FF"
+        dc = "#00CC80" if d == "UP" else "#FF3366"
         icon = "&#9650;" if d == "UP" else "&#9660;"
 
         if r["filled"]:
             ret = float(r["actual_return_4h"]) * 100
-            oc = "#00CC80" if r["correct"] else "#FF00FF"
+            oc = "#00CC80" if r["correct"] else "#FF3366"
             ok = "&#10003;" if r["correct"] else "&#10007;"
             result = f'<span style="color:{oc}">{ret:+.2f}% {ok}</span>'
         else:

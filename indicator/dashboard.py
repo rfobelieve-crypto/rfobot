@@ -100,7 +100,7 @@ def render_dashboard_shell() -> str:
   /* ── Misc ── */
   .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }}
   .dot-ok {{ background:#00CC80; }}
-  .dot-err {{ background:#FF00FF; }}
+  .dot-err {{ background:#FF3366; }}
   .badge {{
     display:inline-block; padding:2px 8px; border-radius:10px;
     font-size:10px; font-weight:600; color:#fff;
@@ -230,7 +230,7 @@ def render_dashboard_shell() -> str:
           new Date().toLocaleString('zh-TW', {{timeZone:'Asia/Taipei'}});
       }})
       .catch(function(err) {{
-        content.innerHTML = '<div class="loading" style="color:#FF00FF">載入失敗: ' + err + '</div>';
+        content.innerHTML = '<div class="loading" style="color:#FF3366">載入失敗: ' + err + '</div>';
       }});
 
     // Reset refresh timer
@@ -288,11 +288,11 @@ def render_tab(tab_name: str, state: dict, engine) -> str:
             from indicator.dashboard_tabs.agents import render_agents
             return render_agents()
         else:
-            return f'<div style="color:#FF00FF">未知的 Tab: {tab_name}</div>'
+            return f'<div style="color:#FF3366">未知的 Tab: {tab_name}</div>'
     except Exception as e:
         logger.exception("Dashboard tab %s render failed", tab_name)
         return (
-            f'<div style="color:#FF00FF;padding:20px">'
+            f'<div style="color:#FF3366;padding:20px">'
             f'<b>Tab "{tab_name}" 渲染失敗</b><br>'
             f'<code>{type(e).__name__}: {e}</code></div>'
         )

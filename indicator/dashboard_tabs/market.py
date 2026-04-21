@@ -86,7 +86,7 @@ def _build_top_features(state: dict, engine) -> str:
                 if r and r["m"] is not None and r["s"] and float(r["s"]) > 1e-10:
                     z = (val - float(r["m"])) / float(r["s"])
                     z_str = f"{z:+.2f}"
-                    z_color = "#FF00FF" if abs(z) > 2 else "#C300FF" if abs(z) > 1 else "#00CC80"
+                    z_color = "#FF3366" if abs(z) > 2 else "#CC4444" if abs(z) > 1 else "#00CC80"
             except Exception:
                 pass
 
@@ -161,7 +161,7 @@ def _build_mag_vs_realized() -> str:
       {card("實際均值", f'{real_mean:.3f}%', "")}
       {card("預測/實際", f'{ratio:.2f}x',
             "高估" if ratio > 1.3 else "低估" if ratio < 0.7 else "校準良好",
-            "#C300FF" if abs(ratio - 1) > 0.3 else "#00CC80")}
+            "#CC4444" if abs(ratio - 1) > 0.3 else "#00CC80")}
     </div>
     <div style="position:relative;height:180px">
       <canvas id="magVolChart"></canvas>
@@ -176,7 +176,7 @@ def _build_mag_vs_realized() -> str:
             {{ label: 'Mag 預測 %', data: {_json.dumps(mag_preds)},
                borderColor: '#00F0FF', borderWidth: 2, pointRadius: 1, tension: 0.3 }},
             {{ label: '實際 |ret| %', data: {_json.dumps(realized)},
-               borderColor: '#C300FF', borderWidth: 2, pointRadius: 1, tension: 0.3 }}
+               borderColor: '#CC4444', borderWidth: 2, pointRadius: 1, tension: 0.3 }}
           ]
         }},
         options: {{
@@ -226,10 +226,10 @@ def _build_funding_env() -> str:
     # Determine sentiment
     if current > 0.02:
         sentiment = "極度做多"
-        sent_color = "#FF00FF"
+        sent_color = "#FF3366"
     elif current > 0.005:
         sentiment = "偏多"
-        sent_color = "#C300FF"
+        sent_color = "#CC4444"
     elif current < -0.02:
         sentiment = "極度做空"
         sent_color = "#00CC80"
@@ -261,7 +261,7 @@ def _build_funding_env() -> str:
         data: {{
           labels: {_json.dumps(labels)},
           datasets: [{{ data: {_json.dumps(values)},
-            borderColor: '#C300FF', backgroundColor: 'rgba(195,0,255,0.05)',
+            borderColor: '#CC4444', backgroundColor: 'rgba(204,68,68,0.05)',
             fill: true, tension: 0.3, borderWidth: 2, pointRadius: 0 }}]
         }},
         options: {{
@@ -276,8 +276,8 @@ def _build_funding_env() -> str:
           scales: {{
             x: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 9 }}, maxRotation: 45 }},
                   grid: {{ color: 'rgba(0,240,255,0.08)' }} }},
-            y: {{ ticks: {{ color: '#C300FF', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
-                  title: {{ display: true, text: 'Funding %', color: '#C300FF' }} }}
+            y: {{ ticks: {{ color: '#CC4444', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
+                  title: {{ display: true, text: 'Funding %', color: '#CC4444' }} }}
           }}
         }}
       }});
@@ -324,9 +324,9 @@ def _build_oi_section() -> str:
     <div class="grid grid-3">
       {card("當前 OI", f'{current_oi/1e9:.2f}B', "")}
       {card("4h 變化", f'{chg_4h:+.2f}%', "",
-            "#00CC80" if chg_4h > 0 else "#FF00FF")}
+            "#00CC80" if chg_4h > 0 else "#FF3366")}
       {card("24h 變化", f'{chg_24h:+.2f}%', "",
-            "#00CC80" if chg_24h > 0 else "#FF00FF")}
+            "#00CC80" if chg_24h > 0 else "#FF3366")}
     </div>
     <div style="position:relative;height:160px">
       <canvas id="oiChart"></canvas>
@@ -338,7 +338,7 @@ def _build_oi_section() -> str:
         data: {{
           labels: {_json.dumps(labels)},
           datasets: [{{ label: 'OI (B)', data: {_json.dumps(oi_vals)},
-            borderColor: '#C300FF', backgroundColor: 'rgba(195,0,255,0.05)',
+            borderColor: '#CC4444', backgroundColor: 'rgba(204,68,68,0.05)',
             fill: true, tension: 0.3, borderWidth: 2, pointRadius: 0 }}]
         }},
         options: {{
@@ -347,8 +347,8 @@ def _build_oi_section() -> str:
           scales: {{
             x: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 9 }}, maxRotation: 45 }},
                   grid: {{ color: 'rgba(0,240,255,0.08)' }} }},
-            y: {{ ticks: {{ color: '#C300FF', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
-                  title: {{ display: true, text: 'OI (Billion)', color: '#C300FF' }} }}
+            y: {{ ticks: {{ color: '#CC4444', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
+                  title: {{ display: true, text: 'OI (Billion)', color: '#CC4444' }} }}
           }}
         }}
       }});
@@ -398,10 +398,10 @@ def _build_ls_ratio() -> str:
         df["top_ls"] = df["cg_top_trader_ls"].astype(float)
         top_vals = df["top_ls"].round(3).tolist()
         datasets += f""",{{ label: '大戶 L/S', data: {_json.dumps(top_vals)},
-            borderColor: '#C300FF', borderWidth: 2, pointRadius: 0, tension: 0.3 }}"""
+            borderColor: '#CC4444', borderWidth: 2, pointRadius: 0, tension: 0.3 }}"""
 
     ls_sentiment = "偏多" if current_ls > 1.05 else "偏空" if current_ls < 0.95 else "均衡"
-    ls_color = "#00CC80" if current_ls > 1.05 else "#FF00FF" if current_ls < 0.95 else "rgba(0,240,255,0.5)"
+    ls_color = "#00CC80" if current_ls > 1.05 else "#FF3366" if current_ls < 0.95 else "rgba(0,240,255,0.5)"
 
     return f"""
     <div class="grid grid-3">
@@ -481,11 +481,11 @@ def _build_cross_timeframe() -> str:
         if val > 0.3:
             return '<span style="color:#00CC80;font-size:16px">&#9650;</span> UP'
         elif val < -0.3:
-            return '<span style="color:#FF00FF;font-size:16px">&#9660;</span> DOWN'
+            return '<span style="color:#FF3366;font-size:16px">&#9660;</span> DOWN'
         return '<span style="color:rgba(0,240,255,0.5)">&#9644;</span> NEUTRAL'
 
     def _ret_color(val):
-        return "#00CC80" if val > 0 else "#FF00FF"
+        return "#00CC80" if val > 0 else "#FF3366"
 
     # Consistency check
     signs = [np.sign(ret_1h), np.sign(ret_4h), np.sign(ret_24h)]
@@ -497,7 +497,7 @@ def _build_cross_timeframe() -> str:
 
     consistency_score = sum([price_consistent, model_consistent, price_model_agree])
     cons_label = {3: "高度一致", 2: "部分一致", 1: "分歧", 0: "強烈分歧"}
-    cons_color = {3: "#00CC80", 2: "#C300FF", 1: "#FF00FF", 0: "#FF00FF"}
+    cons_color = {3: "#00CC80", 2: "#CC4444", 1: "#FF3366", 0: "#FF3366"}
 
     return f"""
     <div style="margin-bottom:8px">

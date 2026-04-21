@@ -31,9 +31,9 @@ def render_overview(state: dict, engine) -> str:
     # ── Key metrics ──
     risk_color = "#999"
     direction = pred.get("direction", "?")
-    dir_color = "#00CC80" if direction == "UP" else "#FF00FF" if direction == "DOWN" else "rgba(0,240,255,0.3)"
-    health_color = {"healthy": "#00CC80", "degraded": "#C300FF",
-                    "critical": "#FF00FF"}.get(overall_health, "rgba(0,240,255,0.3)")
+    dir_color = "#00CC80" if direction == "UP" else "#FF3366" if direction == "DOWN" else "rgba(0,240,255,0.3)"
+    health_color = {"healthy": "#00CC80", "degraded": "#CC4444",
+                    "critical": "#FF3366"}.get(overall_health, "rgba(0,240,255,0.3)")
 
     metrics_html = f"""<div class="grid">
       {card("狀態",
@@ -72,9 +72,9 @@ def render_overview(state: dict, engine) -> str:
     if strong_n or mod_n:
         parts = []
         if strong_n:
-            parts.append(f'<span style="color:#FF00FF;font-weight:600">Strong {strong_n}</span>')
+            parts.append(f'<span style="color:#FF3366;font-weight:600">Strong {strong_n}</span>')
         if mod_n:
-            parts.append(f'<span style="color:#C300FF;font-weight:600">Moderate {mod_n}</span>')
+            parts.append(f'<span style="color:#CC4444;font-weight:600">Moderate {mod_n}</span>')
         sig_summary = f'<div style="font-size:11px;margin-top:4px">信號: {" | ".join(parts)}</div>'
 
     dist_html = f"""
@@ -82,7 +82,7 @@ def render_overview(state: dict, engine) -> str:
       <div class="dist-bar">
         <div style="background:#00CC80;flex:{up_pct:.0f}">UP {up_n}</div>
         <div style="background:rgba(0,240,255,0.3);flex:{nt_pct:.0f}">N {nt_n}</div>
-        <div style="background:#FF00FF;flex:{dn_pct:.0f}">DN {dn_n}</div>
+        <div style="background:#FF3366;flex:{dn_pct:.0f}">DN {dn_n}</div>
       </div>{sig_summary}"""
 
     # ── Regime timeline ──
@@ -134,7 +134,7 @@ def _build_prediction_detail(pred: dict, engine) -> str:
             name = d.get("feature", d.get("name", "?"))
             impact = d.get("impact", d.get("shap_value", 0))
             value = d.get("value", "")
-            bar_color = "#00CC80" if impact > 0 else "#FF00FF"
+            bar_color = "#00CC80" if impact > 0 else "#FF3366"
             bar_w = min(abs(impact) * 500, 80)
             shap_rows.append(
                 f"<tr><td style='font-size:11px'>{name}</td>"
@@ -153,9 +153,9 @@ def _build_prediction_detail(pred: dict, engine) -> str:
     # Signal badge (Strong / Moderate)
     strength_val = pred.get("strength", "Weak")
     if strength_val == "Strong":
-        badge = '<div style="background:#FF00FF;color:white;display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:8px">強烈信號</div>'
+        badge = '<div style="background:#FF3366;color:white;display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:8px">強烈信號</div>'
     elif strength_val == "Moderate":
-        badge = '<div style="background:#C300FF;color:white;display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:8px">中等信號</div>'
+        badge = '<div style="background:#CC4444;color:white;display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:8px">中等信號</div>'
     else:
         badge = ''
 
@@ -247,7 +247,7 @@ def _build_regime_timeline() -> str:
         total_h = sum(s["hours"] for s in segments)
         regime_blocks = ""
         for s in segments:
-            rc = {"BULL": "#00CC80", "BEAR": "#FF00FF", "CHOPPY": "#C300FF",
+            rc = {"BULL": "#00CC80", "BEAR": "#FF3366", "CHOPPY": "#CC4444",
                   "WARMUP": "rgba(0,240,255,0.3)"}.get(s["regime"], "rgba(0,240,255,0.3)")
             pct = s["hours"] / total_h * 100
             regime_blocks += (
@@ -314,15 +314,15 @@ def _build_market_overview() -> str:
         items = f"""
         <div class="grid grid-4">
           {card("Funding Rate", f'{funding*100:.4f}%' if funding else "N/A",
-                "8h 資金費率", "#C300FF" if abs(funding or 0) > 0.0001 else "#00CC80")}
+                "8h 資金費率", "#CC4444" if abs(funding or 0) > 0.0001 else "#00CC80")}
           {card("OI 變化 (24h)", f'{oi_change_pct:+.1f}%',
                 f'OI: {oi_close/1e9:.2f}B' if oi_close > 1e6 else f'OI: {oi_close:,.0f}',
-                "#00CC80" if oi_change_pct > 0 else "#FF00FF")}
+                "#00CC80" if oi_change_pct > 0 else "#FF3366")}
           {card("多空比", f'{ls_ratio:.3f}' if ls_ratio else "N/A",
                 "Long/Short Ratio",
-                "#00CC80" if (ls_ratio or 1) > 1 else "#FF00FF")}
+                "#00CC80" if (ls_ratio or 1) > 1 else "#FF3366")}
           {card("DVOL", f'{dvol:.1f}' if dvol else "N/A",
-                "Deribit 波動率指數", "#C300FF" if (dvol or 0) > 60 else "#00CC80")}
+                "Deribit 波動率指數", "#CC4444" if (dvol or 0) > 60 else "#00CC80")}
         </div>"""
         return items
     except Exception as e:

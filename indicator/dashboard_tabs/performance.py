@@ -35,7 +35,7 @@ def _build_alpha_decay() -> str:
         from indicator.alpha_decay_monitor import run_full_check, STATUS_ICON
         results = run_full_check()
     except Exception as e:
-        return f'<div style="color:#FF00FF">Alpha Decay 載入失敗: {e}</div>'
+        return f'<div style="color:#FF3366">Alpha Decay 載入失敗: {e}</div>'
 
     overall = results.get("overall", "unknown")
     ts = results.get("timestamp", "")
@@ -152,7 +152,7 @@ def _build_ic_trend() -> str:
             legend: {{ labels: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 10 }} }} }},
             annotation: {{ annotations: {{
               zeroLine: {{ type: 'line', yMin: 0, yMax: 0, yScaleID: 'y',
-                          borderColor: '#C300FF', borderWidth: 1, borderDash: [4,4] }}
+                          borderColor: '#CC4444', borderWidth: 1, borderDash: [4,4] }}
             }} }}
           }},
           scales: {{
@@ -213,12 +213,12 @@ def _build_equity_curve() -> str:
 
     n = len(rows)
     wr = wins / n * 100 if n > 0 else 0
-    final_color = "#00CC80" if total >= 0 else "#FF00FF"
+    final_color = "#00CC80" if total >= 0 else "#FF3366"
 
     return f"""
     <div class="grid grid-3" style="margin-bottom:10px">
       {card("總信號", str(n), f"勝: {wins} / 敗: {losses}")}
-      {card("勝率", f"{wr:.1f}%", "", "#00CC80" if wr >= 60 else "#C300FF")}
+      {card("勝率", f"{wr:.1f}%", "", "#00CC80" if wr >= 60 else "#CC4444")}
       {card("累計回報", f"{total:+.1f}%", "方向性 paper return", final_color)}
     </div>
     <div style="position:relative;height:160px">
@@ -283,7 +283,7 @@ def _build_confidence_dist() -> str:
         idx = min(int(s / 20), 4)
         buckets[idx] += 1
 
-    colors = ["rgba(0,240,255,0.3)", "rgba(0,240,255,0.5)", "#C300FF", "#00F0FF", "#00CC80"]
+    colors = ["rgba(0,240,255,0.3)", "rgba(0,240,255,0.5)", "#CC4444", "#00F0FF", "#00CC80"]
     avg = sum(scores) / len(scores)
     median = sorted(scores)[len(scores) // 2]
 
@@ -348,7 +348,7 @@ def _build_pred_vs_actual() -> str:
         prices.append(round(float(r["close"]), 0))
         d = int(r["pred_direction_code"] or 0)
         s = int(r["strength_code"] or 1)
-        colors_list.append("#00CC80" if d == 1 else "#FF00FF" if d == -1 else "rgba(0,240,255,0.3)")
+        colors_list.append("#00CC80" if d == 1 else "#FF3366" if d == -1 else "rgba(0,240,255,0.3)")
         sizes.append(6 if s == 3 else 4 if s == 2 else 2)
 
     return f"""
@@ -439,17 +439,17 @@ def _build_drawdown() -> str:
         else:
             break
 
-    streak_color = "#00CC80" if recent_type == "win" else "#FF00FF"
+    streak_color = "#00CC80" if recent_type == "win" else "#FF3366"
     alert = ""
     if recent_type == "loss" and recent_streak >= max_loss_streak and recent_streak >= 3:
-        alert = '<div style="color:#FF00FF;font-weight:600;margin-top:6px">&#9888; 目前連敗次數已達歷史最高！</div>'
+        alert = '<div style="color:#FF3366;font-weight:600;margin-top:6px">&#9888; 目前連敗次數已達歷史最高！</div>'
 
     return f"""
     <div class="grid grid-4">
       {card("當前連續", f'{recent_streak} {("連勝" if recent_type == "win" else "連敗")}',
             "", streak_color)}
       {card("歷史最長連勝", str(max_win_streak), "", "#00CC80")}
-      {card("歷史最長連敗", str(max_loss_streak), "", "#FF00FF")}
+      {card("歷史最長連敗", str(max_loss_streak), "", "#FF3366")}
       {card("總信號數", str(len(rows)), "")}
     </div>
     {alert}
@@ -500,9 +500,9 @@ def _build_hourly_heatmap() -> str:
             if wr >= 65:
                 bg = "#00CC80"
             elif wr >= 50:
-                bg = "#C300FF"
+                bg = "#CC4444"
             else:
-                bg = "#FF00FF"
+                bg = "#FF3366"
             opacity = min(0.3 + d["total"] / 20, 1.0)
             cells.append(
                 f'<div class="hm-cell" style="background:{bg};opacity:{opacity:.2f}"'
