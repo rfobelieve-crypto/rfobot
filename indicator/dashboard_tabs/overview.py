@@ -64,13 +64,26 @@ def render_overview(state: dict, engine) -> str:
     dn_pct = dn_n / total_24 * 100
     nt_pct = nt_n / total_24 * 100
 
+    # Signal tier counts (24h)
+    sig_24h = _get_24h_signal_tiers()
+    strong_n = sig_24h.get("Strong", 0)
+    mod_n = sig_24h.get("Moderate", 0)
+    sig_summary = ""
+    if strong_n or mod_n:
+        parts = []
+        if strong_n:
+            parts.append(f'<span style="color:#f44336;font-weight:600">Strong {strong_n}</span>')
+        if mod_n:
+            parts.append(f'<span style="color:#ff9800;font-weight:600">Moderate {mod_n}</span>')
+        sig_summary = f'<div style="font-size:11px;margin-top:4px">信號: {" | ".join(parts)}</div>'
+
     dist_html = f"""
       <div style="color:#8b949e;font-size:11px;margin-bottom:4px;">最近 24 根 bar 方向分佈</div>
       <div class="dist-bar">
         <div style="background:#4caf50;flex:{up_pct:.0f}">UP {up_n}</div>
         <div style="background:#666;flex:{nt_pct:.0f}">N {nt_n}</div>
         <div style="background:#f44336;flex:{dn_pct:.0f}">DN {dn_n}</div>
-      </div>"""
+      </div>{sig_summary}"""
 
     # ── Regime timeline ──
     regime_html = _build_regime_timeline()
@@ -137,9 +150,20 @@ def _build_prediction_detail(pred: dict, engine) -> str:
             f"<table>{''.join(shap_rows)}</table></div>"
         )
 
+    # Signal badge (Strong / Moderate)
+    strength_val = pred.get("strength", "Weak")
+    if strength_val == "Strong":
+        badge = '<div style="background:#f44336;color:white;display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:8px">STRONG SIGNAL</div>'
+    elif strength_val == "Moderate":
+        badge = '<div style="background:#ff9800;color:white;display:inline-block;padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:8px">MODERATE SIGNAL</div>'
+    else:
+        badge = ''
+
+    shap_fallback = '<div style="color:#666;font-size:11px">SHAP 數據在 Strong 信號時觸發</div>'
+
     return f"""<div class="two-col">
-      <div>{detail_table}</div>
-      <div>{shap_html if shap_html else '<div style="color:#666;font-size:11px">SHAP 數據在 Strong 信號時觸發</div>'}</div>
+      <div>{badge}{detail_table}</div>
+      <div>{shap_html if shap_html else shap_fallback}</div>
     </div>"""
 
 
@@ -162,6 +186,31 @@ def _get_24h_distribution() -> dict:
     except Exception:
         pass
     return dist
+
+
+def _get_24h_signal_tiers() -> dict:
+    """Count Strong/Moderate signals in last 24h from indicator_history."""
+    tiers = {"Strong": 0, "Moderate": 0}
+    try:
+        conn = get_db_conn()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT strength_code, COUNT(*) as cnt
+                FROM indicator_history
+                WHERE dt >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                  AND strength_code >= 2
+                GROUP BY strength_code
+            """)
+            for r in cur.fetchall():
+                code = int(r["strength_code"] or 0)
+                if code == 3:
+                    tiers["Strong"] = int(r["cnt"])
+                elif code == 2:
+                    tiers["Moderate"] = int(r["cnt"])
+        conn.close()
+    except Exception:
+        pass
+    return tiers
 
 
 def _build_regime_timeline() -> str:
