@@ -166,7 +166,7 @@ def _build_signal_perf() -> str:
                 SELECT signal_time, direction, strength, confidence, entry_price,
                        actual_return_4h, correct, filled
                 FROM tracked_signals
-                ORDER BY signal_time DESC LIMIT 10
+                ORDER BY signal_time DESC LIMIT 100
             """)
             recent = cur.fetchall()
         conn.close()
@@ -231,7 +231,7 @@ def _build_signal_perf() -> str:
     </table>
 
     <div style="color:#58a6ff;font-size:12px;font-weight:600;margin:14px 0 6px">
-      最近信號 (10 筆)
+      最近信號 (100 筆)
     </div>
     <table>
       <tr><th>時間</th><th>等級</th><th>方向</th><th>信心</th><th>入場價</th><th>結果</th></tr>
