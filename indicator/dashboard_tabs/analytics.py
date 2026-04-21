@@ -17,17 +17,17 @@ logger = logging.getLogger(__name__)
 
 def render_analytics(state: dict, engine) -> str:
     parts = [
-        section("Signal on Price (72h)", "sigPrice", True,
+        section("價格走勢 + 信號 (72h)", "sigPrice", True,
                 _build_signal_price_chart()),
-        section("Real-time Gauges", "rtGauges", True, _build_gauges()),
-        section("Equity Curve by Tier", "eqTier", True, _build_equity_by_tier()),
-        section("Rolling IC (7d / 30d)", "rollingIc", True, _build_rolling_ic()),
-        section("Pred vs Actual Scatter (7d)", "predScatter", True, _build_scatter()),
-        section("Feature Radar (Z-Score)", "featRadar", True,
+        section("即時指標儀表", "rtGauges", True, _build_gauges()),
+        section("分級累計收益曲線", "eqTier", True, _build_equity_by_tier()),
+        section("滾動 IC 趨勢", "rollingIc", True, _build_rolling_ic()),
+        section("預測 vs 實際散點圖", "predScatter", True, _build_scatter()),
+        section("特徵雷達圖", "featRadar", True,
                 _build_feature_radar(state, engine)),
-        section("Regime Timeline (7d)", "regimeSig", True,
+        section("市場狀態時間軸 (7d)", "regimeSig", True,
                 _build_regime_signals()),
-        section("Signal Heatmap (30d)", "sigHeatmap", True, _build_signal_heatmap()),
+        section("信號熱力圖 (30d)", "sigHeatmap", True, _build_signal_heatmap()),
     ]
     return "\n".join(parts)
 
@@ -55,10 +55,10 @@ def _build_signal_price_chart() -> str:
             sig_rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">數據載入失敗: {e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'
 
     if not price_rows:
-        return '<div style="color:#666">數據不足</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">數據不足</div>'
 
     df = pd.DataFrame(price_rows)
     df["dt"] = pd.to_datetime(df["dt"])
@@ -104,7 +104,7 @@ def _build_signal_price_chart() -> str:
     <div style="position:relative;height:220px;overflow:hidden">
       <canvas id="sigPriceChart"></canvas>
     </div>
-    <div style="color:#8b949e;font-size:10px;margin-top:4px">
+    <div style="color:rgba(0,240,255,0.5);font-size:10px;margin-top:4px">
       綠=UP, 紅=DOWN | 大點=Strong, 小點=Moderate
     </div>
     <script>
@@ -114,37 +114,37 @@ def _build_signal_price_chart() -> str:
         data: {{
           labels: {_json.dumps(labels)},
           datasets: [
-            {{ label: 'BTC Price', data: {_json.dumps(prices)},
-               borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.05)',
+            {{ label: 'BTC 價格', data: {_json.dumps(prices)},
+               borderColor: '#00F0FF', backgroundColor: 'rgba(0,240,255,0.05)',
                fill: true, tension: 0.3, borderWidth: 2, pointRadius: 0, order: 2 }},
-            {{ label: 'UP Strong', type: 'scatter',
+            {{ label: 'UP 強', type: 'scatter',
                data: {_json.dumps(up_strong)},
-               backgroundColor: '#4caf50', pointRadius: 8,
+               backgroundColor: '#00FF9F', pointRadius: 8,
                pointStyle: 'triangle', order: 1 }},
-            {{ label: 'UP Mod', type: 'scatter',
+            {{ label: 'UP 中', type: 'scatter',
                data: {_json.dumps(up_mod)},
-               backgroundColor: '#66bb6a', pointRadius: 5,
+               backgroundColor: 'rgba(0,255,159,0.6)', pointRadius: 5,
                pointStyle: 'triangle', order: 1 }},
-            {{ label: 'DN Strong', type: 'scatter',
+            {{ label: 'DN 強', type: 'scatter',
                data: {_json.dumps(dn_strong)},
-               backgroundColor: '#f44336', pointRadius: 8,
+               backgroundColor: '#FF00FF', pointRadius: 8,
                pointStyle: 'rectRot', order: 1 }},
-            {{ label: 'DN Mod', type: 'scatter',
+            {{ label: 'DN 中', type: 'scatter',
                data: {_json.dumps(dn_mod)},
-               backgroundColor: '#ef5350', pointRadius: 5,
+               backgroundColor: 'rgba(255,0,255,0.6)', pointRadius: 5,
                pointStyle: 'rectRot', order: 1 }}
           ]
         }},
         options: {{
           responsive: true, maintainAspectRatio: false,
           plugins: {{
-            legend: {{ labels: {{ color: '#c9d1d9', font: {{ size: 10 }} }} }}
+            legend: {{ labels: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 10 }} }} }}
           }},
           scales: {{
-            x: {{ ticks: {{ color: '#8b949e', font: {{ size: 8 }}, maxRotation: 45,
+            x: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 8 }}, maxRotation: 45,
                             maxTicksLimit: 12, autoSkip: true }},
-                  grid: {{ color: '#21262d' }} }},
-            y: {{ ticks: {{ color: '#c9d1d9', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }} }}
+                  grid: {{ color: 'rgba(0,240,255,0.08)' }} }},
+            y: {{ ticks: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }} }}
           }}
         }}
       }});
@@ -162,10 +162,10 @@ def _build_gauges() -> str:
             latest = cur.fetchone()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">數據載入失敗: {e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'
 
     if not latest:
-        return '<div style="color:#666">無數據</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">無數據</div>'
 
     def _safe(col, default=0.0):
         v = latest.get(col)
@@ -182,29 +182,29 @@ def _build_gauges() -> str:
         pct = max(0, min(100, pct))
         return f"""<div style="margin:6px 0">
           <div style="display:flex;justify-content:space-between;margin-bottom:2px">
-            <span style="color:#8b949e;font-size:11px">{label}</span>
+            <span style="color:rgba(0,240,255,0.5);font-size:11px">{label}</span>
             <span style="color:{color};font-size:12px;font-weight:600">{display}</span>
           </div>
-          <div style="background:#21262d;border-radius:4px;height:8px;overflow:hidden">
+          <div style="background:#1A1A2E;border-radius:4px;height:8px;overflow:hidden">
             <div style="background:{color};height:100%;width:{pct:.0f}%;border-radius:4px;
                          transition:width 0.3s"></div>
           </div>
         </div>"""
 
     bbp_pct = (bbp + 1) / 2 * 100  # -1..+1 -> 0..100
-    bbp_color = "#4caf50" if bbp > 0.1 else "#f44336" if bbp < -0.1 else "#8b949e"
+    bbp_color = "#00FF9F" if bbp > 0.1 else "#FF00FF" if bbp < -0.1 else "rgba(0,240,255,0.5)"
 
-    conf_color = "#4caf50" if confidence >= 75 else "#ff9800" if confidence >= 60 else "#8b949e"
+    conf_color = "#00FF9F" if confidence >= 75 else "#C300FF" if confidence >= 60 else "rgba(0,240,255,0.5)"
 
     dir_pct = dir_prob * 100
-    dir_color = "#4caf50" if dir_prob > 0.55 else "#f44336" if dir_prob < 0.45 else "#8b949e"
+    dir_color = "#00F0FF" if dir_prob > 0.55 else "#FF00FF" if dir_prob < 0.45 else "rgba(0,240,255,0.5)"
 
     mag_pct = min(mag / 0.01 * 100, 100) if mag else 0  # 1% = full
-    mag_color = "#ff9800" if mag > 0.005 else "#58a6ff"
+    mag_color = "#C300FF" if mag > 0.005 else "#00F0FF"
 
     ret_display = f"{pred_ret*100:+.3f}%"
     ret_pct = min(abs(pred_ret) / 0.005 * 50 + 50, 100)  # center at 50
-    ret_color = "#4caf50" if pred_ret > 0 else "#f44336" if pred_ret < 0 else "#8b949e"
+    ret_color = "#00FF9F" if pred_ret > 0 else "#FF00FF" if pred_ret < 0 else "rgba(0,240,255,0.5)"
 
     bars = [
         _bar("BBP (Bull Bear Power)", bbp, f"{bbp:+.3f}", bbp_pct, bbp_color),
@@ -236,10 +236,10 @@ def _build_equity_by_tier() -> str:
             rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">數據載入失敗: {e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'
 
     if len(rows) < 2:
-        return '<div style="color:#666">信號不足</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">信號不足</div>'
 
     # Build unified timeline
     combined = []
@@ -271,9 +271,9 @@ def _build_equity_by_tier() -> str:
     return f"""
     <div class="grid grid-3" style="margin-bottom:8px">
       {card("Strong", f'{cum_s:+.2f}%', f'{n_s} 筆',
-            "#4caf50" if cum_s >= 0 else "#f44336")}
+            "#00FF9F" if cum_s >= 0 else "#FF00FF")}
       {card("Moderate", f'{cum_m:+.2f}%', f'{n_m} 筆',
-            "#4caf50" if cum_m >= 0 else "#f44336")}
+            "#00FF9F" if cum_m >= 0 else "#FF00FF")}
       {card("總計", str(len(rows)), "")}
     </div>
     <div style="position:relative;height:180px;overflow:hidden">
@@ -287,21 +287,21 @@ def _build_equity_by_tier() -> str:
           labels: {_json.dumps(labels)},
           datasets: [
             {{ label: 'Strong', data: {_json.dumps(s_vals)},
-               borderColor: '#f44336', fill: false, tension: 0.3,
+               borderColor: '#FF00FF', fill: false, tension: 0.3,
                borderWidth: 2, pointRadius: 2 }},
             {{ label: 'Moderate', data: {_json.dumps(m_vals)},
-               borderColor: '#ff9800', fill: false, tension: 0.3,
+               borderColor: '#C300FF', fill: false, tension: 0.3,
                borderWidth: 2, pointRadius: 2 }}
           ]
         }},
         options: {{
           responsive: true, maintainAspectRatio: false,
-          plugins: {{ legend: {{ labels: {{ color: '#c9d1d9', font: {{ size: 10 }} }} }} }},
+          plugins: {{ legend: {{ labels: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 10 }} }} }} }},
           scales: {{
-            x: {{ ticks: {{ color: '#8b949e', font: {{ size: 8 }}, maxRotation: 45,
-                            maxTicksLimit: 12 }}, grid: {{ color: '#21262d' }} }},
-            y: {{ ticks: {{ color: '#c9d1d9', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }},
-                  title: {{ display: true, text: '累計 %', color: '#8b949e' }} }}
+            x: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 8 }}, maxRotation: 45,
+                            maxTicksLimit: 12 }}, grid: {{ color: 'rgba(0,240,255,0.08)' }} }},
+            y: {{ ticks: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
+                  title: {{ display: true, text: '累計 %', color: 'rgba(0,240,255,0.5)' }} }}
           }}
         }}
       }});
@@ -327,10 +327,10 @@ def _build_rolling_ic() -> str:
             rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">數據載入失敗: {e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'
 
     if len(rows) < 30:
-        return '<div style="color:#666">數據不足 (需要 30+ bars)</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">數據不足 (需要 30+ bars)</div>'
 
     df = pd.DataFrame(rows)
     df["dt"] = pd.to_datetime(df["dt"])
@@ -341,7 +341,7 @@ def _build_rolling_ic() -> str:
     df = df.dropna(subset=["actual_4h", "pred_return_4h"])
 
     if len(df) < 30:
-        return '<div style="color:#666">數據不足</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">數據不足</div>'
 
     window_7d = min(7 * 24, len(df) // 2)
     labels, ic_7d, ic_30d = [], [], []
@@ -366,7 +366,7 @@ def _build_rolling_ic() -> str:
             ic_30d.append(None)
 
     if not labels:
-        return '<div style="color:#666">數據不足以計算 rolling IC</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">數據不足以計算 rolling IC</div>'
 
     zero_line = [0] * len(labels)
 
@@ -382,24 +382,24 @@ def _build_rolling_ic() -> str:
           labels: {_json.dumps(labels)},
           datasets: [
             {{ label: '7d IC', data: {_json.dumps(ic_7d)},
-               borderColor: '#58a6ff', tension: 0.3, borderWidth: 2,
+               borderColor: '#00F0FF', tension: 0.3, borderWidth: 2,
                pointRadius: 1, spanGaps: true }},
             {{ label: '30d IC', data: {_json.dumps(ic_30d)},
-               borderColor: '#ff9800', tension: 0.3, borderWidth: 2,
+               borderColor: '#C300FF', tension: 0.3, borderWidth: 2,
                pointRadius: 1, spanGaps: true }},
             {{ label: '', data: {_json.dumps(zero_line)},
-               borderColor: '#444', borderWidth: 1, borderDash: [4,4],
+               borderColor: '#333', borderWidth: 1, borderDash: [4,4],
                pointRadius: 0, fill: false }}
           ]
         }},
         options: {{
           responsive: true, maintainAspectRatio: false,
-          plugins: {{ legend: {{ labels: {{ color: '#c9d1d9', font: {{ size: 10 }} }} }} }},
+          plugins: {{ legend: {{ labels: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 10 }} }} }} }},
           scales: {{
-            x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }}, maxRotation: 45,
-                            maxTicksLimit: 15 }}, grid: {{ color: '#21262d' }} }},
-            y: {{ ticks: {{ color: '#c9d1d9', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }},
-                  title: {{ display: true, text: 'Spearman IC', color: '#8b949e' }} }}
+            x: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 9 }}, maxRotation: 45,
+                            maxTicksLimit: 15 }}, grid: {{ color: 'rgba(0,240,255,0.08)' }} }},
+            y: {{ ticks: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
+                  title: {{ display: true, text: 'Spearman IC', color: 'rgba(0,240,255,0.5)' }} }}
           }}
         }}
       }});
@@ -413,20 +413,34 @@ def _build_scatter() -> str:
     try:
         conn = get_db_conn()
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT dt, close, pred_return_4h, strength_code
-                FROM indicator_history
-                WHERE dt >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                  AND pred_return_4h IS NOT NULL
-                ORDER BY dt ASC
-            """)
+            # First check total row count to decide query range
+            cur.execute("SELECT COUNT(*) as cnt FROM indicator_history WHERE pred_return_4h IS NOT NULL")
+            total_rows = cur.fetchone()["cnt"]
+
+            # Use 14 days so older bars have their +4h outcome available;
+            # if total data is small (<500 rows), use all available data
+            if total_rows < 500:
+                cur.execute("""
+                    SELECT dt, close, pred_return_4h, strength_code
+                    FROM indicator_history
+                    WHERE pred_return_4h IS NOT NULL
+                    ORDER BY dt ASC
+                """)
+            else:
+                cur.execute("""
+                    SELECT dt, close, pred_return_4h, strength_code
+                    FROM indicator_history
+                    WHERE dt >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+                      AND pred_return_4h IS NOT NULL
+                    ORDER BY dt ASC
+                """)
             rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">數據載入失敗: {e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'
 
     if len(rows) < 10:
-        return '<div style="color:#666">數據不足</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">數據不足</div>'
 
     df = pd.DataFrame(rows)
     df["dt"] = pd.to_datetime(df["dt"])
@@ -438,7 +452,7 @@ def _build_scatter() -> str:
     df = df.dropna(subset=["actual_4h"])
 
     if len(df) < 5:
-        return '<div style="color:#666">等待 4h 回填中</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">等待 4h 回填中</div>'
 
     strong_pts = [{"x": round(float(r.pred_return_4h) * 100, 3),
                    "y": round(float(r.actual_4h) * 100, 3)}
@@ -461,7 +475,7 @@ def _build_scatter() -> str:
     <div style="position:relative;height:200px;overflow:hidden">
       <canvas id="predScatter"></canvas>
     </div>
-    <div style="color:#8b949e;font-size:10px;margin-top:4px">
+    <div style="color:rgba(0,240,255,0.5);font-size:10px;margin-top:4px">
       X=預測 4h return %, Y=實際 4h return % | 虛線=完美預測
     </div>
     <script>
@@ -471,24 +485,24 @@ def _build_scatter() -> str:
         data: {{
           datasets: [
             {{ label: 'Strong', data: {_json.dumps(strong_pts)},
-               backgroundColor: 'rgba(244,67,54,0.7)', pointRadius: 5 }},
+               backgroundColor: 'rgba(255,0,255,0.7)', pointRadius: 5 }},
             {{ label: 'Moderate', data: {_json.dumps(mod_pts)},
-               backgroundColor: 'rgba(255,152,0,0.7)', pointRadius: 4 }},
+               backgroundColor: 'rgba(195,0,255,0.7)', pointRadius: 4 }},
             {{ label: 'Weak', data: {_json.dumps(weak_pts)},
-               backgroundColor: 'rgba(139,148,158,0.4)', pointRadius: 3 }},
+               backgroundColor: 'rgba(0,240,255,0.3)', pointRadius: 3 }},
             {{ label: 'y=x', type: 'line', data: {_json.dumps(diag)},
-               borderColor: '#666', borderWidth: 1, borderDash: [4,4],
+               borderColor: '#333', borderWidth: 1, borderDash: [4,4],
                pointRadius: 0, fill: false }}
           ]
         }},
         options: {{
           responsive: true, maintainAspectRatio: false,
-          plugins: {{ legend: {{ labels: {{ color: '#c9d1d9', font: {{ size: 10 }} }} }} }},
+          plugins: {{ legend: {{ labels: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 10 }} }} }} }},
           scales: {{
-            x: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }},
-                  title: {{ display: true, text: 'Pred %', color: '#8b949e' }} }},
-            y: {{ ticks: {{ color: '#8b949e', font: {{ size: 9 }} }}, grid: {{ color: '#21262d' }},
-                  title: {{ display: true, text: 'Actual %', color: '#8b949e' }} }}
+            x: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
+                  title: {{ display: true, text: '預測 %', color: 'rgba(0,240,255,0.5)' }} }},
+            y: {{ ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(0,240,255,0.08)' }},
+                  title: {{ display: true, text: '實際 %', color: 'rgba(0,240,255,0.5)' }} }}
           }}
         }}
       }});
@@ -499,11 +513,13 @@ def _build_scatter() -> str:
 # ── 6. Feature Radar ─────────────────────────────────────────────────
 
 def _build_feature_radar(state: dict, engine) -> str:
+    # Use ONLY columns confirmed to exist in indicator_history
     groups = {
-        "Momentum": ["close"],
-        "OrderFlow": ["bull_bear_power"],
-        "Sentiment": ["dir_prob_up"],
-        "Volatility": ["mag_pred"],
+        "動量 (Price)": "close",
+        "多空力道 (BBP)": "bull_bear_power",
+        "方向機率 (P_UP)": "dir_prob_up",
+        "波動預測 (Mag)": "mag_pred",
+        "預測收益 (Pred)": "pred_return_4h",
     }
 
     try:
@@ -516,42 +532,58 @@ def _build_feature_radar(state: dict, engine) -> str:
             latest = cur.fetchone()
 
             stats = {}
-            for group, cols in groups.items():
-                for col in cols:
-                    if col in existing_cols:
-                        cur.execute(f"""
-                            SELECT AVG(`{col}`) as m, STDDEV(`{col}`) as s
-                            FROM indicator_history
-                            WHERE dt >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                              AND `{col}` IS NOT NULL
-                        """)
-                        r = cur.fetchone()
-                        if r and r["m"] is not None and r["s"] and float(r["s"]) > 1e-10:
-                            stats[col] = (float(r["m"]), float(r["s"]))
+            for label, col in groups.items():
+                if col in existing_cols:
+                    cur.execute(f"""
+                        SELECT AVG(`{col}`) as m, STDDEV(`{col}`) as s,
+                               MIN(`{col}`) as mn, MAX(`{col}`) as mx
+                        FROM indicator_history
+                        WHERE dt >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                          AND `{col}` IS NOT NULL
+                    """)
+                    r = cur.fetchone()
+                    if r and r["m"] is not None:
+                        std_val = float(r["s"]) if r["s"] else 0.0
+                        mn_val = float(r["mn"]) if r["mn"] is not None else 0.0
+                        mx_val = float(r["mx"]) if r["mx"] is not None else 0.0
+                        stats[col] = {
+                            "mean": float(r["m"]),
+                            "std": std_val,
+                            "min": mn_val,
+                            "max": mx_val,
+                        }
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">數據載入失敗: {e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'
 
     if not latest:
-        return '<div style="color:#666">無數據</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">無數據</div>'
 
-    radar_labels, z_scores = [], []
-    for group, cols in groups.items():
-        z = 0.0
-        for col in cols:
-            if col in existing_cols and latest.get(col) is not None and col in stats:
-                mean, std = stats[col]
-                z = (float(latest[col]) - mean) / std
+    radar_labels, radar_values = [], []
+    for label, col in groups.items():
+        val = 50.0  # default center
+        if col in existing_cols and latest.get(col) is not None and col in stats:
+            cur_val = float(latest[col])
+            s = stats[col]
+            if s["std"] > 1e-10:
+                # Z-score method
+                z = (cur_val - s["mean"]) / s["std"]
                 z = max(-3.0, min(3.0, z))
-                break
-        radar_labels.append(group)
-        z_scores.append(round(z, 2))
-
-    radar_values = [round((z + 3) / 6 * 100, 1) for z in z_scores]
+                val = round((z + 3) / 6 * 100, 1)
+            else:
+                # Fallback: normalize raw value to 0-100 using min/max
+                rng = s["max"] - s["min"]
+                if rng > 1e-10:
+                    val = round((cur_val - s["min"]) / rng * 100, 1)
+                    val = max(0.0, min(100.0, val))
+                else:
+                    val = 50.0
+        radar_labels.append(label)
+        radar_values.append(val)
 
     return f"""
-    <div style="color:#8b949e;font-size:11px;margin-bottom:6px">
-      4 維特徵群 Z-Score (7d 基準) | 50=均值, 0=極低, 100=極高
+    <div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:6px">
+      5 維特徵 Z-Score (7d 基準) | 50=均值, 0=極低, 100=極高
     </div>
     <div style="position:relative;height:240px;max-width:350px;margin:0 auto;overflow:hidden">
       <canvas id="featRadar"></canvas>
@@ -565,10 +597,10 @@ def _build_feature_radar(state: dict, engine) -> str:
           datasets: [{{
             label: 'Z-Score',
             data: {_json.dumps(radar_values)},
-            borderColor: '#58a6ff',
-            backgroundColor: 'rgba(88,166,255,0.15)',
+            borderColor: '#00F0FF',
+            backgroundColor: 'rgba(0,240,255,0.15)',
             borderWidth: 2,
-            pointBackgroundColor: '#58a6ff',
+            pointBackgroundColor: '#00F0FF',
             pointRadius: 4
           }}]
         }},
@@ -578,11 +610,11 @@ def _build_feature_radar(state: dict, engine) -> str:
           scales: {{
             r: {{
               min: 0, max: 100,
-              ticks: {{ color: '#8b949e', font: {{ size: 9 }}, backdropColor: 'transparent',
+              ticks: {{ color: 'rgba(0,240,255,0.6)', font: {{ size: 9 }}, backdropColor: 'transparent',
                         stepSize: 25 }},
-              grid: {{ color: '#30363d' }},
-              angleLines: {{ color: '#30363d' }},
-              pointLabels: {{ color: '#c9d1d9', font: {{ size: 12 }} }}
+              grid: {{ color: '#1A1A2E' }},
+              angleLines: {{ color: '#1A1A2E' }},
+              pointLabels: {{ color: 'rgba(0,240,255,0.85)', font: {{ size: 12 }} }}
             }}
           }}
         }}
@@ -614,13 +646,13 @@ def _build_regime_signals() -> str:
             sig_rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">數據載入失敗: {e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'
 
     if not hist_rows:
-        return '<div style="color:#666">數據不足</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">數據不足</div>'
 
     regime_colors_map = {
-        2: "#4caf50", -2: "#f44336", 0: "#ff9800", -99: "#666"
+        2: "#00FF9F", -2: "#FF00FF", 0: "#C300FF", -99: "rgba(0,240,255,0.3)"
     }
     regime_names = {2: "BULL", -2: "BEAR", 0: "CHOPPY", -99: "WARMUP"}
 
@@ -631,7 +663,7 @@ def _build_regime_signals() -> str:
     bar_cells = []
     for r in hist_rows:
         code = int(r["regime_code"] or 0)
-        color = regime_colors_map.get(code, "#666")
+        color = regime_colors_map.get(code, "rgba(0,240,255,0.3)")
         name = regime_names.get(code, "?")
         regime_counts[name] = regime_counts.get(name, 0) + 1
         bar_cells.append(f'<div style="flex:1;background:{color};min-width:1px" '
@@ -656,7 +688,7 @@ def _build_regime_signals() -> str:
 
         is_up = s["direction"] == "UP"
         is_strong = s["strength"] == "Strong"
-        color = "#4caf50" if is_up else "#f44336"
+        color = "#00FF9F" if is_up else "#FF00FF"
         size = 10 if is_strong else 6
         symbol = "&#9650;" if is_up else "&#9660;"
 
@@ -666,7 +698,7 @@ def _build_regime_signals() -> str:
             f' title="{s["direction"]} {s["strength"]}">{symbol}</div>')
 
     return f"""
-    <div style="color:#8b949e;font-size:11px;margin-bottom:6px">
+    <div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:6px">
       {summary} | 三角形=信號 (綠=UP, 紅=DOWN, 大=Strong)
     </div>
     <div style="position:relative;margin:16px 0 8px">
@@ -676,9 +708,9 @@ def _build_regime_signals() -> str:
       {''.join(sig_markers)}
     </div>
     <div style="display:flex;gap:12px;margin-top:8px">
-      <span style="font-size:10px"><span style="color:#4caf50">&#9632;</span> BULL</span>
-      <span style="font-size:10px"><span style="color:#f44336">&#9632;</span> BEAR</span>
-      <span style="font-size:10px"><span style="color:#ff9800">&#9632;</span> CHOPPY</span>
+      <span style="font-size:10px"><span style="color:#00FF9F">&#9632;</span> BULL</span>
+      <span style="font-size:10px"><span style="color:#FF00FF">&#9632;</span> BEAR</span>
+      <span style="font-size:10px"><span style="color:#C300FF">&#9632;</span> CHOPPY</span>
     </div>"""
 
 
@@ -697,10 +729,10 @@ def _build_signal_heatmap() -> str:
             rows = cur.fetchall()
         conn.close()
     except Exception as e:
-        return f'<div style="color:#666">數據載入失敗: {e}</div>'
+        return f'<div style="color:rgba(0,240,255,0.3)">數據載入失敗: {e}</div>'
 
     if not rows:
-        return '<div style="color:#666">無數據</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">無數據</div>'
 
     # Build HTML grid: rows = confidence buckets, columns = dates
     date_map = {}  # date_str -> [signals]
@@ -719,14 +751,14 @@ def _build_signal_heatmap() -> str:
         correct = bool(r["correct"]) if filled else None
 
         if correct is True:
-            bg = "#4caf50"
+            bg = "#00FF9F"
         elif correct is False:
-            bg = "#f44336"
+            bg = "#FF00FF"
         else:
-            bg = "#555"
+            bg = "#333"
 
         arrow = "&#9650;" if r["direction"] == "UP" else "&#9660;"
-        d_color = "#4caf50" if r["direction"] == "UP" else "#f44336"
+        d_color = "#00FF9F" if r["direction"] == "UP" else "#FF00FF"
 
         if date_str not in date_map:
             date_map[date_str] = []
@@ -737,7 +769,7 @@ def _build_signal_heatmap() -> str:
             f'<span style="color:{d_color}">{arrow}</span> {conf:.0f}</div>')
 
     if not date_map:
-        return '<div style="color:#666">無符合條件的信號</div>'
+        return '<div style="color:rgba(0,240,255,0.3)">無符合條件的信號</div>'
 
     # Render as date rows
     html_rows = []
@@ -745,11 +777,11 @@ def _build_signal_heatmap() -> str:
         signals = "".join(date_map[date_str])
         html_rows.append(
             f'<div style="display:flex;align-items:center;margin:3px 0">'
-            f'<div style="width:50px;color:#8b949e;font-size:11px;flex-shrink:0">{date_str}</div>'
+            f'<div style="width:50px;color:rgba(0,240,255,0.5);font-size:11px;flex-shrink:0">{date_str}</div>'
             f'<div style="flex:1">{signals}</div></div>')
 
     return f"""
-    <div style="color:#8b949e;font-size:11px;margin-bottom:6px">
+    <div style="color:rgba(0,240,255,0.5);font-size:11px;margin-bottom:6px">
       綠底=正確, 紅底=錯誤, 灰底=待定 | 數字=信心分數
     </div>
     {''.join(html_rows)}"""

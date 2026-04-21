@@ -34,21 +34,21 @@ def section(title: str, sec_id: str, open_default: bool, body: str) -> str:
 def status_dot(status: str) -> str:
     """Return colored dot for status strings like healthy/warning/critical."""
     colors = {
-        "healthy": "#4caf50", "warning": "#ff9800", "critical": "#f44336",
-        "error": "#f44336", "insufficient_data": "#666", "no_history": "#666",
+        "healthy": "#00FF9F", "warning": "#C300FF", "critical": "#FF00FF",
+        "error": "#FF00FF", "insufficient_data": "rgba(0,240,255,0.3)", "no_history": "rgba(0,240,255,0.3)",
     }
-    c = colors.get(status, "#666")
+    c = colors.get(status, "rgba(0,240,255,0.3)")
     return f'<span class="dot" style="background:{c}"></span>'
 
 
 def status_badge(status: str) -> str:
     colors = {
-        "healthy": "#4caf50", "warning": "#ff9800", "critical": "#f44336",
-        "error": "#f44336", "insufficient_data": "#666",
+        "healthy": "#00FF9F", "warning": "#C300FF", "critical": "#FF00FF",
+        "error": "#FF00FF", "insufficient_data": "rgba(0,240,255,0.3)",
     }
-    c = colors.get(status, "#666")
-    label = {"healthy": "HEALTHY", "warning": "WARNING", "critical": "CRITICAL",
-             "error": "ERROR", "insufficient_data": "PENDING"}.get(status, status.upper())
+    c = colors.get(status, "rgba(0,240,255,0.3)")
+    label = {"healthy": "健康", "warning": "警告", "critical": "危險",
+             "error": "錯誤", "insufficient_data": "等待中"}.get(status, status.upper())
     return f'<span class="badge" style="background:{c}">{label}</span>'
 
 
@@ -62,7 +62,7 @@ def mini_table(headers: list[str], rows: list[list[str]]) -> str:
     return f"<table><tr>{h}</tr>{body}</table>"
 
 
-def gauge_bar(value: float, max_val: float = 100, color: str = "#58a6ff",
+def gauge_bar(value: float, max_val: float = 100, color: str = "#00F0FF",
               label: str = "") -> str:
     """Horizontal gauge bar."""
     pct = min(max(value / max_val * 100, 0), 100)
