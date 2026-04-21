@@ -285,10 +285,10 @@ def _build_equity_by_tier() -> str:
           datasets: [
             {{ label: 'Strong', data: {_json.dumps(s_vals)},
                borderColor: '#FF3366', fill: false, tension: 0.3,
-               borderWidth: 2, pointRadius: 2 }},
+               borderWidth: 1, pointRadius: 1.5 }},
             {{ label: 'Moderate', data: {_json.dumps(m_vals)},
                borderColor: '#CC4444', fill: false, tension: 0.3,
-               borderWidth: 2, pointRadius: 2 }}
+               borderWidth: 1, pointRadius: 1.5 }}
           ]
         }},
         options: {{
