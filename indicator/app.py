@@ -1183,6 +1183,59 @@ def force_update():
         return jsonify({"status": "update_triggered"})
 
 
+@app.route("/admin/flow-bars-stats", methods=["GET"])
+def admin_flow_bars_stats():
+    """Read-only diagnostic: report coverage of flow_bars_1m and
+    normalized_trades tables (populated by the market_data service) for
+    symbol BTC-USD. Used to plan microstructure research — we need
+    enough 1-min orderflow history to run walk-forward IC validation.
+    Does not modify any state.
+    """
+    from shared.db import get_db_conn
+    from datetime import datetime
+    try:
+        conn = get_db_conn()
+    except Exception as e:
+        return jsonify({"status": "error", "error": f"db connect: {e}"}), 500
+    out = {}
+    try:
+        for table, ts_col in [
+            ("flow_bars_1m", "minute_start_ms"),
+            ("normalized_trades", "ts_exchange"),
+        ]:
+            with conn.cursor() as cur:
+                cur.execute(f"SHOW TABLES LIKE '{table}'")
+                if not cur.fetchone():
+                    out[table] = {"exists": False}
+                    continue
+                cur.execute(
+                    f"SELECT COUNT(*) AS n, MIN({ts_col}) AS mn, MAX({ts_col}) AS mx "
+                    f"FROM {table} WHERE canonical_symbol=%s",
+                    ("BTC-USD",),
+                )
+                r = cur.fetchone()
+                n = int(r["n"]) if r and r["n"] is not None else 0
+                entry = {"exists": True, "rows_btc": n}
+                if n > 0 and r["mn"] and r["mx"]:
+                    mn, mx = int(r["mn"]), int(r["mx"])
+                    t0 = datetime.utcfromtimestamp(mn / 1000).isoformat() + "Z"
+                    t1 = datetime.utcfromtimestamp(mx / 1000).isoformat() + "Z"
+                    span_days = (mx - mn) / 1000.0 / 86400.0
+                    entry.update({
+                        "earliest_utc": t0,
+                        "latest_utc": t1,
+                        "span_days": round(span_days, 2),
+                    })
+                out[table] = entry
+        return jsonify({"status": "ok", "tables": out})
+    except Exception as e:
+        logger.exception("flow_bars_stats query failed")
+        return jsonify({"status": "error", "error": str(e)}), 500
+    finally:
+        try: conn.close()
+        except Exception: pass
+
+
 @app.route("/admin/backfill-gap", methods=["POST", "GET"])
 def admin_backfill_gap():
     """Backfill indicator_history MySQL rows missing between last MySQL row
