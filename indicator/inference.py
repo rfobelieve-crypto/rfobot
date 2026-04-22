@@ -1,11 +1,11 @@
 """
-Model inference — regime-conditional multi-target prediction.
+Model inference — Dual-model direction-regression architecture.
 
-v7: Dual-model architecture — direction (XGBClassifier) and magnitude
-    (XGBRegressor) are fully independent pipelines with separate feature sets.
-    Direction outputs P(UP); magnitude predicts |return_4h|.
-    Combined: pred_return_4h = sign(direction) × magnitude.
-    Falls back to v6 regime models if dual_model/ artifacts are not present.
+v7.1: Direction (XGBRegressor) predicts signed 4h path return;
+      Magnitude (XGBRegressor) predicts |return_4h| in σ-units.
+      Direction decoded via rolling percentile (top 2.5% each tail = Strong,
+      top 7.5% = Moderate).  pred_return_4h comes directly from the
+      direction regression head.
 """
 from __future__ import annotations
 
@@ -17,13 +17,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from scipy.stats import spearmanr
 
 logger = logging.getLogger(__name__)
 
 ARTIFACT_DIR = Path(__file__).parent / "model_artifacts"
-REGIME_DIR = ARTIFACT_DIR / "regime_models"
-DIRECTION_DIR = ARTIFACT_DIR / "direction_models"
 DUAL_MODEL_DIR = ARTIFACT_DIR / "dual_model"
 
 
@@ -46,7 +43,6 @@ def reload_config():
     global STRENGTH_DEADZONE, STRONG_THRESHOLD, MODERATE_THRESHOLD
     global CHOPPY_DEADZONE_MULT, TREND_DEADZONE_MULT, BULL_CONTRA_PENALTY
     global BBP_CONFIRM_THRESHOLD, BBP_CONFIRM_ENABLED
-    global DUAL_DIR_UP_TH, DUAL_DIR_DN_TH
     global HYSTERESIS_MULT, FLIP_COOLDOWN_BARS
 
     STRENGTH_DEADZONE   = _cfg("STRENGTH_DEADZONE", 0.50)
@@ -57,8 +53,6 @@ def reload_config():
     BULL_CONTRA_PENALTY = _cfg("BULL_CONTRA_PENALTY", 2.5)
     BBP_CONFIRM_THRESHOLD = _cfg("BBP_CONFIRM_THRESHOLD", 0.15)
     BBP_CONFIRM_ENABLED = _cfg("BBP_CONFIRM_ENABLED", True)
-    DUAL_DIR_UP_TH      = _cfg("DUAL_DIR_UP_TH", 0.58)
-    DUAL_DIR_DN_TH      = _cfg("DUAL_DIR_DN_TH", 0.42)
     HYSTERESIS_MULT     = _cfg("HYSTERESIS_MULT", 1.40)
     FLIP_COOLDOWN_BARS  = _cfg("FLIP_COOLDOWN_BARS", 1)
 
@@ -71,15 +65,12 @@ STRONG_THRESHOLD = 80.0      # confidence percentile for Strong
 MODERATE_THRESHOLD = 65.0    # confidence percentile for Moderate
 HORIZON_BARS = 4             # 4h prediction horizon (4 x 1h bars)
 MIN_MAG_HISTORY = 30         # minimum bars before mag_score is valid
-MIN_REGIME_IC_HISTORY = 50   # minimum bars per regime before IC is meaningful
-REGIME_BLEND_WEIGHT = 0.35   # weight for regime-specific model (vs global)
 
-# Dynamic deadzone parameters (only affects regime model fallback, NOT dual model)
+# Dynamic deadzone parameters
 CHOPPY_DEADZONE_MULT = 1.60  # CHOPPY regime: widen deadzone significantly
 TREND_DEADZONE_MULT = 0.90   # TRENDING: slightly tighter (momentum is real)
 
 # TRENDING_BULL fix: model IC=-0.03 in bull regime → contra-trend signals unreliable
-# Suppress DOWN signals in TRENDING_BULL by widening their deadzone
 BULL_CONTRA_PENALTY = 2.5    # DOWN signals in BULL need 2.5x more conviction
 VOL_DEADZONE_SCALE = 0.80    # how much vol ratio affects deadzone (0 = off, 1 = full)
 
@@ -87,189 +78,54 @@ VOL_DEADZONE_SCALE = 0.80    # how much vol ratio affects deadzone (0 = off, 1 =
 BBP_CONFIRM_THRESHOLD = 0.15 # |BBP| must exceed this to confirm direction
 BBP_CONFIRM_ENABLED = True   # master switch for BBP confirmation
 
-# Direction model (binary classifier) — high-confidence override
-DIR_MODEL_ENABLED = True     # master switch for direction model
-DIR_HIGH_CONF = 0.65         # P(up) > this → override to UP
-DIR_LOW_CONF = 0.35          # P(up) < this → override to DOWN
-DIR_CHOPPY_DISABLED = True   # disable direction override in CHOPPY regime
-
-# Dual model direction thresholds
-# P(UP) > DUAL_DIR_UP_TH → UP, P(UP) < DUAL_DIR_DN_TH → DOWN, else NEUTRAL
-DUAL_DIR_UP_TH = 0.58       # was 0.60 hardcoded; lowered to reduce NEUTRAL over-suppression
-DUAL_DIR_DN_TH = 0.42       # was 0.40 hardcoded; raised symmetrically
-
 # Hysteresis: require stronger signal to FLIP direction vs maintain
 HYSTERESIS_MULT = 1.40       # to flip UP→DOWN, need strength < -(dz * 1.4)
 
 # Signal cooldown: minimum bars between direction flips
 FLIP_COOLDOWN_BARS = 1       # after flipping direction, hold for at least 1 bar
 
-# Dual-horizon blending
-BLEND_4H = 0.65              # weight for 4h strength
-BLEND_1H = 0.35              # weight for 1h strength
-
-# Regime models to use (skip strength_vol_adj — no signal)
-ACTIVE_TARGETS_4H = ["up_move_vol_adj", "down_move_vol_adj"]
-ACTIVE_TARGETS_1H = ["up_move_1h_vol_adj", "down_move_1h_vol_adj"]
-ACTIVE_TARGETS = ACTIVE_TARGETS_4H + ACTIVE_TARGETS_1H
-
 
 class IndicatorEngine:
-    """Stateful prediction engine with regime-conditional dual-target models."""
+    """Stateful prediction engine with dual-model direction-regression architecture."""
 
     def __init__(self):
-        # Try dual-model first (v7), fall back to regime (v5/v6) or legacy
-        if DUAL_MODEL_DIR.exists() and (DUAL_MODEL_DIR / "direction_xgb.json").exists():
-            self._load_dual_model()
-        elif REGIME_DIR.exists():
-            self._load_regime_models()
-            # Direction classifier (optional — enhances direction signal)
-            self.dir_model = None
-            self.dir_feature_cols: list[str] = []
-            if DIR_MODEL_ENABLED:
-                self._load_direction_model()
-        else:
-            self._load_legacy_model()
-
-        # Regime IC tracking (persists across calls)
-        self.regime_history: dict[str, list[tuple[float, float]]] = {}
-
-    def _load_regime_models(self):
-        """Load multi-target regime-conditional models with per-target features."""
-        self.mode = "regime"
-
-        # Superset feature_cols (for missing-feature warnings)
-        with open(REGIME_DIR / "feature_cols.json") as f:
-            self.feature_cols = json.load(f)
-
-        with open(REGIME_DIR / "training_stats.json") as f:
-            stats = json.load(f)
-        self.pred_history = deque(stats.get("pred_history", []), maxlen=500)
-
-        # Per-target feature cols (v4: target-specific feature selection)
-        self.target_feature_cols: dict[str, list[str]] = {}
-        for target in ACTIVE_TARGETS:
-            target_fc_path = REGIME_DIR / target / "feature_cols.json"
-            if target_fc_path.exists():
-                with open(target_fc_path) as f:
-                    self.target_feature_cols[target] = json.load(f)
-            else:
-                # Fallback: use shared feature_cols (backward compatible)
-                self.target_feature_cols[target] = self.feature_cols
-
-        # Load models: {target: {regime: XGBRegressor}}
-        self.models: dict[str, dict[str, xgb.XGBRegressor]] = {}
-        for target in ACTIVE_TARGETS:
-            tdir = REGIME_DIR / target
-            self.models[target] = {}
-            for fname in tdir.glob("*_xgb.json"):
-                if fname.name == "feature_cols.json":
-                    continue
-                regime_key = fname.stem.replace("_xgb", "").upper()
-                if regime_key == "GLOBAL":
-                    regime_key = "global"
-                m = xgb.XGBRegressor()
-                m.load_model(str(fname))
-                self.models[target][regime_key] = m
-
-        model_count = sum(len(v) for v in self.models.values())
-        for t, fc in self.target_feature_cols.items():
-            logger.info("  %s: %d features", t, len(fc))
-        has_1h = "up_move_1h_vol_adj" in self.models
-        logger.info("IndicatorEngine v5 loaded: %d models (%s), %d warmup bars",
-                     model_count,
-                     "4h+1h dual-horizon" if has_1h else "4h only",
-                     len(self.pred_history))
-
-    def _load_legacy_model(self):
-        """Fallback: load single model (v2 compatibility)."""
-        self.mode = "legacy"
-        self.legacy_model = xgb.XGBRegressor()
-        self.legacy_model.load_model(str(ARTIFACT_DIR / "xgb_model.json"))
-
-        with open(ARTIFACT_DIR / "feature_cols.json") as f:
-            self.feature_cols = json.load(f)
-
-        with open(ARTIFACT_DIR / "training_stats.json") as f:
-            stats = json.load(f)
-        self.pred_history = deque(stats.get("pred_history", []), maxlen=500)
-
-        logger.info("IndicatorEngine legacy loaded: %d features", len(self.feature_cols))
-
-    def _load_direction_model(self):
-        """Load dedicated direction classifier (XGBClassifier, binary)."""
-        model_path = DIRECTION_DIR / "direction_xgb.json"
-        fc_path = DIRECTION_DIR / "feature_cols.json"
-        config_path = DIRECTION_DIR / "config.json"
-
-        if not model_path.exists():
-            logger.info("Direction model not found at %s — disabled", model_path)
-            return
-
-        try:
-            self.dir_model = xgb.XGBClassifier()
-            self.dir_model.load_model(str(model_path))
-
-            with open(fc_path) as f:
-                self.dir_feature_cols = json.load(f)
-
-            with open(config_path) as f:
-                dir_config = json.load(f)
-
-            logger.info("Direction model loaded: %d features, threshold=%.2f/%.2f",
-                        len(self.dir_feature_cols),
-                        DIR_HIGH_CONF, DIR_LOW_CONF)
-        except Exception as e:
-            logger.warning("Failed to load direction model: %s", e)
-            self.dir_model = None
+        self._load_dual_model()
 
     def _load_dual_model(self):
-        """Load dual-model artifacts (direction + magnitude).
+        """Load dual-model artifacts (direction regressor + magnitude regressor).
 
-        Direction head has two modes:
-          - "regression" (new): XGBRegressor predicting signed 4h path return.
-            Detected by presence of direction_reg_config.json. Strong signals
-            are generated by thresholding the predicted return.
-          - "binary" (legacy): XGBClassifier predicting P(UP).
-            Falls back automatically when direction_reg_config.json is absent.
-        Magnitude head is always an XGBRegressor and is NEVER modified by the
-        direction-regression export.
+        Direction head: XGBRegressor predicting signed 4h path return.
+        Config in direction_reg_config.json controls rolling percentile decoding.
+        Magnitude head: XGBRegressor predicting |return_4h| in σ-units.
         """
         self.mode = "dual"
 
-        # Direction-regression config (presence → regression mode)
+        # Direction-regression config
         cfg_path = DUAL_MODEL_DIR / "direction_reg_config.json"
-        if cfg_path.exists():
-            with open(cfg_path) as f:
-                self.dir_reg_config = json.load(f)
-            self.dir_model_type = "regression"
-            self.dir_decoding = self.dir_reg_config.get(
-                "decoding", "rolling_percentile")
-            # Rolling percentile decoding params
-            self.dir_pct_window = int(
-                self.dir_reg_config.get("percentile_window", 500))
-            self.dir_strong_top_frac = float(
-                self.dir_reg_config.get("strong_top_frac", 0.05))
-            self.dir_moderate_top_frac = float(
-                self.dir_reg_config.get("moderate_top_frac", 0.15))
-            self.dir_warmup_bars = int(
-                self.dir_reg_config.get("warmup_bars", 100))
-            # Cold-start fallback (fixed ± thresholds from WF calibration)
-            fb = self.dir_reg_config.get("fallback", {})
-            self.dir_fallback_strong_up = float(fb.get("strong_up", 0.00175))
-            self.dir_fallback_strong_dn = float(fb.get("strong_dn", -0.00175))
-            self.dir_fallback_mod_up = float(fb.get("moderate_up", 0.00105))
-            self.dir_fallback_mod_dn = float(fb.get("moderate_dn", -0.00105))
-            # Rolling buffer of signed predictions for percentile calc
-            self.dir_pred_history = deque(maxlen=self.dir_pct_window)
-            self.dual_dir_model = xgb.XGBRegressor()
-        else:
-            self.dir_reg_config = None
-            self.dir_model_type = "binary"
-            self.dir_decoding = None
-            self.dir_pred_history = deque(maxlen=500)
-            self.dual_dir_model = xgb.XGBClassifier()
+        with open(cfg_path) as f:
+            self.dir_reg_config = json.load(f)
+        self.dir_model_type = "regression"
+        self.dir_decoding = self.dir_reg_config.get(
+            "decoding", "rolling_percentile")
+        # Rolling percentile decoding params
+        self.dir_pct_window = int(
+            self.dir_reg_config.get("percentile_window", 500))
+        self.dir_strong_top_frac = float(
+            self.dir_reg_config.get("strong_top_frac", 0.05))
+        self.dir_moderate_top_frac = float(
+            self.dir_reg_config.get("moderate_top_frac", 0.15))
+        self.dir_warmup_bars = int(
+            self.dir_reg_config.get("warmup_bars", 100))
+        # Cold-start fallback (fixed ± thresholds from WF calibration)
+        fb = self.dir_reg_config.get("fallback", {})
+        self.dir_fallback_strong_up = float(fb.get("strong_up", 0.00175))
+        self.dir_fallback_strong_dn = float(fb.get("strong_dn", -0.00175))
+        self.dir_fallback_mod_up = float(fb.get("moderate_up", 0.00105))
+        self.dir_fallback_mod_dn = float(fb.get("moderate_dn", -0.00105))
+        # Rolling buffer of signed predictions for percentile calc
+        self.dir_pred_history = deque(maxlen=self.dir_pct_window)
 
+        self.dual_dir_model = xgb.XGBRegressor()
         self.dual_dir_model.load_model(str(DUAL_MODEL_DIR / "direction_xgb.json"))
         with open(DUAL_MODEL_DIR / "direction_feature_cols.json") as f:
             self.dual_dir_features = json.load(f)
@@ -290,29 +146,27 @@ class IndicatorEngine:
                 stats = json.load(f)
             self.pred_history = deque(stats.get("pred_history", []), maxlen=500)
             # Direction regression warmup buffer (signed predictions)
-            if self.dir_model_type == "regression":
-                dir_hist = stats.get("dir_pred_history", [])
-                self.dir_pred_history = deque(
-                    dir_hist, maxlen=self.dir_pct_window)
+            dir_hist = stats.get("dir_pred_history", [])
+            self.dir_pred_history = deque(
+                dir_hist, maxlen=self.dir_pct_window)
         else:
             self.pred_history = deque(maxlen=500)
 
-        dir_hist_len = (len(self.dir_pred_history)
-                        if self.dir_model_type == "regression" else 0)
+        dir_hist_len = len(self.dir_pred_history)
         logger.info("IndicatorEngine v7 (dual-model, dir_type=%s) loaded: "
                      "direction=%d features, magnitude=%d features, "
-                     "%d mag-warmup, %d dir-warmup%s",
+                     "%d mag-warmup, %d dir-warmup, decoding=%s "
+                     "top=%.2f",
                      self.dir_model_type,
                      len(self.dual_dir_features), len(self.dual_mag_features),
                      len(self.pred_history),
                      dir_hist_len,
-                     (f", decoding={self.dir_decoding} "
-                      f"top={self.dir_strong_top_frac:.2f}"
-                      if self.dir_model_type == "regression" else ""))
+                     self.dir_decoding,
+                     self.dir_strong_top_frac)
 
     def backfill_mag_pred(self, features: pd.DataFrame) -> pd.Series:
         """Predict magnitude only — no state changes. For backfilling historical bars."""
-        if self.mode != "dual" or not hasattr(self, "dual_mag_model"):
+        if not hasattr(self, "dual_mag_model"):
             return pd.Series(np.nan, index=features.index)
 
         X = features.reindex(columns=self.dual_mag_features, fill_value=0).fillna(0).values
@@ -367,14 +221,8 @@ class IndicatorEngine:
         else:
             regime = full_regime
 
-        if self.mode == "dual":
-            return self._predict_dual(features, regime,
-                                      update_history=update_history)
-        elif self.mode == "regime":
-            return self._predict_regime(features, None, regime)
-        else:
-            X = features[self.feature_cols].fillna(0).values
-            return self._predict_legacy(features, X, regime)
+        return self._predict_dual(features, regime,
+                                  update_history=update_history)
 
     # ── Dual-model prediction (v7) ──────────────────────────────────────
 
@@ -384,9 +232,9 @@ class IndicatorEngine:
         """
         Dual-model inference: independent direction + magnitude pipelines.
 
-        Direction: P(UP) from XGBClassifier → direction + confidence
-        Magnitude: |return_4h| from XGBRegressor → expected move size
-        Combined: pred_return_4h = sign × magnitude
+        Direction: XGBRegressor → signed 4h path return → rolling percentile decode
+        Magnitude: XGBRegressor → |return_4h| in σ-units → × realized_vol
+        Combined: pred_return_4h comes directly from direction regression head
         """
         n = len(features)
 
@@ -396,16 +244,12 @@ class IndicatorEngine:
             for c in dir_missing:
                 features[c] = np.nan
         X_dir = features[self.dual_dir_features].fillna(0).values
-        if self.dir_model_type == "regression":
-            # Regression: predicts signed 4h path return directly
-            dir_pred_ret = self.dual_dir_model.predict(X_dir).astype(float)
-            # Synthesize a P(UP)-like value for legacy downstream code
-            # (charts, BBP, log fields). sigmoid(pred_ret * 200) maps a ±1%
-            # return to ≈0.88 / ≈0.12, preserving monotonicity with pred_ret.
-            dir_prob = 1.0 / (1.0 + np.exp(-dir_pred_ret * 200.0))
-        else:
-            dir_pred_ret = None  # legacy: synthesized from mag below
-            dir_prob = self.dual_dir_model.predict_proba(X_dir)[:, 1]  # P(UP)
+        # Regression: predicts signed 4h path return directly
+        dir_pred_ret = self.dual_dir_model.predict(X_dir).astype(float)
+        # Synthesize a P(UP)-like value for legacy downstream code
+        # (charts, BBP, log fields). sigmoid(pred_ret * 200) maps a ±1%
+        # return to ≈0.88 / ≈0.12, preserving monotonicity with pred_ret.
+        dir_prob = 1.0 / (1.0 + np.exp(-dir_pred_ret * 200.0))
 
         # ── Magnitude model ──
         mag_missing = [c for c in self.dual_mag_features if c not in features.columns]
@@ -431,8 +275,8 @@ class IndicatorEngine:
             logger.warning("realized_vol_20b not in features, using fallback vol=0.005")
             mag_pred = mag_pred_sigma * 0.005
 
-        # Magnitude score is computed up-front for both modes (used in
-        # confidence display only — regression mode does NOT gate Strong on it).
+        # Magnitude score is computed up-front (used in confidence display
+        # — regression mode does NOT gate Strong on it).
         mag_score = self._compute_mag_score(mag_pred_sigma,
                                                 update_history=update_history)
 
@@ -441,96 +285,83 @@ class IndicatorEngine:
         pred_return = np.zeros(n)
         confidence = np.full(n, np.nan)
 
-        if self.dir_model_type == "regression":
-            # ── Regression direction path (rolling percentile decoding) ──
-            # For each bar we:
-            #   1. push pred into dir_pred_history
-            #   2. if buffer < warmup, use fallback fixed thresholds
-            #      (calibrated at export time from full WF predictions)
-            #   3. else compute upper/lower quantile cutoffs from the buffer
-            #      (strong_top_frac / 2 on each side — symmetric two-tailed)
-            #   4. |pred| outside the cutoffs → Strong; otherwise check
-            #      moderate cutoffs; else NEUTRAL/Weak
-            strong_frac = self.dir_strong_top_frac
-            mod_frac = self.dir_moderate_top_frac
-            warmup = self.dir_warmup_bars
+        # ── Regression direction path (rolling percentile decoding) ──
+        # For each bar we:
+        #   1. push pred into dir_pred_history
+        #   2. if buffer < warmup, use fallback fixed thresholds
+        #      (calibrated at export time from full WF predictions)
+        #   3. else compute upper/lower quantile cutoffs from the buffer
+        #      (strong_top_frac / 2 on each side — symmetric two-tailed)
+        #   4. |pred| outside the cutoffs → Strong; otherwise check
+        #      moderate cutoffs; else NEUTRAL/Weak
+        strong_frac = self.dir_strong_top_frac
+        mod_frac = self.dir_moderate_top_frac
+        warmup = self.dir_warmup_bars
 
-            for i in range(n):
-                p = float(dir_pred_ret[i])
-                abs_p = abs(p)
+        for i in range(n):
+            p = float(dir_pred_ret[i])
+            abs_p = abs(p)
 
-                # Update rolling buffer BEFORE computing the cutoff so that
-                # "now" is included — consistent with mag_score expanding pctile.
-                # Skip when re-scoring historical bars to avoid buffer contamination.
-                if update_history:
-                    self.dir_pred_history.append(p)
-                buf_len = len(self.dir_pred_history)
+            # Update rolling buffer BEFORE computing the cutoff so that
+            # "now" is included — consistent with mag_score expanding pctile.
+            # Skip when re-scoring historical bars to avoid buffer contamination.
+            if update_history:
+                self.dir_pred_history.append(p)
+            buf_len = len(self.dir_pred_history)
 
-                if buf_len < warmup:
-                    # Cold start → fixed fallback thresholds
-                    up_strong = self.dir_fallback_strong_up
-                    dn_strong = self.dir_fallback_strong_dn
-                    up_mod = self.dir_fallback_mod_up
-                    dn_mod = self.dir_fallback_mod_dn
-                else:
-                    buf = np.fromiter(self.dir_pred_history, dtype=float)
-                    up_strong = float(np.quantile(buf, 1.0 - strong_frac / 2.0))
-                    dn_strong = float(np.quantile(buf, strong_frac / 2.0))
-                    up_mod = float(np.quantile(buf, 1.0 - mod_frac / 2.0))
-                    dn_mod = float(np.quantile(buf, mod_frac / 2.0))
+            if buf_len < warmup:
+                # Cold start → fixed fallback thresholds
+                up_strong = self.dir_fallback_strong_up
+                dn_strong = self.dir_fallback_strong_dn
+                up_mod = self.dir_fallback_mod_up
+                dn_mod = self.dir_fallback_mod_dn
+            else:
+                buf = np.fromiter(self.dir_pred_history, dtype=float)
+                up_strong = float(np.quantile(buf, 1.0 - strong_frac / 2.0))
+                dn_strong = float(np.quantile(buf, strong_frac / 2.0))
+                up_mod = float(np.quantile(buf, 1.0 - mod_frac / 2.0))
+                dn_mod = float(np.quantile(buf, mod_frac / 2.0))
 
-                # Direction decision: threshold-based using dynamic cutoffs
-                if p >= up_strong:
-                    direction[i] = "UP"
-                    strength_tier[i] = "Strong"
-                elif p <= dn_strong:
-                    direction[i] = "DOWN"
-                    strength_tier[i] = "Strong"
-                elif p >= up_mod:
-                    direction[i] = "UP"
-                    strength_tier[i] = "Moderate"
-                elif p <= dn_mod:
-                    direction[i] = "DOWN"
-                    strength_tier[i] = "Moderate"
-                # else direction stays NEUTRAL / tier stays Weak
+            # Regime-aware contra-trend suppression: widen the threshold that
+            # fights the prevailing regime, keep the aligned side untouched.
+            # CLAUDE.md: "DOWN signals in BULL need 2.5x more conviction";
+            # mirrored symmetrically for BEAR (UP needs 2.5x in TRENDING_BEAR).
+            reg_i = regime[i] if regime is not None else "CHOPPY"
+            up_mul = BULL_CONTRA_PENALTY if reg_i == "TRENDING_BEAR" else 1.0
+            dn_mul = BULL_CONTRA_PENALTY if reg_i == "TRENDING_BULL" else 1.0
+            up_strong_eff = up_strong * up_mul
+            up_mod_eff = up_mod * up_mul
+            dn_strong_eff = dn_strong * dn_mul  # negative × 2.5 → more negative
+            dn_mod_eff = dn_mod * dn_mul
 
-                # pred_return_4h comes DIRECTLY from the regression head.
-                pred_return[i] = p
+            # Direction decision: threshold-based using regime-adjusted cutoffs
+            if p >= up_strong_eff:
+                direction[i] = "UP"
+                strength_tier[i] = "Strong"
+            elif p <= dn_strong_eff:
+                direction[i] = "DOWN"
+                strength_tier[i] = "Strong"
+            elif p >= up_mod_eff:
+                direction[i] = "UP"
+                strength_tier[i] = "Moderate"
+            elif p <= dn_mod_eff:
+                direction[i] = "DOWN"
+                strength_tier[i] = "Moderate"
+            # else direction stays NEUTRAL / tier stays Weak
 
-                # Confidence 0-100: 80 pts from |pred_ret| scaled to the
-                # current Strong cutoff magnitude, + 20 pts mag percentile.
-                ref = max(abs(up_strong), abs(dn_strong), 1e-6)
-                ret_score = min(abs_p / ref, 1.0) ** 0.6 * 80
-                ms = mag_score[i] if not np.isnan(mag_score[i]) else 50.0
-                mag_bonus = (ms / 100) * 20
-                confidence[i] = float(np.clip(ret_score + mag_bonus, 0, 100))
-        else:
-            # ── Legacy binary direction path ──
-            for i in range(n):
-                if dir_prob[i] > DUAL_DIR_UP_TH:
-                    direction[i] = "UP"
-                elif dir_prob[i] < DUAL_DIR_DN_TH:
-                    direction[i] = "DOWN"
+            # pred_return_4h comes DIRECTLY from the regression head.
+            pred_return[i] = p
 
-            for i in range(n):
-                if direction[i] == "UP":
-                    pred_return[i] = mag_pred[i]
-                elif direction[i] == "DOWN":
-                    pred_return[i] = -mag_pred[i]
-                else:
-                    pred_return[i] = (dir_prob[i] - 0.5) * 2 * mag_pred[i]
+            # Confidence 0-100: 80 pts from |pred_ret| scaled to the
+            # current Strong cutoff magnitude, + 20 pts mag percentile.
+            # Use the unadjusted ref to keep confidence comparable across regimes.
+            ref = max(abs(up_strong), abs(dn_strong), 1e-6)
+            ret_score = min(abs_p / ref, 1.0) ** 0.6 * 80
+            ms = mag_score[i] if not np.isnan(mag_score[i]) else 50.0
+            mag_bonus = (ms / 100) * 20
+            confidence[i] = float(np.clip(ret_score + mag_bonus, 0, 100))
 
-            for i in range(n):
-                dir_dist = abs(dir_prob[i] - 0.5)
-                dir_score = (dir_dist / 0.5) ** 0.6 * 80
-                ms = mag_score[i] if not np.isnan(mag_score[i]) else 50.0
-                mag_bonus = (ms / 100) * 20
-                confidence[i] = np.clip(dir_score + mag_bonus, 0, 100)
-
-            strength_tier[confidence >= MODERATE_THRESHOLD] = "Moderate"
-            strength_tier[confidence >= STRONG_THRESHOLD] = "Strong"
-
-        # ── Bull/Bear Power (unchanged) ──
+        # ── Bull/Bear Power ──
         bbp = self._compute_bbp(features)
 
         # ── Output ──
@@ -546,249 +377,8 @@ class IndicatorEngine:
         out["strength_raw"] = dir_prob - 0.5  # direction strength
         out["dynamic_deadzone"] = np.full(n, 0.1)
         out["dir_prob_up"] = dir_prob
-        out["mag_pred"] = mag_pred      # new: raw magnitude prediction
-        if self.dir_model_type == "regression":
-            out["dir_pred_ret"] = dir_pred_ret  # raw regression output
-
-        for c in ["open", "high", "low", "close"]:
-            if c in features.columns:
-                out[c] = features[c].values
-
-        return out
-
-    # ── Regime-conditional prediction ─────────────────────────────────────
-
-    def _predict_regime(self, features: pd.DataFrame,
-                        X: np.ndarray, regime: np.ndarray) -> pd.DataFrame:
-        n = len(features)
-
-        # Build per-target X matrices (may differ in feature count)
-        target_X: dict[str, np.ndarray] = {}
-        for target in ACTIVE_TARGETS:
-            tc = self.target_feature_cols.get(target, self.feature_cols)
-            target_X[target] = features[tc].fillna(0).values
-
-        # Helper: predict one target for all bars
-        def _predict_target(target_name: str) -> np.ndarray:
-            arr = np.zeros(n)
-            models = self.models.get(target_name)
-            if models is None:
-                return arr
-            for i in range(n):
-                r = regime[i]
-                x_i = target_X[target_name][i:i+1]
-                global_model = models.get("global")
-                regime_model = models.get(r)
-                if global_model is None:
-                    continue
-                global_p = float(global_model.predict(x_i)[0])
-                if regime_model is not None and r != "WARMUP":
-                    regime_p = float(regime_model.predict(x_i)[0])
-                    arr[i] = ((1 - REGIME_BLEND_WEIGHT) * global_p +
-                              REGIME_BLEND_WEIGHT * regime_p)
-                else:
-                    arr[i] = global_p
-            return np.maximum(arr, 0)  # up/down moves >= 0
-
-        # 4h predictions
-        up_pred_4h = _predict_target("up_move_vol_adj")
-        down_pred_4h = _predict_target("down_move_vol_adj")
-        strength_4h = up_pred_4h - down_pred_4h
-
-        # 1h predictions (if models available)
-        up_pred_1h = _predict_target("up_move_1h_vol_adj")
-        down_pred_1h = _predict_target("down_move_1h_vol_adj")
-        has_1h = "up_move_1h_vol_adj" in self.models
-        strength_1h = up_pred_1h - down_pred_1h
-
-        # Blend: 4h + 1h (fall back to 4h-only if no 1h models)
-        if has_1h:
-            strength = BLEND_4H * strength_4h + BLEND_1H * strength_1h
-            up_pred = BLEND_4H * up_pred_4h + BLEND_1H * up_pred_1h
-            down_pred = BLEND_4H * down_pred_4h + BLEND_1H * down_pred_1h
-            logger.debug("Dual-horizon blend: 4h=%.2f, 1h=%.2f", BLEND_4H, BLEND_1H)
-        else:
-            strength = strength_4h
-            up_pred = up_pred_4h
-            down_pred = down_pred_4h
-
-        # Bull/Bear Power (compute early — needed for confirmation gate)
-        bbp = self._compute_bbp(features)
-
-        # ── Dynamic deadzone ──────────────────────────────────────────
-        # Scale deadzone by realized vol ratio and regime
-        dynamic_dz = self._compute_dynamic_deadzone(features, regime)
-
-        # ── Direction with hysteresis + cooldown ─────────────────────
-        # Initial direction from strength vs deadzone
-        direction = np.full(n, "NEUTRAL", dtype=object)
-        prev_dir = "NEUTRAL"
-        bars_since_flip = 999  # bars since last direction change
-
-        for i in range(n):
-            dz = dynamic_dz[i]
-            s = strength[i]
-
-            # Compute candidate direction
-            if prev_dir == "NEUTRAL":
-                if s > dz:
-                    candidate = "UP"
-                elif s < -dz:
-                    candidate = "DOWN"
-                else:
-                    candidate = "NEUTRAL"
-            elif prev_dir == "UP":
-                if s < -(dz * HYSTERESIS_MULT):
-                    candidate = "DOWN"
-                elif s > dz * 0.5:
-                    candidate = "UP"
-                else:
-                    candidate = "NEUTRAL"
-            elif prev_dir == "DOWN":
-                if s > dz * HYSTERESIS_MULT:
-                    candidate = "UP"
-                elif s < -dz * 0.5:
-                    candidate = "DOWN"
-                else:
-                    candidate = "NEUTRAL"
-            else:
-                candidate = "NEUTRAL"
-
-            # Cooldown: if we flipped recently, hold previous direction
-            if candidate != prev_dir and prev_dir != "NEUTRAL":
-                if bars_since_flip < FLIP_COOLDOWN_BARS:
-                    candidate = prev_dir  # hold, don't flip yet
-
-            # Track flips
-            if candidate != prev_dir:
-                bars_since_flip = 0
-            else:
-                bars_since_flip += 1
-
-            direction[i] = candidate
-            prev_dir = candidate
-
-        # ── BBP confirmation gate ─────────────────────────────────────
-        # If BBP disagrees with strength direction, demote to NEUTRAL
-        if BBP_CONFIRM_ENABLED:
-            for i in range(n):
-                if direction[i] == "NEUTRAL":
-                    continue
-                if direction[i] == "UP" and bbp[i] < -BBP_CONFIRM_THRESHOLD:
-                    direction[i] = "NEUTRAL"
-                elif direction[i] == "DOWN" and bbp[i] > BBP_CONFIRM_THRESHOLD:
-                    direction[i] = "NEUTRAL"
-
-        # ── Direction classifier override (high-confidence only) ────────
-        dir_prob = np.full(n, 0.5)  # default: uncertain
-        if self.dir_model is not None:
-            try:
-                dir_X = self._prepare_direction_features(features)
-                dir_prob = self.dir_model.predict_proba(dir_X)[:, 1]  # P(up)
-                # Only override when classifier is very confident
-                # Skip override in CHOPPY regime (model unreliable in ranging markets)
-                for i in range(n):
-                    if DIR_CHOPPY_DISABLED and regime[i] == "CHOPPY":
-                        continue
-                    # TRENDING_BULL fix: suppress contra-trend (DOWN) signals
-                    # Model IC=-0.03 in bull → DOWN predictions unreliable
-                    if regime[i] == "TRENDING_BULL":
-                        # UP signals: normal threshold
-                        if dir_prob[i] > DIR_HIGH_CONF and direction[i] != "UP":
-                            direction[i] = "UP"
-                        # DOWN signals: much stricter threshold
-                        elif dir_prob[i] < DIR_LOW_CONF / BULL_CONTRA_PENALTY and direction[i] != "DOWN":
-                            direction[i] = "DOWN"
-                        # (else: don't override to DOWN in bull)
-                    # TRENDING_BEAR: mirror — suppress UP signals
-                    elif regime[i] == "TRENDING_BEAR":
-                        if dir_prob[i] < DIR_LOW_CONF and direction[i] != "DOWN":
-                            direction[i] = "DOWN"
-                        elif dir_prob[i] > 1 - DIR_LOW_CONF / BULL_CONTRA_PENALTY and direction[i] != "UP":
-                            direction[i] = "UP"
-                    else:
-                        if dir_prob[i] > DIR_HIGH_CONF and direction[i] != "UP":
-                            direction[i] = "UP"
-                        elif dir_prob[i] < DIR_LOW_CONF and direction[i] != "DOWN":
-                            direction[i] = "DOWN"
-                n_override = int(np.sum((dir_prob > DIR_HIGH_CONF) | (dir_prob < DIR_LOW_CONF)))
-                if n_override > 0:
-                    logger.info("Direction model: %d/%d bars overridden", n_override, n)
-            except Exception as e:
-                logger.warning("Direction model inference failed: %s", e)
-
-        # Synthetic pred_return_4h (for chart compatibility)
-        # Scale strength to approximate return scale
-        pred_return = strength * 0.003  # rough scaling factor
-
-        # Mag score (expanding percentile of |strength|)
-        mag_score = self._compute_mag_score(strength)
-
-        # Confidence = mag_score only (regime_score removed —
-        # trailing IC is unreliable: inflated during cold-start from
-        # in-sample overlap, then collapses to ~0 on true OOS data)
-        confidence = np.clip(mag_score, 0, 100)
-
-        # Strength tiers
-        strength_tier = np.full(n, "Weak", dtype=object)
-        strength_tier[confidence >= MODERATE_THRESHOLD] = "Moderate"
-        strength_tier[confidence >= STRONG_THRESHOLD] = "Strong"
-        strength_tier[np.isnan(confidence)] = "Weak"
-
-        out = pd.DataFrame(index=features.index)
-        out["pred_return_4h"] = pred_return
-        out["pred_direction"] = direction
-        out["confidence_score"] = confidence
-        out["strength_score"] = strength_tier
-        out["bull_bear_power"] = bbp
-        out["regime"] = regime
-        out["up_pred"] = up_pred
-        out["down_pred"] = down_pred
-        out["strength_raw"] = strength
-        out["dynamic_deadzone"] = dynamic_dz
-        out["dir_prob_up"] = dir_prob
-
-        for c in ["open", "high", "low", "close"]:
-            if c in features.columns:
-                out[c] = features[c].values
-
-        return out
-
-    def _prepare_direction_features(self, features: pd.DataFrame) -> np.ndarray:
-        """Prepare feature matrix for direction classifier."""
-        missing = [c for c in self.dir_feature_cols if c not in features.columns]
-        if missing:
-            logger.debug("Direction model missing %d features (zero-filled)", len(missing))
-            for c in missing:
-                features[c] = np.nan
-        return features[self.dir_feature_cols].fillna(0).values
-
-    # ── Legacy prediction (v2 fallback) ───────────────────────────────────
-
-    def _predict_legacy(self, features: pd.DataFrame,
-                        X: np.ndarray, regime: np.ndarray) -> pd.DataFrame:
-        pred_raw = self.legacy_model.predict(X)
-
-        direction = np.where(pred_raw > 0.0006, "UP",
-                    np.where(pred_raw < -0.0006, "DOWN", "NEUTRAL"))
-
-        mag_score = self._compute_mag_score(pred_raw)
-        confidence = np.clip(mag_score, 0, 100)
-
-        strength = np.full(len(pred_raw), "Weak", dtype=object)
-        strength[confidence >= MODERATE_THRESHOLD] = "Moderate"
-        strength[confidence >= STRONG_THRESHOLD] = "Strong"
-        strength[np.isnan(confidence)] = "Weak"
-
-        bbp = self._compute_bbp(features)
-
-        out = pd.DataFrame(index=features.index)
-        out["pred_return_4h"] = pred_raw
-        out["pred_direction"] = direction
-        out["confidence_score"] = confidence
-        out["strength_score"] = strength
-        out["bull_bear_power"] = bbp
-        out["regime"] = regime
+        out["mag_pred"] = mag_pred      # raw magnitude prediction
+        out["dir_pred_ret"] = dir_pred_ret  # raw regression output
 
         for c in ["open", "high", "low", "close"]:
             if c in features.columns:
@@ -857,19 +447,6 @@ class IndicatorEngine:
 
         return regime
 
-    # ── Actual returns for regime IC ──────────────────────────────────────
-
-    @staticmethod
-    def _compute_actual_returns(df: pd.DataFrame) -> np.ndarray:
-        """Compute realized 4h returns — only for bars where outcome is known.
-        Last HORIZON_BARS entries are NaN (no future data used)."""
-        close = df["close"].values.astype(float)
-        y = np.full(len(close), np.nan)
-        # Only compute for bars where the 4h outcome has already occurred
-        for i in range(len(close) - HORIZON_BARS):
-            y[i] = close[i + HORIZON_BARS] / close[i] - 1
-        return y
-
     # ── Mag score (expanding percentile) ──────────────────────────────────
 
     def _compute_mag_score(self, pred: np.ndarray,
@@ -891,44 +468,6 @@ class IndicatorEngine:
             mag_score[i] = (hist_arr < abs_pred[i]).sum() / len(hist_arr) * 100
 
         return mag_score
-
-    # ── Regime score (trailing IC) ────────────────────────────────────────
-
-    def _compute_regime_score(self, pred: np.ndarray, y: np.ndarray,
-                              regime: np.ndarray) -> np.ndarray:
-        regime_score = np.full(len(pred), np.nan)
-
-        for i in range(len(pred)):
-            if np.isnan(pred[i]):
-                continue
-
-            r = regime[i]
-            if r == "WARMUP":
-                regime_score[i] = 0.8
-                continue
-
-            if r in self.regime_history and len(self.regime_history[r]) >= MIN_REGIME_IC_HISTORY:
-                hist = self.regime_history[r]
-                preds = np.array([h[0] for h in hist])
-                actuals = np.array([h[1] for h in hist])
-                ic, _ = spearmanr(preds, actuals)
-
-                if ic > 0.03:
-                    regime_score[i] = 1.0
-                elif ic > 0:
-                    regime_score[i] = 0.6
-                else:
-                    regime_score[i] = 0.0
-            else:
-                # Cold-start: conservative until IC data accumulates
-                regime_score[i] = 0.6
-
-            if not np.isnan(y[i]):
-                if r not in self.regime_history:
-                    self.regime_history[r] = []
-                self.regime_history[r].append((float(pred[i]), float(y[i])))
-
-        return regime_score
 
     # ── Bull/Bear Power ───────────────────────────────────────────────────
 
