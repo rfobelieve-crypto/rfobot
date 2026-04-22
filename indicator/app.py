@@ -1185,48 +1185,74 @@ def force_update():
 
 @app.route("/admin/flow-bars-stats", methods=["GET"])
 def admin_flow_bars_stats():
-    """Read-only diagnostic: report coverage of flow_bars_1m and
-    normalized_trades tables (populated by the market_data service) for
-    symbol BTC-USD. Used to plan microstructure research — we need
-    enough 1-min orderflow history to run walk-forward IC validation.
+    """Read-only diagnostic: report schema + coverage of flow_bars_1m and
+    normalized_trades tables (populated by the market_data service).
     Does not modify any state.
     """
     from shared.db import get_db_conn
     from datetime import datetime
+
+    # Candidate timestamp columns per table — probe whichever the actual
+    # schema exposes. Different market_data migrations may name the same
+    # concept differently.
+    TS_CANDIDATES = {
+        "flow_bars_1m": ["minute_start_ms", "bucket_ms", "window_start_ms",
+                         "window_start", "ts_ms", "minute_start", "bucket_start_ms"],
+        "normalized_trades": ["ts_exchange", "ts_ms", "ts_received", "ts",
+                              "timestamp_ms"],
+    }
+    SYMBOL_CANDIDATES = ["canonical_symbol", "symbol", "raw_symbol"]
+
     try:
         conn = get_db_conn()
     except Exception as e:
         return jsonify({"status": "error", "error": f"db connect: {e}"}), 500
+
     out = {}
     try:
-        for table, ts_col in [
-            ("flow_bars_1m", "minute_start_ms"),
-            ("normalized_trades", "ts_exchange"),
-        ]:
+        for table, ts_cands in TS_CANDIDATES.items():
+            entry = {}
             with conn.cursor() as cur:
                 cur.execute(f"SHOW TABLES LIKE '{table}'")
                 if not cur.fetchone():
                     out[table] = {"exists": False}
                     continue
-                cur.execute(
-                    f"SELECT COUNT(*) AS n, MIN({ts_col}) AS mn, MAX({ts_col}) AS mx "
-                    f"FROM {table} WHERE canonical_symbol=%s",
-                    ("BTC-USD",),
-                )
+                cur.execute(f"SHOW COLUMNS FROM {table}")
+                cols = [r["Field"] for r in cur.fetchall()]
+                entry["exists"] = True
+                entry["columns"] = cols
+                ts_col = next((c for c in ts_cands if c in cols), None)
+                sym_col = next((c for c in SYMBOL_CANDIDATES if c in cols), None)
+                entry["ts_col_used"] = ts_col
+                entry["sym_col_used"] = sym_col
+                if ts_col is None:
+                    entry["error"] = "no known timestamp column matched"
+                    out[table] = entry; continue
+                # Total rows (all symbols)
+                cur.execute(f"SELECT COUNT(*) AS n, MIN({ts_col}) AS mn, MAX({ts_col}) AS mx FROM {table}")
                 r = cur.fetchone()
-                n = int(r["n"]) if r and r["n"] is not None else 0
-                entry = {"exists": True, "rows_btc": n}
-                if n > 0 and r["mn"] and r["mx"]:
+                entry["rows_total"] = int(r["n"]) if r and r["n"] is not None else 0
+                if r and r["mn"] is not None and r["mx"] is not None:
                     mn, mx = int(r["mn"]), int(r["mx"])
-                    t0 = datetime.utcfromtimestamp(mn / 1000).isoformat() + "Z"
-                    t1 = datetime.utcfromtimestamp(mx / 1000).isoformat() + "Z"
-                    span_days = (mx - mn) / 1000.0 / 86400.0
-                    entry.update({
-                        "earliest_utc": t0,
-                        "latest_utc": t1,
-                        "span_days": round(span_days, 2),
-                    })
-                out[table] = entry
+                    # Timestamps may be in ms or s — detect by magnitude
+                    divisor = 1000.0 if mn > 10**11 else 1.0
+                    entry["earliest_utc"] = datetime.utcfromtimestamp(mn/divisor).isoformat() + "Z"
+                    entry["latest_utc"] = datetime.utcfromtimestamp(mx/divisor).isoformat() + "Z"
+                    entry["span_days"] = round((mx - mn) / divisor / 86400.0, 2)
+                    entry["ts_units"] = "ms" if divisor == 1000.0 else "s"
+                # BTC-only if we found a symbol column
+                if sym_col is not None:
+                    btc_counts = {}
+                    for cand in ["BTC-USD", "BTCUSDT", "BTC-USDT-SWAP", "BTC"]:
+                        cur.execute(
+                            f"SELECT COUNT(*) n FROM {table} WHERE {sym_col}=%s",
+                            (cand,),
+                        )
+                        n = cur.fetchone()["n"]
+                        if n > 0:
+                            btc_counts[cand] = int(n)
+                    entry["btc_row_counts_by_symbol_value"] = btc_counts
+            out[table] = entry
         return jsonify({"status": "ok", "tables": out})
     except Exception as e:
         logger.exception("flow_bars_stats query failed")
