@@ -1199,12 +1199,15 @@ def admin_db_health_all():
 
     # ── MySQL tables ──
     # (table, ts_col, expected_max_stale_hours, per-scope-breakdown)
+    # Notes:
+    #   normalized_trades: always 0 by design (SAVE_RAW_TRADES=false)
+    #   liquidity_events / sweep_outcomes: written by main bot
+    #     (BTC_perp_data.py). Not critical for indicator service.
     TABLES = [
         ("flow_bars_1m", "window_start", 2, True),
-        ("normalized_trades", "ts_exchange", None, False),  # expected 0 by design
+        ("normalized_trades", "ts_exchange", None, False),
         ("indicator_history", "dt", 2, False),
         ("tracked_signals", None, None, False),
-        ("strong_signal_tracking", None, None, False),
         ("liquidity_events", None, None, False),
         ("sweep_outcomes", None, None, False),
     ]
@@ -1328,12 +1331,21 @@ def admin_db_health_all():
                             entry["latest"] = str(df.index.max())
                             stale_h = (datetime.now(timezone.utc) - df.index.max().to_pydatetime()).total_seconds() / 3600
                             entry["stale_hours"] = round(stale_h, 2)
-                            # Klines / CG parquets should be < 2h stale
-                            if "klines" in pq.name.lower() or pq.name.startswith("cg_"):
-                                if stale_h > 2:
-                                    out["issues"].append(
-                                        f"parquet {pq.name}: {stale_h:.1f}h stale (expected < 2h)"
-                                    )
+                            # Staleness check only applies to auto-refresh
+                            # parquets under .data_cache/ (CG / Deribit /
+                            # klines). indicator/model_artifacts/*.parquet
+                            # are git-shipped snapshots that only update on
+                            # deploy — stale latest-row is expected.
+                            is_auto_refresh = (
+                                pq.name.lower().startswith(("cg_", "binance_klines",
+                                                           "deribit_", "coinbase_",
+                                                           "bitfinex_"))
+                                and ".data_cache" in str(pq)
+                            )
+                            if is_auto_refresh and stale_h > 2:
+                                out["issues"].append(
+                                    f"parquet {pq.name}: {stale_h:.1f}h stale (expected < 2h)"
+                                )
                     except Exception:
                         pass
                     out["parquet"][str(pq.relative_to(Path(".")))] = entry
