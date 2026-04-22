@@ -227,6 +227,8 @@ const TEXT = '#7a828e';
 const headerH = 36;
 const footerH = 24;
 const totalH = window.innerHeight - headerH - footerH;
+// see AXIS_W comment below — declared here so makeChart default can use it
+const AXIS_W_DEFAULT = 60;
 const confH = Math.round(totalH * 0.{conf_pct:02d});
 const regimeH = hasRegime ? Math.round(totalH * 0.{regime_pct:02d}) : 0;
 const priceH = Math.round(totalH * 0.{price_pct:02d});
@@ -246,16 +248,24 @@ function makeChart(container, height, opts) {{
       timeVisible: true, secondsVisible: false,
       borderColor: GRID,
     }},
-    rightPriceScale: {{ borderColor: GRID }},
+    rightPriceScale: {{ borderColor: GRID, minimumWidth: AXIS_W_DEFAULT }},
     ...opts,
   }});
   return chart;
 }}
 
+// Align every chart's price-axis width to AXIS_W so plot areas line up
+// across panes. Without this, each pane's axis width depends on its own
+// tick label length (price "78119.57" ≫ bbp "0.500"), producing visual
+// drift between the Confidence heatmap, regime strip, candlesticks, and
+// BBP panel. minimumWidth is a Lightweight Charts v4.1+ hint; ignored
+// gracefully on older versions.
+const AXIS_W = 60;
+
 // ── Confidence chart ──
 const confChart = makeChart('chart-conf', confH, {{
   rightPriceScale: {{ visible: true, borderVisible: false, drawTicks: false,
-    scaleMargins: {{ top: 0, bottom: 0 }} }},
+    scaleMargins: {{ top: 0, bottom: 0 }}, minimumWidth: AXIS_W }},
 }});
 const confSeries = confChart.addHistogramSeries({{
   priceFormat: {{ type: 'custom', formatter: (v) => (v * 100).toFixed(0) + '%' }},
@@ -267,12 +277,19 @@ confSeries.setData(confData);
 // ── Regime strip ──
 // Histogram series with per-bar color encoding the regime. Value=1 for
 // every bar, so the visual is a uniform color band where the color tells
-// the regime. Price axis hidden since value is uninformative.
+// the regime. Price axis kept VISIBLE (but empty label) to reserve the
+// same horizontal width as sibling charts — otherwise the strip's
+// plot area is ~50px wider and the bars drift out of alignment with
+// the Confidence heatmap and candlestick above/below.
 let regimeChart = null;
 let regimeSeries = null;
 if (hasRegime) {{
   regimeChart = makeChart('chart-regime', regimeH, {{
-    rightPriceScale: {{ visible: false }},
+    rightPriceScale: {{
+      visible: true, borderVisible: false, drawTicks: false,
+      ticksVisible: false, entireTextOnly: true,
+      scaleMargins: {{ top: 0, bottom: 0 }}, minimumWidth: AXIS_W,
+    }},
     timeScale: {{ visible: false, borderColor: GRID }},
   }});
   regimeSeries = regimeChart.addHistogramSeries({{
@@ -286,7 +303,7 @@ if (hasRegime) {{
 
 // ── Price chart ──
 const priceChart = makeChart('chart-price', priceH, {{
-  rightPriceScale: {{ autoScale: true }},
+  rightPriceScale: {{ autoScale: true, minimumWidth: AXIS_W }},
 }});
 const candleSeries = priceChart.addCandlestickSeries({{
   upColor: '#26a69a', downColor: '#ef5350',
