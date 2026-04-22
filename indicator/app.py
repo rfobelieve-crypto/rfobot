@@ -1183,6 +1183,170 @@ def force_update():
         return jsonify({"status": "update_triggered"})
 
 
+@app.route("/admin/db-health-all", methods=["GET"])
+def admin_db_health_all():
+    """Comprehensive health sweep across MySQL tables + parquet files.
+    Read-only. Reports row counts, date ranges, staleness for every
+    data source the system depends on (production + accumulating)."""
+    from shared.db import get_db_conn
+    from datetime import datetime, timezone
+    import os as _os
+    import pandas as _pd
+
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    out = {"generated_at_utc": datetime.now(timezone.utc).isoformat(),
+           "mysql": {}, "parquet": {}, "issues": []}
+
+    # ── MySQL tables ──
+    # (table, ts_col, expected_max_stale_hours, per-scope-breakdown)
+    TABLES = [
+        ("flow_bars_1m", "window_start", 2, True),
+        ("normalized_trades", "ts_exchange", None, False),  # expected 0 by design
+        ("indicator_history", "dt", 2, False),
+        ("tracked_signals", None, None, False),
+        ("strong_signal_tracking", None, None, False),
+        ("liquidity_events", None, None, False),
+        ("sweep_outcomes", None, None, False),
+    ]
+
+    try:
+        conn = get_db_conn()
+    except Exception as e:
+        return jsonify({"status": "error", "error": f"db connect: {e}"}), 500
+
+    try:
+        for table, ts_col, max_stale_h, per_scope in TABLES:
+            entry = {}
+            with conn.cursor() as cur:
+                cur.execute("SHOW TABLES LIKE %s", (table,))
+                if not cur.fetchone():
+                    entry["exists"] = False
+                    out["mysql"][table] = entry
+                    continue
+                entry["exists"] = True
+                cur.execute(f"SELECT COUNT(*) AS n FROM {table}")
+                entry["rows_total"] = int(cur.fetchone()["n"])
+
+                if ts_col:
+                    # Find units by sample magnitude
+                    cur.execute(f"SELECT MIN({ts_col}) AS mn, MAX({ts_col}) AS mx FROM {table}")
+                    r = cur.fetchone()
+                    if r and r["mn"] is not None and r["mx"] is not None:
+                        mn, mx = r["mn"], r["mx"]
+                        if isinstance(mn, (datetime,)):
+                            mn_ms = int(mn.replace(tzinfo=timezone.utc).timestamp()*1000)
+                            mx_ms = int(mx.replace(tzinfo=timezone.utc).timestamp()*1000)
+                            unit = "datetime"
+                        else:
+                            mn, mx = int(mn), int(mx)
+                            unit = "ms" if mn > 10**11 else "s"
+                            divisor = 1000 if unit == "ms" else 1
+                            mn_ms, mx_ms = mn*(1000//divisor), mx*(1000//divisor)
+                        entry["earliest_utc"] = datetime.utcfromtimestamp(mn_ms/1000).isoformat() + "Z"
+                        entry["latest_utc"] = datetime.utcfromtimestamp(mx_ms/1000).isoformat() + "Z"
+                        entry["span_days"] = round((mx_ms - mn_ms) / 1000 / 86400, 2)
+                        stale_h = (now_ms - mx_ms) / 1000 / 3600
+                        entry["stale_hours"] = round(stale_h, 2)
+                        if max_stale_h is not None and stale_h > max_stale_h:
+                            out["issues"].append(
+                                f"{table} stale: {stale_h:.1f}h > expected {max_stale_h}h"
+                            )
+
+                # Per-scope breakdown for flow_bars_1m
+                if per_scope and table == "flow_bars_1m":
+                    cur.execute(
+                        "SELECT exchange_scope, COUNT(*) AS n, "
+                        f"MIN({ts_col}) AS mn, MAX({ts_col}) AS mx "
+                        "FROM flow_bars_1m WHERE canonical_symbol='BTC-USD' "
+                        "GROUP BY exchange_scope"
+                    )
+                    scopes = {}
+                    for r in cur.fetchall():
+                        stale_h = (now_ms - int(r["mx"])) / 1000 / 3600 if r["mx"] else None
+                        scopes[r["exchange_scope"]] = {
+                            "rows_btc": int(r["n"]),
+                            "latest_utc": datetime.utcfromtimestamp(int(r["mx"])/1000).isoformat() + "Z" if r["mx"] else None,
+                            "stale_hours": round(stale_h, 2) if stale_h is not None else None,
+                        }
+                    entry["per_scope"] = scopes
+                    # Issue: Bybit should exist after recent deploy
+                    if "bybit" not in scopes:
+                        out["issues"].append("flow_bars_1m: no Bybit scope rows yet (deploy just happened?)")
+
+                # indicator_history: distribution of strengths + regimes
+                if table == "indicator_history":
+                    cur.execute(
+                        "SELECT strength_code, COUNT(*) AS n FROM indicator_history "
+                        "WHERE dt > DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY strength_code"
+                    )
+                    entry["strength_dist_7d"] = {
+                        {3:"Strong",2:"Moderate",1:"Weak"}.get(int(r["strength_code"] or 0), "?"): int(r["n"])
+                        for r in cur.fetchall()
+                    }
+                    cur.execute(
+                        "SELECT COUNT(*) AS n FROM indicator_history "
+                        "WHERE dt > DATE_SUB(NOW(), INTERVAL 7 DAY) AND pred_return_4h = 0 AND confidence_score = 0"
+                    )
+                    n_zero = int(cur.fetchone()["n"])
+                    if n_zero > 0:
+                        out["issues"].append(
+                            f"indicator_history: {n_zero} rows in last 7d with both pred_return_4h=0 and confidence_score=0 (possible NaN)"
+                        )
+
+            out["mysql"][table] = entry
+    except Exception as e:
+        logger.exception("db-health-all mysql query failed")
+        out["issues"].append(f"mysql query error: {e}")
+    finally:
+        try: conn.close()
+        except Exception: pass
+
+    # ── Parquet files (the accumulated feature data that feeds model) ──
+    try:
+        parquet_dirs = [
+            Path("research/dual_model/.cache"),
+            Path(".data_cache"),
+            Path("indicator/model_artifacts"),
+        ]
+        for d in parquet_dirs:
+            if not d.exists(): continue
+            for pq in d.glob("*.parquet"):
+                try:
+                    df = _pd.read_parquet(pq)
+                    mtime = datetime.fromtimestamp(pq.stat().st_mtime, tz=timezone.utc)
+                    entry = {
+                        "exists": True,
+                        "rows": len(df),
+                        "cols": len(df.columns),
+                        "file_mtime_utc": mtime.isoformat(),
+                        "file_size_kb": round(pq.stat().st_size / 1024, 1),
+                    }
+                    # Find date range from index if it's datetime
+                    try:
+                        if _pd.api.types.is_datetime64_any_dtype(df.index):
+                            entry["earliest"] = str(df.index.min())
+                            entry["latest"] = str(df.index.max())
+                            stale_h = (datetime.now(timezone.utc) - df.index.max().to_pydatetime()).total_seconds() / 3600
+                            entry["stale_hours"] = round(stale_h, 2)
+                            # Klines / CG parquets should be < 2h stale
+                            if "klines" in pq.name.lower() or pq.name.startswith("cg_"):
+                                if stale_h > 2:
+                                    out["issues"].append(
+                                        f"parquet {pq.name}: {stale_h:.1f}h stale (expected < 2h)"
+                                    )
+                    except Exception:
+                        pass
+                    out["parquet"][str(pq.relative_to(Path(".")))] = entry
+                except Exception as e:
+                    out["parquet"][str(pq.relative_to(Path(".")))] = {"error": str(e)}
+    except Exception as e:
+        logger.exception("parquet health scan failed")
+        out["issues"].append(f"parquet scan error: {e}")
+
+    out["status"] = "ok" if not out["issues"] else "issues_found"
+    return jsonify(out)
+
+
 @app.route("/admin/flow-bars-export", methods=["GET"])
 def admin_flow_bars_export():
     """Read-only export of flow_bars_1m rows for research.
