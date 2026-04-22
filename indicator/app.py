@@ -1183,6 +1183,49 @@ def force_update():
         return jsonify({"status": "update_triggered"})
 
 
+@app.route("/admin/flow-bars-export", methods=["GET"])
+def admin_flow_bars_export():
+    """Read-only export of flow_bars_1m rows for research.
+    Query params:
+      symbol (default BTC-USD), since_ms (default 0), limit (default 100000).
+    Returns JSON array of rows. Intended for local research caching;
+    do not rely on for anything else."""
+    from shared.db import get_db_conn
+    symbol = request.args.get("symbol", "BTC-USD")
+    since_ms = int(request.args.get("since_ms", "0"))
+    limit = int(request.args.get("limit", "100000"))
+    try:
+        conn = get_db_conn()
+    except Exception as e:
+        return jsonify({"status": "error", "error": f"db connect: {e}"}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT window_start, window_end, buy_notional_usd, "
+                "sell_notional_usd, delta_usd, volume_usd, trade_count, cvd_usd "
+                "FROM flow_bars_1m "
+                "WHERE canonical_symbol=%s AND window_start >= %s "
+                "ORDER BY window_start ASC LIMIT %s",
+                (symbol, since_ms, limit),
+            )
+            rows = cur.fetchall()
+        # Convert Decimal to float for JSON
+        out_rows = []
+        for r in rows:
+            out_rows.append({k: (float(v) if hasattr(v, "as_tuple") else v)
+                             for k, v in r.items()})
+        return jsonify({
+            "status": "ok", "symbol": symbol, "n": len(out_rows),
+            "rows": out_rows,
+        })
+    except Exception as e:
+        logger.exception("flow_bars_export failed")
+        return jsonify({"status": "error", "error": str(e)}), 500
+    finally:
+        try: conn.close()
+        except Exception: pass
+
+
 @app.route("/admin/flow-bars-stats", methods=["GET"])
 def admin_flow_bars_stats():
     """Read-only diagnostic: report schema + coverage of flow_bars_1m and
