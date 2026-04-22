@@ -118,6 +118,15 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     last_dir = str(sig.get("pred_direction", pd.Series("?")).iloc[-1])
     last_conf = float(sig.get("confidence_score", pd.Series(0)).iloc[-1] or 0)
     last_str = str(sig.get("strength_score", pd.Series("?")).iloc[-1])
+    last_reg = str(sig.get("regime", pd.Series("?")).iloc[-1])
+    # Short display: TRENDING_BULL → BULL, etc.
+    reg_short = last_reg.replace("TRENDING_", "")
+    reg_color = {
+        "TRENDING_BULL": "#26a69a",
+        "TRENDING_BEAR": "#ef5350",
+        "CHOPPY":        "#78828f",
+        "WARMUP":        "#999999",
+    }.get(last_reg, "#999999")
 
     # Height ratios for panels
     if has_mag:
@@ -162,7 +171,7 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
 <body>
 <div id="header">
   <span class="title">BTC Market Intelligence Indicator (4h prediction)</span>
-  <span class="info">{last_dir} | Conf {last_conf:.0f}% ({last_str}) | ${last_price:,.0f}</span>
+  <span class="info">{last_dir} | Conf {last_conf:.0f}% ({last_str}) | <span style="color: {reg_color}; font-weight: 600;">{reg_short}</span> | ${last_price:,.0f}</span>
   <span>{last_time}</span>
 </div>
 <div class="chart-wrapper" id="conf-wrapper">

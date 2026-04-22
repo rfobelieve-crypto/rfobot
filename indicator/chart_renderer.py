@@ -24,6 +24,14 @@ logger = logging.getLogger(__name__)
 
 CHART_PATH = Path("/tmp/indicator_chart.png")
 
+# Regime color mapping for the regime strip (Panel 2)
+REGIME_COLORS = {
+    "TRENDING_BULL": "#26a69a",
+    "TRENDING_BEAR": "#ef5350",
+    "CHOPPY":        "#78828f",
+    "WARMUP":        "#eeeeee",
+}
+
 
 def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     """
@@ -48,15 +56,21 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     dates = sig.index
 
     has_mag = "mag_pred" in sig.columns and sig["mag_pred"].notna().any()
+    has_regime = "regime" in sig.columns and sig["regime"].notna().any()
 
-    # Layout: 4 panels (with magnitude) or 3 (legacy)
-    panels = [0.8, 8]  # confidence + candlestick
+    # Layout panels (top → bottom):
+    #   confidence heatmap (0.8) → regime strip (0.3, optional)
+    #   → candlestick (8) → magnitude (2.0, optional) → BBP (2.0)
+    panels = [0.8]                       # confidence heatmap
+    if has_regime:
+        panels.append(0.3)               # regime strip
+    panels.append(8)                     # candlestick
     if has_mag:
-        panels.append(2.0)   # magnitude
-    panels.append(2.0)       # BBP
+        panels.append(2.0)               # magnitude
+    panels.append(2.0)                   # BBP
 
     n_panels = len(panels)
-    fig_h = 9 + 2 * (n_panels - 3)
+    fig_h = 9 + 2 * (n_panels - 3 - (1 if has_regime else 0))
     fig = plt.figure(figsize=(20, fig_h), facecolor="white")
     gs = gridspec.GridSpec(n_panels, 1, height_ratios=panels, hspace=0.05)
 
@@ -82,7 +96,32 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_conf.text(n + 1, 0.5, "Confidence", fontsize=8, va="center",
                  transform=ax_conf.transData)
 
-    # ── Panel 2: Candlestick + direction triangles ───────────────────────
+    # ── Panel 2: Regime strip ────────────────────────────────────────────
+    # Thin horizontal band showing regime over time. Aligned with candlestick
+    # x-axis (same bar indices) so readers can immediately see which bars
+    # fall in TRENDING_BULL / TRENDING_BEAR / CHOPPY windows — useful for
+    # diagnosing contra-trend signal clusters.
+    if has_regime:
+        ax_regime = fig.add_subplot(gs[panel_idx]); panel_idx += 1
+        regimes = sig["regime"].fillna("CHOPPY").astype(str).values
+        reg_colors = [REGIME_COLORS.get(r, REGIME_COLORS["CHOPPY"]) for r in regimes]
+        ax_regime.bar(x, np.ones(n), width=1.0, color=reg_colors, edgecolor="none")
+        ax_regime.set_xlim(-0.5, n - 0.5)
+        ax_regime.set_ylim(0, 1)
+        ax_regime.set_yticks([])
+        ax_regime.set_xticks([])
+        ax_regime.text(n + 1, 0.5, "Regime", fontsize=8, va="center",
+                       transform=ax_regime.transData)
+        # Current regime as a small label at the right edge
+        last_reg = regimes[-1]
+        ax_regime.text(
+            n - 0.5, 0.5, last_reg.replace("TRENDING_", ""),
+            fontsize=7, va="center", ha="right", color="white",
+            fontweight="bold",
+            transform=ax_regime.transData,
+        )
+
+    # ── Panel 3: Candlestick + direction triangles ───────────────────────
     ax_price = fig.add_subplot(gs[panel_idx]); panel_idx += 1
 
     opens = sig["open"].values.astype(float)
