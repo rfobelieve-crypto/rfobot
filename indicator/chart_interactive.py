@@ -33,12 +33,21 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         pass
 
     has_mag = "mag_pred" in sig.columns and sig["mag_pred"].notna().any()
+    has_regime = "regime" in sig.columns and sig["regime"].notna().any()
+
+    REGIME_COLORS = {
+        "TRENDING_BULL": "#26a69a",
+        "TRENDING_BEAR": "#ef5350",
+        "CHOPPY":        "#78828f",
+        "WARMUP":        "#3a3f4a",
+    }
 
     # ── Build data arrays ──
     candle_data = []
     conf_data = []
     mag_data = []
     bbp_data = []
+    regime_data = []
     markers = []
 
     for i, (dt, row) in enumerate(sig.iterrows()):
@@ -86,6 +95,15 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         bbp_color = "#26a69a" if bbp_val > 0 else "#ef5350"
         bbp_data.append({"time": ts, "value": round(bbp_val, 4), "color": bbp_color})
 
+        # Regime strip (value=1 for all bars, color encodes regime)
+        if has_regime:
+            reg_val = str(row.get("regime", "CHOPPY"))
+            regime_data.append({
+                "time": ts,
+                "value": 1,
+                "color": REGIME_COLORS.get(reg_val, REGIME_COLORS["CHOPPY"]),
+            })
+
         # Direction markers (Strong + Moderate)
         strength = str(row.get("strength_score", ""))
         direction = str(row.get("pred_direction", ""))
@@ -128,14 +146,15 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         "WARMUP":        "#999999",
     }.get(last_reg, "#999999")
 
-    # Height ratios for panels
+    # Height ratios for panels. Reserve 5% for regime strip if present.
+    regime_pct = 5 if has_regime else 0
     if has_mag:
-        price_pct = 60
+        price_pct = 60 - regime_pct
         mag_pct_h = 15
         bbp_pct = 15
         conf_pct = 10
     else:
-        price_pct = 70
+        price_pct = 70 - regime_pct
         mag_pct_h = 0
         bbp_pct = 20
         conf_pct = 10
@@ -178,6 +197,7 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
   <div class="chart-label">Confidence</div>
   <div id="chart-conf"></div>
 </div>
+{"<div class='chart-wrapper' id='regime-wrapper'><div class='chart-label'>Regime</div><div id='chart-regime'></div></div>" if has_regime else ""}
 <div class="chart-wrapper" id="price-wrapper">
   <div class="chart-label">Price (USD)</div>
   <div id="chart-price"></div>
@@ -194,8 +214,10 @@ const candleData = {json.dumps(candle_data)};
 const confData = {json.dumps(conf_data)};
 const magData = {json.dumps(mag_data)};
 const bbpData = {json.dumps(bbp_data)};
+const regimeData = {json.dumps(regime_data)};
 const markers = {json.dumps(markers)};
 const hasMag = {'true' if has_mag else 'false'};
+const hasRegime = {'true' if has_regime else 'false'};
 
 const BG = '#0d1117';
 const CARD = '#161b22';
@@ -206,6 +228,7 @@ const headerH = 36;
 const footerH = 24;
 const totalH = window.innerHeight - headerH - footerH;
 const confH = Math.round(totalH * 0.{conf_pct:02d});
+const regimeH = hasRegime ? Math.round(totalH * 0.{regime_pct:02d}) : 0;
 const priceH = Math.round(totalH * 0.{price_pct:02d});
 const magH = hasMag ? Math.round(totalH * 0.{mag_pct_h:02d}) : 0;
 const bbpH = Math.round(totalH * 0.{bbp_pct:02d});
@@ -240,6 +263,26 @@ const confSeries = confChart.addHistogramSeries({{
   lastValueVisible: false,
 }});
 confSeries.setData(confData);
+
+// ── Regime strip ──
+// Histogram series with per-bar color encoding the regime. Value=1 for
+// every bar, so the visual is a uniform color band where the color tells
+// the regime. Price axis hidden since value is uninformative.
+let regimeChart = null;
+let regimeSeries = null;
+if (hasRegime) {{
+  regimeChart = makeChart('chart-regime', regimeH, {{
+    rightPriceScale: {{ visible: false }},
+    timeScale: {{ visible: false, borderColor: GRID }},
+  }});
+  regimeSeries = regimeChart.addHistogramSeries({{
+    priceFormat: {{ type: 'custom', formatter: () => '' }},
+    priceLineVisible: false,
+    lastValueVisible: false,
+    base: 0,
+  }});
+  regimeSeries.setData(regimeData);
+}}
 
 // ── Price chart ──
 const priceChart = makeChart('chart-price', priceH, {{
@@ -300,7 +343,7 @@ const bbpSeries = bbpChart.addHistogramSeries({{
 bbpSeries.setData(bbpData);
 
 // ── Sync all charts (scroll + zoom) ──
-const charts = [confChart, priceChart, magChart, bbpChart].filter(Boolean);
+const charts = [confChart, regimeChart, priceChart, magChart, bbpChart].filter(Boolean);
 
 let isSyncing = false;
 charts.forEach((chart, idx) => {{
@@ -319,6 +362,7 @@ charts.forEach((chart, idx) => {{
 // ── Sync crosshair across all panels ──
 const chartSeriesPairs = [
   [confChart, confSeries, 0.5],
+  hasRegime ? [regimeChart, regimeSeries, 1] : null,
   [priceChart, candleSeries, null],
   hasMag ? [magChart, magSeries, 0] : null,
   [bbpChart, bbpSeries, 0],
