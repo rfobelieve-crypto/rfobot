@@ -50,7 +50,7 @@ def reload_config():
     MODERATE_THRESHOLD  = _cfg("MODERATE_THRESHOLD", 65.0)
     CHOPPY_DEADZONE_MULT = _cfg("CHOPPY_DEADZONE_MULT", 1.60)
     TREND_DEADZONE_MULT = _cfg("TREND_DEADZONE_MULT", 0.90)
-    BULL_CONTRA_PENALTY = _cfg("BULL_CONTRA_PENALTY", 2.5)
+    BULL_CONTRA_PENALTY = _cfg("BULL_CONTRA_PENALTY", 1.0)
     BBP_CONFIRM_THRESHOLD = _cfg("BBP_CONFIRM_THRESHOLD", 0.15)
     BBP_CONFIRM_ENABLED = _cfg("BBP_CONFIRM_ENABLED", True)
     HYSTERESIS_MULT     = _cfg("HYSTERESIS_MULT", 1.40)
@@ -70,8 +70,27 @@ MIN_MAG_HISTORY = 30         # minimum bars before mag_score is valid
 CHOPPY_DEADZONE_MULT = 1.60  # CHOPPY regime: widen deadzone significantly
 TREND_DEADZONE_MULT = 0.90   # TRENDING: slightly tighter (momentum is real)
 
-# TRENDING_BULL fix: model IC=-0.03 in bull regime → contra-trend signals unreliable
-BULL_CONTRA_PENALTY = 2.5    # DOWN signals in BULL need 2.5x more conviction
+# Regime-based contra-trend penalty.  Default 1.0 = no penalty (disabled).
+#
+# History: introduced as 2.5 in commit abcea69 (2026-04-09), based on an
+# in-sample observation that "model IC = -0.03 in BULL regime".  That
+# observation was later shown to be statistically unreliable (mistake log
+# 2026-04-13).
+#
+# 2026-04-22 sensitivity sweep on 3696 WF OOS bars
+# (research/regime_penalty_sensitivity.py) found:
+#   - Overall precision is flat in [65.6%, 65.9%] across penalty ∈ [1.0, 4.0].
+#     95% CIs overlap heavily — no penalty value is statistically distinguishable.
+#   - Contra-trend signal precision (66–78%) is already >= overall; they are
+#     not noise the penalty should suppress.
+#   - Aligned signals (trend-following) precision is 64.1% — LOWER than contra.
+#     The penalty's founding assumption ("contra are noise, aligned are signal")
+#     is reversed by the data.
+# Reverting to 1.0 (no penalty) recovers ~80 more valid signals over the
+# OOS window with no measurable precision cost.  The code path is retained
+# (not deleted) so a future config override can re-enable penalty instantly
+# without a redeploy.
+BULL_CONTRA_PENALTY = 1.0    # no-op by default; set >1 via config to re-enable
 VOL_DEADZONE_SCALE = 0.80    # how much vol ratio affects deadzone (0 = off, 1 = full)
 
 # BBP confirmation gate
