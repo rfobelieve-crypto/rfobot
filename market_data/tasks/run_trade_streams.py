@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from market_data.adapters.okx_trades import OKXTradeAdapter
 from market_data.adapters.binance_trades import BinanceTradeAdapter
+from market_data.adapters.bybit_trades import BybitTradeAdapter
 from market_data.core.trade_normalizer import normalize
 from market_data.core.flow_aggregator import add_trade
 from market_data.core.health_monitor import check_staleness, get_status
@@ -118,11 +119,13 @@ def main():
     # Start adapters in separate threads
     okx = OKXTradeAdapter(on_trades_callback=on_raw_trades)
     binance = BinanceTradeAdapter(on_trades_callback=on_raw_trades)
+    bybit = BybitTradeAdapter(on_trades_callback=on_raw_trades)
 
     threading.Thread(target=okx.start, daemon=True, name="okx-ws").start()
     threading.Thread(target=binance.start, daemon=True, name="binance-ws").start()
+    threading.Thread(target=bybit.start, daemon=True, name="bybit-ws").start()
 
-    logger.info("OKX and Binance adapters started. Press Ctrl+C to stop.")
+    logger.info("OKX, Binance and Bybit adapters started. Press Ctrl+C to stop.")
 
     try:
         while True:
@@ -131,6 +134,7 @@ def main():
         logger.info("Shutting down...")
         okx.stop()
         binance.stop()
+        bybit.stop()
         _flush_trades()
 
 

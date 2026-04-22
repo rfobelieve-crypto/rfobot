@@ -3,6 +3,7 @@ Symbol mapping: exchange raw_symbol -> canonical_symbol.
 
 Phase 1: BTC-USD, ETH-USD only. Hard-coded.
 """
+from __future__ import annotations
 
 SYMBOL_MAP = {
     "binance": {
@@ -13,11 +14,16 @@ SYMBOL_MAP = {
         "BTC-USDT-SWAP": "BTC-USD",
         "ETH-USDT-SWAP": "ETH-USD",
     },
+    "bybit": {
+        "BTCUSDT": "BTC-USD",
+        "ETHUSDT": "ETH-USD",
+    },
 }
 
 # Contract sizes per (exchange, raw_symbol).
 # Binance perp trades are already in base units (size_unit="base"), so contract_size=1.
 # OKX SWAP trades are in contracts: BTC 0.01 BTC/contract, ETH 0.1 ETH/contract.
+# Bybit USDT linear perp trades: size is in base units (BTC for BTCUSDT).
 CONTRACT_INFO = {
     "binance": {
         "BTCUSDT": {"contract_size": 1.0, "size_unit": "base"},
@@ -26,6 +32,10 @@ CONTRACT_INFO = {
     "okx": {
         "BTC-USDT-SWAP": {"contract_size": 0.01, "size_unit": "contract"},
         "ETH-USDT-SWAP": {"contract_size": 0.1, "size_unit": "contract"},
+    },
+    "bybit": {
+        "BTCUSDT": {"contract_size": 1.0, "size_unit": "base"},
+        "ETHUSDT": {"contract_size": 1.0, "size_unit": "base"},
     },
 }
 
