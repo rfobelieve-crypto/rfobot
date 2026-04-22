@@ -46,6 +46,7 @@ _state = {
     "status": "initializing",
     "error": None,
     "indicator_df": None,  # full indicator DataFrame (history + live)
+    "consecutive_errors": 0,  # silent-failure detector
 }
 _lock = threading.Lock()
 _engine = None
@@ -629,6 +630,9 @@ def update_cycle() -> dict:
         except Exception as buf_err:
             logger.debug("Buffer persist skipped: %s", buf_err)
 
+        with _lock:
+            _state["consecutive_errors"] = 0
+
         return {
             "engine_mode": _engine.mode if _engine else "?",
             "bars_predicted": len(new_features) if 'new_features' in dir() else 0,
@@ -644,6 +648,29 @@ def update_cycle() -> dict:
         with _lock:
             _state["status"] = "error"
             _state["error"] = str(e)
+            _state["consecutive_errors"] = _state.get("consecutive_errors", 0) + 1
+            n_errs = _state["consecutive_errors"]
+
+        # Silent-failure alert: fire at N=2 consecutive errors, then every 6 cycles
+        # after. Skips N=1 (transient API blips). Lesson: 2026-04-21 NameError ran
+        # 10 cycles undetected because outer except swallowed errors silently.
+        ALERT_AFTER = 2
+        ALERT_COOLDOWN = 6
+        should_alert = (
+            n_errs == ALERT_AFTER
+            or (n_errs > ALERT_AFTER and (n_errs - ALERT_AFTER) % ALERT_COOLDOWN == 0)
+        )
+        if should_alert:
+            try:
+                from indicator.monitor_icir import send_telegram_alert
+                send_telegram_alert(
+                    f"<b>⚠️ Indicator silent failure</b>\n"
+                    f"update_cycle failed <b>{n_errs}</b> cycles in a row.\n"
+                    f"Latest error: <code>{str(e)[:300]}</code>\n"
+                    f"Check /indicator-status."
+                )
+            except Exception as alert_err:
+                logger.error("Silent-failure alert send failed: %s", alert_err)
         raise
 
 
