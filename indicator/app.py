@@ -1166,6 +1166,64 @@ def force_update():
         return jsonify({"status": "update_triggered"})
 
 
+@app.route("/admin/backfill-gap", methods=["POST", "GET"])
+def admin_backfill_gap():
+    """Backfill indicator_history MySQL rows missing between last MySQL row
+    and current in-memory indicator_df. Use after a crash window to keep
+    the chart visually continuous across restarts.
+
+    WARNING: written predictions are in-sample for the current model
+    (the model has already seen this period in training). They are for
+    chart continuity only — exclude from performance evaluation.
+    """
+    from indicator.snapshot_collector import save_indicator_history
+    try:
+        with _lock:
+            idf = _state["indicator_df"]
+        if idf is None or idf.empty:
+            return jsonify({"status": "error", "error": "indicator_df empty — run /force-update first"}), 400
+
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT MAX(dt) AS mx FROM indicator_history")
+                row = cur.fetchone()
+                last_mysql_dt = row["mx"] if row and row["mx"] else None
+        finally:
+            conn.close()
+
+        if last_mysql_dt is None:
+            gap_df = idf
+        else:
+            last_ts = pd.Timestamp(last_mysql_dt, tz="UTC")
+            gap_df = idf[idf.index > last_ts]
+
+        gap_df = gap_df.dropna(subset=["close"])
+        if gap_df.empty:
+            return jsonify({"status": "ok", "filled": 0, "last_mysql": str(last_mysql_dt)})
+
+        filled = 0
+        for i in range(len(gap_df)):
+            try:
+                save_indicator_history(gap_df.iloc[: i + 1])
+                filled += 1
+            except Exception as e:
+                logger.warning("Backfill row %s failed: %s", gap_df.index[i], e)
+
+        return jsonify({
+            "status": "ok",
+            "filled": filled,
+            "last_mysql_before": str(last_mysql_dt),
+            "first_filled": str(gap_df.index[0]),
+            "last_filled": str(gap_df.index[-1]),
+            "warning": "in-sample predictions — exclude from performance evaluation",
+        })
+    except Exception as e:
+        logger.exception("Backfill gap failed")
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
 @app.route("/dashboard")
 def dashboard_route():
     """System diagnostic dashboard — tabbed shell."""
