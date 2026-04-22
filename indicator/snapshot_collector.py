@@ -261,10 +261,13 @@ def save_indicator_history(df: pd.DataFrame):
         return
 
     table = "indicator_history"
+    # Note: bull_bear_power column retained in the schema (DEFAULT 0) for
+    # backward-compat with historical rows, but BBP was removed from the
+    # pipeline 2026-04-22 — no longer written here.
     columns = [
         "open", "high", "low", "close",
         "pred_return_4h", "pred_direction_code", "confidence_score",
-        "strength_code", "bull_bear_power", "regime_code",
+        "strength_code", "regime_code",
         "up_pred", "down_pred", "strength_raw", "dynamic_deadzone",
         "dir_prob_up", "mag_pred",
     ]
@@ -291,7 +294,6 @@ def save_indicator_history(df: pd.DataFrame):
         float(dir_map.get(str(last.get("pred_direction", "NEUTRAL")), 0)),
         float(last.get("confidence_score", 0) or 0),
         float(str_map.get(str(last.get("strength_score", "Weak")), 1)),
-        float(last.get("bull_bear_power", 0) or 0),
         float(regime_map.get(str(last.get("regime", "CHOPPY")), 0)),
         float(last.get("up_pred", 0) or 0),
         float(last.get("down_pred", 0) or 0),

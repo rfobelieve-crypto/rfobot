@@ -168,7 +168,6 @@ def _build_gauges() -> str:
         v = latest.get(col)
         return float(v) if v is not None else default
 
-    bbp = _safe("bull_bear_power")
     confidence = _safe("confidence_score")
     dir_prob = _safe("dir_prob_up", 0.5)
     mag = _safe("mag_pred")
@@ -188,9 +187,6 @@ def _build_gauges() -> str:
           </div>
         </div>"""
 
-    bbp_pct = (bbp + 1) / 2 * 100  # -1..+1 -> 0..100
-    bbp_color = "#00CC80" if bbp > 0.1 else "#FF3366" if bbp < -0.1 else "rgba(0,240,255,0.5)"
-
     conf_color = "#00CC80" if confidence >= 75 else "#CC4444" if confidence >= 60 else "rgba(0,240,255,0.5)"
 
     dir_pct = dir_prob * 100
@@ -204,7 +200,6 @@ def _build_gauges() -> str:
     ret_color = "#00CC80" if pred_ret > 0 else "#FF3366" if pred_ret < 0 else "rgba(0,240,255,0.5)"
 
     bars = [
-        _bar("BBP (Bull Bear Power)", bbp, f"{bbp:+.3f}", bbp_pct, bbp_color),
         _bar("Confidence", confidence, f"{confidence:.0f}", confidence, conf_color),
         _bar("P(UP)", dir_prob, f"{dir_prob:.1%}", dir_pct, dir_color),
         _bar("Magnitude", mag, f"{mag*100:.3f}%", mag_pct, mag_color),
@@ -497,7 +492,6 @@ def _build_feature_radar(state: dict, engine) -> str:
     # All computation in SQL to avoid type/column issues
     axes = [
         ("動量", "close"),
-        ("多空力道", "bull_bear_power"),
         ("方向機率", "dir_prob_up"),
         ("波動預測", "mag_pred"),
         ("預測收益", "pred_return_4h"),

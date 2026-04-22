@@ -46,8 +46,6 @@ def render_overview(state: dict, engine) -> str:
             f'${pred.get("close", 0):,.0f}')}
       {card("Magnitude", f'{pred.get("mag_pred", 0)*100:.2f}%' if pred.get("mag_pred") else "N/A",
             f'Regime: {pred.get("regime", "?")}')}
-      {card("BBP", f'{pred.get("bull_bear_power", 0):.3f}' if pred.get("bull_bear_power") is not None else "N/A",
-            "Bull/Bear Power")}
       {card("模型", "Dual v7", f'Dir={dir_n}f Mag={mag_n}f')}
     </div>"""
 
@@ -113,7 +111,6 @@ def _build_prediction_detail(pred: dict, engine) -> str:
         ("strength", "強度", str),
         ("confidence", "信心分數", lambda v: f"{v:.0f}"),
         ("mag_pred", "波動預測", lambda v: f"{v*100:.3f}%"),
-        ("bull_bear_power", "BBP", lambda v: f"{v:.4f}"),
         ("regime", "Regime", str),
         ("dir_prob_up", "P(UP) raw", lambda v: f"{v:.4f}"),
     ]

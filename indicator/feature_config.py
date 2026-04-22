@@ -137,12 +137,3 @@ EXCLUDE = {
     "taker_buy_vol", "taker_buy_quote", "trade_count",
     "y_return_4h", "actual_return_4h",
 }
-
-# ── Bull/Bear Power components (rule-based, not model features) ───────────
-BBP_COMPONENTS = {
-    "oi_delta": "cg_oi_delta_zscore",
-    "funding": "cg_funding_close_zscore",        # inverted
-    "taker_delta": "cg_taker_delta_zscore",
-    "ls_ratio": "cg_ls_ratio_zscore",            # inverted
-    "ls_divergence": "cg_ls_divergence_zscore",  # new: top vs global
-}

@@ -236,7 +236,6 @@ def _backfill_from_mysql(df: pd.DataFrame) -> pd.DataFrame:
             "pred_direction": dir_map.get(int(r.get("pred_direction_code", 0)), "NEUTRAL"),
             "confidence_score": r.get("confidence_score", 0),
             "strength_score": str_map.get(int(r.get("strength_code", 1)), "Weak"),
-            "bull_bear_power": r.get("bull_bear_power", 0),
             "regime": regime_map.get(int(r.get("regime_code", 0)), "CHOPPY"),
             "up_pred": r.get("up_pred", 0),
             "down_pred": r.get("down_pred", 0),
@@ -371,7 +370,7 @@ def update_cycle() -> dict:
             _state["cg_status"] = cg_status
 
         if cg_fail == len(cg_status):
-            logger.error("ALL Coinglass endpoints failed — BBP will be zero")
+            logger.error("ALL Coinglass endpoints failed — many CG features will be NaN")
 
         # 2. Build features for ALL fetched bars
         features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades,
@@ -441,7 +440,7 @@ def update_cycle() -> dict:
             logger.info("No new bars to predict")
 
         # 5b. Re-predict historical bars with the current model — full rescore
-        # (direction + strength + confidence + mag + bbp). Rationale: after any
+        # (direction + strength + confidence + mag). Rationale: after any
         # model swap (e.g. binary → regression) stale historical triangles
         # otherwise linger in the 200-bar window for ~8 days.
         overlap_idx = indicator_df.index.intersection(features.index)
@@ -472,7 +471,6 @@ def update_cycle() -> dict:
                 "confidence": float(last_row["confidence_score"]) if not _is_nan(last_row.get("confidence_score")) else 0,
                 "strength": str(last_row.get("strength_score", "Weak")),
                 "pred_return_4h": float(last_row.get("pred_return_4h", 0)),
-                "bull_bear_power": float(last_row.get("bull_bear_power", 0)),
                 "close": float(last_row["close"]) if "close" in last_row.index else 0,
                 "dir_prob_up": float(last_row.get("dir_prob_up", 0.5)),
                 "mag_pred": float(last_row.get("mag_pred", 0)),
@@ -485,7 +483,6 @@ def update_cycle() -> dict:
         conf = float(last_row["confidence_score"]) if not _is_nan(last_row.get("confidence_score")) else 0
         strength = str(last_row.get("strength_score", "Weak"))
         pred_ret = float(last_row.get("pred_return_4h", 0)) * 100
-        bbp = float(last_row.get("bull_bear_power", 0))
         price = float(last_row["close"]) if "close" in last_row.index else 0
         TZ_TPE = timezone(timedelta(hours=8))
         now_str = datetime.now(TZ_TPE).strftime("%m/%d %H:%M UTC+8")
@@ -500,7 +497,7 @@ def update_cycle() -> dict:
             f"{arrow} BTC 4h Indicator | {now_str}\n"
             f"Price: ${price:,.0f}\n"
             f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
-            f"Mag: {mag*100:.3f}% | BBP: {bbp:+.2f}"
+            f"Mag: {mag*100:.3f}%"
             f"{risk_text}"
         )
         tg_result = _send_telegram_photo(png, caption)
@@ -780,14 +777,13 @@ def indicator_chart_api():
     strength = pred.get("strength", "?")
     dir_prob = pred.get("dir_prob_up", 0.5)
     mag = pred.get("mag_pred", 0)
-    bbp = pred.get("bull_bear_power", 0)
     price = pred.get("close", 0)
     arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
     caption = (
         f"{arrow} BTC 4h Indicator\n"
         f"Price: ${price:,.0f}\n"
         f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
-        f"P(UP): {dir_prob:.0%} | Mag: {mag:.2f}x | BBP: {bbp:+.2f}\n"
+        f"P(UP): {dir_prob:.0%} | Mag: {mag:.2f}x\n"
         f"Updated: {last_update or '?'}"
     )
     import base64
@@ -849,7 +845,7 @@ def db_diagnostics():
 
 @app.route("/diag")
 def diagnostics():
-    """Live diagnostics — check Coinglass API and BBP pipeline."""
+    """Live diagnostics — check Coinglass API + indicator history state."""
     import math
 
     # List ALL env var names in this container (no values, just names)
@@ -866,13 +862,7 @@ def diagnostics():
         indicator_df = _state.get("indicator_df")
     if indicator_df is not None and not indicator_df.empty:
         last10 = indicator_df.tail(10)
-        bbp_vals = last10["bull_bear_power"].tolist()
-        diag["last_10_bbp"] = [
-            round(v, 4) if not (isinstance(v, float) and math.isnan(v)) else None
-            for v in bbp_vals
-        ]
         diag["last_10_times"] = [str(t) for t in last10.index]
-        diag["bbp_all_zero"] = all(v == 0 for v in bbp_vals if not (isinstance(v, float) and math.isnan(v)))
         diag["total_bars"] = len(indicator_df)
         diag["history_range"] = f"{indicator_df.index[0]} ~ {indicator_df.index[-1]}"
     else:

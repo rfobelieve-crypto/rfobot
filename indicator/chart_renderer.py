@@ -1,10 +1,10 @@
 """
 Chart renderer — generates indicator PNG from prediction DataFrame.
-v4: 4-panel layout (removed Direction P(UP) panel):
+v5: panel layout:
     1. Confidence heatmap
-    2. Candlestick + direction triangles (Moderate + Strong)
-    3. Magnitude bar chart (predicted |return|)
-    4. Bull/Bear Power histogram
+    2. Regime strip (when regime column present)
+    3. Candlestick + direction triangles (Moderate + Strong)
+    4. Magnitude bar chart (when mag_pred present)
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     Render indicator chart and return PNG bytes.
 
     ind must have: open, high, low, close, pred_direction, confidence_score,
-                   strength_score, pred_return_4h, bull_bear_power, regime
+                   strength_score, pred_return_4h, regime
     Optional: mag_pred
     """
     sig = ind.tail(last_n).copy()
@@ -60,17 +60,16 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
 
     # Layout panels (top → bottom):
     #   confidence heatmap (0.8) → regime strip (0.3, optional)
-    #   → candlestick (8) → magnitude (2.0, optional) → BBP (2.0)
+    #   → candlestick (8) → magnitude (2.0, optional)
     panels = [0.8]                       # confidence heatmap
     if has_regime:
         panels.append(0.3)               # regime strip
     panels.append(8)                     # candlestick
     if has_mag:
         panels.append(2.0)               # magnitude
-    panels.append(2.0)                   # BBP
 
     n_panels = len(panels)
-    fig_h = 9 + 2 * (n_panels - 3 - (1 if has_regime else 0))
+    fig_h = 9 + 2 * (n_panels - 2 - (1 if has_regime else 0))
     fig = plt.figure(figsize=(20, fig_h), facecolor="white")
     gs = gridspec.GridSpec(n_panels, 1, height_ratios=panels, hspace=0.05)
 
@@ -172,7 +171,10 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_price.set_ylabel("Price (USD)", fontsize=10)
     ax_price.grid(True, alpha=0.15)
     ax_price.set_xlim(-0.5, n - 0.5)
-    ax_price.set_xticks([])
+    # x-tick labels will be set on the bottom-most panel below (either
+    # ax_mag if has_mag, or ax_price itself). Suppress here conditionally.
+    if has_mag:
+        ax_price.set_xticks([])
 
     # Legend
     legend_elements = [
@@ -273,23 +275,11 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         ax_mag.yaxis.set_major_formatter(FuncFormatter(fmt))
         ax_mag.tick_params(axis="y", labelsize=7)
         ax_mag.grid(True, alpha=0.2, axis="both", which="major")
-        ax_mag.set_xticks([])
 
-    # ── Panel: Bull/Bear Power (bottom) ──────────────────────────────────
-    ax_bbp = fig.add_subplot(gs[panel_idx]); panel_idx += 1
-    bbp = sig["bull_bear_power"].fillna(0).values
-    bbp_colors = ["#26a69a" if v > 0 else "#ef5350" for v in bbp]
-
-    ax_bbp.bar(x, bbp, width=0.8, color=bbp_colors, alpha=0.7, edgecolor="none")
-    ax_bbp.axhline(0, color="black", linewidth=0.5)
-    ax_bbp.set_ylabel("Bull/Bear\nPower", fontsize=9)
-    ax_bbp.set_ylim(-1, 1)
-    ax_bbp.set_xlim(-0.5, n - 0.5)
-    ax_bbp.grid(True, alpha=0.15)
-
-    # Bottom panel — date labels
-    ax_bbp.set_xticks(tick_pos)
-    ax_bbp.set_xticklabels(
+    # Date labels on the bottom-most existing panel.
+    bottom_ax = ax_mag if has_mag else ax_price
+    bottom_ax.set_xticks(tick_pos)
+    bottom_ax.set_xticklabels(
         [dates[i].strftime("%m/%d %H:%M") for i in tick_pos],
         fontsize=7, rotation=30, ha="right"
     )

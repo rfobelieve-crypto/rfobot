@@ -46,7 +46,6 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     candle_data = []
     conf_data = []
     mag_data = []
-    bbp_data = []
     regime_data = []
     markers = []
 
@@ -89,11 +88,6 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
             else:
                 mag_color = "#bdbdbd"
             mag_data.append({"time": ts, "value": round(mag_val, 4), "color": mag_color})
-
-        # BBP
-        bbp_val = float(row.get("bull_bear_power", 0) or 0)
-        bbp_color = "#26a69a" if bbp_val > 0 else "#ef5350"
-        bbp_data.append({"time": ts, "value": round(bbp_val, 4), "color": bbp_color})
 
         # Regime strip (value=1 for all bars, color encodes regime)
         if has_regime:
@@ -147,16 +141,15 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
     }.get(last_reg, "#999999")
 
     # Height ratios for panels. Reserve 5% for regime strip if present.
+    # BBP panel was removed 2026-04-22 — its 15% height returned to price.
     regime_pct = 5 if has_regime else 0
     if has_mag:
-        price_pct = 60 - regime_pct
+        price_pct = 75 - regime_pct
         mag_pct_h = 15
-        bbp_pct = 15
         conf_pct = 10
     else:
-        price_pct = 70 - regime_pct
+        price_pct = 90 - regime_pct
         mag_pct_h = 0
-        bbp_pct = 20
         conf_pct = 10
 
     html = f"""<!DOCTYPE html>
@@ -203,17 +196,12 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
   <div id="chart-price"></div>
 </div>
 {"<div class='chart-wrapper' id='mag-wrapper'><div class='chart-label'>Magnitude (%)</div><div id='chart-mag'></div></div>" if has_mag else ""}
-<div class="chart-wrapper" id="bbp-wrapper">
-  <div class="chart-label">Bull/Bear Power</div>
-  <div id="chart-bbp"></div>
-</div>
 <div id="footer">source@rfo</div>
 
 <script>
 const candleData = {json.dumps(candle_data)};
 const confData = {json.dumps(conf_data)};
 const magData = {json.dumps(mag_data)};
-const bbpData = {json.dumps(bbp_data)};
 const regimeData = {json.dumps(regime_data)};
 const markers = {json.dumps(markers)};
 const hasMag = {'true' if has_mag else 'false'};
@@ -233,7 +221,6 @@ const confH = Math.round(totalH * 0.{conf_pct:02d});
 const regimeH = hasRegime ? Math.round(totalH * 0.{regime_pct:02d}) : 0;
 const priceH = Math.round(totalH * 0.{price_pct:02d});
 const magH = hasMag ? Math.round(totalH * 0.{mag_pct_h:02d}) : 0;
-const bbpH = Math.round(totalH * 0.{bbp_pct:02d});
 
 function makeChart(container, height, opts) {{
   const el = document.getElementById(container);
@@ -256,10 +243,10 @@ function makeChart(container, height, opts) {{
 
 // Align every chart's price-axis width to AXIS_W so plot areas line up
 // across panes. Without this, each pane's axis width depends on its own
-// tick label length (price "78119.57" ≫ bbp "0.500"), producing visual
-// drift between the Confidence heatmap, regime strip, candlesticks, and
-// BBP panel. minimumWidth is a Lightweight Charts v4.1+ hint; ignored
-// gracefully on older versions.
+// tick label length (e.g. price "78119.57" ≫ mag "0.500"), producing
+// visual drift between the Confidence heatmap, regime strip,
+// candlesticks, and magnitude panels. minimumWidth is a Lightweight
+// Charts v4.1+ hint; ignored gracefully on older versions.
 const AXIS_W = 60;
 
 // ── Confidence chart ──
@@ -350,17 +337,8 @@ if (hasMag) {{
   }}
 }}
 
-// ── BBP chart ──
-const bbpChart = makeChart('chart-bbp', bbpH);
-const bbpSeries = bbpChart.addHistogramSeries({{
-  priceFormat: {{ type: 'custom', formatter: (v) => v.toFixed(3) }},
-  priceLineVisible: false,
-  lastValueVisible: false,
-}});
-bbpSeries.setData(bbpData);
-
 // ── Sync all charts (scroll + zoom) ──
-const charts = [confChart, regimeChart, priceChart, magChart, bbpChart].filter(Boolean);
+const charts = [confChart, regimeChart, priceChart, magChart].filter(Boolean);
 
 let isSyncing = false;
 charts.forEach((chart, idx) => {{
@@ -382,7 +360,6 @@ const chartSeriesPairs = [
   hasRegime ? [regimeChart, regimeSeries, 1] : null,
   [priceChart, candleSeries, null],
   hasMag ? [magChart, magSeries, 0] : null,
-  [bbpChart, bbpSeries, 0],
 ].filter(Boolean);
 
 let isSyncingCH = false;
@@ -417,11 +394,9 @@ window.addEventListener('resize', () => {{
   const newConfH = Math.round(totalH2 * 0.{conf_pct:02d});
   const newPriceH = Math.round(totalH2 * 0.{price_pct:02d});
   const newMagH = hasMag ? Math.round(totalH2 * 0.{mag_pct_h:02d}) : 0;
-  const newBbpH = Math.round(totalH2 * 0.{bbp_pct:02d});
   confChart.resize(window.innerWidth, newConfH);
   priceChart.resize(window.innerWidth, newPriceH);
   if (magChart) magChart.resize(window.innerWidth, newMagH);
-  bbpChart.resize(window.innerWidth, newBbpH);
 }});
 </script>
 </body>

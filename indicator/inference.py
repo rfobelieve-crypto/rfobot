@@ -42,7 +42,6 @@ def reload_config():
     """
     global STRENGTH_DEADZONE, STRONG_THRESHOLD, MODERATE_THRESHOLD
     global CHOPPY_DEADZONE_MULT, TREND_DEADZONE_MULT, BULL_CONTRA_PENALTY
-    global BBP_CONFIRM_THRESHOLD, BBP_CONFIRM_ENABLED
     global HYSTERESIS_MULT, FLIP_COOLDOWN_BARS
 
     STRENGTH_DEADZONE   = _cfg("STRENGTH_DEADZONE", 0.50)
@@ -51,8 +50,6 @@ def reload_config():
     CHOPPY_DEADZONE_MULT = _cfg("CHOPPY_DEADZONE_MULT", 1.60)
     TREND_DEADZONE_MULT = _cfg("TREND_DEADZONE_MULT", 0.90)
     BULL_CONTRA_PENALTY = _cfg("BULL_CONTRA_PENALTY", 1.0)
-    BBP_CONFIRM_THRESHOLD = _cfg("BBP_CONFIRM_THRESHOLD", 0.15)
-    BBP_CONFIRM_ENABLED = _cfg("BBP_CONFIRM_ENABLED", True)
     HYSTERESIS_MULT     = _cfg("HYSTERESIS_MULT", 1.40)
     FLIP_COOLDOWN_BARS  = _cfg("FLIP_COOLDOWN_BARS", 1)
 
@@ -92,10 +89,6 @@ TREND_DEADZONE_MULT = 0.90   # TRENDING: slightly tighter (momentum is real)
 # without a redeploy.
 BULL_CONTRA_PENALTY = 1.0    # no-op by default; set >1 via config to re-enable
 VOL_DEADZONE_SCALE = 0.80    # how much vol ratio affects deadzone (0 = off, 1 = full)
-
-# BBP confirmation gate
-BBP_CONFIRM_THRESHOLD = 0.15 # |BBP| must exceed this to confirm direction
-BBP_CONFIRM_ENABLED = True   # master switch for BBP confirmation
 
 # Hysteresis: require stronger signal to FLIP direction vs maintain
 HYSTERESIS_MULT = 1.40       # to flip UP→DOWN, need strength < -(dz * 1.4)
@@ -221,7 +214,7 @@ class IndicatorEngine:
             historical bars to avoid contaminating the buffers.
 
         Returns DataFrame with: pred_return_4h, pred_direction,
-        confidence_score, strength_score, bull_bear_power, regime
+        confidence_score, strength_score, regime
         """
         # Align features (check superset — individual targets may need subsets)
         missing = [c for c in self.feature_cols if c not in features.columns]
@@ -266,7 +259,7 @@ class IndicatorEngine:
         # Regression: predicts signed 4h path return directly
         dir_pred_ret = self.dual_dir_model.predict(X_dir).astype(float)
         # Synthesize a P(UP)-like value for legacy downstream code
-        # (charts, BBP, log fields). sigmoid(pred_ret * 200) maps a ±1%
+        # (charts, log fields). sigmoid(pred_ret * 200) maps a ±1%
         # return to ≈0.88 / ≈0.12, preserving monotonicity with pred_ret.
         dir_prob = 1.0 / (1.0 + np.exp(-dir_pred_ret * 200.0))
 
@@ -380,16 +373,12 @@ class IndicatorEngine:
             mag_bonus = (ms / 100) * 20
             confidence[i] = float(np.clip(ret_score + mag_bonus, 0, 100))
 
-        # ── Bull/Bear Power ──
-        bbp = self._compute_bbp(features)
-
         # ── Output ──
         out = pd.DataFrame(index=features.index)
         out["pred_return_4h"] = pred_return
         out["pred_direction"] = direction
         out["confidence_score"] = confidence
         out["strength_score"] = strength_tier
-        out["bull_bear_power"] = bbp
         out["regime"] = regime
         out["up_pred"] = mag_pred       # magnitude prediction
         out["down_pred"] = mag_pred     # same (symmetric)
@@ -487,26 +476,3 @@ class IndicatorEngine:
             mag_score[i] = (hist_arr < abs_pred[i]).sum() / len(hist_arr) * 100
 
         return mag_score
-
-    # ── Bull/Bear Power ───────────────────────────────────────────────────
-
-    @staticmethod
-    def _compute_bbp(df: pd.DataFrame) -> np.ndarray:
-        """Bull/Bear Power from available Coinglass z-scores."""
-        components = []
-
-        if "cg_oi_delta_zscore" in df.columns:
-            components.append(df["cg_oi_delta_zscore"].clip(-3, 3) / 3)
-        if "cg_funding_close_zscore" in df.columns:
-            components.append(-df["cg_funding_close_zscore"].clip(-3, 3) / 3)
-        if "cg_taker_delta_zscore" in df.columns:
-            components.append(df["cg_taker_delta_zscore"].clip(-3, 3) / 3)
-        if "cg_ls_ratio_zscore" in df.columns:
-            components.append(-df["cg_ls_ratio_zscore"].clip(-3, 3) / 3)
-        if "cg_ls_divergence_zscore" in df.columns:
-            components.append(df["cg_ls_divergence_zscore"].clip(-3, 3) / 3)
-
-        if not components:
-            return np.zeros(len(df))
-
-        return pd.concat(components, axis=1).mean(axis=1).clip(-1, 1).fillna(0).values

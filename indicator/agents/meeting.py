@@ -81,7 +81,7 @@ Respond in Traditional Chinese."""
             },
             {
                 "name": "adjust_threshold",
-                "description": "Modify a system threshold (e.g., DUAL_DIR_UP_TH, STRONG_THRESHOLD, BBP_CONFIRM_THRESHOLD). Changes take effect on the next hourly update cycle.",
+                "description": "Modify a system threshold (e.g., STRONG_THRESHOLD, MODERATE_THRESHOLD, BULL_CONTRA_PENALTY). Changes take effect on the next hourly update cycle.",
                 "input_schema": {
                     "type": "object",
                     "properties": {

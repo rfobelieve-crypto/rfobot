@@ -33,10 +33,10 @@ Dual XGBoost 架構：Direction Regressor + Magnitude Regressor，獨立管線�
 - Direction: 500-bar rolling percentile 解碼，top 5% → Strong UP，top 15% → Moderate UP（DOWN 同理）
 - Confidence = 80 pts from |pred_ret|/Strong_cutoff^0.6 + 20 pts mag percentile bonus
 - Strong ≥ 80, Moderate ≥ 65, Weak < 65
-- BBP 確認閘門 + Regime 動態死區 + Hysteresis + Cooldown
+- Hysteresis + Cooldown
 
 ### 輸出
-- 4 面板圖表 (Confidence / K線+三角形 / Magnitude / BBP)
+- 圖表面板 (Confidence / Regime / K線+三角形 / Magnitude)
 - Telegram 推送 (Strong 信號文字告警 + SHAP 驅動因子)
 - REST API (10 routes)
 - MySQL + Parquet 持久化
@@ -55,7 +55,6 @@ Dual XGBoost 架構：Direction Regressor + Magnitude Regressor，獨立管線�
 - **confidence_score**: 0~100
 - **mag_pred**: |return_4h| 預測值
 - **dir_prob_up**: P(UP) 原始值
-- **bull_bear_power**: [-1, 1] 合成指標
 - **regime**: 當前市場狀態
 
 ### 核心 target
