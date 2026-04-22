@@ -4,6 +4,29 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-04-22: 新特徵邏輯貼進錯誤的 helper 函數，signature 不符導致 NameError 整夜停機
+
+**What happened:**
+b604afc commit 新增 SPX / DXY / US10Y / FNG 等 cross-market 特徵時，把一整段使用 `cross_market` 和 `fear_greed` 變數的程式碼**除了貼進 `build_live_features()`（正確位置，signature 有這兩個參數），又同時重複貼進 `_inject_coinglass(df, cg_data)` 這個 helper 函數裡**。後者的 signature 根本沒有這兩個參數。
+
+commit 後不會在 import / 語法檢查階段報錯——因為 `_inject_coinglass` 只在 runtime 被呼叫，而且只有執行到 `if cross_market:` 那行才丟 `NameError: name 'cross_market' is not defined`。Railway 部署成功（build 綠），Process 啟動成功，但每次 `update_cycle()` 跑到該行都 crash。外層 `try/except` 把錯誤吞成 `_state["status"] = "error"`，整個下游（predict、render chart、Telegram 推送、寫 MySQL）全部靜默停擺。
+
+結果：23:00 push 生效 → 到隔天 09:00 用戶打 `/indicator-status` 看到 `error: name 'cross_market' is not defined` 才發現，整整 10 小時圖表沒有新 bar。
+
+**Root cause:**
+加新特徵時沒有確認「我把這段貼進的函數，它的 signature 有沒有我要用的變數」。編輯器的 copy-paste / multi-insert 很容易一次改多處，中間的某一處 paste 點如果剛好在錯誤的 helper 函數裡，本機的靜態檢查（`python -c "import module"`）抓不到——只有 runtime 執行那條分支才會炸。push 前沒跑任何會觸發 `update_cycle()` 的本地測試。
+
+另一個放大因素：`update_cycle()` 外層 `try: ... except Exception as e: _state["status"] = "error"` 把錯誤吞太深，只在 `/indicator-status` 才看得到；沒有任何 alert 機制通知「Railway 進程活著但內部邏輯壞了」這種 **silent failure**。Railway build 綠 + process 活著 = 用戶預期功能正常，但實際上功能靜默死亡。
+
+**Correct approach:**
+1. 任何 commit 如果碰到 `indicator/feature_builder_live.py`、`indicator/app.py` 的 `update_cycle()`、`indicator/inference.py` 等 hot-path 檔案，push 前必須至少跑一次 `python -c "from indicator.app import update_cycle; update_cycle()"` 或 `/force-update?sync=1` 的本地版。import 成功不代表 runtime 成功。
+2. 加新變數到某段邏輯時，先 grep 確認自己貼進的那個 `def` 的 signature 到底有沒有這個變數。如果沒有，**不是** `def` 漏了參數（先問自己「這段邏輯是不是根本不該在這個函數裡」），而是貼錯函數了。
+3. Silent failure 的監控：`update_cycle()` 外層 except 應該把 last error 暴露到一個更顯眼的健康指標（不是只有 `/indicator-status`），並且觸發 Telegram 告警——「Railway 活著但 update_cycle 連續 N 次 error」應該被當成 critical。這個後續要補。
+
+**Rule:** 碰 hot-path 檔案（`feature_builder_live.py` / `app.py` `update_cycle` / `inference.py`）的 commit，push 前必須跑一次真實的 `update_cycle()` 或 `/force-update?sync=1`。**import OK 不代表程式碼會跑**——Python 的 NameError 只在執行那條分支時才炸。加新 feature code 時，grep 貼入處的 `def ...():` signature，確認引用的所有外部變數都在 signature 裡或在該 scope 可見。Silent failure（process 活著但邏輯死了）是最危險的故障模式，因為 Railway dashboard 看起來全綠。
+
+---
+
 ## 2026-04-14: 把 Strong 勝率目標寫成 95%（從策略系統沿用未更新）
 
 **What happened:**
