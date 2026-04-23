@@ -37,6 +37,7 @@ def _ensure_table():
                     `confidence` DOUBLE NOT NULL,
                     `entry_price` DOUBLE NOT NULL,
                     `regime` VARCHAR(30) DEFAULT '',
+                    `mag_pct_200` DOUBLE DEFAULT NULL,
                     `exit_price` DOUBLE DEFAULT NULL,
                     `actual_return_4h` DOUBLE DEFAULT NULL,
                     `correct` TINYINT DEFAULT NULL,
@@ -46,6 +47,16 @@ def _ensure_table():
                     UNIQUE KEY `uq_time_strength` (`signal_time`, `strength`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
+            # Additive migration: add mag_pct_200 column if pre-existing
+            # table was created before this feature. Safe to run repeatedly.
+            cur.execute("""
+                SELECT COUNT(*) AS n FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = %s
+                  AND column_name = 'mag_pct_200'
+            """, (TABLE,))
+            if int(cur.fetchone()["n"]) == 0:
+                cur.execute(f"ALTER TABLE `{TABLE}` ADD COLUMN `mag_pct_200` DOUBLE DEFAULT NULL")
+                logger.info("Added mag_pct_200 column to %s", TABLE)
             # Migrate old strong_signals data if exists and tracked_signals is empty
             cur.execute(f"SELECT COUNT(*) as cnt FROM `{TABLE}`")
             if cur.fetchone()["cnt"] == 0:
@@ -73,8 +84,14 @@ def _ensure_table():
 
 def record_signal(signal_time: datetime, direction: str, strength: str,
                   p_up: float, mag_pred: float, confidence: float,
-                  entry_price: float, regime: str = "", shap_json: str = ""):
-    """Record a Strong or Moderate directional signal."""
+                  entry_price: float, regime: str = "", shap_json: str = "",
+                  mag_pct_200: float = None):
+    """Record a Strong or Moderate directional signal.
+
+    mag_pct_200: rolling 200-bar percentile of |mag_pred| at signal time.
+    Used downstream to evaluate dual-gate (direction+mag) performance
+    tiers. NULL for pre-feature historical signals.
+    """
     if direction not in ("UP", "DOWN"):
         return
     if strength not in ("Strong", "Moderate"):
@@ -87,30 +104,33 @@ def record_signal(signal_time: datetime, direction: str, strength: str,
             cur.execute(f"""
                 INSERT INTO `{TABLE}`
                     (signal_time, direction, strength, p_up, mag_pred,
-                     confidence, entry_price, regime, shap_top)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     confidence, entry_price, regime, shap_top, mag_pct_200)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     direction=VALUES(direction), p_up=VALUES(p_up),
                     mag_pred=VALUES(mag_pred), confidence=VALUES(confidence),
                     entry_price=VALUES(entry_price), regime=VALUES(regime),
-                    shap_top=VALUES(shap_top)
+                    shap_top=VALUES(shap_top), mag_pct_200=VALUES(mag_pct_200)
             """, (
                 signal_time.strftime("%Y-%m-%d %H:%M:%S"),
                 direction, strength, float(p_up), float(mag_pred),
                 float(confidence), float(entry_price), regime, shap_json or None,
+                float(mag_pct_200) if mag_pct_200 is not None else None,
             ))
         conn.commit()
-        logger.info("%s signal recorded: %s %s @ $%.0f conf=%.0f",
-                    strength, direction, signal_time, entry_price, confidence)
+        logger.info("%s signal recorded: %s %s @ $%.0f conf=%.0f mag_p=%s",
+                    strength, direction, signal_time, entry_price, confidence,
+                    f"{mag_pct_200:.0f}" if mag_pct_200 is not None else "?")
     finally:
         conn.close()
 
 
 # Backward compat alias
 def record_strong_signal(signal_time, direction, p_up, mag_pred,
-                         confidence, entry_price, regime="", shap_json=""):
+                         confidence, entry_price, regime="", shap_json="",
+                         mag_pct_200=None):
     record_signal(signal_time, direction, "Strong", p_up, mag_pred,
-                  confidence, entry_price, regime, shap_json)
+                  confidence, entry_price, regime, shap_json, mag_pct_200)
 
 
 def backfill_outcomes():

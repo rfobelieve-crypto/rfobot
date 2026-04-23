@@ -583,6 +583,7 @@ def update_cycle() -> dict:
                     entry_price=price,
                     regime=str(last_row.get("regime", "")),
                     shap_json=shap_json_str,
+                    mag_pct_200=mag_pct,  # dual-gate tier analysis
                 )
             except Exception as e:
                 logger.warning("Signal tracker record failed: %s", e)
@@ -1105,6 +1106,83 @@ def indicator_performance():
                 lines.append(f"\n{tier_icon} <b>{tier}</b>: 尚無信號")
             if tier_pending > 0:
                 lines.append(f"  等待結算: {tier_pending} 筆")
+
+        # ── Section 2.5: Dual-Gate breakdown (strength × mag_pct_200) ──
+        try:
+            _conn2 = get_db_conn()
+            try:
+                with _conn2.cursor() as cur:
+                    cur.execute("""
+                        SELECT
+                          strength,
+                          CASE
+                            WHEN mag_pct_200 IS NULL THEN 'unknown'
+                            WHEN mag_pct_200 >= 90 THEN 'p90+'
+                            WHEN mag_pct_200 >= 80 THEN 'p80-90'
+                            ELSE 'p<80'
+                          END AS mag_tier,
+                          COUNT(*) AS total,
+                          SUM(filled) AS filled_cnt,
+                          SUM(correct) AS wins
+                        FROM tracked_signals
+                        WHERE signal_time >= %s AND strength IN ('Strong', 'Moderate')
+                        GROUP BY strength, mag_tier
+                    """, (CURRENT_MODEL_DEPLOY,))
+                    breakdown = {}
+                    for r in cur.fetchall():
+                        key = (r["strength"], r["mag_tier"])
+                        breakdown[key] = {
+                            "total": int(r["total"] or 0),
+                            "filled": int(r["filled_cnt"] or 0),
+                            "wins": int(r["wins"] or 0),
+                        }
+            finally:
+                _conn2.close()
+
+            # Sorted display per the user's dual-gate rule priority
+            priority = [
+                ("Strong",   "p90+",   "🔥", "Strong + ≥p90"),
+                ("Strong",   "p80-90", "🎯", "Strong + p80-90"),
+                ("Moderate", "p90+",   "🎯", "Moderate + ≥p90"),
+                ("Strong",   "p<80",   " ·", "Strong + <p80"),
+                ("Moderate", "p80-90", " ·", "Moderate + p80-90"),
+                ("Moderate", "p<80",   " ·", "Moderate + <p80"),
+            ]
+
+            dg_lines = []
+            any_data = False
+            for s, t, badge, label in priority:
+                b = breakdown.get((s, t))
+                if not b or b["filled"] == 0:
+                    continue
+                any_data = True
+                n, k = b["filled"], b["wins"]
+                p = k / n
+                z = 1.96
+                den = 1 + z*z/n
+                c = (p + z*z/(2*n)) / den
+                hw = z * ((p*(1-p)/n + z*z/(4*n*n))**0.5) / den
+                ci_lo = max(0.0, (c - hw)) * 100
+                ci_hi = min(1.0, (c + hw)) * 100
+                dg_lines.append(
+                    f"  {badge} {label}: {p*100:.0f}% ({k}W/{n-k}L) [{ci_lo:.0f}-{ci_hi:.0f}%]"
+                )
+
+            unknown_total = sum(
+                breakdown.get((s, "unknown"), {}).get("filled", 0)
+                for s in ("Strong", "Moderate")
+            )
+
+            if any_data or unknown_total > 0:
+                lines.append("\n<b>📐 Dual-Gate 拆解</b> (你手動 rule 的量化驗證)")
+                if any_data:
+                    lines.extend(dg_lines)
+                if unknown_total > 0:
+                    lines.append(
+                        f"  <i>legacy 無 mag_pct: {unknown_total} 筆 (2026-04-23 前,未記錄)</i>"
+                    )
+        except Exception as e:
+            logger.warning("Dual-gate breakdown failed: %s", e)
 
         # Recent signals
         if recent_lines:
