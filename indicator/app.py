@@ -1007,10 +1007,11 @@ def indicator_performance():
                 pending = sum(pending_rows.values())
 
                 # Alert threshold (need 20+ for significance)
+                # Note: "&lt;" HTML-escape required for Telegram parse_mode=HTML.
                 if all_filled >= 20:
                     all_wr = all_wins / all_filled * 100
                     if all_wr < 55:
-                        alerts.append(f"🔴 信號累積勝率 {all_wr:.0f}% (< 55%) — 建議重訓")
+                        alerts.append(f"🔴 信號累積勝率 {all_wr:.0f}% (&lt; 55%) — 建議重訓")
 
         except Exception as e:
             logger.warning("Tracked signals query failed: %s", e)
