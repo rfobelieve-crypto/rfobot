@@ -1139,14 +1139,19 @@ def indicator_performance():
             finally:
                 _conn2.close()
 
-            # Sorted display per the user's dual-gate rule priority
+            # Sorted display per the user's dual-gate rule priority.
+            # Note: Telegram sends with parse_mode=HTML, so "<" must be
+            # HTML-escaped as "&lt;" to avoid the parser mistakenly treating
+            # "<p80" as the start of an HTML tag (which returned 400 and
+            # caused /perf to silently fail once the first "<p80" row
+            # appeared in the breakdown).
             priority = [
                 ("Strong",   "p90+",   "🔥", "Strong + ≥p90"),
                 ("Strong",   "p80-90", "🎯", "Strong + p80-90"),
                 ("Moderate", "p90+",   "🎯", "Moderate + ≥p90"),
-                ("Strong",   "p<80",   " ·", "Strong + <p80"),
+                ("Strong",   "p<80",   " ·", "Strong + p&lt;80"),
                 ("Moderate", "p80-90", " ·", "Moderate + p80-90"),
-                ("Moderate", "p<80",   " ·", "Moderate + <p80"),
+                ("Moderate", "p<80",   " ·", "Moderate + p&lt;80"),
             ]
 
             dg_lines = []
