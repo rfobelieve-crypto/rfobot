@@ -139,6 +139,22 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     ax_price.vlines(x[up], lows[up], highs[up], color="#26a69a", linewidth=0.5)
     ax_price.vlines(x[down], lows[down], highs[down], color="#ef5350", linewidth=0.5)
 
+    # Rolling 200-bar percentile of |mag_pred| — used to scale triangle
+    # size by the user's mental filter: Strong + mag>p90 → extra large
+    # (🔥 strongest conviction), Strong + mag<p80 → downsized to show
+    # "direction strong but magnitude weak", and mirrors for Moderate.
+    if "mag_pred" in sig.columns:
+        _abs_mag = np.abs(sig["mag_pred"].fillna(0).values.astype(float))
+        mag_pct_arr = np.full(n, 50.0)
+        for i in range(n):
+            start = max(0, i - 199)
+            w = _abs_mag[start:i + 1]
+            w_nz = w[w > 1e-9]
+            if len(w_nz) >= 10 and _abs_mag[i] > 1e-9:
+                mag_pct_arr[i] = (w_nz <= _abs_mag[i]).sum() / len(w_nz) * 100
+    else:
+        mag_pct_arr = np.full(n, 50.0)
+
     # Direction triangles — Strong + Moderate signals
     price_range = highs.max() - lows.min()
     offset = price_range * 0.02
@@ -152,7 +168,16 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
             continue
 
         is_strong = (s == "Strong")
-        tri_size = 13**2 if is_strong else 9**2
+        mag_p = mag_pct_arr[i]
+        # Size by (strength × mag_pct) — the user's dual-gate mental rule
+        if is_strong:
+            if mag_p >= 90:   tri_size = 17**2    # extra large: 🔥 Go
+            elif mag_p >= 80: tri_size = 13**2    # regular Strong
+            else:             tri_size = 9**2     # downsized: dir strong, mag weak
+        else:  # Moderate
+            if mag_p >= 90:   tri_size = 13**2    # upsized: dir mod, mag strong 🎯
+            elif mag_p >= 80: tri_size = 9**2     # regular Moderate
+            else:             tri_size = 6**2     # downsized: both weak
         alpha = max(0.5, min(c / 100, 1.0)) if is_strong else max(0.35, min(c / 100, 0.7))
 
         if d == "UP":

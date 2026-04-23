@@ -42,6 +42,18 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         "WARMUP":        "#3a3f4a",
     }
 
+    # Pre-compute per-bar rolling 200-bar mag percentile for dual-gate
+    # badge/size on markers.
+    _abs_all = np.abs(sig.get("mag_pred", pd.Series(0, index=sig.index))
+                      .fillna(0).values.astype(float))
+    _mag_pct_series = np.full(len(_abs_all), 50.0)
+    for _i in range(len(_abs_all)):
+        _st = max(0, _i - 199)
+        _w = _abs_all[_st:_i + 1]
+        _wn = _w[_w > 1e-9]
+        if len(_wn) >= 10 and _abs_all[_i] > 1e-9:
+            _mag_pct_series[_i] = (_wn <= _abs_all[_i]).sum() / len(_wn) * 100
+
     # ── Build data arrays ──
     candle_data = []
     conf_data = []
@@ -98,19 +110,33 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                 "color": REGIME_COLORS.get(reg_val, REGIME_COLORS["CHOPPY"]),
             })
 
-        # Direction markers (Strong + Moderate)
+        # Direction markers (Strong + Moderate) with dual-gate badge/size
         strength = str(row.get("strength_score", ""))
         direction = str(row.get("pred_direction", ""))
         if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
             is_strong = (strength == "Strong")
+            mp = float(_mag_pct_series[i])
+            # Badge text + size per dual-gate rule
+            if is_strong and mp >= 90:
+                badge_text, mk_size = "\U0001f525", 2   # :fire:
+            elif is_strong and mp >= 80:
+                badge_text, mk_size = "", 2
+            elif is_strong:
+                badge_text, mk_size = "", 1            # downsized Strong
+            elif mp >= 90:  # Moderate + mag p90+
+                badge_text, mk_size = "\U0001f3af", 2   # :dart:  upsized
+            elif mp >= 80:
+                badge_text, mk_size = "", 1
+            else:
+                badge_text, mk_size = "", 1
             if direction == "UP":
                 markers.append({
                     "time": ts,
                     "position": "belowBar",
                     "color": "#004d40" if is_strong else "#66bb6a",
                     "shape": "arrowUp",
-                    "text": "",
-                    "size": 2 if is_strong else 1,
+                    "text": badge_text,
+                    "size": mk_size,
                 })
             else:
                 markers.append({
@@ -118,8 +144,8 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                     "position": "aboveBar",
                     "color": "#b71c1c" if is_strong else "#ef5350",
                     "shape": "arrowDown",
-                    "text": "",
-                    "size": 2 if is_strong else 1,
+                    "text": badge_text,
+                    "size": mk_size,
                 })
 
     last_dt = sig.index[-1]
@@ -139,6 +165,30 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         "CHOPPY":        "#78828f",
         "WARMUP":        "#999999",
     }.get(last_reg, "#999999")
+
+    # Mag + rolling 200-bar percentile for dual-gate badge
+    last_mag = float(sig.get("mag_pred", pd.Series(0)).iloc[-1] or 0)
+    try:
+        _abs_mag = np.abs(sig["mag_pred"].tail(200).fillna(0).values.astype(float))
+        _abs_nz = _abs_mag[_abs_mag > 1e-9]
+        if len(_abs_nz) >= 10 and abs(last_mag) > 1e-9:
+            last_mag_pct = float((_abs_nz <= abs(last_mag)).sum() / len(_abs_nz) * 100)
+        else:
+            last_mag_pct = 50.0
+    except Exception:
+        last_mag_pct = 50.0
+
+    # Dual-gate badge
+    if last_str == "Strong" and last_mag_pct >= 90:
+        mag_badge = "\U0001f525"  # :fire:
+        mag_badge_color = "#ff6b35"
+    elif (last_str == "Strong" and last_mag_pct >= 80) or \
+         (last_str == "Moderate" and last_mag_pct >= 90):
+        mag_badge = "\U0001f3af"  # :dart:
+        mag_badge_color = "#f9a825"
+    else:
+        mag_badge = ""
+        mag_badge_color = "#7a828e"
 
     # Height ratios for panels. Reserve 5% for regime strip if present.
     # BBP panel was removed 2026-04-22 — its 15% height returned to price.
@@ -183,7 +233,7 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
 <body>
 <div id="header">
   <span class="title">BTC Market Intelligence Indicator (4h prediction)</span>
-  <span class="info">{last_dir} | Conf {last_conf:.0f}% ({last_str}) | <span style="color: {reg_color}; font-weight: 600;">{reg_short}</span> | ${last_price:,.0f}</span>
+  <span class="info">{last_dir} | Conf {last_conf:.0f}% ({last_str}) | Mag {last_mag*100:.2f}% (p{last_mag_pct:.0f}) <span style="color: {mag_badge_color}; font-weight: 600;">{mag_badge}</span> | <span style="color: {reg_color}; font-weight: 600;">{reg_short}</span> | ${last_price:,.0f}</span>
   <span>{last_time}</span>
 </div>
 <div class="chart-wrapper" id="conf-wrapper">

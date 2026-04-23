@@ -490,6 +490,30 @@ def update_cycle() -> dict:
         dir_prob = float(last_row.get("dir_prob_up", 0.5))
         mag = float(last_row.get("mag_pred", 0))
 
+        # Rolling 200-bar mag percentile (dual-gate decision helper)
+        try:
+            _recent = indicator_df.tail(200)
+            _abs_mag = np.abs(_recent["mag_pred"].fillna(0).values.astype(float))
+            _abs_nz = _abs_mag[_abs_mag > 1e-9]
+            if len(_abs_nz) >= 10 and abs(mag) > 1e-9:
+                mag_pct = float((_abs_nz <= abs(mag)).sum() / len(_abs_nz) * 100)
+            else:
+                mag_pct = 50.0
+        except Exception:
+            mag_pct = 50.0
+
+        # Dual-gate badge — maps the user's manual trading rule:
+        #   fire Strong+mag>=p90 : Go (top conviction)
+        #   target Strong+p80-p90 OR Moderate+mag>=p90 : Consider
+        #   (no badge) : direction signal weak or mag insufficient
+        if strength == "Strong" and mag_pct >= 90:
+            badge = " \U0001f525"  # :fire:
+        elif (strength == "Strong" and mag_pct >= 80) or \
+             (strength == "Moderate" and mag_pct >= 90):
+            badge = " \U0001f3af"  # :dart:
+        else:
+            badge = ""
+
         risk_text = ""
 
         arrow = "\U0001f53c" if direction == "UP" else "\U0001f53d" if direction == "DOWN" else "\u2796"
@@ -497,7 +521,7 @@ def update_cycle() -> dict:
             f"{arrow} BTC 4h Indicator | {now_str}\n"
             f"Price: ${price:,.0f}\n"
             f"Direction: {direction} | Confidence: {conf:.0f} ({strength})\n"
-            f"Mag: {mag*100:.3f}%"
+            f"Mag: {mag*100:.3f}% (p{mag_pct:.0f}){badge}"
             f"{risk_text}"
         )
         tg_result = _send_telegram_photo(png, caption)
