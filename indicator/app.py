@@ -537,6 +537,19 @@ def update_cycle() -> dict:
             else:
                 icon = "\U0001f534\u25bc" if is_strong else "\U0001f534\u25bd"  # 🔴▼ / 🔴▽
                 label = "STRONG BEARISH" if is_strong else "MODERATE BEARISH"
+
+            # Dual-gate mag tier — mirrors chart_renderer triangle-size and
+            # PNG caption badge so the alert text matches the visual.
+            #   mag_pct >= 90 -> 🔥 (extra-large / upsized triangle, fire badge)
+            #   mag_pct 80-90 -> 🎯 (regular triangle, target badge if Strong)
+            #   mag_pct < 80  -> ⚠️ Mag Weak (downsized triangle, no badge)
+            if mag_pct >= 90:
+                mag_tier_line = f"\n\U0001f525 Mag Strong (p{mag_pct:.0f})"
+            elif mag_pct >= 80:
+                mag_tier_line = f"\n\U0001f3af Mag Solid (p{mag_pct:.0f})"
+            else:
+                mag_tier_line = f"\n⚠️ Mag Weak (p{mag_pct:.0f})"
+
             # SHAP explanation for Strong signals only
             shap_text = ""
             shap_json_str = ""
@@ -559,6 +572,7 @@ def update_cycle() -> dict:
                 f"P(UP): {dir_prob:.0%} | Mag: {mag:.2f}x\n"
                 f"Confidence: {conf:.0f}{risk_line}\n"
                 f"Regime: {regime}"
+                f"{mag_tier_line}"
                 f"{shap_text}\n\n"
                 f"\u23f0 {now_str}"
             )
