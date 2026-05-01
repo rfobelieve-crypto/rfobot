@@ -439,21 +439,13 @@ def update_cycle() -> dict:
         else:
             logger.info("No new bars to predict")
 
-        # 5b. Re-predict historical bars with the current model — full rescore
-        # (direction + strength + confidence + mag). Rationale: after any
-        # model swap (e.g. binary → regression) stale historical triangles
-        # otherwise linger in the 200-bar window for ~8 days.
-        overlap_idx = indicator_df.index.intersection(features.index)
-        if len(overlap_idx) > 0:
-            repredicted = _engine.predict(features.loc[overlap_idx], context_features=features,
-                                             update_history=False)
-            if hasattr(repredicted.index, 'as_unit'):
-                repredicted.index = repredicted.index.as_unit("ns")
-            pred_cols = [c for c in repredicted.columns
-                         if c not in ("open", "high", "low", "close")]
-            for col in pred_cols:
-                indicator_df.loc[overlap_idx, col] = repredicted[col]
-            logger.info("Re-scored %d historical bars with current model", len(overlap_idx))
+        # 5b. (REMOVED 2026-05-01) Historical bars are NEVER re-scored. Each
+        # bar's prediction is frozen at the model_version that produced it
+        # live; a retrain only changes predictions for bars that arrive AFTER
+        # the new model is loaded. See feedback_no_signal_overwrite memory
+        # and indicator/model_version.py. The earlier re-score block silently
+        # converted past chart triangles into in-sample shadows of the
+        # current model on every retrain, breaking live OOS evaluation.
 
         # 6. Render chart (last 200 bars that have OHLC data)
         chart_df = indicator_df.dropna(subset=["open", "high", "low", "close"])

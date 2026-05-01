@@ -38,6 +38,7 @@ def _ensure_table():
                     `entry_price` DOUBLE NOT NULL,
                     `regime` VARCHAR(30) DEFAULT '',
                     `mag_pct_200` DOUBLE DEFAULT NULL,
+                    `model_version` VARCHAR(40) DEFAULT NULL,
                     `exit_price` DOUBLE DEFAULT NULL,
                     `actual_return_4h` DOUBLE DEFAULT NULL,
                     `correct` TINYINT DEFAULT NULL,
@@ -47,16 +48,21 @@ def _ensure_table():
                     UNIQUE KEY `uq_time_strength` (`signal_time`, `strength`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
-            # Additive migration: add mag_pct_200 column if pre-existing
-            # table was created before this feature. Safe to run repeatedly.
-            cur.execute("""
-                SELECT COUNT(*) AS n FROM information_schema.columns
-                WHERE table_schema = DATABASE() AND table_name = %s
-                  AND column_name = 'mag_pct_200'
-            """, (TABLE,))
-            if int(cur.fetchone()["n"]) == 0:
-                cur.execute(f"ALTER TABLE `{TABLE}` ADD COLUMN `mag_pct_200` DOUBLE DEFAULT NULL")
-                logger.info("Added mag_pct_200 column to %s", TABLE)
+            # Additive migrations — safe to run repeatedly.
+            for col_name, col_def in (
+                ("mag_pct_200", "DOUBLE DEFAULT NULL"),
+                ("model_version", "VARCHAR(40) DEFAULT NULL"),
+            ):
+                cur.execute("""
+                    SELECT COUNT(*) AS n FROM information_schema.columns
+                    WHERE table_schema = DATABASE() AND table_name = %s
+                      AND column_name = %s
+                """, (TABLE, col_name))
+                if int(cur.fetchone()["n"]) == 0:
+                    cur.execute(
+                        f"ALTER TABLE `{TABLE}` ADD COLUMN `{col_name}` {col_def}"
+                    )
+                    logger.info("Added %s column to %s", col_name, TABLE)
             # Migrate old strong_signals data if exists and tracked_signals is empty
             cur.execute(f"SELECT COUNT(*) as cnt FROM `{TABLE}`")
             if cur.fetchone()["cnt"] == 0:
@@ -98,24 +104,28 @@ def record_signal(signal_time: datetime, direction: str, strength: str,
         return
 
     _ensure_table()
+    from indicator.model_version import get_current_model_version
+
     conn = _get_db_conn()
     try:
         with conn.cursor() as cur:
+            # ⚠ INSERT IGNORE (not ON DUPLICATE KEY UPDATE): a fired signal
+            # is frozen at the model version that produced it. Re-running
+            # this writer for an already-stored (signal_time, strength) pair
+            # is a no-op so the original prediction stays attributable to
+            # the original model_version. See feedback_no_signal_overwrite.
             cur.execute(f"""
-                INSERT INTO `{TABLE}`
+                INSERT IGNORE INTO `{TABLE}`
                     (signal_time, direction, strength, p_up, mag_pred,
-                     confidence, entry_price, regime, shap_top, mag_pct_200)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    direction=VALUES(direction), p_up=VALUES(p_up),
-                    mag_pred=VALUES(mag_pred), confidence=VALUES(confidence),
-                    entry_price=VALUES(entry_price), regime=VALUES(regime),
-                    shap_top=VALUES(shap_top), mag_pct_200=VALUES(mag_pct_200)
+                     confidence, entry_price, regime, shap_top, mag_pct_200,
+                     model_version)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 signal_time.strftime("%Y-%m-%d %H:%M:%S"),
                 direction, strength, float(p_up), float(mag_pred),
                 float(confidence), float(entry_price), regime, shap_json or None,
                 float(mag_pct_200) if mag_pct_200 is not None else None,
+                get_current_model_version(),
             ))
         conn.commit()
         logger.info("%s signal recorded: %s %s @ $%.0f conf=%.0f mag_p=%s",

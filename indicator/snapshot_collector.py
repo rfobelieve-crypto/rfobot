@@ -269,10 +269,12 @@ def save_indicator_history(df: pd.DataFrame):
         "pred_return_4h", "pred_direction_code", "confidence_score",
         "strength_code", "regime_code",
         "up_pred", "down_pred", "strength_raw", "dynamic_deadzone",
-        "dir_prob_up", "mag_pred",
+        "dir_prob_up", "mag_pred", "model_version",
     ]
 
     _ensure_indicator_history_table(table)
+
+    from indicator.model_version import get_current_model_version
 
     last = df.iloc[-1]
     ts = df.index[-1]
@@ -301,15 +303,18 @@ def save_indicator_history(df: pd.DataFrame):
         float(last.get("dynamic_deadzone", 0) or 0),
         float(last.get("dir_prob_up", 0.5) or 0.5),
         float(last.get("mag_pred", 0) or 0),
+        get_current_model_version(),
     ]
 
     col_list = ", ".join(f"`{c}`" for c in ["dt"] + columns)
     placeholders = ", ".join(["%s"] * len(values))
-    update_clause = ", ".join(f"`{c}`=VALUES(`{c}`)" for c in columns)
-
+    # ⚠ INSERT IGNORE (not ON DUPLICATE KEY UPDATE): a bar's prediction is
+    # frozen at the model version that produced it. Re-running this writer
+    # for an already-stored bar — even after a retrain — is a no-op so the
+    # original prediction stays attributable to the original model_version.
+    # See feedback_no_signal_overwrite memory.
     sql = (
-        f"INSERT INTO `{table}` ({col_list}) VALUES ({placeholders}) "
-        f"ON DUPLICATE KEY UPDATE {update_clause}"
+        f"INSERT IGNORE INTO `{table}` ({col_list}) VALUES ({placeholders})"
     )
 
     conn = _get_db_conn()
@@ -346,6 +351,7 @@ def _ensure_indicator_history_table(table: str):
         `dynamic_deadzone` DOUBLE DEFAULT 0,
         `dir_prob_up` DOUBLE DEFAULT 0.5,
         `mag_pred` DOUBLE DEFAULT 0,
+        `model_version` VARCHAR(40) DEFAULT NULL,
         PRIMARY KEY (`dt`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """
@@ -353,14 +359,18 @@ def _ensure_indicator_history_table(table: str):
     try:
         with conn.cursor() as cur:
             cur.execute(sql)
-            # Add mag_pred column if missing (existing tables won't have it)
-            try:
-                cur.execute(
-                    f"ALTER TABLE `{table}` ADD COLUMN `mag_pred` DOUBLE DEFAULT 0"
-                )
-                logger.info("Added mag_pred column to %s", table)
-            except Exception:
-                pass  # column already exists
+            # Additive migrations — safe to run repeatedly.
+            for col_name, col_def in (
+                ("mag_pred", "DOUBLE DEFAULT 0"),
+                ("model_version", "VARCHAR(40) DEFAULT NULL"),
+            ):
+                try:
+                    cur.execute(
+                        f"ALTER TABLE `{table}` ADD COLUMN `{col_name}` {col_def}"
+                    )
+                    logger.info("Added %s column to %s", col_name, table)
+                except Exception:
+                    pass  # column already exists
         _tables_ensured.add(table)
         logger.info("Table ensured: %s", table)
     except Exception as e:
