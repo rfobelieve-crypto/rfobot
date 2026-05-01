@@ -81,14 +81,19 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         conf_data.append({"time": ts, "value": conf_val / 100, "color": conf_color})
 
         # Magnitude — colour by regression lean sign + tier shade.
-        # Prefer dir_pred_ret so every bar gets a directional colour; fall
-        # back to pred_direction for legacy binary compat.
+        # Use pred_return_4h as the lean source: same value as dir_pred_ret
+        # (inference.py:365) but persisted to indicator_history MySQL, so
+        # historical bars survive a process restart with their direction
+        # colour intact. Falls back through dir_pred_ret then
+        # pred_direction for legacy/edge-case rows.
         if has_mag:
             # Always positive; direction is encoded purely by colour.
             mag_val = abs(float(row.get("mag_pred", 0) or 0)) * 100
-            dpr = row.get("dir_pred_ret")
-            if dpr is not None and pd.notna(dpr):
-                sgn = 1 if float(dpr) > 0 else (-1 if float(dpr) < 0 else 0)
+            lean = row.get("pred_return_4h")
+            if lean is None or pd.isna(lean):
+                lean = row.get("dir_pred_ret")
+            if lean is not None and pd.notna(lean):
+                sgn = 1 if float(lean) > 0 else (-1 if float(lean) < 0 else 0)
             else:
                 d = str(row.get("pred_direction", "NEUTRAL"))
                 sgn = 1 if d == "UP" else (-1 if d == "DOWN" else 0)

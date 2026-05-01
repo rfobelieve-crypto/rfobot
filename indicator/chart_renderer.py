@@ -223,12 +223,24 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         ax_mag = fig.add_subplot(gs[panel_idx]); panel_idx += 1
         mag_raw = sig["mag_pred"].fillna(0).values.astype(float) * 100  # to %
         strength = sig["strength_score"].fillna("Weak").values
-        # Prefer regression lean (dir_pred_ret) so every bar gets a direction,
-        # not just the top-15% tiers. Fall back to pred_direction for the
-        # legacy binary path which has no dir_pred_ret column.
-        if "dir_pred_ret" in sig.columns:
-            lean = sig["dir_pred_ret"].fillna(0).values.astype(float)
-            sign_arr = np.sign(lean)
+        # Magnitude bar colour encodes the regression lean sign (UP/DOWN/0).
+        # We use pred_return_4h as the lean source — it carries the same
+        # value as the engine's raw dir_pred_ret (inference.py:365) but IS
+        # persisted to indicator_history MySQL, so historical bars survive
+        # a process restart with their direction colour intact.
+        # Per-bar fallback to pred_direction handles legacy rows that
+        # somehow lack pred_return_4h (extreme edge case after migrations).
+        lean_col = sig.get("pred_return_4h")
+        if lean_col is None:
+            lean_col = sig.get("dir_pred_ret")
+        if lean_col is not None:
+            lean_vals = lean_col.values.astype(float)
+            dirs = sig["pred_direction"].fillna("NEUTRAL").values
+            fallback_sign = np.where(dirs == "UP", 1.0,
+                                     np.where(dirs == "DOWN", -1.0, 0.0))
+            sign_arr = np.where(np.isnan(lean_vals),
+                                fallback_sign,
+                                np.sign(lean_vals))
         else:
             dirs = sig["pred_direction"].fillna("NEUTRAL").values
             sign_arr = np.where(dirs == "UP", 1.0,
