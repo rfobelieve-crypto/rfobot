@@ -1,12 +1,24 @@
 """
-Export dual-model artifacts for production deployment.
+Export MAGNITUDE production model (regression on |return_4h|).
 
-Trains direction (key_4_only) and magnitude (expanded) models on
-ALL available data, then exports to indicator/model_artifacts/dual_model/.
+⚠ This script does NOT export the direction model by default. Production
+direction is the REGRESSION model (rolling-percentile decoder), exported
+by `export_direction_reg_model.py`. Running direction export here would
+overwrite the regression artifacts with the legacy binary classifier and
+silently break the runtime decoder (config still claims regression while
+the model file is binary — same artifact name, different schema).
 
 Usage:
     python -m research.dual_model.export_production_models
+        # magnitude-only (default — safe to run after direction-reg export)
+
     python -m research.dual_model.export_production_models --refresh
+        # also force re-fetch raw data before training
+
+    python -m research.dual_model.export_production_models --include-direction-binary
+        # legacy: also re-export the binary direction classifier.
+        # Use ONLY if rolling back to the binary architecture; otherwise this
+        # corrupts the regression direction setup.
 """
 from __future__ import annotations
 
@@ -187,22 +199,20 @@ def export_magnitude_model(df: pd.DataFrame):
     return model, features
 
 
-def build_pred_history(df: pd.DataFrame, dir_model, dir_features,
-                       mag_model, mag_features):
-    """Build prediction history for mag_score warmup."""
-    labels = build_direction_labels(df, k=0.5)
-    mag_labels = build_magnitude_labels(df)
+def build_pred_history(df: pd.DataFrame, mag_model, mag_features):
+    """Build magnitude prediction history for warmup.
 
-    X_dir = df[dir_features].fillna(0)
+    Reads existing training_stats.json and updates ONLY the magnitude
+    `pred_history` key — preserves `dir_pred_history` written by
+    export_direction_reg_model.py (mistake.md 2026-04-19: shared-file write
+    must be read-then-update).
+    """
     X_mag = df[mag_features].fillna(0)
-
-    dir_prob = dir_model.predict_proba(X_dir)[:, 1]
     mag_pred = mag_model.predict(X_mag)
 
     # Save last 300 bars of |mag_pred| for expanding percentile warmup
     history = [float(abs(m)) for m in mag_pred[-300:] if not np.isnan(m)]
 
-    # MERGE into existing stats — preserve dir_pred_history
     stats_path = EXPORT_DIR / "training_stats.json"
     if stats_path.exists():
         with open(stats_path) as f:
@@ -225,8 +235,20 @@ def main():
     )
 
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--refresh", action="store_true")
+    parser = argparse.ArgumentParser(
+        description="Export magnitude (and optionally legacy binary direction) "
+                    "production models. See module docstring for usage notes."
+    )
+    parser.add_argument("--refresh", action="store_true",
+                        help="Force re-fetch raw data before training.")
+    parser.add_argument(
+        "--include-direction-binary", action="store_true",
+        help="Also re-export the legacy BINARY direction classifier. "
+             "WARNING: this overwrites the regression direction artifacts "
+             "produced by export_direction_reg_model.py and breaks the "
+             "rolling-percentile decoder. Only use when intentionally "
+             "rolling back to the binary architecture.",
+    )
     args = parser.parse_args()
 
     ensure_dirs()
@@ -235,15 +257,32 @@ def main():
     print(f"\nData: {len(df)} bars x {len(df.columns)} cols")
     print(f"Range: {df.index[0]} → {df.index[-1]}")
 
-    dir_model, dir_features = export_direction_model(df)
+    if args.include_direction_binary:
+        logger.warning(
+            "EXPORTING LEGACY BINARY DIRECTION CLASSIFIER — this overwrites "
+            "the regression artifacts. Direction config (regression schema) "
+            "and the binary model file will become inconsistent until "
+            "export_direction_reg_model.py is rerun. This flag should only "
+            "be used during a deliberate rollback.")
+        export_direction_model(df)
+    else:
+        logger.info("Skipping direction export "
+                    "(production direction = regression model, owned by "
+                    "export_direction_reg_model.py). Pass "
+                    "--include-direction-binary to override.")
+
     mag_model, mag_features = export_magnitude_model(df)
-    build_pred_history(df, dir_model, dir_features, mag_model, mag_features)
+    build_pred_history(df, mag_model, mag_features)
 
     print(f"\n{'=' * 60}")
-    print(f"  DUAL-MODEL ARTIFACTS EXPORTED")
+    print(f"  MAGNITUDE ARTIFACTS EXPORTED")
     print(f"  Directory: {EXPORT_DIR}")
-    print(f"  Direction: {DIRECTION_FEATURE_SET} ({len(dir_features)} features)")
     print(f"  Magnitude: {MAGNITUDE_FEATURE_SET} ({len(mag_features)} features)")
+    if args.include_direction_binary:
+        print(f"  Direction (BINARY, legacy): {DIRECTION_FEATURE_SET}  "
+              f"⚠ rerun export_direction_reg_model.py to restore regression")
+    else:
+        print(f"  Direction: UNTOUCHED  (managed by export_direction_reg_model.py)")
     print(f"{'=' * 60}")
 
 

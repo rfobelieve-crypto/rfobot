@@ -9,16 +9,16 @@
   "moderate_top_frac": 0.15,
   "warmup_bars": 100,
   "fallback": {
-    "strong_up": 0.005864151474088422,
-    "strong_dn": -0.006244711391627788,
-    "moderate_up": 0.0035746496869251162,
-    "moderate_dn": -0.0037431347533129155
+    "strong_up": 0.0021502008312381804,
+    "strong_dn": -0.0015994133136700839,
+    "moderate_up": 0.0011227245995542035,
+    "moderate_dn": -0.0010095790785271674
   },
   "use_mag_gate": false,
   "n_train_samples": 3995,
   "n_features": 136,
   "n_estimators": 250,
-  "trained_at": "2026-04-15T19:42:31.983522",
-  "in_sample_mae": 0.003498130786986323,
-  "in_sample_corr": 0.8363432884306018
+  "trained_at": "2026-05-01T07:42:43.559770",
+  "in_sample_mae": 0.0033850238749987154,
+  "in_sample_corr": 0.838453035713305
 }

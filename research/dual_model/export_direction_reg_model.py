@@ -15,8 +15,16 @@ This script:
   3. Loads the walk-forward OOS parquet and calibrates fallback ± thresholds
      (= top-strong_top_frac symmetric quantiles of all WF OOS predictions)
      for cold-start use when dir_pred_history < warmup_bars.
-  4. Also seeds training_stats.json's "dir_pred_history" with the last 500
-     WF OOS predictions so the engine starts warm on boot.
+  4. Seeds training_stats.json's "dir_pred_history" with the last 500
+     IN-SAMPLE predictions of the freshly-trained PRODUCTION MODEL on its
+     own training data, so the rolling-percentile decoder starts warm with
+     a buffer that lives on the same scale as live predictions.
+
+     ⚠ Do NOT seed from WF OOS predictions: WF fold models train on a small
+     subset and produce ~3.5x narrower variance than the production model,
+     which biases the rolling-percentile thresholds and causes runaway
+     same-side signals (mistake.md 2026-04-19).
+
   5. Does NOT touch magnitude_xgb.json / magnitude_feature_cols.json /
      magnitude_config.json.
 
@@ -55,16 +63,15 @@ ARTIFACT_DIR = PROJECT_ROOT / "indicator" / "model_artifacts" / "dual_model"
 
 
 def _calibrate_fallback(wf_oos_path: Path, strong_frac: float,
-                        mod_frac: float) -> tuple[dict, list[float]]:
+                        mod_frac: float) -> dict:
     """
-    Read WF OOS predictions and derive:
-      - fallback ± thresholds (symmetric quantiles)
-      - warmup buffer (last 500 signed predictions, time-ordered)
+    Read WF OOS predictions and derive fallback ± thresholds (symmetric
+    quantiles).
 
     The fallback thresholds are what the engine falls back to when its live
-    dir_pred_history buffer has fewer samples than warmup_bars. Using the WF
-    OOS quantiles keeps the fallback in the same distribution as training —
-    without this, the first 100 live bars would misfire wildly.
+    dir_pred_history buffer has fewer samples than warmup_bars. WF OOS is
+    the right source for thresholds because it represents how the model
+    behaves on truly unseen data — fallback should be conservative.
     """
     oos = pd.read_parquet(wf_oos_path)
     pred = oos["pred_ret"].values.astype(float)
@@ -75,11 +82,32 @@ def _calibrate_fallback(wf_oos_path: Path, strong_frac: float,
         moderate_up=float(np.quantile(pred, 1.0 - mod_frac / 2.0)),
         moderate_dn=float(np.quantile(pred, mod_frac / 2.0)),
     )
+    return fallback
 
-    # Warmup buffer: last 500 WF OOS predictions in time order
-    oos_sorted = oos.sort_index()
-    warmup = oos_sorted["pred_ret"].tail(500).astype(float).tolist()
-    return fallback, warmup
+
+def _build_warmup_buffer(model: xgb.XGBRegressor, X: pd.DataFrame,
+                         y_index: pd.Index, n_bars: int = 500) -> list[float]:
+    """
+    Seed the rolling-percentile warmup buffer with the freshly-trained
+    PRODUCTION model's in-sample predictions on its own training data,
+    time-ordered, last `n_bars` rows.
+
+    Why in-sample (not WF OOS): the runtime decoder compares each live
+    prediction against the buffer's percentile thresholds. WF OOS fold
+    models train on a small subset and produce ~3.5x narrower variance
+    than the production model — using their predictions as the buffer
+    biases the thresholds and pushes nearly every live prediction into a
+    Strong tail (mistake.md 2026-04-19).
+
+    Caller must verify: ratio of buffer_std to recent-live-pred std should
+    sit in [0.5, 2.0].
+    """
+    in_sample = pd.Series(
+        model.predict(X).astype(float),
+        index=y_index,
+    ).sort_index()
+    warmup = in_sample.tail(n_bars).tolist()
+    return warmup
 
 
 def export(objective: str, strong_frac: float, mod_frac: float,
@@ -109,6 +137,7 @@ def export(objective: str, strong_frac: float, mod_frac: float,
     mask = df["y_path_ret_4h"].notna()
     X = df.loc[mask, features].fillna(0)
     y = df.loc[mask, "y_path_ret_4h"].astype(float).values
+    y_index = df.loc[mask].index
     print(f"[data] training rows: {len(y)}   "
           f"target mu/sigma = {y.mean():+.5f} / {y.std():.5f}")
 
@@ -125,20 +154,35 @@ def export(objective: str, strong_frac: float, mod_frac: float,
     in_sample_pred = model.predict(X)
     in_sample_mae = float(np.mean(np.abs(in_sample_pred - y)))
     in_sample_corr = float(np.corrcoef(in_sample_pred, y)[0, 1])
+    in_sample_std = float(np.std(in_sample_pred))
     print(f"[train] in-sample MAE={in_sample_mae:.5f}  "
-          f"corr={in_sample_corr:+.4f}  (diagnostic only, NOT OOS)")
+          f"corr={in_sample_corr:+.4f}  std={in_sample_std:.5f}  "
+          f"(diagnostic only, NOT OOS)")
 
-    # ── 4. Calibrate fallback thresholds from WF OOS ───────────────────
+    # ── 4a. Calibrate fallback thresholds from WF OOS ──────────────────
     wf_path = RESULTS_DIR / f"direction_reg_oos_{objective}.parquet"
     if not wf_path.exists():
         raise FileNotFoundError(
             f"{wf_path} not found — run train_direction_reg_4h first")
-    fallback, warmup_buffer = _calibrate_fallback(wf_path, strong_frac, mod_frac)
+    fallback = _calibrate_fallback(wf_path, strong_frac, mod_frac)
     print(f"[calib] fallback strong ±  up={fallback['strong_up']:+.5f}  "
           f"dn={fallback['strong_dn']:+.5f}")
     print(f"[calib] fallback mod    ±  up={fallback['moderate_up']:+.5f}  "
           f"dn={fallback['moderate_dn']:+.5f}")
-    print(f"[calib] warmup buffer: {len(warmup_buffer)} signed preds")
+
+    # ── 4b. Seed warmup buffer from PRODUCTION model in-sample preds ──
+    warmup_buffer = _build_warmup_buffer(model, X, y_index, n_bars=500)
+    buf_std = float(np.std(warmup_buffer))
+    wf_pred_std = float(np.std(pd.read_parquet(wf_path)["pred_ret"].values))
+    scale_ratio = buf_std / wf_pred_std if wf_pred_std > 0 else float("inf")
+    print(f"[calib] warmup buffer: {len(warmup_buffer)} signed preds  "
+          f"std={buf_std:.5f}")
+    print(f"[calib] buffer/WF-OOS std ratio = {scale_ratio:.2f}x  "
+          "(prod model typically 2-4x wider than WF folds; this is expected)")
+    if scale_ratio < 1.5:
+        print("[WARN] buffer std ratio < 1.5x — production model may be "
+              "underfitting OR WF folds were trained on too-similar splits. "
+              "Verify manually before deploying.")
 
     # ── 5. Write artifacts ─────────────────────────────────────────────
     model_path = ARTIFACT_DIR / "direction_xgb.json"
