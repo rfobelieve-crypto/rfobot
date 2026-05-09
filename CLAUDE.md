@@ -1,14 +1,47 @@
-# 專案 CLAUDE.md - BTC 多空強度預測指標 (Market Intelligence Indicator)
+# 專案 CLAUDE.md - BTC 量化交易系統（從指標漸進演化）
 
-## 專案定位（所有設計以此為準）
-這是一個「多空強度預測指標 / Market Intelligence Indicator」，**不是**交易策略或自動下單系統。
+## 專案定位（2026-05-09 更新）
+這個專案最初是「多空強度預測指標 / Market Intelligence Indicator」，
+從 2026-05-09 起，**正在漸進演化成量化交易系統（含自動下單）**。
 
-核心功能：預測未來固定 horizon（4h）的市場方向、強度、信心，以圖表方式可視化。
+### 為什麼從指標走向自動交易
+- 使用者不要盯盤手動下單
+- 5.5 個月歷史訊號 robustness check 顯示後半段 net per trade +9 bps（已扣 13 bps 成本），
+  值得用嚴格風控驗證能否轉成實戰收益。詳見 robustness 結論：
+  - Strong / CHOPPY 91.8% WR 是 sample artifact（regime 標記從 3/21 才開始），不是真 edge
+  - 整體 Strong 95% CI [-2.2, +14.6] bps 含 0，無法統計上斷言 edge 顯著
+  - 可信的判斷是「邊際正 EV，需要 forward window 驗證」
 
-**這不是策略系統 — 嚴禁延伸到以下方向：**
-- entry/exit 規則、TP/SL 設計、倉位管理、槓桿控制
-- 交易績效最大化、strategy backtest framework
-- 自動下單 execution logic、fee simulation
+## Staged auto-trading framework
+不是「驗證夠了再上線」vs「不驗證就上線」的二元選擇。是「金額大小 × 風控深度 對齊
+edge 確信度」的漸進過程。
+
+| Stage | 描述 | Risk | 進階條件 |
+|---|---|---|---|
+| 0 | 純指標 + 推送 | 0 | (已過) |
+| 1 | **Paper trading**（虛擬 PnL，0 風險）| 0 | 100+ 筆穩定版本 trades + paper net > +5 bps × 4 週 |
+| 2 | Testnet executor（exchange 測試環境）| 0 | testnet 1-2 週無 bug + order flow 正確 |
+| 3 | Live tiny size（$100，輸光不痛）| 極小 | live 4 週 net positive + MDD < 20% |
+| 4 | 漸進加碼（每月 +50%）| 隨加碼 | 每階段 hit hard rules 不退出 |
+
+每個階段都有 hard rules，寫入 production 程式碼，**不靠紀律**：
+- drawdown trigger（cumulative drawdown 觸發 → 自動降階段）
+- connection loss kill switch（與 exchange 失聯 → 取消所有未平倉位）
+- position limit（單筆 / 總部位上限）
+- daily loss cap（單日累積虧損上限 → 暫停當日所有訊號）
+
+## 當前 stage：Stage 1 (Paper Trading)
+- 入口：`/paper-perf` endpoint（HTML report）+ `indicator/paper_trading.py` (computation)
+- 觀察項：每週看「最近 30 天」cohort 的 net_bps、WR、Sharpe、Drawdown
+- **本 stage 仍可改進指標模型**（feature、訓練、信心公式等），改完即新 cohort 開始
+- 進階前必須等：穩定版本下 100+ 筆 trades 且 4 週連續正 EV
+
+## 仍然禁止的（避免在錯的階段做錯事）
+- **Stage 1**：禁寫 exchange execution code（連券商 API）；只計算虛擬 PnL
+- **Stage 2-3**：禁鬆 hard rules；禁未經 rules 驗證就加碼到下一階段
+- **Stage 4**：禁 leverage > 1（先驗證 cash spot 模式）
+- 任何階段：strategy sweep 必須留 OOS hold-out，禁全資料 fit
+- 任何階段：禁因為「最近表現好」就跳階段——必須 hit hard rules
 
 ## 系統架構（v7 Dual-Model）
 Dual XGBoost 架構：Direction Regressor + Magnitude Regressor，獨立管線。
@@ -31,8 +64,9 @@ Dual XGBoost 架構：Direction Regressor + Magnitude Regressor，獨立管線�
 
 ### 信號生成
 - Direction: 500-bar rolling percentile 解碼，top 5% → Strong UP，top 15% → Moderate UP（DOWN 同理）
-- Confidence = 80 pts from |pred_ret|/Strong_cutoff^0.6 + 20 pts mag percentile bonus
-- Strong ≥ 80, Moderate ≥ 65, Weak < 65
+- Absolute |pred| floor (Strong=0.0008, Moderate=0.0005)：低 vol regime 保險，rolling cutoff 比 floor 寬鬆時 floor 接管（2026-05-09 加入）
+- Confidence = `min(|pred|/Strong_cutoff, 1.0)^0.6 × 100`（純 |pred| 公式，2026-05-09 移除 mag bonus 因為 OOS 顯示高 mag bar 在模型失靈區）
+- Strong ≥ 80, Moderate ≥ 65, Weak < 65（顯示用，實際 tier 觸發看 |pred| vs cutoff）
 - Hysteresis + Cooldown
 
 ### 輸出

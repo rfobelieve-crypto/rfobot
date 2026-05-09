@@ -1254,6 +1254,24 @@ def signal_perf_api():
         return jsonify({"text": f"❌ 信號績效查詢失敗: {e}"}), 500
 
 
+@app.route("/paper-perf", methods=["GET"])
+def paper_perf_api():
+    """API: paper-trading virtual PnL report (Stage 1 of auto-trading roadmap).
+
+    Reads tracked_signals + assumes 4h-hold blind execution + 13 bps cost.
+    Used to monitor whether the indicator's signals are net-positive after
+    realistic trading frictions, as a precondition for moving toward live
+    auto-trading stages.
+    """
+    try:
+        from indicator.paper_trading import get_paper_trading_report
+        report = get_paper_trading_report()
+        return jsonify({"text": report})
+    except Exception as e:
+        logger.exception("Paper perf failed")
+        return jsonify({"text": f"❌ Paper trading 查詢失敗: {e}"}), 500
+
+
 @app.route("/meeting", methods=["GET", "POST"])
 def meeting_route():
     """Trigger full agent sweep: all 5 agents investigate + self-heal."""

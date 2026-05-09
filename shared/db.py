@@ -8,6 +8,7 @@ Resolution order:
 
 Used by both BTC_perp_data.py (main bot) and market_data layer.
 """
+from __future__ import annotations  # let `queue.Queue | None` parse on Py 3.9 dev envs
 
 import os
 import json
