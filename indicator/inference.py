@@ -96,6 +96,18 @@ HYSTERESIS_MULT = 1.40       # to flip UP→DOWN, need strength < -(dz * 1.4)
 # Signal cooldown: minimum bars between direction flips
 FLIP_COOLDOWN_BARS = 1       # after flipping direction, hold for at least 1 bar
 
+# Absolute |pred| floors for direction decoding (Step 2, 2026-05-09).
+# Rationale: research/step234_empirics.py shows that bars with |pred| below
+# these levels have OOS IC ≈ 0 or negative (Q1: IC -0.076, Q2: -0.118), while
+# bars above the Strong floor have sign_acc ≥ 0.55 and IC ≥ +0.10. Rolling
+# percentile cutoffs occasionally dip below these floors in low-vol regimes
+# (~6.8% of time below 0.0004), allowing weak/noise predictions to fire
+# Moderate signals — the floor blocks that.  Effective cutoff =
+# max(rolling_cutoff, ABS_FLOOR_*) so high-vol regimes are still governed by
+# the rolling percentile.
+ABS_FLOOR_STRONG = 0.0008    # corresponds to OOS sign_acc ≈ 0.556, IC ≈ +0.124
+ABS_FLOOR_MODERATE = 0.0005  # corresponds to OOS sign_acc ≈ 0.553, IC ≈ +0.102
+
 
 class IndicatorEngine:
     """Stateful prediction engine with dual-model direction-regression architecture."""
@@ -150,6 +162,14 @@ class IndicatorEngine:
 
         # Shared feature superset (for missing-feature warnings)
         self.feature_cols = sorted(set(self.dual_dir_features + self.dual_mag_features))
+
+        # Step 3 (isotonic confidence) was designed but rejected 2026-05-09:
+        # OOS isotonic fit produced a P_correct plateau in |pred| 0.001~0.005,
+        # which made every Moderate signal share an identical confidence value
+        # — breaking alpha_decay_monitor.check_confidence_wr_decoupling()
+        # which needs a confidence quantile split.  The fit knot points are
+        # still saved at confidence_isotonic.json for future investigation
+        # (e.g. with more OOS samples or feature work that breaks the plateau).
 
         # Pred histories for mag_score + direction-regression rolling percentile
         stats_path = DUAL_MODEL_DIR / "training_stats.json"
@@ -334,6 +354,15 @@ class IndicatorEngine:
                 up_mod = float(np.quantile(buf, 1.0 - mod_frac / 2.0))
                 dn_mod = float(np.quantile(buf, mod_frac / 2.0))
 
+            # Step 2 (2026-05-09): apply absolute |pred| floor BEFORE the
+            # contra-trend penalty.  effective_cutoff = max(rolling, floor).
+            # In low-vol regimes the rolling cutoff can dip below the floor,
+            # which would trigger Moderate signals in OOS-IC ≈ 0 territory.
+            up_strong_floor = max(up_strong, ABS_FLOOR_STRONG)
+            dn_strong_floor = min(dn_strong, -ABS_FLOOR_STRONG)
+            up_mod_floor = max(up_mod, ABS_FLOOR_MODERATE)
+            dn_mod_floor = min(dn_mod, -ABS_FLOOR_MODERATE)
+
             # Regime-aware contra-trend suppression: widen the threshold that
             # fights the prevailing regime, keep the aligned side untouched.
             # CLAUDE.md: "DOWN signals in BULL need 2.5x more conviction";
@@ -341,10 +370,10 @@ class IndicatorEngine:
             reg_i = regime[i] if regime is not None else "CHOPPY"
             up_mul = BULL_CONTRA_PENALTY if reg_i == "TRENDING_BEAR" else 1.0
             dn_mul = BULL_CONTRA_PENALTY if reg_i == "TRENDING_BULL" else 1.0
-            up_strong_eff = up_strong * up_mul
-            up_mod_eff = up_mod * up_mul
-            dn_strong_eff = dn_strong * dn_mul  # negative × 2.5 → more negative
-            dn_mod_eff = dn_mod * dn_mul
+            up_strong_eff = up_strong_floor * up_mul
+            up_mod_eff = up_mod_floor * up_mul
+            dn_strong_eff = dn_strong_floor * dn_mul  # negative × 2.5 → more negative
+            dn_mod_eff = dn_mod_floor * dn_mul
 
             # Direction decision: threshold-based using regime-adjusted cutoffs
             if p >= up_strong_eff:
@@ -364,14 +393,16 @@ class IndicatorEngine:
             # pred_return_4h comes DIRECTLY from the regression head.
             pred_return[i] = p
 
-            # Confidence 0-100: 80 pts from |pred_ret| scaled to the
-            # current Strong cutoff magnitude, + 20 pts mag percentile.
-            # Use the unadjusted ref to keep confidence comparable across regimes.
+            # Confidence 0-100 (Step 1, 2026-05-09): 100 pts from |pred_ret|
+            # scaled to the current Strong cutoff magnitude.  Mag percentile
+            # bonus removed — OOS slice showed high-mag bars sit in the
+            # |y|-Q5 region where the model has zero discrimination
+            # (sign_acc 47.9%, IC ~0), and the bonus systematically pushed
+            # those bars into high-confidence, producing the alpha-decay
+            # confidence-WR inversion (high WR=48% < low WR=67%).
             ref = max(abs(up_strong), abs(dn_strong), 1e-6)
-            ret_score = min(abs_p / ref, 1.0) ** 0.6 * 80
-            ms = mag_score[i] if not np.isnan(mag_score[i]) else 50.0
-            mag_bonus = (ms / 100) * 20
-            confidence[i] = float(np.clip(ret_score + mag_bonus, 0, 100))
+            confidence[i] = float(np.clip(
+                min(abs_p / ref, 1.0) ** 0.6 * 100, 0, 100))
 
         # ── Output ──
         out = pd.DataFrame(index=features.index)
