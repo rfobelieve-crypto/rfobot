@@ -2045,6 +2045,29 @@ def _funding_loop():
         _time.sleep(60)
 
 
+def _orderbook_l20_loop():
+    """Background: collect Binance perp L20 orderbook snapshots every 60s.
+
+    Pure historical accumulation for Phase 3 R&D (orderbook imbalance
+    features).  Production v7 indicator does NOT read this table.
+    """
+    import time as _time
+    from market_data.adapters.orderbook_l20_collector import (
+        collect_once as _ob_once,
+        _ensure_schema as _ob_ensure,
+    )
+    try:
+        _ob_ensure()
+    except Exception:
+        logger.exception("Orderbook L20 schema setup failed")
+    while True:
+        try:
+            _ob_once()
+        except Exception:
+            logger.exception("Orderbook L20 collector error")
+        _time.sleep(60)
+
+
 def start_background_threads():
     threading.Thread(target=start_ws_forever, daemon=True).start()
     threading.Thread(target=clean_old_data, daemon=True).start()
@@ -2074,6 +2097,10 @@ def start_background_threads():
     # Funding rate collector (每 60s REST 抓取)
     threading.Thread(target=_funding_loop, daemon=True, name="funding-collector").start()
     logger.info("Funding rate collector started.")
+
+    # Orderbook L20 collector (每 60s REST 抓取, Phase 3 R&D accumulation only)
+    threading.Thread(target=_orderbook_l20_loop, daemon=True, name="orderbook-l20-collector").start()
+    logger.info("Orderbook L20 collector started.")
 
     # Liquidation collector (OKX + Binance WebSocket)
     try:
