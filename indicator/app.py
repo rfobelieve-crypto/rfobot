@@ -110,12 +110,18 @@ def _send_telegram_photo(png: bytes, caption: str) -> str:
         return f"error: {e}"
 
 
+def _fmt_v9(v9: dict | None) -> str:
+    if not v9 or v9.get("p_long") is None:
+        return ""
+    return f"\nv9: P_long={v9['p_long']:.3f} P_short={v9['p_short']:.3f}"
+
+
 def _send_ldc_swing_alerts(result: dict, paused: bool) -> None:
     """Translate ldc_swing_executor.run_cycle result into Telegram messages."""
     if not result:
         return
     action = result.get("action")
-    if action not in ("open", "close", "reverse"):
+    if action not in ("open", "close", "reverse", "v9_veto"):
         return  # hold/none: silent
 
     pause_tag = " <i>[PAUSED — shadow only]</i>" if paused else ""
@@ -126,18 +132,24 @@ def _send_ldc_swing_alerts(result: dict, paused: bool) -> None:
         msgs.append(
             f"{emoji} <b>LDC {d} OPEN</b>{pause_tag}\n"
             f"Entry: ${result['entry_price']:,.2f}\n"
-            f"Strategy: jdehorty LDC swing + min hold 4h\n"
+            f"Strategy: jdehorty LDC swing + v9 filter + min hold 4h\n"
             f"Notional $1000 × 3x leverage"
+            f"{_fmt_v9(result.get('v9'))}"
         )
     elif action == "close":
         c = result["closed"]
         emoji = "✅" if c["win"] else "❌"
         net_lev = c["net_pct"] * 100 * 3.0  # 3x leverage applied to net %
+        skip_tag = ""
+        if "skipped_reverse" in result:
+            skip_tag = f"\n<i>(Reverse {result['skipped_reverse']} skipped: v9 veto)</i>"
         msgs.append(
             f"{emoji} <b>LDC {c['direction']} CLOSE</b>\n"
             f"Exit: ${c['exit_price']:,.2f} ({c['reason']})\n"
             f"Held: {c['bars_held']}h | "
             f"Net: {c['net_pct']*100:+.2f}% (1x) / <b>{net_lev:+.2f}% (3x)</b>"
+            f"{skip_tag}"
+            f"{_fmt_v9(result.get('v9'))}"
         )
     elif action == "reverse":
         c = result["closed"]
@@ -150,6 +162,15 @@ def _send_ldc_swing_alerts(result: dict, paused: bool) -> None:
             f"{emoji_close} CLOSE {c['direction']} @ ${c['exit_price']:,.2f}\n"
             f"  Net: {c['net_pct']*100:+.2f}% (1x) / <b>{net_lev:+.2f}% (3x)</b>\n"
             f"{emoji_open} OPEN {new_d} @ ${result['entry_price']:,.2f}"
+            f"{_fmt_v9(result.get('v9'))}"
+        )
+    elif action == "v9_veto":
+        v9 = result.get("v9", {})
+        d = result.get("skipped_direction", "?")
+        msgs.append(
+            f"⚠️ <b>LDC {d} VETOED</b> by v9\n"
+            f"Price: ${result.get('entry_price', 0):,.2f}\n"
+            f"{v9.get('reason', '')}"
         )
     for m in msgs:
         try:
@@ -668,7 +689,7 @@ def update_cycle() -> dict:
 
         try:
             from indicator.ldc_swing_executor import run_cycle as run_ldc_cycle
-            ldc_result = run_ldc_cycle(klines, paused=ldc_paused)
+            ldc_result = run_ldc_cycle(klines, features=features, paused=ldc_paused)
             _send_ldc_swing_alerts(ldc_result, ldc_paused)
         except Exception as e:
             logger.warning("LDC swing executor failed (non-critical): %s", e)

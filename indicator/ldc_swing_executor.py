@@ -68,6 +68,15 @@ LDC_PARAMS = dict(
     kernel_lag=2,
 )
 
+# v9 order-flow filter at entry time.  Enabled 2026-05-13 per user request.
+# Threshold 0.55 is permissive — skips only entries where v9 has NO bias
+# towards the LDC-proposed direction.  Production v9 model covers every
+# bar (vs walk-forward OOS which was sparse), so the filter sample limit
+# from earlier backtest does not apply at runtime.
+V9_FILTER_ENABLED = True
+V9_LONG_THRESHOLD = 0.55
+V9_SHORT_THRESHOLD = 0.55
+
 
 # ── DB ───────────────────────────────────────────────────────────────────────
 
@@ -203,6 +212,60 @@ def close_position(position_id: int, exit_time: datetime, exit_price: float,
 
 # ── LDC computation (cached) ─────────────────────────────────────────────────
 
+# ── v9 order-flow filter ─────────────────────────────────────────────────────
+
+_v9_engine = None
+
+
+def _get_v9_engine():
+    """Lazy-load the hybrid_inference engine which already wraps v9.
+    Returns None if v9 model artifacts not present."""
+    global _v9_engine
+    if _v9_engine is not None:
+        return _v9_engine
+    try:
+        from indicator.hybrid_inference import HybridInferenceEngine
+        engine = HybridInferenceEngine()
+        if engine.long_model is None:
+            logger.warning("ldc_swing: v9 artifacts missing — filter disabled")
+            return None
+        _v9_engine = engine
+        return _v9_engine
+    except Exception as exc:
+        logger.warning("ldc_swing: failed to load v9 engine: %s", exc)
+        return None
+
+
+def evaluate_v9_for_direction(features: Optional[pd.DataFrame],
+                                 direction: str) -> dict:
+    """Return dict with p_long, p_short, allow.
+    allow=False means v9 vetoes the proposed entry.
+    If features missing or v9 unavailable, returns allow=True (no filter)."""
+    if not V9_FILTER_ENABLED or features is None or features.empty:
+        return {"p_long": None, "p_short": None, "allow": True,
+                "reason": "v9_disabled_or_no_features"}
+    engine = _get_v9_engine()
+    if engine is None:
+        return {"p_long": None, "p_short": None, "allow": True,
+                "reason": "v9_engine_unavailable"}
+    try:
+        p_long, p_short = engine.predict_v9(features)
+    except Exception as exc:
+        logger.warning("v9 predict failed: %s", exc)
+        return {"p_long": None, "p_short": None, "allow": True,
+                "reason": f"v9_predict_failed: {exc}"}
+
+    if direction == "LONG":
+        allow = p_long >= V9_LONG_THRESHOLD
+        reason = (f"v9_pass P_long={p_long:.3f}>={V9_LONG_THRESHOLD}"
+                   if allow else f"v9_veto P_long={p_long:.3f}<{V9_LONG_THRESHOLD}")
+    else:  # SHORT
+        allow = p_short >= V9_SHORT_THRESHOLD
+        reason = (f"v9_pass P_short={p_short:.3f}>={V9_SHORT_THRESHOLD}"
+                   if allow else f"v9_veto P_short={p_short:.3f}<{V9_SHORT_THRESHOLD}")
+    return {"p_long": p_long, "p_short": p_short, "allow": allow, "reason": reason}
+
+
 def compute_ldc_tail(klines: pd.DataFrame) -> pd.DataFrame:
     """Compute LDC signal frame on tail of klines (full recompute, ~5s)."""
     try:
@@ -225,11 +288,17 @@ def compute_ldc_tail(klines: pd.DataFrame) -> pd.DataFrame:
 
 # ── Cycle orchestrator ───────────────────────────────────────────────────────
 
-def run_cycle(klines: pd.DataFrame, paused: bool = False) -> dict:
+def run_cycle(klines: pd.DataFrame,
+               features: Optional[pd.DataFrame] = None,
+               paused: bool = False) -> dict:
     """Run one LDC swing inference cycle.
 
+    features : optional features DataFrame for v9 order-flow filter.
+        If provided and V9_FILTER_ENABLED, entries are gated by v9 P(side).
+        If None, no v9 filtering occurs (LDC pure mode).
+
     Returns dict describing what happened:
-      {action: "open"|"close"|"reverse"|"hold"|"none", ...}
+      {action: "open"|"close"|"reverse"|"hold"|"none"|"v9_veto", ...}
     """
     try:
         init_table()
@@ -294,16 +363,22 @@ def run_cycle(klines: pd.DataFrame, paused: bool = False) -> dict:
                      pos["id"], direction, last_close,
                      closed["gross_pct"] * 100, closed["net_pct"] * 100, exit_reason)
 
-        # If reverse, immediately open opposite
+        # If reverse, immediately open opposite — also gated by v9
         if exit_reason == "reverse":
             new_dir = "SHORT" if start_short else "LONG"
+            v9 = evaluate_v9_for_direction(features, new_dir)
+            if not v9["allow"]:
+                logger.info("LDC swing REVERSE %s vetoed by v9: %s",
+                             new_dir, v9["reason"])
+                return {"action": "close", "closed": closed,
+                        "skipped_reverse": new_dir, "v9": v9}
             new_id = insert_open(bar_ts, new_dir, last_close, paused=paused)
             if new_id:
-                logger.info("LDC swing REVERSE OPEN id=%d %s @ %.2f paused=%s",
-                             new_id, new_dir, last_close, paused)
+                logger.info("LDC swing REVERSE OPEN id=%d %s @ %.2f paused=%s v9=%s",
+                             new_id, new_dir, last_close, paused, v9["reason"])
                 return {"action": "reverse", "closed": closed,
                         "opened_id": new_id, "opened_direction": new_dir,
-                        "entry_price": last_close, "paused": paused}
+                        "entry_price": last_close, "paused": paused, "v9": v9}
         return {"action": "close", "closed": closed}
 
     # ─── Case B: no open position — check for entry ──
@@ -311,14 +386,21 @@ def run_cycle(klines: pd.DataFrame, paused: bool = False) -> dict:
         return {"action": "none"}
 
     new_dir = "LONG" if start_long else "SHORT"
+    v9 = evaluate_v9_for_direction(features, new_dir)
+    if not v9["allow"]:
+        logger.info("LDC swing %s entry vetoed by v9 at %s: %s",
+                     new_dir, bar_ts, v9["reason"])
+        return {"action": "v9_veto", "skipped_direction": new_dir,
+                "v9": v9, "bar_ts": str(bar_ts), "entry_price": last_close}
+
     new_id = insert_open(bar_ts, new_dir, last_close, paused=paused)
     if not new_id:
         return {"action": "none", "note": "dup entry timestamp"}
-    logger.info("LDC swing OPEN id=%d %s @ %.2f paused=%s",
-                 new_id, new_dir, last_close, paused)
+    logger.info("LDC swing OPEN id=%d %s @ %.2f paused=%s v9=%s",
+                 new_id, new_dir, last_close, paused, v9["reason"])
     return {"action": "open", "opened_id": new_id,
             "opened_direction": new_dir, "entry_price": last_close,
-            "paused": paused}
+            "paused": paused, "v9": v9}
 
 
 # ── Status helper ────────────────────────────────────────────────────────────
