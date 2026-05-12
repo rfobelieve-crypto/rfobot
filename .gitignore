@@ -15,6 +15,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# Runtime state — never commit
+indicator/state/
+
 # Large data — never commit
 market_data/raw_data/
 research/ml_data/

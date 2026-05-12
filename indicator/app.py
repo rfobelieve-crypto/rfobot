@@ -72,6 +72,10 @@ def _make_reply_markup():
         ],
         [
             {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
+            {"text": "\U0001f4c8 LDC Chart", "callback_data": "ldc_chart"},
+            {"text": "\U0001f4c9 LDC Stats", "callback_data": "ldc_stats"},
+        ],
+        [
             {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
             {"text": "\U0001f4cb Meeting", "callback_data": "meeting"},
         ],
@@ -104,6 +108,54 @@ def _send_telegram_photo(png: bytes, caption: str) -> str:
     except Exception as e:
         logger.error("Telegram photo send failed: %s", e)
         return f"error: {e}"
+
+
+def _send_ldc_swing_alerts(result: dict, paused: bool) -> None:
+    """Translate ldc_swing_executor.run_cycle result into Telegram messages."""
+    if not result:
+        return
+    action = result.get("action")
+    if action not in ("open", "close", "reverse"):
+        return  # hold/none: silent
+
+    pause_tag = " <i>[PAUSED — shadow only]</i>" if paused else ""
+    msgs = []
+    if action == "open":
+        d = result["opened_direction"]
+        emoji = "🟢" if d == "LONG" else "🔴"
+        msgs.append(
+            f"{emoji} <b>LDC {d} OPEN</b>{pause_tag}\n"
+            f"Entry: ${result['entry_price']:,.2f}\n"
+            f"Strategy: jdehorty LDC swing + min hold 4h\n"
+            f"Notional $1000 × 3x leverage"
+        )
+    elif action == "close":
+        c = result["closed"]
+        emoji = "✅" if c["win"] else "❌"
+        net_lev = c["net_pct"] * 100 * 3.0  # 3x leverage applied to net %
+        msgs.append(
+            f"{emoji} <b>LDC {c['direction']} CLOSE</b>\n"
+            f"Exit: ${c['exit_price']:,.2f} ({c['reason']})\n"
+            f"Held: {c['bars_held']}h | "
+            f"Net: {c['net_pct']*100:+.2f}% (1x) / <b>{net_lev:+.2f}% (3x)</b>"
+        )
+    elif action == "reverse":
+        c = result["closed"]
+        new_d = result["opened_direction"]
+        emoji_close = "✅" if c["win"] else "❌"
+        emoji_open = "🟢" if new_d == "LONG" else "🔴"
+        net_lev = c["net_pct"] * 100 * 3.0
+        msgs.append(
+            f"🔄 <b>LDC FLIP</b>{pause_tag}\n"
+            f"{emoji_close} CLOSE {c['direction']} @ ${c['exit_price']:,.2f}\n"
+            f"  Net: {c['net_pct']*100:+.2f}% (1x) / <b>{net_lev:+.2f}% (3x)</b>\n"
+            f"{emoji_open} OPEN {new_d} @ ${result['entry_price']:,.2f}"
+        )
+    for m in msgs:
+        try:
+            _send_telegram_text(m)
+        except Exception as exc:
+            logger.warning("LDC swing alert send failed: %s", exc)
 
 
 def _send_telegram_text(message: str, chat_id: str = ""):
@@ -600,6 +652,26 @@ def update_cycle() -> dict:
             backfill_outcomes()
         except Exception as e:
             logger.warning("Signal tracker backfill failed: %s", e)
+
+        # ── Path 2: LDC Swing executor (jdehorty original, min hold 4h, 3x).
+        # Replaced v9+LDC must-agree hybrid on 2026-05-12.
+        # Independent path — failures MUST NOT break v7 outputs.
+        try:
+            from indicator.hybrid_monitor import (
+                check_and_update_pause_state, is_paused,
+            )
+            check_and_update_pause_state()
+            ldc_paused = is_paused()
+        except Exception as e:
+            logger.warning("LDC monitor failed (defaulting to NOT paused): %s", e)
+            ldc_paused = False
+
+        try:
+            from indicator.ldc_swing_executor import run_cycle as run_ldc_cycle
+            ldc_result = run_ldc_cycle(klines, paused=ldc_paused)
+            _send_ldc_swing_alerts(ldc_result, ldc_paused)
+        except Exception as e:
+            logger.warning("LDC swing executor failed (non-critical): %s", e)
 
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
@@ -1252,6 +1324,39 @@ def signal_perf_api():
     except Exception as e:
         logger.exception("Signal perf failed")
         return jsonify({"text": f"❌ 信號績效查詢失敗: {e}"}), 500
+
+
+@app.route("/hybrid-status", methods=["GET"])
+def hybrid_status_api():
+    """Hybrid v9+LDC monitor status (pause state + forward window metrics)."""
+    try:
+        from indicator.hybrid_monitor import get_status_report
+        return jsonify({"text": get_status_report()})
+    except Exception as e:
+        logger.exception("Hybrid status failed")
+        return jsonify({"text": f"❌ Hybrid status 查詢失敗: {e}"}), 500
+
+
+@app.route("/hybrid-chart", methods=["GET"])
+def hybrid_chart_api():
+    """Interactive chart of hybrid v9+LDC signal entries and exits.
+
+    Separate from /ichart so the indicator chart stays untouched.
+    Query params:
+        ?days=30  — lookback window (default 30, max 90)
+        ?demo=1   — show historical walk-forward signals instead of live
+                    hybrid_signals.  Useful before production accumulates
+                    real signals.
+    """
+    try:
+        days = max(1, min(int(request.args.get("days", "30")), 90))
+        demo = request.args.get("demo", "0") == "1"
+        from indicator.chart_hybrid import render_hybrid_chart
+        html = render_hybrid_chart(since_days=days, demo=demo)
+        return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+    except Exception as e:
+        logger.exception("Hybrid chart failed")
+        return f"<h3>Hybrid chart 失敗: {e}</h3>", 500
 
 
 @app.route("/paper-perf", methods=["GET"])

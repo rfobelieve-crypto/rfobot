@@ -1602,6 +1602,10 @@ _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
         {"text": "\U0001f4c8 Perf", "callback_data": "perf"},
         {"text": "\U0001f4e6 DB", "callback_data": "db"},
     ],
+    [
+        {"text": "\U0001f4c8 LDC Chart", "callback_data": "ldc_chart"},
+        {"text": "\U0001f4c9 LDC Stats", "callback_data": "ldc_stats"},
+    ],
 ]})
 
 
@@ -1709,6 +1713,52 @@ def _handle_alpha_decay(chat_id: str):
     except Exception as e:
         logger.exception("alpha decay error: %s", e)
         send_message(chat_id, f"❌ Alpha decay 檢查失敗: {e}")
+
+
+def _handle_ldc_chart(chat_id: str):
+    """Send link to interactive LDC swing signal chart."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    url_link = f"{INDICATOR_SERVICE_URL}/hybrid-chart"
+    demo_link = f"{INDICATOR_SERVICE_URL}/hybrid-chart?demo=1"
+    send_message(chat_id,
+        f"\U0001f4c8 <b>LDC Swing 進出場圖表</b>\n\n"
+        f"<a href=\"{url_link}\">即時訊號（production）</a>\n"
+        f"<a href=\"{demo_link}\">5.5 月 walk-forward demo</a>\n\n"
+        f"標記:\n"
+        f"  ▲ 綠色 = LONG 進場\n"
+        f"  ▼ 紅色 = SHORT 進場\n"
+        f"  ● 綠色 = 獲利出場\n"
+        f"  ● 紅色 = 虧損出場\n"
+        f"  exit 標籤: Cross (dynamic) / Reverse / 數字 = net%")
+
+
+def _handle_ldc_stats(chat_id: str):
+    """Fetch LDC swing strategy stats from indicator service."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        # paper-perf includes LDC swing cohort section after 2026-05-12 refactor
+        paper = requests.get(f"{INDICATOR_SERVICE_URL}/paper-perf", timeout=30)
+        status = requests.get(f"{INDICATOR_SERVICE_URL}/hybrid-status", timeout=15)
+        msg_parts = []
+        if status.status_code == 200:
+            msg_parts.append(status.json().get("text", ""))
+        if paper.status_code == 200:
+            msg_parts.append(paper.json().get("text", ""))
+        if not msg_parts:
+            send_message(chat_id, f"❌ Indicator 服務未就緒 (paper={paper.status_code} status={status.status_code})")
+            return
+        # Telegram message length cap = 4096; truncate if needed
+        combined = "\n\n────────\n\n".join(msg_parts)
+        if len(combined) > 3900:
+            combined = combined[:3850] + "\n... (訊息過長已截斷)"
+        send_message(chat_id, combined)
+    except Exception as e:
+        logger.exception("ldc stats fetch error: %s", e)
+        send_message(chat_id, f"❌ 取得 LDC 統計失敗: {e}")
 
 
 def _handle_signal_perf(chat_id: str):
@@ -1875,6 +1925,10 @@ def webhook():
                         f"功能: 放大縮小 / 拖曳平移 / 十字線游標")
                 else:
                     send_message(cb_chat_id, "INDICATOR_SERVICE_URL 未設定")
+            elif cb_data == "ldc_chart":
+                threading.Thread(target=_handle_ldc_chart, args=(cb_chat_id,), daemon=True).start()
+            elif cb_data == "ldc_stats":
+                threading.Thread(target=_handle_ldc_stats, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "decay":
                 threading.Thread(target=_handle_alpha_decay, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "meeting":
