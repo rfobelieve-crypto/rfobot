@@ -46,6 +46,28 @@ NOTIONAL_USD = 1000.0       # paper-mode notional
 LEVERAGE = 3.0              # user spec 2026-05-12
 INITIAL_CAPITAL_USD = 1000.0
 
+# LDC parameters — tuned for BTC 1h via grid search 2026-05-13.
+# Best risk-adjusted (cum/|MDD| = 2.36) on 5.5mo backtest:
+#   cum +29.4% (1x) / +88.3% (3x), MDD -12.5% (1x) / -37.4% (3x)
+#   n=120 trades, WR 42.5%, PF 1.36
+# Tuned: kernel_h 8 -> 10, ema_filter ON -> OFF.
+# Kept default: k=8, kernel_r=8, vol+regime filters ON, regime_thr=-0.1,
+#               3 features (rsi 14/1, wt 10/11, cci 20/1).
+LDC_PARAMS = dict(
+    neighbors_count=8,
+    max_bars_back=2000,
+    feature_spec=(("rsi", 14, 1), ("wt", 10, 11), ("cci", 20, 1)),
+    use_volatility_filter=True,
+    use_regime_filter=True,
+    regime_threshold=-0.1,
+    use_ema_filter=False,       # CHANGED 2026-05-13 (was True, period=200)
+    ema_period=200,             # ignored when use_ema_filter=False
+    kernel_h=10,                # CHANGED 2026-05-13 (was 8)
+    kernel_r=8.0,
+    kernel_x=25,
+    kernel_lag=2,
+)
+
 
 # ── DB ───────────────────────────────────────────────────────────────────────
 
@@ -195,7 +217,7 @@ def compute_ldc_tail(klines: pd.DataFrame) -> pd.DataFrame:
                         len(tail))
         return pd.DataFrame()
     try:
-        return compute_ldc_signals(tail)
+        return compute_ldc_signals(tail, verbose=False, **LDC_PARAMS)
     except Exception as exc:
         logger.exception("ldc_swing: LDC compute failed: %s", exc)
         return pd.DataFrame()

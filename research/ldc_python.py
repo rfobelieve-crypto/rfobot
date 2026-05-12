@@ -311,32 +311,64 @@ def ann_lorentzian_signals(features: np.ndarray, labels: np.ndarray,
 
 # ─── Main pipeline ──────────────────────────────────────────────────────────
 
-def compute_ldc_signals(klines: pd.DataFrame) -> pd.DataFrame:
+def compute_ldc_signals(
+    klines: pd.DataFrame,
+    *,
+    neighbors_count: int = 8,
+    max_bars_back: int = 2000,
+    feature_spec: tuple = (("rsi", 14, 1), ("wt", 10, 11), ("cci", 20, 1)),
+    use_volatility_filter: bool = True,
+    use_regime_filter: bool = True,
+    regime_threshold: float = -0.1,
+    use_ema_filter: bool = True,
+    ema_period: int = 200,
+    kernel_h: int = 8,
+    kernel_r: float = 8.0,
+    kernel_x: int = 25,
+    kernel_lag: int = 2,
+    verbose: bool = True,
+) -> pd.DataFrame:
     """
+    Compute LDC signals with configurable parameters.
+
+    feature_spec : tuple of (kind, n1, n2) tuples.  kind in {"rsi","wt","cci"}.
+        n1/n2 are the indicator's two main periods (see n_rsi/n_wt/n_cci).
+        1-5 features supported.  Default = jdehorty's 3 features.
+
+    Set use_*_filter=False to drop that filter (more entries).
+    Set ema_period=None or use_ema_filter=False to drop EMA filter.
+
     Returns DataFrame with columns:
-        prediction       : raw ANN sum (-k..+k)
-        signal           : -1 short, +1 long, 0 neutral (with carryover)
-        is_bullish_kernel: kernel rate filter (long-side)
-        is_bearish_kernel: kernel rate filter (short-side)
-        ema_uptrend      : close > EMA(200)
-        ema_downtrend    : close < EMA(200)
-        vol_filter_pass  : volatility filter
-        regime_filter_pass : regime filter
-        start_long_trade : True at long entry bar
-        start_short_trade: True at short entry bar
+        prediction, signal, is_bullish_kernel, is_bearish_kernel,
+        is_bullish_cross, is_bearish_cross, yhat1, yhat2,
+        ema_uptrend, ema_downtrend, vol_filter_pass, regime_filter_pass,
+        start_long_trade, start_short_trade
     """
+    log = logger.info if verbose else logger.debug
     close = klines["close"]
     high = klines["high"]
     low = klines["low"]
     open_ = klines["open"]
     hlc3 = (high + low + close) / 3
 
-    logger.info("Computing 3 normalized features (n_rsi 14/1, n_wt 10/11, n_cci 20/1)...")
-    f1 = n_rsi(close, 14, 1)
-    f2 = n_wt(hlc3, 10, 11)
-    f3 = n_cci(close, 20, 1)
-    feature_df = pd.concat([f1, f2, f3], axis=1)
-    feature_df.columns = ["f1_rsi14", "f2_wt10_11", "f3_cci20"]
+    feat_parts = []
+    feat_names = []
+    for i, (kind, n1, n2) in enumerate(feature_spec, start=1):
+        if kind == "rsi":
+            f = n_rsi(close, n1, n2)
+            feat_names.append(f"f{i}_rsi{n1}_{n2}")
+        elif kind == "wt":
+            f = n_wt(hlc3, n1, n2)
+            feat_names.append(f"f{i}_wt{n1}_{n2}")
+        elif kind == "cci":
+            f = n_cci(close, n1, n2)
+            feat_names.append(f"f{i}_cci{n1}_{n2}")
+        else:
+            raise ValueError(f"unknown feature kind {kind}")
+        feat_parts.append(f)
+    log("Computing %d normalized features: %s", len(feat_parts), feat_names)
+    feature_df = pd.concat(feat_parts, axis=1)
+    feature_df.columns = feat_names
 
     # Drop bars where any feature is NaN (warmup)
     valid = feature_df.dropna().index
@@ -346,7 +378,7 @@ def compute_ldc_signals(klines: pd.DataFrame) -> pd.DataFrame:
     high_v = klines_v["high"]
     low_v = klines_v["low"]
     open_v = klines_v["open"]
-    logger.info("After feature warmup drop: %d / %d rows", len(feature_df), len(klines))
+    log("After feature warmup drop: %d / %d rows", len(feature_df), len(klines))
 
     # Training labels — exact port of PineScript:
     #   `src[4] < src[0] ? direction.short : src[4] > src[0] ? direction.long : neutral`
@@ -362,31 +394,36 @@ def compute_ldc_signals(klines: pd.DataFrame) -> pd.DataFrame:
     y_train[close_v.shift(4) < close_v] = -1  # past 4 went up → SHORT label
     y_train[close_v.shift(4) > close_v] = 1   # past 4 went down → LONG label
 
-    logger.info("Running ANN Lorentzian KNN (k=8, max_bars_back=2000)... this is the slow part")
+    log("Running ANN Lorentzian KNN (k=%d, max_bars_back=%d)...", neighbors_count, max_bars_back)
     pred = ann_lorentzian_signals(
         feature_df.values, y_train.values,
-        neighbors_count=8, max_bars_back=2000,
+        neighbors_count=neighbors_count, max_bars_back=max_bars_back,
     )
     pred_s = pd.Series(pred, index=feature_df.index, name="prediction")
 
-    logger.info("Computing filters...")
-    vol_pass = filter_volatility(high_v, low_v, close_v, 1, 10).fillna(False)
-    reg_pass = regime_filter(open_v, high_v, low_v, close_v, -0.1).fillna(False)
-    filter_all = vol_pass & reg_pass  # ADX filter is OFF in user's settings
+    log("Computing filters...")
+    vol_pass = (filter_volatility(high_v, low_v, close_v, 1, 10).fillna(False)
+                if use_volatility_filter else pd.Series(True, index=close_v.index))
+    reg_pass = (regime_filter(open_v, high_v, low_v, close_v, regime_threshold).fillna(False)
+                if use_regime_filter else pd.Series(True, index=close_v.index))
+    filter_all = vol_pass & reg_pass
 
-    ema200 = ema(close_v, 200)
-    ema_uptrend = close_v > ema200
-    ema_downtrend = close_v < ema200
+    if use_ema_filter:
+        ema_val = ema(close_v, ema_period)
+        ema_uptrend = close_v > ema_val
+        ema_downtrend = close_v < ema_val
+    else:
+        ema_uptrend = pd.Series(True, index=close_v.index)
+        ema_downtrend = pd.Series(True, index=close_v.index)
 
-    logger.info("Computing kernel filter (rationalQuadratic h=8, r=8, x=25)...")
-    yhat1 = kernel_rational_quadratic(close_v, 8, 8.0, 25)
-    is_bullish_rate = yhat1 > yhat1.shift(1)  # yhat1[1] < yhat1
+    log("Computing kernel filter (rationalQuadratic h=%d, r=%.1f, x=%d)...",
+        kernel_h, kernel_r, kernel_x)
+    yhat1 = kernel_rational_quadratic(close_v, kernel_h, kernel_r, kernel_x)
+    is_bullish_rate = yhat1 > yhat1.shift(1)
     is_bearish_rate = yhat1 < yhat1.shift(1)
 
-    # Secondary kernel for dynamic exits (jdehorty/KernelFunctions/2 gaussian,
-    # lookback = h - lag with default lag=2 -> 6, x = same start_at_bar)
-    LAG = 2
-    yhat2 = kernel_gaussian(close_v, 8 - LAG, 25)
+    # Secondary kernel for dynamic exits (gaussian, lookback = h - lag)
+    yhat2 = kernel_gaussian(close_v, max(2, kernel_h - kernel_lag), kernel_x)
     # Cross signals (yhat1 = rationalQuadratic, yhat2 = gaussian)
     is_bullish_cross = (yhat1 > yhat2) & (yhat1.shift(1) <= yhat2.shift(1))
     is_bearish_cross = (yhat1 < yhat2) & (yhat1.shift(1) >= yhat2.shift(1))
