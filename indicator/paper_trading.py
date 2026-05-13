@@ -33,6 +33,34 @@ logger = logging.getLogger(__name__)
 COST_BPS = 13.0
 COST = COST_BPS / 10000.0
 
+# ── LDC swing dashboard constants ────────────────────────────────────────────
+# Live cohort cutoff: commit 54d70c0 (v9 filter on, kernel_h=10, EMA off).
+# Closed trades before this used different params and are excluded from the
+# "部署後實戰" cohort.  2026-05-13 00:09:57 +08:00 → 2026-05-12 16:09:57 UTC,
+# rounded down to the bar boundary.
+LDC_LIVE_CUTOFF = datetime(2026, 5, 12, 16, 0, 0)  # naive UTC, matches DB
+
+# Backtest reference — 5/13 grid search, 5.5 months BTC 1h.
+LDC_BACKTEST_BASELINE = {
+    "n": 120,
+    "wr_pct": 42.5,
+    "pf": 1.36,
+    "cum_1x_pct": 29.4,
+    "cum_3x_pct": 88.3,
+    "mdd_1x_pct": -12.5,
+    "mdd_3x_pct": -37.4,
+    "ratio": 2.36,
+    "period_months": 5.5,
+}
+
+# Mirror of risk_manager defaults (risk_manager not wired in yet; alerts only).
+LDC_KILL_SWITCH_MDD_1X_PCT = -20.0
+LDC_KILL_SWITCH_WARN_PCT = -15.0    # warn at 75% of kill switch
+LDC_CONSEC_LOSS_THRESHOLD = 7
+LDC_STAGE2_MIN_TRADES = 100
+LDC_STAGE2_NET_BPS = 5.0
+LDC_MIN_HOLD_BARS = 4
+
 
 def fetch_paper_signals(since: datetime | None = None) -> pd.DataFrame:
     """Pull settled tracked_signals into a DataFrame.
@@ -422,7 +450,11 @@ def fetch_ldc_swing_positions(since: datetime | None = None) -> pd.DataFrame:
 
 
 def _slice_swing_metrics(group: pd.DataFrame) -> dict:
-    """LDC swing metrics — uses net_pct_maker (already cost-adjusted)."""
+    """LDC swing metrics — uses net_pct_maker (already cost-adjusted).
+
+    Includes both peak-to-trough MDD (worst over history) and the CURRENT
+    drawdown (cum - peak), the latter being what the kill-switch watches.
+    """
     n = len(group)
     if n == 0:
         return {"n": 0}
@@ -435,6 +467,16 @@ def _slice_swing_metrics(group: pd.DataFrame) -> dict:
     pf = (wins.sum() / abs(losses.sum())) if len(losses) > 0 else np.inf
     leverage = float(group["leverage"].iloc[0]) if "leverage" in group else 1.0
     avg_hold = float(group["bars_held"].mean())
+
+    # Trailing loss streak (count consecutive losses from most-recent trade)
+    g_sorted = group.sort_values("entry_time")
+    streak = 0
+    for w in g_sorted["win"].values[::-1]:
+        if int(w) == 0:
+            streak += 1
+        else:
+            break
+
     return {
         "n": n,
         "wr": float((group["win"] == 1).mean()),
@@ -444,22 +486,53 @@ def _slice_swing_metrics(group: pd.DataFrame) -> dict:
         "cum_net_levered_pct": float(cum[-1]) * 100 * leverage,
         "mdd_pct": float(drawdown.min()) * 100,
         "mdd_levered_pct": float(drawdown.min()) * 100 * leverage,
+        "current_dd_pct": float(drawdown[-1]) * 100,
+        "current_dd_levered_pct": float(drawdown[-1]) * 100 * leverage,
         "profit_factor": float(pf),
         "leverage": leverage,
         "avg_hold_hours": avg_hold,
+        "consec_loss_streak": int(streak),
     }
 
 
-def compute_ldc_swing_summary(days_recent: int = 30) -> dict:
-    """Compute LDC swing cohort dashboard."""
-    df = fetch_ldc_swing_positions()
+def _weekly_net_bps(df: pd.DataFrame, weeks: int = 4) -> list[dict]:
+    """Bucket trades by ISO week, return last N weeks (most recent first)."""
     if df.empty:
-        return {"empty": True, "label": "ldc_swing", "cost_bps": 5.0}
+        return []
+    g = df.copy()
+    g["week"] = g["entry_time"].dt.to_period("W-MON")
+    out = []
+    for wk, sub in g.groupby("week"):
+        out.append({
+            "week_start": sub["entry_time"].min().strftime("%m-%d"),
+            "n": int(len(sub)),
+            "avg_net_bps": float(sub["net_pct_maker"].mean()) * 10000,
+            "wr": float((sub["win"] == 1).mean()),
+        })
+    out.sort(key=lambda r: r["week_start"], reverse=True)
+    return out[:weeks]
+
+
+def compute_ldc_swing_summary(
+    days_recent: int = 30,
+    since_cutoff: datetime | None = LDC_LIVE_CUTOFF,
+) -> dict:
+    """Compute LDC swing cohort dashboard.
+
+    `since_cutoff` filters to the "deploy-after live" cohort (default =
+    2026-05-13 commit when v9 filter + tuned LDC params went live).  Pass
+    None to include every closed trade (informational only — params differ).
+    """
+    df = fetch_ldc_swing_positions(since=since_cutoff)
+    if df.empty:
+        return {"empty": True, "label": "ldc_swing", "cost_bps": 5.0,
+                "cutoff": since_cutoff.isoformat() if since_cutoff else None}
 
     df = df[df["paused_at_signal"] == 0]
     if df.empty:
         return {"empty": True, "label": "ldc_swing", "cost_bps": 5.0,
-                "note": "all signals paused"}
+                "note": "all signals paused",
+                "cutoff": since_cutoff.isoformat() if since_cutoff else None}
 
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=days_recent)
@@ -473,6 +546,7 @@ def compute_ldc_swing_summary(days_recent: int = 30) -> dict:
 
     return {
         "empty": False, "label": "ldc_swing", "cost_bps": 5.0,
+        "cutoff": since_cutoff.isoformat() if since_cutoff else None,
         "n_total": int(len(df)),
         "date_range": [
             df["entry_time"].min().isoformat(),
@@ -482,45 +556,376 @@ def compute_ldc_swing_summary(days_recent: int = 30) -> dict:
         "recent": _slice_swing_metrics(recent) if len(recent) > 0 else {"n": 0},
         "recent_window_days": days_recent,
         "by_dir": by_dir,
+        "weekly_4w": _weekly_net_bps(df, weeks=4),
     }
 
 
-def format_ldc_swing_html(s: dict) -> str:
-    """Format LDC swing summary for Telegram HTML."""
-    if s.get("empty"):
-        note = f" ({s['note']})" if s.get("note") else ""
-        return f"\n\n📈 <b>LDC Swing (jdehorty)</b>{note}\n暫無已平倉訊號。"
+# ── Dashboard helpers (mirror /perf layout) ──────────────────────────────────
 
-    lines = ["\n\n📈 <b>LDC Swing (jdehorty + min hold 4h)</b>"]
-    lines.append(
-        f"成本: {s['cost_bps']:.0f} bps round-trip (maker) | "
-        f"無 TP/SL，dynamic_cross exit"
+def _fetch_recent_closed_ldc(limit: int = 5) -> pd.DataFrame:
+    """Last N closed LDC swing trades (any params), most recent first."""
+    sql = """
+        SELECT entry_time, exit_time, direction, entry_price, exit_price,
+               exit_reason, bars_held, gross_pct, net_pct_maker, win, leverage
+        FROM ldc_swing_positions
+        WHERE status = 'CLOSED'
+        ORDER BY entry_time DESC
+        LIMIT %s
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(sql, (int(limit),))
+                rows = cur.fetchall()
+            except Exception as exc:
+                if "doesn't exist" in str(exc).lower():
+                    return pd.DataFrame()
+                raise
+    finally:
+        conn.close()
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    for c in ("entry_price", "exit_price", "gross_pct", "net_pct_maker", "leverage"):
+        df[c] = df[c].astype(float)
+    df["entry_time"] = pd.to_datetime(df["entry_time"])
+    df["exit_time"] = pd.to_datetime(df["exit_time"])
+    df["win"] = df["win"].astype(int)
+    df["bars_held"] = df["bars_held"].astype(int)
+    return df
+
+
+def _fetch_open_ldc_with_pnl() -> dict | None:
+    """Current open LDC position enriched with live PnL.
+
+    Returns None if no open position or the table is missing.
+    """
+    try:
+        from indicator.ldc_swing_executor import get_open_position
+    except Exception:
+        return None
+    try:
+        pos = get_open_position()
+    except Exception as exc:
+        logger.warning("get_open_position failed: %s", exc)
+        return None
+    if not pos:
+        return None
+
+    # Latest BTC close from indicator_history (already 1h aligned).
+    last_close = None
+    last_bar_ts = None
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT `close`, dt FROM indicator_history "
+                    "ORDER BY dt DESC LIMIT 1"
+                )
+                row = cur.fetchone()
+                if row:
+                    last_close = float(row["close"])
+                    last_bar_ts = row["dt"]
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.warning("latest close query failed: %s", exc)
+
+    entry_ts = pos["entry_time"]
+    if hasattr(entry_ts, "tz_convert"):
+        try:
+            entry_ts = entry_ts.tz_convert("UTC").tz_localize(None)
+        except Exception:
+            pass
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    bars_held = max(0, int((now_utc - entry_ts).total_seconds() / 3600))
+    min_hold_remaining = max(0, LDC_MIN_HOLD_BARS - bars_held)
+
+    entry_price = float(pos["entry_price"])
+    direction = pos["direction"]
+    leverage = float(pos.get("leverage") or 1.0)
+    if last_close is not None:
+        sign = 1.0 if direction == "LONG" else -1.0
+        gross_pct = (last_close / entry_price - 1.0) * sign
+        # Maker fee already paid 1 side; the other half hits on exit. Show
+        # gross as the unrealised PnL — net only known at close.
+        live_pnl_pct = gross_pct * 100
+        live_pnl_levered_pct = live_pnl_pct * leverage
+    else:
+        live_pnl_pct = None
+        live_pnl_levered_pct = None
+
+    return {
+        "id": int(pos["id"]),
+        "direction": direction,
+        "entry_time": entry_ts,
+        "entry_price": entry_price,
+        "leverage": leverage,
+        "last_close": last_close,
+        "last_bar_ts": last_bar_ts,
+        "bars_held": bars_held,
+        "min_hold_remaining": min_hold_remaining,
+        "live_pnl_pct": live_pnl_pct,
+        "live_pnl_levered_pct": live_pnl_levered_pct,
+    }
+
+
+def _compute_ldc_alerts(summary: dict) -> list[str]:
+    """Generate alert lines for the LDC dashboard.
+
+    Mirrors risk_manager thresholds (max_dd 20%, consec_loss 7), plus the
+    Stage 2 graduation criterion (4 weeks net > +5 bps).
+    """
+    alerts: list[str] = []
+    if summary.get("empty"):
+        return alerts
+    o = summary["overall"]
+
+    # 1) Drawdown approaching kill switch (1x scale; 3x is implicit).
+    cur_dd = o.get("current_dd_pct", 0.0)
+    if cur_dd <= LDC_KILL_SWITCH_MDD_1X_PCT:
+        alerts.append(
+            f"🚨 1x 當前 DD {cur_dd:.1f}% 已達 kill switch "
+            f"{LDC_KILL_SWITCH_MDD_1X_PCT:.0f}% — 應暫停或降階段"
+        )
+    elif cur_dd <= LDC_KILL_SWITCH_WARN_PCT:
+        alerts.append(
+            f"⚠️ 1x 當前 DD {cur_dd:.1f}% 接近 kill switch "
+            f"({LDC_KILL_SWITCH_MDD_1X_PCT:.0f}%)"
+        )
+
+    # 2) Consecutive losses ≥ 7.
+    streak = o.get("consec_loss_streak", 0)
+    if streak >= LDC_CONSEC_LOSS_THRESHOLD:
+        alerts.append(
+            f"🚨 連續虧損 {streak} 筆 (≥{LDC_CONSEC_LOSS_THRESHOLD}) — "
+            f"risk_manager 預設會暫停 24h"
+        )
+    elif streak >= LDC_CONSEC_LOSS_THRESHOLD - 2:
+        alerts.append(f"⚠️ 連續虧損 {streak} 筆，距暫停門檻還 "
+                       f"{LDC_CONSEC_LOSS_THRESHOLD - streak} 筆")
+
+    # 3) Recent (≈4w) net bps turned negative.
+    r = summary.get("recent", {})
+    if r.get("n", 0) >= 20:
+        rn = r["avg_net_bps"]
+        if rn < 0:
+            alerts.append(
+                f"🔴 近 {summary['recent_window_days']} 天 net "
+                f"{rn:+.1f} bps < 0 — Stage 2 進階倒退 (門檻 +{LDC_STAGE2_NET_BPS:.0f} bps)"
+            )
+        elif rn < LDC_STAGE2_NET_BPS:
+            alerts.append(
+                f"🟡 近 {summary['recent_window_days']} 天 net {rn:+.1f} bps，"
+                f"低於 Stage 2 門檻 +{LDC_STAGE2_NET_BPS:.0f} bps"
+            )
+
+    # 4) Any of last 4 weekly buckets < 0 (more granular than #3).
+    weeks = summary.get("weekly_4w", [])
+    if weeks:
+        bad = [w for w in weeks if w["avg_net_bps"] < 0]
+        if bad:
+            alerts.append(
+                f"⚠️ 最近 4 週中有 {len(bad)} 週 net < 0 "
+                f"(連續 4 週正 EV 才能進階)"
+            )
+
+    return alerts
+
+
+def _format_stage2_progress(summary: dict) -> str:
+    """Stage 1 → Stage 2 progress: trade count + 4-week net positive."""
+    if summary.get("empty"):
+        n = 0
+    else:
+        n = summary["overall"].get("n", 0)
+    remaining_trades = max(0, LDC_STAGE2_MIN_TRADES - n)
+
+    weeks = summary.get("weekly_4w", []) if not summary.get("empty") else []
+    weeks_ge_threshold = sum(
+        1 for w in weeks if w["avg_net_bps"] >= LDC_STAGE2_NET_BPS
     )
-    o = s["overall"]
-    lev = o["leverage"]
+
+    pct = min(100, int(n / LDC_STAGE2_MIN_TRADES * 100))
+    bar_len = 20
+    filled = int(bar_len * n / LDC_STAGE2_MIN_TRADES)
+    bar = "█" * min(filled, bar_len) + "░" * max(0, bar_len - filled)
+
+    lines = ["\n<b>🎯 Stage 2 進階進度</b>"]
     lines.append(
-        f"\n<b>整體</b> n={o['n']} | WR={o['wr']*100:.1f}% | "
-        f"net={o['avg_net_bps']:+.1f} bps/trade | PF={o['profit_factor']:.2f}\n"
-        f"  累積 {o['cum_net_pct']:+.2f}% (1x) / "
-        f"<b>{o['cum_net_levered_pct']:+.2f}% ({lev:.0f}x)</b>\n"
-        f"  MDD {o['mdd_pct']:.2f}% (1x) / "
-        f"<b>{o['mdd_levered_pct']:.2f}% ({lev:.0f}x)</b> | "
-        f"avg hold {o['avg_hold_hours']:.0f}h"
+        f"  Trades: <code>{bar}</code> {n}/{LDC_STAGE2_MIN_TRADES} "
+        f"({pct}%, 差 {remaining_trades} 筆)"
     )
-    r = s["recent"]
-    if r.get("n", 0) > 0:
+    lines.append(
+        f"  4 週連續 net ≥ +{LDC_STAGE2_NET_BPS:.0f} bps: "
+        f"{weeks_ge_threshold}/4 週達標"
+    )
+    return "\n".join(lines)
+
+
+def _format_open_position_section(op: dict | None) -> str:
+    """Render current open LDC position block; empty string if no position."""
+    if op is None:
+        return "\n<b>📦 當前持倉</b>\n  (無)"
+    arrow = "🟢▲ LONG" if op["direction"] == "LONG" else "🔴▼ SHORT"
+    lev = op["leverage"]
+    entry_str = op["entry_time"].strftime("%m-%d %H:%M UTC")
+    lines = [f"\n<b>📦 當前持倉</b> {arrow} (id={op['id']})"]
+    lines.append(
+        f"  entry: {entry_str} @ ${op['entry_price']:,.0f} | {lev:.0f}x"
+    )
+    if op["last_close"] is not None:
         lines.append(
-            f"\n<b>最近 {s['recent_window_days']} 天</b> n={r['n']} | "
-            f"WR={r['wr']*100:.1f}% | net={r['avg_net_bps']:+.1f}bp | "
-            f"cum {r['cum_net_levered_pct']:+.2f}% ({lev:.0f}x)"
+            f"  now: ${op['last_close']:,.0f} | "
+            f"PnL {op['live_pnl_pct']:+.2f}% (1x) / "
+            f"<b>{op['live_pnl_levered_pct']:+.2f}% ({lev:.0f}x)</b>"
         )
     else:
-        lines.append(f"\n<b>最近 {s['recent_window_days']} 天</b> (無樣本)")
-    for d, m in s["by_dir"].items():
+        lines.append("  now: (無最新價)")
+    if op["min_hold_remaining"] > 0:
         lines.append(
-            f"  {d} n={m['n']} WR={m['wr']*100:.1f}% "
-            f"net={m['avg_net_bps']:+.1f}bp cum={m['cum_net_pct']:+.2f}%"
+            f"  bars held: {op['bars_held']} (min hold 還剩 "
+            f"{op['min_hold_remaining']} 根，期間無 exit)"
         )
+    else:
+        lines.append(
+            f"  bars held: {op['bars_held']} (過 min hold，等 LDC cross / reverse)"
+        )
+    return "\n".join(lines)
+
+
+def _format_recent_closed_section(df: pd.DataFrame) -> str:
+    """Render last-N closed trades block; empty string if none."""
+    if df is None or df.empty:
+        return ""
+    lines = ["\n<b>最近平倉 (5 筆)</b>"]
+    for _, r in df.iterrows():
+        d = r["direction"]
+        arrow = "🟢▲" if d == "LONG" else "🔴▼"
+        ts = r["entry_time"].strftime("%m-%d %H:%M")
+        entry = float(r["entry_price"])
+        net = float(r["net_pct_maker"]) * 100
+        mark = "✅" if int(r["win"]) == 1 else "❌"
+        reason = (r["exit_reason"] or "").strip()
+        held = int(r["bars_held"])
+        lines.append(
+            f"  {arrow}[{d[0]}] {ts} ${entry:,.0f} → "
+            f"{net:+.2f}% {mark} ({reason}, {held}h)"
+        )
+    return "\n".join(lines)
+
+
+def format_ldc_swing_html(s: dict) -> str:
+    """Format LDC swing summary for Telegram HTML, mirroring /perf layout."""
+    header = ["\n\n📈 <b>LDC Swing (jdehorty + min hold 4h)</b>"]
+    header.append(
+        f"成本: {s.get('cost_bps', 5.0):.0f} bps round-trip (maker) | "
+        f"無 TP/SL，dynamic_cross exit"
+    )
+
+    # ── Section 1: Backtest baseline (authoritative reference) ──
+    b = LDC_BACKTEST_BASELINE
+    header.append(
+        f"\n<b>Backtest 基準</b> "
+        f"({b['period_months']:.1f} 個月 grid search, 5/13)"
+    )
+    header.append(
+        f"  n={b['n']} | WR={b['wr_pct']:.1f}% | PF={b['pf']:.2f}"
+    )
+    header.append(
+        f"  cum {b['cum_1x_pct']:+.1f}% (1x) / "
+        f"<b>{b['cum_3x_pct']:+.1f}% (3x)</b>"
+    )
+    header.append(
+        f"  MDD {b['mdd_1x_pct']:.1f}% (1x) / {b['mdd_3x_pct']:.1f}% (3x) "
+        f"| cum/|MDD|={b['ratio']:.2f}"
+    )
+
+    # ── Section 2: Deploy-after live cohort ──
+    lines = list(header)
+    if s.get("empty"):
+        note = f" ({s['note']})" if s.get("note") else ""
+        lines.append(f"\n<b>部署後實戰</b> (2026-05-13~){note}")
+        lines.append("  暫無已平倉訊號（v9 filter 開啟後尚無 trade 結算）")
+    else:
+        o = s["overall"]
+        lev = o["leverage"]
+        lines.append("\n<b>部署後實戰</b> (2026-05-13~ / v9 filter on)")
+        lines.append(
+            f"  n={o['n']} | WR={o['wr']*100:.1f}% | "
+            f"net={o['avg_net_bps']:+.1f} bps/trade | PF={o['profit_factor']:.2f}"
+        )
+        lines.append(
+            f"  cum {o['cum_net_pct']:+.2f}% (1x) / "
+            f"<b>{o['cum_net_levered_pct']:+.2f}% ({lev:.0f}x)</b>"
+        )
+        lines.append(
+            f"  MDD {o['mdd_pct']:.2f}% (1x) / "
+            f"<b>{o['mdd_levered_pct']:.2f}% ({lev:.0f}x)</b> | "
+            f"當前 DD {o['current_dd_pct']:.2f}%"
+        )
+        lines.append(f"  avg hold {o['avg_hold_hours']:.0f}h")
+
+        # Recent window slice
+        r = s["recent"]
+        if r.get("n", 0) > 0:
+            lines.append(
+                f"\n<b>最近 {s['recent_window_days']} 天</b> n={r['n']} | "
+                f"WR={r['wr']*100:.1f}% | net={r['avg_net_bps']:+.1f}bp | "
+                f"cum {r['cum_net_levered_pct']:+.2f}% ({lev:.0f}x)"
+            )
+        else:
+            lines.append(f"\n<b>最近 {s['recent_window_days']} 天</b> (無樣本)")
+
+        # LONG / SHORT split
+        for d, m in s.get("by_dir", {}).items():
+            icon = "🟢" if d == "LONG" else "🔴"
+            lines.append(
+                f"  {icon} {d} n={m['n']} WR={m['wr']*100:.1f}% "
+                f"net={m['avg_net_bps']:+.1f}bp cum={m['cum_net_pct']:+.2f}%"
+            )
+
+        # Weekly breakdown (4 most recent ISO weeks)
+        weeks = s.get("weekly_4w", [])
+        if weeks:
+            lines.append("\n<b>週切片 (最近 4 週)</b>")
+            for w in weeks:
+                badge = "🟢" if w["avg_net_bps"] >= LDC_STAGE2_NET_BPS else (
+                    "🟡" if w["avg_net_bps"] >= 0 else "🔴"
+                )
+                lines.append(
+                    f"  {badge} {w['week_start']} n={w['n']} "
+                    f"WR={w['wr']*100:.0f}% net={w['avg_net_bps']:+.1f}bp"
+                )
+
+    # ── Section 3: Current open position ──
+    try:
+        op = _fetch_open_ldc_with_pnl()
+    except Exception as exc:
+        logger.warning("open position fetch failed: %s", exc)
+        op = None
+    lines.append(_format_open_position_section(op))
+
+    # ── Section 4: Recent 5 closed ──
+    try:
+        recent_df = _fetch_recent_closed_ldc(limit=5)
+        rc_block = _format_recent_closed_section(recent_df)
+        if rc_block:
+            lines.append(rc_block)
+    except Exception as exc:
+        logger.warning("recent closed fetch failed: %s", exc)
+
+    # ── Section 5: Alerts ──
+    alerts = _compute_ldc_alerts(s)
+    if alerts:
+        lines.append("\n<b>⚠️ 警報</b>")
+        lines.extend(f"  {a}" for a in alerts)
+
+    # ── Section 6: Stage 2 progress ──
+    lines.append(_format_stage2_progress(s))
+
     return "\n".join(lines)
 
 
