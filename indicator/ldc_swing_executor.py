@@ -4,16 +4,20 @@ LDC Swing Executor — production runner for jdehorty LDC swing-trade strategy.
 Replaces the previous v9+LDC must-agree hybrid (indicator/hybrid_inference.py)
 after the user chose Path 2 (jdehorty original) on 2026-05-12.
 
-Strategy (LDC swing with dynamic exits, min hold 4h):
+Strategy (LDC swing with C.1 signal-aligned exit, min hold 4h):
     Entry:
         start_long_trade   -> open LONG  (close at signal-bar's close)
         start_short_trade  -> open SHORT
+        Both gated by v9 P(side) >= 0.55 (V9_FILTER_ENABLED)
     Exit (whichever fires first AFTER min_hold_bars=4 from entry):
-        is_bearish_cross   -> close LONG  (yhat1 crosses below yhat2)
-        is_bullish_cross   -> close SHORT (yhat1 crosses above yhat2)
-        opposite start_*_trade -> close current AND open opposite (jdehorty
-                                  flip behaviour, also subject to min_hold)
+        opposite start_*_trade -> reverse (close + open opposite)
+        is_bearish_cross AND ML signal == -1 -> close LONG (signal_cross)
+        is_bullish_cross AND ML signal == +1 -> close SHORT (signal_cross)
     No TP/SL.  Maker cost assumed (5 bps round-trip).
+    C.1 exit chosen 2026-05-13 over raw dynamic_cross after backtest sweep
+    (research/dual_model/ldc_exit_optimization.py): with v9 entry filter on,
+    raw cross fires too often on noise — requiring ML signal confirmation
+    increases cum 7-month n=11 from -3.1% to +5.6%.
 
 Stateful — at most one position open at a time, persisted to
 `ldc_swing_positions` MySQL table.
@@ -323,6 +327,11 @@ def run_cycle(klines: pd.DataFrame,
     start_short = bool(bar.get("start_short_trade", False))
     is_bullish_cross = bool(bar.get("is_bullish_cross", False))
     is_bearish_cross = bool(bar.get("is_bearish_cross", False))
+    # C.1 signal-aligned exit (2026-05-13 backtest: cum +5.6% vs baseline
+    # -3.1% with v9 entry filter ON, ratio 1.24 vs 0.92). Dynamic cross alone
+    # was too weak when entries already passed v9 P>=0.55; require ML signal
+    # carry-over to also be opposite before exiting.
+    signal_val = int(bar.get("signal", 0) or 0)
 
     pos = get_open_position()
 
@@ -340,13 +349,13 @@ def run_cycle(klines: pd.DataFrame,
             if direction == "LONG":
                 if start_short:
                     exit_reason = "reverse"
-                elif is_bearish_cross:
-                    exit_reason = "dynamic"
+                elif is_bearish_cross and signal_val == -1:
+                    exit_reason = "signal_cross"
             else:  # SHORT
                 if start_long:
                     exit_reason = "reverse"
-                elif is_bullish_cross:
-                    exit_reason = "dynamic"
+                elif is_bullish_cross and signal_val == 1:
+                    exit_reason = "signal_cross"
 
         if exit_reason is None:
             return {"action": "hold", "position_id": pos["id"],

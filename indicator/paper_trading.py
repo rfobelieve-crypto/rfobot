@@ -34,23 +34,28 @@ COST_BPS = 13.0
 COST = COST_BPS / 10000.0
 
 # ── LDC swing dashboard constants ────────────────────────────────────────────
-# Live cohort cutoff: commit 54d70c0 (v9 filter on, kernel_h=10, EMA off).
-# Closed trades before this used different params and are excluded from the
-# "部署後實戰" cohort.  2026-05-13 00:09:57 +08:00 → 2026-05-12 16:09:57 UTC,
-# rounded down to the bar boundary.
-LDC_LIVE_CUTOFF = datetime(2026, 5, 12, 16, 0, 0)  # naive UTC, matches DB
+# Live cohort cutoff: 2026-05-13 16:00 UTC — when C.1 signal-aligned exit
+# (cross AND ML signal flipped) replaced raw dynamic_cross exit.  Trades
+# before this used the old exit logic and are excluded from "部署後實戰".
+LDC_LIVE_CUTOFF = datetime(2026, 5, 13, 16, 0, 0)  # naive UTC, matches DB
 
-# Backtest reference — 5/13 grid search, 5.5 months BTC 1h.
+# Backtest reference — 5/13 in-sample sweep of exit variants on 7-month
+# BTC 1h history with v9 entry filter on.  Sample size is small (n=11)
+# because v9 P>=0.55 is restrictive; numbers are directional, not
+# statistically significant. Forward Stage 1 paper validation required.
+# See research/dual_model/ldc_exit_optimization.py for the full sweep.
 LDC_BACKTEST_BASELINE = {
-    "n": 120,
-    "wr_pct": 42.5,
-    "pf": 1.36,
-    "cum_1x_pct": 29.4,
-    "cum_3x_pct": 88.3,
-    "mdd_1x_pct": -12.5,
-    "mdd_3x_pct": -37.4,
-    "ratio": 2.36,
-    "period_months": 5.5,
+    "n": 11,
+    "wr_pct": 45.5,
+    "pf": 1.42,
+    "cum_1x_pct": 5.6,
+    "cum_3x_pct": 16.8,
+    "mdd_1x_pct": -4.5,
+    "mdd_3x_pct": -13.5,
+    "ratio": 1.24,
+    "period_months": 7.0,
+    "config": "v9 entry 0.55 + C.1 signal-cross exit",
+    "note": "in-sample sweep, small n",
 }
 
 # Mirror of risk_manager defaults (risk_manager not wired in yet; alerts only).
@@ -822,14 +827,13 @@ def format_ldc_swing_html(s: dict) -> str:
     header = ["\n\n📈 <b>LDC Swing (jdehorty + min hold 4h)</b>"]
     header.append(
         f"成本: {s.get('cost_bps', 5.0):.0f} bps round-trip (maker) | "
-        f"無 TP/SL，dynamic_cross exit"
+        f"無 TP/SL，C.1 signal-cross exit"
     )
 
     # ── Section 1: Backtest baseline (authoritative reference) ──
     b = LDC_BACKTEST_BASELINE
     header.append(
-        f"\n<b>Backtest 基準</b> "
-        f"({b['period_months']:.1f} 個月 grid search, 5/13)"
+        f"\n<b>Backtest 基準</b> ({b.get('config', '')})"
     )
     header.append(
         f"  n={b['n']} | WR={b['wr_pct']:.1f}% | PF={b['pf']:.2f}"
@@ -842,6 +846,8 @@ def format_ldc_swing_html(s: dict) -> str:
         f"  MDD {b['mdd_1x_pct']:.1f}% (1x) / {b['mdd_3x_pct']:.1f}% (3x) "
         f"| cum/|MDD|={b['ratio']:.2f}"
     )
+    if b.get("note"):
+        header.append(f"  <i>({b['note']})</i>")
 
     # ── Section 2: Deploy-after live cohort ──
     lines = list(header)
@@ -852,7 +858,7 @@ def format_ldc_swing_html(s: dict) -> str:
     else:
         o = s["overall"]
         lev = o["leverage"]
-        lines.append("\n<b>部署後實戰</b> (2026-05-13~ / v9 filter on)")
+        lines.append("\n<b>部署後實戰</b> (2026-05-13~ / v9 entry + C.1 exit)")
         lines.append(
             f"  n={o['n']} | WR={o['wr']*100:.1f}% | "
             f"net={o['avg_net_bps']:+.1f} bps/trade | PF={o['profit_factor']:.2f}"
