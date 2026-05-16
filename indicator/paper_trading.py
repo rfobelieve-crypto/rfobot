@@ -935,11 +935,302 @@ def format_ldc_swing_html(s: dict) -> str:
     return "\n".join(lines)
 
 
+# ── V7 paper cohort (v7.1 signal-exit + 3xATR trailing stop) ─────────────────
+# Parallel Stage-1 paper cohort, runs alongside LDC. Equity-compounding with
+# fixed-fractional 2%-risk / 1x sizing (see indicator/v7_paper_executor.py).
+
+V7_INITIAL_CAPITAL = 1000.0
+
+# Backtest reference — research/v71_v7_sizing_1x.py: WF-OOS 5-month one-position
+# sim, fixed-fractional 2% risk + 1x cap. Live uses the production model and
+# will differ — that is exactly what this Stage-1 cohort is validating.
+V7_BACKTEST_BASELINE = {
+    "n": 169, "wr_pct": 56.2, "roi_pct": 84.9, "mdd_pct": 5.3,
+    "sharpe": 5.10, "avg_eq_ret_pct": 0.38,
+    "config": "2% risk / 1x / 3×ATR trailing + signal exit",
+    "note": "WF-OOS backtest — live uses production model, expect drift",
+}
+
+
+def fetch_v7_paper_positions(since: datetime | None = None) -> pd.DataFrame:
+    """Pull v7_paper_positions (closed only). Empty df if table absent."""
+    sql = """
+        SELECT entry_time, exit_time, direction, entry_price, exit_price,
+               entry_tier, exit_reason, bars_held, gross_pct, net_pct,
+               equity_ret_pct, equity_before, equity_after, win,
+               size_frac, notional_usd, model_version
+        FROM v7_paper_positions
+        WHERE status = 'CLOSED'
+    """
+    params: tuple = ()
+    if since is not None:
+        sql += " AND entry_time >= %s"
+        params = (since.strftime("%Y-%m-%d %H:%M:%S"),)
+    sql += " ORDER BY entry_time ASC"
+
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+            except Exception as exc:
+                if "doesn't exist" in str(exc).lower():
+                    return pd.DataFrame()
+                raise
+    finally:
+        conn.close()
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    for c in ("entry_price", "exit_price", "gross_pct", "net_pct",
+              "equity_ret_pct", "equity_before", "equity_after",
+              "size_frac", "notional_usd"):
+        df[c] = df[c].astype(float)
+    df["entry_time"] = pd.to_datetime(df["entry_time"])
+    df["exit_time"] = pd.to_datetime(df["exit_time"])
+    df["win"] = df["win"].astype(int)
+    df["bars_held"] = df["bars_held"].astype(int)
+    return df
+
+
+def _slice_v7_metrics(group: pd.DataFrame) -> dict:
+    """V7 metrics — equity-compounding (fixed-fractional 2%-risk sizing)."""
+    n = len(group)
+    if n == 0:
+        return {"n": 0}
+    g = group.sort_values("exit_time")
+    eq_ret = g["equity_ret_pct"].values            # percent, per trade
+    eq_after = g["equity_after"].values
+    start = float(g["equity_before"].iloc[0])
+    curve = np.concatenate([[start], eq_after])    # equity path incl. seed
+    peak = np.maximum.accumulate(curve)
+    dd = (curve / peak - 1.0) * 100.0
+    final = float(eq_after[-1])
+    wins = eq_ret[eq_ret > 0]
+    losses = eq_ret[eq_ret < 0]
+    pf = (wins.sum() / abs(losses.sum())) if len(losses) > 0 else np.inf
+    # trailing loss streak
+    streak = 0
+    for w in g["win"].values[::-1]:
+        if int(w) == 0:
+            streak += 1
+        else:
+            break
+    return {
+        "n": n,
+        "wr": float((group["win"] == 1).mean()),
+        "avg_eq_ret_pct": float(eq_ret.mean()),
+        "med_eq_ret_pct": float(np.median(eq_ret)),
+        "best_pct": float(eq_ret.max()),
+        "worst_pct": float(eq_ret.min()),
+        "avg_hold_h": float(group["bars_held"].mean()),
+        "avg_net_bps": float(group["net_pct"].mean()) * 10000,
+        "final_equity": final,
+        "roi_pct": float((final / V7_INITIAL_CAPITAL - 1.0) * 100.0),
+        "mdd_pct": float(dd.min()),
+        "sharpe_per_trade": (
+            float(eq_ret.mean() / eq_ret.std()) if eq_ret.std() > 0 else 0.0
+        ),
+        "profit_factor": float(pf),
+        "consec_loss_streak": int(streak),
+    }
+
+
+def compute_v7_summary(days_recent: int = 30) -> dict:
+    """Compute V7 paper cohort dashboard."""
+    df = fetch_v7_paper_positions()
+    if df.empty:
+        return {"empty": True, "label": "v7_paper"}
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days_recent)
+    recent = df[df["entry_time"] >= cutoff.replace(tzinfo=None)]
+
+    by_dir: dict = {}
+    for d in ("LONG", "SHORT"):
+        sub = df[df["direction"] == d]
+        if len(sub) > 0:
+            by_dir[d] = _slice_v7_metrics(sub)
+
+    by_reason: dict = {}
+    for reason, sub in df.groupby("exit_reason"):
+        by_reason[str(reason)] = {
+            "n": int(len(sub)),
+            "avg_eq_ret_pct": float(sub["equity_ret_pct"].mean()),
+            "wr": float((sub["win"] == 1).mean()),
+        }
+
+    return {
+        "empty": False, "label": "v7_paper",
+        "n_total": int(len(df)),
+        "date_range": [
+            df["entry_time"].min().isoformat(),
+            df["entry_time"].max().isoformat(),
+        ],
+        "overall": _slice_v7_metrics(df),
+        "recent": _slice_v7_metrics(recent) if len(recent) > 0 else {"n": 0},
+        "recent_window_days": days_recent,
+        "by_dir": by_dir,
+        "by_reason": by_reason,
+    }
+
+
+def _fetch_open_v7_with_pnl() -> dict | None:
+    """Current open V7 position with live unrealised PnL. None if flat."""
+    try:
+        from indicator.v7_paper_executor import get_open_position
+    except Exception:
+        return None
+    try:
+        pos = get_open_position()
+    except Exception as exc:
+        logger.warning("v7 get_open_position failed: %s", exc)
+        return None
+    if not pos:
+        return None
+
+    last_close = None
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT `close` FROM indicator_history "
+                            "ORDER BY dt DESC LIMIT 1")
+                row = cur.fetchone()
+                if row:
+                    last_close = float(row["close"])
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.warning("v7 latest close query failed: %s", exc)
+
+    entry_ts = pos["entry_time"]
+    if hasattr(entry_ts, "tz_convert"):
+        try:
+            entry_ts = entry_ts.tz_convert("UTC").tz_localize(None)
+        except Exception:
+            pass
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    bars_held = max(0, int((now_utc - entry_ts).total_seconds() / 3600))
+
+    entry_price = float(pos["entry_price"])
+    direction = pos["direction"]
+    live_pnl_pct = None
+    if last_close is not None:
+        sign = 1.0 if direction == "LONG" else -1.0
+        live_pnl_pct = (last_close / entry_price - 1.0) * sign * 100.0
+
+    return {
+        "id": int(pos["id"]),
+        "direction": direction,
+        "entry_time": entry_ts,
+        "entry_price": entry_price,
+        "entry_tier": pos.get("entry_tier"),
+        "current_stop": float(pos["current_stop"]),
+        "size_frac": float(pos["size_frac"]),
+        "last_close": last_close,
+        "bars_held": bars_held,
+        "live_pnl_pct": live_pnl_pct,
+    }
+
+
+def format_v7_html(s: dict) -> str:
+    """Format V7 paper cohort summary for Telegram HTML."""
+    lines = ["\n\n🤖 <b>V7 Paper (v7.1 訊號出場 + 3×ATR trailing)</b>"]
+    lines.append(
+        "本金 $1000 | 2% 風險 / 1x / 複利 | 成本 8 bps round-trip"
+    )
+
+    # Backtest reference
+    b = V7_BACKTEST_BASELINE
+    lines.append(f"\n<b>Backtest 基準</b> ({b['config']})")
+    lines.append(
+        f"  n={b['n']} | WR={b['wr_pct']:.1f}% | ROI {b['roi_pct']:+.1f}% | "
+        f"MDD {b['mdd_pct']:.1f}% | Sharpe {b['sharpe']:.2f}"
+    )
+    lines.append(f"  <i>({b['note']})</i>")
+
+    if s.get("empty"):
+        lines.append("\n<b>實盤 paper</b>\n  暫無已平倉 V7 訊號（尚未結算）")
+    else:
+        o = s["overall"]
+        lines.append("\n<b>實盤 paper</b>")
+        lines.append(
+            f"  n={o['n']} | WR={o['wr']*100:.1f}% | "
+            f"每筆 {o['avg_eq_ret_pct']:+.2f}% | PF={o['profit_factor']:.2f}"
+        )
+        lines.append(
+            f"  權益 ${o['final_equity']:,.0f} | "
+            f"<b>ROI {o['roi_pct']:+.1f}%</b> | MDD {o['mdd_pct']:.1f}%"
+        )
+        lines.append(
+            f"  avg hold {o['avg_hold_h']:.0f}h | "
+            f"Sharpe/trade {o['sharpe_per_trade']:.2f} | "
+            f"最佳/最差 {o['best_pct']:+.1f}%/{o['worst_pct']:+.1f}%"
+        )
+
+        r = s["recent"]
+        if r.get("n", 0) > 0:
+            lines.append(
+                f"\n<b>最近 {s['recent_window_days']} 天</b> n={r['n']} | "
+                f"WR={r['wr']*100:.1f}% | 每筆 {r['avg_eq_ret_pct']:+.2f}%"
+            )
+        else:
+            lines.append(f"\n<b>最近 {s['recent_window_days']} 天</b> (無樣本)")
+
+        for d, m in s.get("by_dir", {}).items():
+            icon = "🟢" if d == "LONG" else "🔴"
+            lines.append(
+                f"  {icon} {d} n={m['n']} WR={m['wr']*100:.1f}% "
+                f"每筆 {m['avg_eq_ret_pct']:+.2f}%"
+            )
+
+        if s.get("by_reason"):
+            lines.append("\n<b>出場原因</b>")
+            for reason, m in s["by_reason"].items():
+                lines.append(
+                    f"  {reason}: n={m['n']} WR={m['wr']*100:.0f}% "
+                    f"每筆 {m['avg_eq_ret_pct']:+.2f}%"
+                )
+
+    # Open position
+    try:
+        op = _fetch_open_v7_with_pnl()
+    except Exception as exc:
+        logger.warning("v7 open position fetch failed: %s", exc)
+        op = None
+    if op is None:
+        lines.append("\n<b>📦 當前持倉</b>\n  (無)")
+    else:
+        arrow = "🟢▲ LONG" if op["direction"] == "LONG" else "🔴▼ SHORT"
+        lines.append(f"\n<b>📦 當前持倉</b> {arrow} (id={op['id']})")
+        lines.append(
+            f"  entry: {op['entry_time'].strftime('%m-%d %H:%M')} "
+            f"@ ${op['entry_price']:,.0f} ({op.get('entry_tier') or '-'})"
+        )
+        if op["live_pnl_pct"] is not None:
+            lines.append(
+                f"  now: ${op['last_close']:,.0f} | "
+                f"PnL {op['live_pnl_pct']:+.2f}% | "
+                f"trailing stop ${op['current_stop']:,.0f} | "
+                f"held {op['bars_held']}h"
+            )
+        else:
+            lines.append(
+                f"  trailing stop ${op['current_stop']:,.0f} | "
+                f"held {op['bars_held']}h"
+            )
+
+    return "\n".join(lines)
+
+
 def get_paper_trading_report() -> str:
     """One-call helper for the /paper-perf endpoint.
 
-    Returns combined v7 (tracked_signals) + LDC swing (ldc_swing_positions)
-    + legacy hybrid (hybrid_signals — kept for reference) report.
+    Returns combined v7 indicator (tracked_signals) + LDC swing
+    + V7 paper (v7_paper_positions) + legacy hybrid report.
     """
     v7_html = format_paper_trading_html(compute_paper_trading_summary())
     try:
@@ -947,6 +1238,11 @@ def get_paper_trading_report() -> str:
     except Exception as exc:
         logger.warning("ldc_swing summary failed: %s", exc)
         ldc_html = "\n\n📈 <b>LDC Swing</b>\n(查詢失敗 — 表格可能尚未建立)"
+    try:
+        v7_paper_html = format_v7_html(compute_v7_summary())
+    except Exception as exc:
+        logger.warning("v7 paper summary failed: %s", exc)
+        v7_paper_html = "\n\n🤖 <b>V7 Paper</b>\n(查詢失敗 — 表格可能尚未建立)"
     try:
         hybrid_summary = compute_hybrid_summary()
         if hybrid_summary.get("empty") and not hybrid_summary.get("note"):
@@ -956,4 +1252,4 @@ def get_paper_trading_report() -> str:
     except Exception as exc:
         logger.warning("hybrid summary failed: %s", exc)
         hybrid_html = ""
-    return v7_html + ldc_html + hybrid_html
+    return v7_html + ldc_html + v7_paper_html + hybrid_html

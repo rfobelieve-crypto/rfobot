@@ -153,6 +153,41 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
                     "size": mk_size,
                 })
 
+    # ── V7 paper-trade entry/exit markers (overlaid on the price panel) ──
+    # Distinct from indicator triangles: V7 entry = blue circle, V7 exit =
+    # square coloured by win/loss. Non-critical — never break the chart.
+    if candle_data:
+        try:
+            from indicator.v7_paper_executor import fetch_positions_for_chart
+            win_start = sig.index[0].tz_convert("UTC").tz_localize(None)
+            win_end = sig.index[-1].tz_convert("UTC").tz_localize(None)
+            first_ts, last_ts_c = candle_data[0]["time"], candle_data[-1]["time"]
+            for p in fetch_positions_for_chart(win_start, win_end):
+                d = p["direction"]
+                e_ts = int(pd.Timestamp(p["entry_time"]).tz_localize("UTC")
+                           .timestamp()) + 8 * 3600
+                if first_ts <= e_ts <= last_ts_c:
+                    markers.append({
+                        "time": e_ts,
+                        "position": "belowBar" if d == "LONG" else "aboveBar",
+                        "color": "#29b6f6", "shape": "circle",
+                        "text": "V7", "size": 1,
+                    })
+                if p["status"] == "CLOSED" and p.get("exit_time"):
+                    x_ts = int(pd.Timestamp(p["exit_time"]).tz_localize("UTC")
+                               .timestamp()) + 8 * 3600
+                    if first_ts <= x_ts <= last_ts_c:
+                        won = int(p.get("win") or 0)
+                        markers.append({
+                            "time": x_ts,
+                            "position": "aboveBar" if d == "LONG" else "belowBar",
+                            "color": "#26a69a" if won else "#ef5350",
+                            "shape": "square", "text": "V7×", "size": 1,
+                        })
+            markers.sort(key=lambda m: m["time"])
+        except Exception as exc:
+            logger.warning("V7 chart markers failed (non-critical): %s", exc)
+
     last_dt = sig.index[-1]
     if last_dt.tzinfo:
         last_dt = last_dt.astimezone(TZ_UTC8)

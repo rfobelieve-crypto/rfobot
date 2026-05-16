@@ -1606,6 +1606,9 @@ _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
         {"text": "\U0001f4c8 LDC Chart", "callback_data": "ldc_chart"},
         {"text": "\U0001f4c9 LDC Stats", "callback_data": "ldc_stats"},
     ],
+    [
+        {"text": "\U0001f916 V7 Stats", "callback_data": "v7_stats"},
+    ],
 ]})
 
 
@@ -1759,6 +1762,33 @@ def _handle_ldc_stats(chat_id: str):
     except Exception as e:
         logger.exception("ldc stats fetch error: %s", e)
         send_message(chat_id, f"❌ 取得 LDC 統計失敗: {e}")
+
+
+def _handle_v7_stats(chat_id: str):
+    """Fetch V7 paper-trading stats from indicator service.
+
+    /paper-perf returns the combined report; the V7 cohort section
+    (🤖 V7 Paper) is included alongside the indicator + LDC cohorts.
+    """
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        paper = requests.get(f"{INDICATOR_SERVICE_URL}/paper-perf", timeout=30)
+        if paper.status_code != 200:
+            send_message(chat_id,
+                         f"❌ Indicator 服務未就緒 (paper={paper.status_code})")
+            return
+        text = paper.json().get("text", "")
+        if not text:
+            send_message(chat_id, "❌ paper-perf 無內容")
+            return
+        if len(text) > 3900:
+            text = text[:3850] + "\n... (訊息過長已截斷)"
+        send_message(chat_id, text)
+    except Exception as e:
+        logger.exception("v7 stats fetch error: %s", e)
+        send_message(chat_id, f"❌ 取得 V7 統計失敗: {e}")
 
 
 def _handle_signal_perf(chat_id: str):
@@ -1930,6 +1960,8 @@ def webhook():
                 threading.Thread(target=_handle_ldc_chart, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "ldc_stats":
                 threading.Thread(target=_handle_ldc_stats, args=(cb_chat_id,), daemon=True).start()
+            elif cb_data == "v7_stats":
+                threading.Thread(target=_handle_v7_stats, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "decay":
                 threading.Thread(target=_handle_alpha_decay, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "meeting":

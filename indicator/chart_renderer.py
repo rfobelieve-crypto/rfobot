@@ -193,6 +193,48 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
                          color=color, alpha=alpha, edgecolors="white",
                          linewidths=1.2 if is_strong else 0.8, zorder=5)
 
+    # ── V7 paper-trade entry/exit overlay ────────────────────────────────
+    # Blue hollow circle = V7 entry; X = exit (green win / red loss); a thin
+    # line connects entry→exit. Non-critical — never break the chart.
+    try:
+        from indicator.v7_paper_executor import fetch_positions_for_chart
+        bar_idx = {}
+        for _ib, _tb in enumerate(sig.index):
+            _key = _tb.tz_convert("UTC").tz_localize(None).replace(
+                minute=0, second=0, microsecond=0)
+            bar_idx[_key] = _ib
+        _win_start = sig.index[0].tz_convert("UTC").tz_localize(None)
+        _win_end = sig.index[-1].tz_convert("UTC").tz_localize(None)
+        for p in fetch_positions_for_chart(_win_start, _win_end):
+            ekey = pd.Timestamp(p["entry_time"]).replace(
+                minute=0, second=0, microsecond=0)
+            ei = bar_idx.get(ekey)
+            entry_px = float(p["entry_price"])
+            if p["status"] == "CLOSED" and p.get("exit_time"):
+                xkey = pd.Timestamp(p["exit_time"]).replace(
+                    minute=0, second=0, microsecond=0)
+                xi = bar_idx.get(xkey)
+                exit_px = float(p["exit_price"])
+                lc = "#26a69a" if int(p.get("win") or 0) else "#ef5350"
+                ax_price.plot([ei if ei is not None else 0,
+                               xi if xi is not None else n - 1],
+                              [entry_px, exit_px], color=lc, lw=1.1,
+                              alpha=0.55, zorder=4)
+                if xi is not None:
+                    ax_price.scatter(xi, exit_px, marker="X", s=70, color=lc,
+                                     edgecolors="white", linewidths=0.8,
+                                     zorder=6)
+            else:  # open position — dashed line to the last bar
+                ax_price.plot([ei if ei is not None else 0, n - 1],
+                              [entry_px, closes[-1]], color="#29b6f6",
+                              lw=1.1, ls="--", alpha=0.55, zorder=4)
+            if ei is not None:
+                ax_price.scatter(ei, entry_px, marker="o", s=85,
+                                 facecolors="none", edgecolors="#2962ff",
+                                 linewidths=1.6, zorder=6)
+    except Exception as exc:
+        logger.warning("V7 chart overlay failed (non-critical): %s", exc)
+
     ax_price.set_ylabel("Price (USD)", fontsize=10)
     ax_price.grid(True, alpha=0.15)
     ax_price.set_xlim(-0.5, n - 0.5)
@@ -211,9 +253,12 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
                     linewidths=0.8, label="Moderate UP"),
         plt.scatter([], [], marker="v", color="#ef5350", s=81, edgecolors="white",
                     linewidths=0.8, label="Moderate DOWN"),
+        plt.scatter([], [], marker="o", facecolors="none", edgecolors="#2962ff",
+                    linewidths=1.6, s=85, label="V7 entry"),
+        plt.scatter([], [], marker="X", color="#26a69a", s=70, label="V7 exit"),
     ]
     ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
-                    framealpha=0.8, ncol=4)
+                    framealpha=0.8, ncol=3)
 
     # Date labels — shared tick positions for all panels
     tick_pos = np.linspace(0, n - 1, min(12, n)).astype(int)

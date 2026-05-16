@@ -77,6 +77,7 @@ def _make_reply_markup():
         ],
         [
             {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
+            {"text": "\U0001f916 V7 Stats", "callback_data": "v7_stats"},
             {"text": "\U0001f4cb Meeting", "callback_data": "meeting"},
         ],
     ]})
@@ -177,6 +178,42 @@ def _send_ldc_swing_alerts(result: dict, paused: bool) -> None:
             _send_telegram_text(m)
         except Exception as exc:
             logger.warning("LDC swing alert send failed: %s", exc)
+
+
+def _send_v7_paper_alerts(result: dict) -> None:
+    """Translate v7_paper_executor.run_cycle result into Telegram messages."""
+    if not result:
+        return
+    action = result.get("action")
+    if action not in ("open", "close"):
+        return  # hold/none: silent
+    msg = None
+    if action == "open":
+        d = result["opened_direction"]
+        emoji = "🟢" if d == "LONG" else "🔴"
+        msg = (
+            f"{emoji} <b>V7 {d} OPEN</b>\n"
+            f"Entry: ${result['entry_price']:,.2f} "
+            f"({result.get('entry_tier', '')})\n"
+            f"Strategy: v7.1 signal-exit + 3×ATR trailing stop\n"
+            f"Size: {result['size_frac']*100:.0f}% equity "
+            f"(${result['notional_usd']:,.0f}) | "
+            f"stop ${result['current_stop']:,.2f}"
+        )
+    elif action == "close":
+        c = result["closed"]
+        emoji = "✅" if c["win"] else "❌"
+        msg = (
+            f"{emoji} <b>V7 {c['direction']} CLOSE</b>\n"
+            f"Exit: ${c['exit_price']:,.2f} ({c['reason']})\n"
+            f"Held: {c['bars_held']}h | Net: {c['net_pct']*100:+.2f}%\n"
+            f"Equity: {c['equity_ret_pct']:+.2f}% → ${c['equity_after']:,.0f}"
+        )
+    if msg:
+        try:
+            _send_telegram_text(msg)
+        except Exception as exc:
+            logger.warning("V7 paper alert send failed: %s", exc)
 
 
 def _send_telegram_text(message: str, chat_id: str = ""):
@@ -693,6 +730,16 @@ def update_cycle() -> dict:
             _send_ldc_swing_alerts(ldc_result, ldc_paused)
         except Exception as e:
             logger.warning("LDC swing executor failed (non-critical): %s", e)
+
+        # ── Path 3: V7 paper executor (v7.1 signal-exit + 3xATR trailing).
+        # Parallel Stage-1 paper cohort — runs alongside LDC, LDC untouched.
+        try:
+            from indicator.v7_paper_executor import run_cycle as run_v7_cycle
+            v7_result = run_v7_cycle(
+                klines, signal_direction=direction, signal_strength=strength)
+            _send_v7_paper_alerts(v7_result)
+        except Exception as e:
+            logger.warning("V7 paper executor failed (non-critical): %s", e)
 
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
