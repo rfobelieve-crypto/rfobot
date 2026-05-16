@@ -20,6 +20,15 @@ Position sizing (fixed-fractional, deployable):
     - 2% of CURRENT equity risked per trade (risk = initial 3xATR stop).
     - notional = min( 1x * equity , 0.02 * equity / stop_pct ).  1x leverage cap.
     - Account compounds; starts at 1000 USDT.
+    - The 2% / 1x configuration is kept in sync with
+      indicator/risk_manager.py RiskConfig.from_stage("paper").
+
+Model-version shadow:
+    The first TRANSITION_PAUSE_HOURS of trades on a freshly-seen
+    model_version are recorded with paused_at_signal=1 and excluded from
+    the /paper-perf cohort stats. A retrain's warmup-buffer reseed can
+    misfire (see .claude/rules/mistake.md 2026-04-19) — those trades must
+    not contaminate the Stage-1 graduation decision.
 
 Stateful — at most one position open at a time, persisted to the
 `v7_paper_positions` MySQL table.  The trailing-stop state (running extreme +
@@ -47,8 +56,9 @@ TRAIL_MULT = 3.0            # 3 x ATR(14) trailing stop
 TIME_CAP_HOURS = 72         # safety cap on holding period
 TAKER_COST = 0.0008         # round-trip 8 bps
 INITIAL_CAPITAL_USD = 1000.0
-RISK_FRAC = 0.02            # 2% of equity risked per trade
+RISK_FRAC = 0.02            # 2% of equity risked per trade (see risk_manager.py)
 MAX_LEVERAGE = 1.0          # leverage cap (notional <= 1x equity)
+TRANSITION_PAUSE_HOURS = 48  # shadow V7 entries for 48h after a model retrain
 
 TABLE = "v7_paper_positions"
 
@@ -113,7 +123,8 @@ def get_open_position() -> Optional[dict]:
                 cur.execute(f"""
                     SELECT id, entry_time, direction, entry_price, entry_tier,
                            atr_at_entry, stop_dist, trail_extreme, current_stop,
-                           size_frac, notional_usd, equity_before
+                           size_frac, notional_usd, equity_before,
+                           paused_at_signal
                     FROM `{TABLE}`
                     WHERE status = 'OPEN'
                     ORDER BY entry_time DESC
@@ -247,6 +258,7 @@ def close_position(pos: dict, exit_time: datetime, exit_price: float,
         "gross_pct": gross_pct, "net_pct": net_pct,
         "equity_ret_pct": equity_ret * 100.0, "equity_after": equity_after,
         "win": win, "bars_held": bars_held, "reason": exit_reason,
+        "paused": int(pos.get("paused_at_signal", 0) or 0),
     }
 
 
@@ -294,10 +306,53 @@ def _atr_wilder(klines: pd.DataFrame, period: int = ATR_PERIOD) -> float:
     return float(val) if np.isfinite(val) else 0.0
 
 
+# ── Model-version transition shadow ──────────────────────────────────────────
+
+def _is_in_transition_window(model_version: Optional[str],
+                             now: pd.Timestamp) -> bool:
+    """True if `now` falls inside the post-retrain shadow window.
+
+    A V7 entry is shadowed (paused_at_signal=1, excluded from the paper
+    cohort) for the first TRANSITION_PAUSE_HOURS after a NEW model_version
+    first appears — a warmup-buffer reseed can misfire right after a
+    retrain (.claude/rules/mistake.md 2026-04-19), and those trades must
+    not contaminate the Stage-1 graduation cohort.
+
+    The model_version running while V7 has no history yet is treated as
+    the baseline (not a retrain) and is NOT shadowed.
+    """
+    if not model_version:
+        return False  # version unknown → default live (matches LDC convention)
+    try:
+        conn = _get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f"""
+                    SELECT MIN(entry_time) AS first_ts
+                    FROM `{TABLE}` WHERE model_version = %s
+                """, (model_version,))
+                first_ts = (cur.fetchone() or {}).get("first_ts")
+                cur.execute(f"SELECT COUNT(*) AS n FROM `{TABLE}`")
+                total = int((cur.fetchone() or {}).get("n", 0))
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.warning("V7 transition-window check failed (default live): %s",
+                        exc)
+        return False
+    if first_ts is not None:
+        elapsed_h = (now - pd.Timestamp(first_ts)).total_seconds() / 3600.0
+        return elapsed_h < TRANSITION_PAUSE_HOURS
+    # current version has no prior V7 trades
+    if total == 0:
+        return False   # first-ever V7 entry → baseline model, not a retrain
+    return True        # table has trades but none on this version → retrain
+
+
 # ── Cycle orchestrator ───────────────────────────────────────────────────────
 
 def run_cycle(klines: pd.DataFrame, signal_direction: str,
-              signal_strength: str = "", paused: bool = False,
+              signal_strength: str = "",
               model_version: Optional[str] = None) -> dict:
     """Run one V7 paper cycle on the latest closed bar.
 
@@ -403,6 +458,7 @@ def run_cycle(klines: pd.DataFrame, signal_direction: str,
     current_stop = (last_close - stop_dist if side == "LONG"
                     else last_close + stop_dist)
     tier = signal_strength if signal_strength in ("Strong", "Moderate") else "Moderate"
+    paused = _is_in_transition_window(model_version, bar_ts)
 
     new_id = insert_open(
         entry_time=bar_ts, direction=side, entry_price=last_close,
@@ -447,4 +503,5 @@ def get_status_summary() -> dict:
         "max_leverage": MAX_LEVERAGE,
         "trail_mult": TRAIL_MULT,
         "time_cap_hours": TIME_CAP_HOURS,
+        "transition_pause_hours": TRANSITION_PAUSE_HOURS,
     }

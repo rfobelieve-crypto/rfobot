@@ -59,7 +59,14 @@ class RiskConfig:
     def from_stage(cls, stage: str) -> "RiskConfig":
         """Convenience constructor — sensible defaults per stage."""
         if stage == "paper":
-            return cls(stage="paper", initial_equity=1000.0)
+            # 2% per-trade risk — aligned with the live V7 paper executor
+            # (indicator/v7_paper_executor.py RISK_FRAC = 0.02). This is the
+            # fixed-fractional sizing validated in
+            # research/v71_v7_sizing_1x.py; keep the two in sync so paper
+            # results transfer when RiskManager is wired into the executor
+            # at Stage 2+.
+            return cls(stage="paper", initial_equity=1000.0,
+                       max_risk_per_trade=0.02)
         if stage == "testnet":
             return cls(stage="testnet", initial_equity=10000.0)
         if stage == "live_tiny":

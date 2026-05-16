@@ -958,7 +958,7 @@ def fetch_v7_paper_positions(since: datetime | None = None) -> pd.DataFrame:
         SELECT entry_time, exit_time, direction, entry_price, exit_price,
                entry_tier, exit_reason, bars_held, gross_pct, net_pct,
                equity_ret_pct, equity_before, equity_after, win,
-               size_frac, notional_usd, model_version
+               size_frac, notional_usd, model_version, paused_at_signal
         FROM v7_paper_positions
         WHERE status = 'CLOSED'
     """
@@ -992,6 +992,7 @@ def fetch_v7_paper_positions(since: datetime | None = None) -> pd.DataFrame:
     df["exit_time"] = pd.to_datetime(df["exit_time"])
     df["win"] = df["win"].astype(int)
     df["bars_held"] = df["bars_held"].astype(int)
+    df["paused_at_signal"] = df["paused_at_signal"].fillna(0).astype(int)
     return df
 
 
@@ -1039,10 +1040,22 @@ def _slice_v7_metrics(group: pd.DataFrame) -> dict:
 
 
 def compute_v7_summary(days_recent: int = 30) -> dict:
-    """Compute V7 paper cohort dashboard."""
-    df = fetch_v7_paper_positions()
-    if df.empty:
+    """Compute V7 paper cohort dashboard.
+
+    Trades stamped paused_at_signal=1 (model-version transition shadow —
+    see v7_paper_executor._is_in_transition_window) are excluded from all
+    cohort stats: they ran on an unproven freshly-retrained model and must
+    not contaminate the Stage-1 graduation decision.
+    """
+    df_all = fetch_v7_paper_positions()
+    if df_all.empty:
         return {"empty": True, "label": "v7_paper"}
+
+    n_shadow = int((df_all["paused_at_signal"] == 1).sum())
+    df = df_all[df_all["paused_at_signal"] == 0].copy()
+    if df.empty:
+        return {"empty": True, "label": "v7_paper", "n_shadow": n_shadow,
+                "note": "all V7 trades shadowed (model-transition window)"}
 
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=days_recent)
@@ -1065,6 +1078,7 @@ def compute_v7_summary(days_recent: int = 30) -> dict:
     return {
         "empty": False, "label": "v7_paper",
         "n_total": int(len(df)),
+        "n_shadow": n_shadow,
         "date_range": [
             df["entry_time"].min().isoformat(),
             df["entry_time"].max().isoformat(),
@@ -1133,6 +1147,7 @@ def _fetch_open_v7_with_pnl() -> dict | None:
         "last_close": last_close,
         "bars_held": bars_held,
         "live_pnl_pct": live_pnl_pct,
+        "paused": int(pos.get("paused_at_signal", 0) or 0),
     }
 
 
@@ -1153,10 +1168,20 @@ def format_v7_html(s: dict) -> str:
     lines.append(f"  <i>({b['note']})</i>")
 
     if s.get("empty"):
-        lines.append("\n<b>實盤 paper</b>\n  暫無已平倉 V7 訊號（尚未結算）")
+        if s.get("n_shadow"):
+            lines.append(
+                f"\n<b>實盤 paper</b>\n  {s['n_shadow']} 筆 V7 訊號全為 "
+                f"shadow（模型轉換窗口）— 暫無計入 cohort 的樣本"
+            )
+        else:
+            lines.append("\n<b>實盤 paper</b>\n  暫無已平倉 V7 訊號（尚未結算）")
     else:
         o = s["overall"]
         lines.append("\n<b>實盤 paper</b>")
+        if s.get("n_shadow"):
+            lines.append(
+                f"  <i>（{s['n_shadow']} 筆 shadow 已排除 — 模型轉換窗口）</i>"
+            )
         lines.append(
             f"  n={o['n']} | WR={o['wr']*100:.1f}% | "
             f"每筆 {o['avg_eq_ret_pct']:+.2f}% | PF={o['profit_factor']:.2f}"
@@ -1205,7 +1230,8 @@ def format_v7_html(s: dict) -> str:
         lines.append("\n<b>📦 當前持倉</b>\n  (無)")
     else:
         arrow = "🟢▲ LONG" if op["direction"] == "LONG" else "🔴▼ SHORT"
-        lines.append(f"\n<b>📦 當前持倉</b> {arrow} (id={op['id']})")
+        shadow = " <i>[SHADOW]</i>" if op.get("paused") else ""
+        lines.append(f"\n<b>📦 當前持倉</b> {arrow} (id={op['id']}){shadow}")
         lines.append(
             f"  entry: {op['entry_time'].strftime('%m-%d %H:%M')} "
             f"@ ${op['entry_price']:,.0f} ({op.get('entry_tier') or '-'})"

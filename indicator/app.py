@@ -191,8 +191,10 @@ def _send_v7_paper_alerts(result: dict) -> None:
     if action == "open":
         d = result["opened_direction"]
         emoji = "🟢" if d == "LONG" else "🔴"
+        shadow = (" <i>[SHADOW — 模型轉換窗口, 不計入 cohort]</i>"
+                  if result.get("paused") else "")
         msg = (
-            f"{emoji} <b>V7 {d} OPEN</b>\n"
+            f"{emoji} <b>V7 {d} OPEN</b>{shadow}\n"
             f"Entry: ${result['entry_price']:,.2f} "
             f"({result.get('entry_tier', '')})\n"
             f"Strategy: v7.1 signal-exit + 3×ATR trailing stop\n"
@@ -203,8 +205,9 @@ def _send_v7_paper_alerts(result: dict) -> None:
     elif action == "close":
         c = result["closed"]
         emoji = "✅" if c["win"] else "❌"
+        shadow = " <i>[SHADOW — 不計入 cohort]</i>" if c.get("paused") else ""
         msg = (
-            f"{emoji} <b>V7 {c['direction']} CLOSE</b>\n"
+            f"{emoji} <b>V7 {c['direction']} CLOSE</b>{shadow}\n"
             f"Exit: ${c['exit_price']:,.2f} ({c['reason']})\n"
             f"Held: {c['bars_held']}h | Net: {c['net_pct']*100:+.2f}%\n"
             f"Equity: {c['equity_ret_pct']:+.2f}% → ${c['equity_after']:,.0f}"
@@ -735,8 +738,10 @@ def update_cycle() -> dict:
         # Parallel Stage-1 paper cohort — runs alongside LDC, LDC untouched.
         try:
             from indicator.v7_paper_executor import run_cycle as run_v7_cycle
+            from indicator.model_version import get_current_model_version
             v7_result = run_v7_cycle(
-                klines, signal_direction=direction, signal_strength=strength)
+                klines, signal_direction=direction, signal_strength=strength,
+                model_version=get_current_model_version())
             _send_v7_paper_alerts(v7_result)
         except Exception as e:
             logger.warning("V7 paper executor failed (non-critical): %s", e)
