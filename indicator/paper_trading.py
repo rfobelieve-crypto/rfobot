@@ -951,6 +951,19 @@ V7_BACKTEST_BASELINE = {
     "note": "WF-OOS backtest — live uses production model, expect drift",
 }
 
+# Stage 1 → Stage 2 graduation thresholds + Stage 1 kill conditions for V7.
+# Mirrors the LDC constants above. The LONG-side guard is V7-specific:
+# the WF-OOS backtest's edge was concentrated on SHORT (WR 80% vs LONG 53%),
+# so a graduation that's only "整體正" can be a short-side artifact under a
+# down-trending sample. Require LONG side net ≥ 0 once it has enough sample.
+V7_STAGE2_MIN_TRADES = 100
+V7_STAGE2_NET_BPS = 5.0            # 4-week-rolling target
+V7_KILL_SWITCH_MDD_PCT = -15.0     # paper-equity DD that should pause cohort
+V7_KILL_SWITCH_WARN_PCT = -10.0
+V7_CONSEC_LOSS_THRESHOLD = 7
+V7_LONG_GUARD_MIN_N = 20           # below this, long-side guard is informational
+V7_LONG_GUARD_MIN_NET_BPS = 0.0    # LONG side must clear this to graduate
+
 
 def fetch_v7_paper_positions(since: datetime | None = None) -> pd.DataFrame:
     """Pull v7_paper_positions (closed only). Empty df if table absent."""
@@ -1031,12 +1044,31 @@ def _slice_v7_metrics(group: pd.DataFrame) -> dict:
         "final_equity": final,
         "roi_pct": float((final / V7_INITIAL_CAPITAL - 1.0) * 100.0),
         "mdd_pct": float(dd.min()),
+        "current_dd_pct": float(dd[-1]),
         "sharpe_per_trade": (
             float(eq_ret.mean() / eq_ret.std()) if eq_ret.std() > 0 else 0.0
         ),
         "profit_factor": float(pf),
         "consec_loss_streak": int(streak),
     }
+
+
+def _v7_weekly_net_bps(df: pd.DataFrame, weeks: int = 4) -> list[dict]:
+    """Bucket V7 trades by ISO week (Mon-start); return last N weeks newest-first."""
+    if df.empty:
+        return []
+    g = df.copy()
+    g["week"] = g["entry_time"].dt.to_period("W-MON")
+    out = []
+    for _wk, sub in g.groupby("week"):
+        out.append({
+            "week_start": sub["entry_time"].min().strftime("%m-%d"),
+            "n": int(len(sub)),
+            "avg_net_bps": float(sub["net_pct"].mean()) * 10000,
+            "wr": float((sub["win"] == 1).mean()),
+        })
+    out.sort(key=lambda r: r["week_start"], reverse=True)
+    return out[:weeks]
 
 
 def compute_v7_summary(days_recent: int = 30) -> dict:
@@ -1067,6 +1099,18 @@ def compute_v7_summary(days_recent: int = 30) -> dict:
         if len(sub) > 0:
             by_dir[d] = _slice_v7_metrics(sub)
 
+    by_dir_recent: dict = {}
+    for d in ("LONG", "SHORT"):
+        sub = recent[recent["direction"] == d]
+        if len(sub) > 0:
+            by_dir_recent[d] = _slice_v7_metrics(sub)
+
+    by_tier: dict = {}
+    for tier in ("Strong", "Moderate"):
+        sub = df[df["entry_tier"] == tier]
+        if len(sub) > 0:
+            by_tier[tier] = _slice_v7_metrics(sub)
+
     by_reason: dict = {}
     for reason, sub in df.groupby("exit_reason"):
         by_reason[str(reason)] = {
@@ -1087,8 +1131,120 @@ def compute_v7_summary(days_recent: int = 30) -> dict:
         "recent": _slice_v7_metrics(recent) if len(recent) > 0 else {"n": 0},
         "recent_window_days": days_recent,
         "by_dir": by_dir,
+        "by_dir_recent": by_dir_recent,
+        "by_tier": by_tier,
         "by_reason": by_reason,
+        "weekly_4w": _v7_weekly_net_bps(df, weeks=4),
     }
+
+
+def _compute_v7_alerts(summary: dict) -> list[str]:
+    """V7 alerts mirroring _compute_ldc_alerts, plus the V7-specific
+    LONG-side graduation guard. The guard exists because the WF-OOS backtest's
+    edge was carried by SHORT (WR 80%) in a down-trending sample; the LONG
+    side was barely break-even (WR 53%). Graduating Stage 1 on overall numbers
+    alone risks promoting a short-side-only artifact."""
+    alerts: list[str] = []
+    if summary.get("empty"):
+        return alerts
+    o = summary["overall"]
+
+    cur_dd = o.get("current_dd_pct", 0.0)
+    if cur_dd <= V7_KILL_SWITCH_MDD_PCT:
+        alerts.append(
+            f"🚨 V7 當前 DD {cur_dd:.1f}% 已達 kill switch "
+            f"{V7_KILL_SWITCH_MDD_PCT:.0f}% — 應暫停 cohort 並重新評估"
+        )
+    elif cur_dd <= V7_KILL_SWITCH_WARN_PCT:
+        alerts.append(
+            f"⚠️ V7 當前 DD {cur_dd:.1f}% 接近 kill switch "
+            f"({V7_KILL_SWITCH_MDD_PCT:.0f}%)"
+        )
+
+    streak = o.get("consec_loss_streak", 0)
+    if streak >= V7_CONSEC_LOSS_THRESHOLD:
+        alerts.append(
+            f"🚨 V7 連續虧損 {streak} 筆 (≥{V7_CONSEC_LOSS_THRESHOLD}) — "
+            f"應暫停並檢查訊號是否仍有效"
+        )
+
+    long_m = summary.get("by_dir", {}).get("LONG", {})
+    n_long = int(long_m.get("n", 0))
+    if n_long >= V7_LONG_GUARD_MIN_N:
+        long_net = long_m.get("avg_net_bps", 0.0)
+        if long_net < V7_LONG_GUARD_MIN_NET_BPS:
+            alerts.append(
+                f"🔴 LONG-side guard: n={n_long} avg_net {long_net:+.1f} bps < "
+                f"+{V7_LONG_GUARD_MIN_NET_BPS:.0f} bps — 整體可能只是空方 "
+                f"撐起,不符合進階條件"
+            )
+
+    r = summary.get("recent", {})
+    if r.get("n", 0) >= 20:
+        rn = r.get("avg_net_bps", 0.0)
+        if rn < 0:
+            alerts.append(
+                f"🔴 V7 近 {summary['recent_window_days']} 天 net {rn:+.1f} bps "
+                f"< 0 — Stage 2 進階倒退 (門檻 +{V7_STAGE2_NET_BPS:.0f} bps)"
+            )
+        elif rn < V7_STAGE2_NET_BPS:
+            alerts.append(
+                f"🟡 V7 近 {summary['recent_window_days']} 天 net {rn:+.1f} bps,"
+                f"低於 Stage 2 門檻 +{V7_STAGE2_NET_BPS:.0f} bps"
+            )
+
+    weeks = summary.get("weekly_4w", [])
+    if weeks:
+        bad = [w for w in weeks if w["avg_net_bps"] < 0]
+        if bad:
+            alerts.append(
+                f"⚠️ V7 最近 4 週中有 {len(bad)} 週 net < 0 "
+                f"(連續 4 週正 EV 才能進階)"
+            )
+
+    return alerts
+
+
+def _format_v7_stage2_progress(summary: dict) -> str:
+    """V7 Stage 1 → Stage 2 progress: trade count + 4-week net + LONG guard."""
+    if summary.get("empty"):
+        n = 0
+        weeks: list[dict] = []
+        long_n = 0
+        long_net = 0.0
+    else:
+        n = summary["overall"].get("n", 0)
+        weeks = summary.get("weekly_4w", [])
+        long_m = summary.get("by_dir", {}).get("LONG", {})
+        long_n = int(long_m.get("n", 0))
+        long_net = float(long_m.get("avg_net_bps", 0.0))
+
+    remaining = max(0, V7_STAGE2_MIN_TRADES - n)
+    weeks_ge = sum(1 for w in weeks if w["avg_net_bps"] >= V7_STAGE2_NET_BPS)
+    pct = min(100, int(n / V7_STAGE2_MIN_TRADES * 100))
+    bar_len = 20
+    filled = int(bar_len * n / V7_STAGE2_MIN_TRADES)
+    bar = "█" * min(filled, bar_len) + "░" * max(0, bar_len - filled)
+
+    if long_n < V7_LONG_GUARD_MIN_N:
+        long_status = (f"(尚未到評估門檻 n≥{V7_LONG_GUARD_MIN_N},"
+                       f"目前 {long_n} 筆 {long_net:+.1f} bps)")
+    elif long_net >= V7_LONG_GUARD_MIN_NET_BPS:
+        long_status = f"✅ 通過 ({long_net:+.1f} bps, n={long_n})"
+    else:
+        long_status = (f"❌ 未通過 ({long_net:+.1f} bps < "
+                       f"+{V7_LONG_GUARD_MIN_NET_BPS:.0f} bps, n={long_n})")
+
+    lines = ["\n<b>🎯 Stage 2 進階進度</b>"]
+    lines.append(
+        f"  Trades: <code>{bar}</code> {n}/{V7_STAGE2_MIN_TRADES} "
+        f"({pct}%, 差 {remaining} 筆)"
+    )
+    lines.append(
+        f"  4 週連續 net ≥ +{V7_STAGE2_NET_BPS:.0f} bps: {weeks_ge}/4 週達標"
+    )
+    lines.append(f"  LONG-side guard: {long_status}")
+    return "\n".join(lines)
 
 
 def _fetch_open_v7_with_pnl() -> dict | None:
@@ -1167,6 +1323,13 @@ def format_v7_html(s: dict) -> str:
     )
     lines.append(f"  <i>({b['note']})</i>")
 
+    # Alerts — fire before the cohort block so they're visible up top
+    v7_alerts = _compute_v7_alerts(s)
+    if v7_alerts:
+        lines.append("\n<b>⚠️ 警示</b>")
+        for a in v7_alerts:
+            lines.append(f"  {a}")
+
     if s.get("empty"):
         if s.get("n_shadow"):
             lines.append(
@@ -1196,21 +1359,45 @@ def format_v7_html(s: dict) -> str:
             f"最佳/最差 {o['best_pct']:+.1f}%/{o['worst_pct']:+.1f}%"
         )
 
+        # Overall LONG / SHORT split — clearly labeled as ALL-time so it's
+        # not mistaken for a 30-day slice as n grows past the window.
+        if s.get("by_dir"):
+            lines.append("\n<b>整體 多空拆解</b>")
+            for d, m in s["by_dir"].items():
+                icon = "🟢" if d == "LONG" else "🔴"
+                lines.append(
+                    f"  {icon} {d} n={m['n']} WR={m['wr']*100:.1f}% "
+                    f"每筆 {m['avg_eq_ret_pct']:+.2f}% | "
+                    f"net {m['avg_net_bps']:+.1f}bps"
+                )
+
+        # Overall tier split — V7 enters on Strong + Moderate; the legacy
+        # paper-trading data showed Moderate net-negative, so this surfaces
+        # whether Moderate is dragging the cohort.
+        if s.get("by_tier"):
+            lines.append("\n<b>整體 tier 拆解</b>")
+            for tier, m in s["by_tier"].items():
+                icon = "⭐" if tier == "Strong" else "🔹"
+                lines.append(
+                    f"  {icon} {tier} n={m['n']} WR={m['wr']*100:.1f}% "
+                    f"每筆 {m['avg_eq_ret_pct']:+.2f}% | "
+                    f"net {m['avg_net_bps']:+.1f}bps"
+                )
+
         r = s["recent"]
         if r.get("n", 0) > 0:
             lines.append(
                 f"\n<b>最近 {s['recent_window_days']} 天</b> n={r['n']} | "
                 f"WR={r['wr']*100:.1f}% | 每筆 {r['avg_eq_ret_pct']:+.2f}%"
             )
+            for d, m in s.get("by_dir_recent", {}).items():
+                icon = "🟢" if d == "LONG" else "🔴"
+                lines.append(
+                    f"  {icon} {d} n={m['n']} WR={m['wr']*100:.1f}% "
+                    f"每筆 {m['avg_eq_ret_pct']:+.2f}%"
+                )
         else:
             lines.append(f"\n<b>最近 {s['recent_window_days']} 天</b> (無樣本)")
-
-        for d, m in s.get("by_dir", {}).items():
-            icon = "🟢" if d == "LONG" else "🔴"
-            lines.append(
-                f"  {icon} {d} n={m['n']} WR={m['wr']*100:.1f}% "
-                f"每筆 {m['avg_eq_ret_pct']:+.2f}%"
-            )
 
         if s.get("by_reason"):
             lines.append("\n<b>出場原因</b>")
@@ -1248,6 +1435,9 @@ def format_v7_html(s: dict) -> str:
                 f"  trailing stop ${op['current_stop']:,.0f} | "
                 f"held {op['bars_held']}h"
             )
+
+    # Stage 1 → Stage 2 progress + LONG-side guard at the bottom
+    lines.append(_format_v7_stage2_progress(s))
 
     return "\n".join(lines)
 
