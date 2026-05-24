@@ -78,6 +78,10 @@ def _build_v7_paper() -> str:
                      f'margin-top:8px">最近 {s["recent_window_days"]} 天: '
                      f'n={r["n"]} · WR {r["wr"]*100:.1f}% · '
                      f'每筆 {r["avg_eq_ret_pct"]:+.2f}%</div>')
+    if s.get("n_shadow"):
+        live += (f'<div style="color:rgba(255,180,0,0.65);font-size:11px;'
+                 f'margin-top:6px">⚠ {s["n_shadow"]} 筆 shadow 已排除 '
+                 f'— 模型轉換窗口 (前 48h)，不計入 cohort</div>')
     return bt + live
 
 

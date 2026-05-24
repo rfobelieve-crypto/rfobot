@@ -47,6 +47,7 @@ _state = {
     "error": None,
     "indicator_df": None,  # full indicator DataFrame (history + live)
     "consecutive_errors": 0,  # silent-failure detector
+    "executor_errors": {},  # per paper-executor consecutive-failure counts (V7/LDC)
 }
 _lock = threading.Lock()
 _engine = None
@@ -191,8 +192,10 @@ def _send_v7_paper_alerts(result: dict) -> None:
     if action == "open":
         d = result["opened_direction"]
         emoji = "🟢" if d == "LONG" else "🔴"
+        shadow = (" <i>[SHADOW — 模型轉換窗口, 不計入 cohort]</i>"
+                  if result.get("paused") else "")
         msg = (
-            f"{emoji} <b>V7 {d} OPEN</b>\n"
+            f"{emoji} <b>V7 {d} OPEN</b>{shadow}\n"
             f"Entry: ${result['entry_price']:,.2f} "
             f"({result.get('entry_tier', '')})\n"
             f"Strategy: v7.1 signal-exit + 3×ATR trailing stop\n"
@@ -203,8 +206,9 @@ def _send_v7_paper_alerts(result: dict) -> None:
     elif action == "close":
         c = result["closed"]
         emoji = "✅" if c["win"] else "❌"
+        shadow = " <i>[SHADOW — 不計入 cohort]</i>" if c.get("paused") else ""
         msg = (
-            f"{emoji} <b>V7 {c['direction']} CLOSE</b>\n"
+            f"{emoji} <b>V7 {c['direction']} CLOSE</b>{shadow}\n"
             f"Exit: ${c['exit_price']:,.2f} ({c['reason']})\n"
             f"Held: {c['bars_held']}h | Net: {c['net_pct']*100:+.2f}%\n"
             f"Equity: {c['equity_ret_pct']:+.2f}% → ${c['equity_after']:,.0f}"
@@ -230,6 +234,58 @@ def _send_telegram_text(message: str, chat_id: str = ""):
         }, timeout=15)
     except Exception as e:
         logger.error("Telegram text send failed: %s", e)
+
+
+# ── Per-paper-executor silent-failure detector ──────────────────────────────
+# Mirrors the outer update_cycle counter at line ~824. V7/LDC executors are
+# wrapped in `except: warning("non-critical")`; without this counter a broken
+# executor silently zeroes out Stage-1 data accumulation while update_cycle
+# stays green. Lesson 2026-04-22.
+EXECUTOR_ALERT_AFTER = 2     # alert on the 2nd consecutive failure
+EXECUTOR_ALERT_COOLDOWN = 6  # re-alert every 6 cycles after that
+
+
+def _record_executor_failure(name: str, exc: BaseException) -> None:
+    with _lock:
+        st = _state["executor_errors"].setdefault(name, {"fails": 0})
+        st["fails"] += 1
+        n = st["fails"]
+    logger.warning("%s failed (consecutive=%d, non-critical): %s", name, n, exc)
+    fire = (n == EXECUTOR_ALERT_AFTER or
+            (n > EXECUTOR_ALERT_AFTER and
+             (n - EXECUTOR_ALERT_AFTER) % EXECUTOR_ALERT_COOLDOWN == 0))
+    if not fire:
+        return
+    try:
+        from indicator.monitor_icir import send_telegram_alert
+        send_telegram_alert(
+            f"<b>⚠️ Paper executor silent failure</b>\n"
+            f"<b>{name}</b> failed <b>{n}</b> cycles in a row.\n"
+            f"Latest: <code>{str(exc)[:300]}</code>\n"
+            f"update_cycle is still green; Stage-1 data on this path "
+            f"has stopped accumulating."
+        )
+    except Exception as alert_exc:
+        logger.warning("Executor failure alert send failed for %s: %s",
+                       name, alert_exc)
+
+
+def _record_executor_success(name: str) -> None:
+    with _lock:
+        st = _state["executor_errors"].get(name)
+        if not st or st["fails"] == 0:
+            return
+        n_recovered = st["fails"]
+        st["fails"] = 0
+    if n_recovered >= EXECUTOR_ALERT_AFTER:
+        try:
+            from indicator.monitor_icir import send_telegram_alert
+            send_telegram_alert(
+                f"<b>✅ Paper executor recovered</b>\n"
+                f"<b>{name}</b> back to normal after {n_recovered} failed cycles."
+            )
+        except Exception:
+            pass
 
 
 def _send_telegram_photo_to(chat_id: str, png: bytes, caption: str):
@@ -728,18 +784,22 @@ def update_cycle() -> dict:
             from indicator.ldc_swing_executor import run_cycle as run_ldc_cycle
             ldc_result = run_ldc_cycle(klines, features=features, paused=ldc_paused)
             _send_ldc_swing_alerts(ldc_result, ldc_paused)
+            _record_executor_success("LDC swing executor")
         except Exception as e:
-            logger.warning("LDC swing executor failed (non-critical): %s", e)
+            _record_executor_failure("LDC swing executor", e)
 
         # ── Path 3: V7 paper executor (v7.1 signal-exit + 3xATR trailing).
         # Parallel Stage-1 paper cohort — runs alongside LDC, LDC untouched.
         try:
             from indicator.v7_paper_executor import run_cycle as run_v7_cycle
+            from indicator.model_version import get_current_model_version
             v7_result = run_v7_cycle(
-                klines, signal_direction=direction, signal_strength=strength)
+                klines, signal_direction=direction, signal_strength=strength,
+                model_version=get_current_model_version())
             _send_v7_paper_alerts(v7_result)
+            _record_executor_success("V7 paper executor")
         except Exception as e:
-            logger.warning("V7 paper executor failed (non-critical): %s", e)
+            _record_executor_failure("V7 paper executor", e)
 
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
