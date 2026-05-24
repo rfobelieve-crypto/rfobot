@@ -964,6 +964,15 @@ V7_CONSEC_LOSS_THRESHOLD = 7
 V7_LONG_GUARD_MIN_N = 20           # below this, long-side guard is informational
 V7_LONG_GUARD_MIN_NET_BPS = 0.0    # LONG side must clear this to graduate
 
+# Regime-flip early-warning thresholds. Triggered well before the -15%
+# kill switch — derived from stress test 7 (research/stress_test_v7.py),
+# which showed that a market regime flip collapses one-side WR from 80% to
+# 12% within the flipped window. Catching that one-side WR collapse early
+# lets a human investigate before the cohort bleeds the full 15%.
+V7_REGIME_WARN_WINDOW_DAYS = 14
+V7_REGIME_WARN_MIN_N = 5            # minimum trades on a side to evaluate
+V7_REGIME_WARN_WR_PCT = 35.0        # WR below this on either side fires warn
+
 
 def fetch_v7_paper_positions(since: datetime | None = None) -> pd.DataFrame:
     """Pull v7_paper_positions (closed only). Empty df if table absent."""
@@ -1105,6 +1114,15 @@ def compute_v7_summary(days_recent: int = 30) -> dict:
         if len(sub) > 0:
             by_dir_recent[d] = _slice_v7_metrics(sub)
 
+    # 14-day window — regime-flip early warning (separate from 30d 'recent')
+    cutoff_warn = now - timedelta(days=V7_REGIME_WARN_WINDOW_DAYS)
+    recent_warn = df[df["entry_time"] >= cutoff_warn.replace(tzinfo=None)]
+    by_dir_14d: dict = {}
+    for d in ("LONG", "SHORT"):
+        sub = recent_warn[recent_warn["direction"] == d]
+        if len(sub) > 0:
+            by_dir_14d[d] = _slice_v7_metrics(sub)
+
     by_tier: dict = {}
     for tier in ("Strong", "Moderate"):
         sub = df[df["entry_tier"] == tier]
@@ -1132,6 +1150,7 @@ def compute_v7_summary(days_recent: int = 30) -> dict:
         "recent_window_days": days_recent,
         "by_dir": by_dir,
         "by_dir_recent": by_dir_recent,
+        "by_dir_14d": by_dir_14d,
         "by_tier": by_tier,
         "by_reason": by_reason,
         "weekly_4w": _v7_weekly_net_bps(df, weeks=4),
@@ -1177,6 +1196,21 @@ def _compute_v7_alerts(summary: dict) -> list[str]:
                 f"🔴 LONG-side guard: n={n_long} avg_net {long_net:+.1f} bps < "
                 f"+{V7_LONG_GUARD_MIN_NET_BPS:.0f} bps — 整體可能只是空方 "
                 f"撐起,不符合進階條件"
+            )
+
+    # Regime-flip early warning — fires on a one-side WR collapse in the
+    # last 14 days. Designed to catch the signature Test 7 found (SHORT WR
+    # 80% -> 12% under a flipped regime) BEFORE the -15% kill switch.
+    for side, m in summary.get("by_dir_14d", {}).items():
+        n_side = int(m.get("n", 0))
+        wr_pct = float(m.get("wr", 0.0)) * 100.0
+        if n_side >= V7_REGIME_WARN_MIN_N and wr_pct < V7_REGIME_WARN_WR_PCT:
+            net_bps = m.get("avg_net_bps", 0.0)
+            alerts.append(
+                f"🟠 Regime-flip 預警: {side} 近 {V7_REGIME_WARN_WINDOW_DAYS} "
+                f"天 WR {wr_pct:.0f}% (n={n_side}, net {net_bps:+.0f}bps) — "
+                f"模型在這方向可能已失效,kill switch ({V7_KILL_SWITCH_MDD_PCT:.0f}%) "
+                f"觸發前請人工確認 market regime 是否已改變"
             )
 
     r = summary.get("recent", {})
