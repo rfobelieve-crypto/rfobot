@@ -330,6 +330,235 @@ def test_4_block_bootstrap(df, direction, tier, span_days,
     print()
 
 
+# ── Test 5: multi-crash week ─────────────────────────────────────────────────
+
+def test_5_multi_crash_week(df, direction, tier, span_days,
+                              n_trials=40, seed=123):
+    print("=" * 78)
+    print("  TEST 5 — Multi-crash week (3 × -10% crashes within 7 days)")
+    print("=" * 78)
+    print("  >> 一週內連環閃崩。比單一事件殘酷得多,測試「黑天鵝周」會不會把 cohort 弄死。")
+    print()
+    rng = np.random.default_rng(seed)
+    in_oos_idx = np.where(df["in_oos"].values)[0]
+    valid_start = in_oos_idx[(in_oos_idx > 100) & (in_oos_idx < len(df) - 200)]
+
+    configs = [
+        ("A resting_stop      ", "resting_stop", 0.0),
+        (f"B resting +{DEFAULT_SLIP_BPS}bps  ", "resting_stop",
+         DEFAULT_SLIP_BPS / 1e4),
+        ("C poll_close         ", "poll_close", 0.0),
+    ]
+
+    for label, em, slip in configs:
+        rois, mdds, killed_count, worst_trade = [], [], 0, 0.0
+        for _ in range(n_trials):
+            window_start = int(rng.choice(valid_start))
+            # 3 crash positions within next 168 bars (7 days), >= 12h apart
+            candidates = list(range(window_start, window_start + 168))
+            crash_positions = sorted(rng.choice(candidates, size=3, replace=False))
+            df_inj = df.copy()
+            for cp in crash_positions:
+                df_inj = _inject_flash_crash(df_inj, int(cp), -0.10)
+            df_inj["atr"] = bt._atr_wilder(df_inj)
+            tr = simulate_exec(df_inj, direction, tier, em, slip)
+            r = hdr(label, tr, span_days)
+            if r["n"] == 0:
+                continue
+            rois.append(r["roi_pct"])
+            mdds.append(r["mdd_pct"])
+            killed_count += int(r["killed"])
+            worst_trade = min(worst_trade, r["worst_single_pct"])
+        rois = np.array(rois); mdds = np.array(mdds)
+        print(f"  {label} ROI med {np.median(rois):+5.1f}% / "
+              f"p5 {np.percentile(rois,5):+5.1f}% | "
+              f"MDD med {np.median(mdds):4.1f}% / "
+              f"worst {mdds.min():4.1f}% | "
+              f"killed {killed_count}/{n_trials} | "
+              f"worst-trade {worst_trade:+.1f}%")
+    print()
+
+
+# ── Test 6: crash stacked on losing streak ──────────────────────────────────
+
+def test_6_crash_on_streak(df, direction, tier, span_days, seed=55):
+    print("=" * 78)
+    print("  TEST 6 — Crash stacked on loss streak")
+    print("=" * 78)
+    print("  >> 找 baseline 裡每個 ≥3 筆連虧序列,在序列結束後 1 根 bar 注入 -15% 閃崩,")
+    print("     測試「正在虧錢時碰到天災」的疊加風險。")
+    print()
+    base = simulate_exec(df, direction, tier, "resting_stop",
+                         DEFAULT_SLIP_BPS / 1e4)
+    if base.empty:
+        print("  no baseline trades")
+        return
+
+    # find loss-streak endpoints (last trade of any ≥3-loss run)
+    wins = base["win"].values
+    streak_ends = []
+    i = 0
+    while i < len(wins):
+        if wins[i] == 0:
+            j = i
+            while j < len(wins) and wins[j] == 0:
+                j += 1
+            run_len = j - i
+            if run_len >= 3:
+                streak_ends.append(base["exit_ts"].iloc[j - 1])
+            i = j
+        else:
+            i += 1
+
+    if not streak_ends:
+        print("  no ≥3-loss streaks in baseline")
+        return
+    print(f"  baseline contains {len(streak_ends)} loss-streak endings\n")
+
+    configs = [
+        ("A resting_stop      ", "resting_stop", 0.0),
+        (f"B resting +{DEFAULT_SLIP_BPS}bps  ", "resting_stop",
+         DEFAULT_SLIP_BPS / 1e4),
+        ("C poll_close         ", "poll_close", 0.0),
+    ]
+
+    for label, em, slip in configs:
+        rois, mdds, killed_count, worst_trade = [], [], 0, 0.0
+        for end_ts in streak_ends:
+            try:
+                pos = df.index.get_indexer([pd.Timestamp(end_ts)],
+                                            method="nearest")[0]
+            except Exception:
+                continue
+            if pos + 1 >= len(df) - 2 or pos + 1 < 100:
+                continue
+            df_inj = _inject_flash_crash(df, int(pos + 1), -0.15)
+            df_inj["atr"] = bt._atr_wilder(df_inj)
+            tr = simulate_exec(df_inj, direction, tier, em, slip)
+            r = hdr(label, tr, span_days)
+            if r["n"] == 0:
+                continue
+            rois.append(r["roi_pct"]); mdds.append(r["mdd_pct"])
+            killed_count += int(r["killed"])
+            worst_trade = min(worst_trade, r["worst_single_pct"])
+        rois = np.array(rois); mdds = np.array(mdds)
+        print(f"  {label} ROI med {np.median(rois):+5.1f}% / "
+              f"p5 {np.percentile(rois,5):+5.1f}% | "
+              f"MDD med {np.median(mdds):4.1f}% / "
+              f"worst {mdds.min():4.1f}% | "
+              f"killed {killed_count}/{len(rois)} | "
+              f"worst-trade {worst_trade:+.1f}%")
+    print()
+
+
+# ── Test 7: regime flip (price-return inversion in 2nd half) ────────────────
+
+def _flip_regime(df: pd.DataFrame, flip_from_idx: int) -> pd.DataFrame:
+    """Invert close-to-close log returns from flip_from_idx onward, swap
+    upper/lower wicks so high/low reflect the new direction. Decoded signals
+    are unchanged — this simulates `market regime flipped, but the model
+    still believes the old patterns`. The harshest realistic regime test."""
+    df2 = df.copy()
+    oc, oo, oh, ol = (df["close"].values, df["open"].values,
+                       df["high"].values, df["low"].values)
+    log_c = np.log(oc[1:] / oc[:-1])
+    log_o = np.log(oo[1:] / oc[:-1])
+    log_h = np.log(oh[1:] / oc[:-1])
+    log_l = np.log(ol[1:] / oc[:-1])
+
+    new_c, new_o, new_h, new_l = log_c.copy(), log_o.copy(), log_h.copy(), log_l.copy()
+    fi = flip_from_idx - 1  # log_*[i] corresponds to bar i+1
+    new_c[fi:] = -log_c[fi:]
+    new_o[fi:] = -log_o[fi:]
+    new_h[fi:] = -log_l[fi:]   # upside wick becomes downside in flipped world
+    new_l[fi:] = -log_h[fi:]
+
+    close_arr = oc.copy()
+    open_arr = oo.copy()
+    high_arr = oh.copy()
+    low_arr = ol.copy()
+    for i in range(1, len(oc)):
+        close_arr[i] = close_arr[i - 1] * np.exp(new_c[i - 1])
+        open_arr[i] = close_arr[i - 1] * np.exp(new_o[i - 1])
+        high_arr[i] = close_arr[i - 1] * np.exp(new_h[i - 1])
+        low_arr[i] = close_arr[i - 1] * np.exp(new_l[i - 1])
+    # enforce high = max / low = min just in case
+    high_arr = np.maximum.reduce([high_arr, open_arr, close_arr])
+    low_arr = np.minimum.reduce([low_arr, open_arr, close_arr])
+
+    df2["close"] = close_arr
+    df2["open"] = open_arr
+    df2["high"] = high_arr
+    df2["low"] = low_arr
+    df2["atr"] = bt._atr_wilder(df2)
+    return df2
+
+
+def test_7_regime_flip(df, direction, tier, span_days):
+    print("=" * 78)
+    print("  TEST 7 — Regime flip (2nd half OHLC return-inversion)")
+    print("=" * 78)
+    print("  >> 把後半段 OOS 的 log return 全部取負——原本下跌的 bar 變上漲、反之亦然。")
+    print("     decoded signal 不變 (模型還相信舊 pattern)。等於模擬:")
+    print("     『系統訓練在空頭市場,結果突然換成多頭市場』——你最該擔心的 regime risk。")
+    print()
+    flip_idx = len(df) // 2
+    df_flip = _flip_regime(df, flip_idx)
+
+    # show what regime change looks like
+    orig_2nd_ret = (df["close"].iloc[-1] / df["close"].iloc[flip_idx] - 1) * 100
+    flip_2nd_ret = (df_flip["close"].iloc[-1] / df_flip["close"].iloc[flip_idx] - 1) * 100
+    print(f"  flip at bar {flip_idx}  ({df.index[flip_idx]})")
+    print(f"  2nd-half price change: 原始 {orig_2nd_ret:+.1f}%  →  翻轉後 {flip_2nd_ret:+.1f}%")
+    print()
+
+    configs = [
+        ("A resting_stop      ", "resting_stop", 0.0),
+        (f"B resting +{DEFAULT_SLIP_BPS}bps  ", "resting_stop",
+         DEFAULT_SLIP_BPS / 1e4),
+        ("C poll_close         ", "poll_close", 0.0),
+    ]
+    print("  全期(包含未翻轉的前半段):")
+    for label, em, slip in configs:
+        tr = simulate_exec(df_flip, direction, tier, em, slip)
+        r = hdr(label, tr, span_days)
+        print(fmt(r))
+
+    print()
+    print("  只看翻轉後的後半段(直接比較對 regime 改變的反應):")
+    # mask trades to only those entered after flip_idx
+    flip_ts = df.index[flip_idx]
+    for label, em, slip in configs:
+        tr = simulate_exec(df_flip, direction, tier, em, slip)
+        if tr.empty:
+            print(fmt({"label": label + " 後半", "n": 0, "killed": False}))
+            continue
+        post = tr[tr["entry_ts"] >= flip_ts].copy()
+        if post.empty:
+            print(f"  {label} 後半: 無交易")
+            continue
+        # rebase equity to start of post window
+        eq_start = float(post["equity_after"].iloc[0]) / (1 + post["equity_ret_pct"].iloc[0] / 100)
+        # recompute MDD on post-window only
+        eq_arr = np.concatenate([[eq_start], post["equity_after"].values])
+        peak = np.maximum.accumulate(eq_arr)
+        dd = (eq_arr / peak - 1.0) * 100
+        roi_post = (eq_arr[-1] / eq_start - 1) * 100
+        mdd_post = float(dd.min())
+        killed = bool((dd <= KILL_SWITCH_DD_PCT).any())
+        wr = float((post["win"] == 1).mean()) * 100
+        long_n = int((post["side"] == "LONG").sum())
+        short_n = int((post["side"] == "SHORT").sum())
+        long_wr = float((post[post["side"]=="LONG"]["win"] == 1).mean()) * 100 if long_n > 0 else 0
+        short_wr = float((post[post["side"]=="SHORT"]["win"] == 1).mean()) * 100 if short_n > 0 else 0
+        kill_flag = "🚨KILLED" if killed else "—"
+        print(f"  {label} 後半 n={len(post):>2} WR={wr:>4.1f}% "
+              f"ROI {roi_post:>+6.1f}% MDD {mdd_post:>5.1f}% "
+              f"LONG {long_n}({long_wr:.0f}%) SHORT {short_n}({short_wr:.0f}%) "
+              f"kill={kill_flag}")
+    print()
+
+
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
@@ -343,6 +572,9 @@ def main():
     test_2_slippage_gradient(df, direction, tier, span)
     test_3_flash_crash(df, direction, tier, span, n_trials=60)
     test_4_block_bootstrap(df, direction, tier, span)
+    test_5_multi_crash_week(df, direction, tier, span, n_trials=40)
+    test_6_crash_on_streak(df, direction, tier, span)
+    test_7_regime_flip(df, direction, tier, span)
 
     print("=" * 78)
     print("  Stress test complete.")
