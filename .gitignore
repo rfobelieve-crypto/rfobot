@@ -1,6 +1,24 @@
 # Secrets — never commit
 .env
+.env.*
+!.env.example
 config.json
+config.*.json
+secrets.yaml
+secrets.yml
+secrets.json
+credentials.json
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+api_keys.txt
+.netrc
+# Local-only setup scripts that may carry keys
+scripts/local_*.sh
+scripts/setup_local_*.py
 
 # Python
 __pycache__/

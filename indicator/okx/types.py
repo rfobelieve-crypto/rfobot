@@ -1,0 +1,159 @@
+"""Shared dataclasses + enums for OKX integration.
+
+Pure types — no logic, no side effects. Imported by every other okx/*
+module.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Optional
+
+
+# ── Enums ───────────────────────────────────────────────────────────────
+
+class Side(str, Enum):
+    """Order direction."""
+    BUY = "buy"
+    SELL = "sell"
+
+
+class ExecutorStatus(str, Enum):
+    """V7OkxExecutor state machine.  See okx_integration_design.md §4."""
+    INIT = "INIT"
+    CONNECTING = "CONNECTING"
+    READY = "READY"
+    ACTIVE = "ACTIVE"
+    HALTED = "HALTED"          # transient error, may auto-resume
+    DEMOTED = "DEMOTED"        # terminal until manual re-entry
+
+
+class KillSeverity(str, Enum):
+    """How a kill_check fires."""
+    HALT = "HALT"              # stop new orders, keep open positions
+    DEMOTE = "DEMOTE"          # force-close everything, terminal
+    HARD_FREEZE = "HARD_FREEZE"  # also pause paper executor (F-class)
+
+
+class ReconciliationVerdict(str, Enum):
+    CONSISTENT = "CONSISTENT"
+    MISMATCH = "MISMATCH"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+# ── Position / Order ────────────────────────────────────────────────────
+
+@dataclass
+class Position:
+    """A live position as reported by OKX (or our local mirror)."""
+    inst_id: str
+    direction: str                  # "LONG" / "SHORT" / "FLAT"
+    size_contracts: int             # signed not used; direction carries sign
+    avg_price: float
+    unrealized_pnl_usd: float = 0.0
+    raw: dict = field(default_factory=dict)  # original OKX payload
+
+
+@dataclass
+class OrderResult:
+    cl_ord_id: str
+    ord_id: Optional[str] = None
+    status: str = "submitted"       # submitted / filled / partial / rejected / unknown
+    error: Optional[str] = None
+    fill_price: Optional[float] = None
+    fill_size: Optional[int] = None
+    fee_usd: Optional[float] = None
+
+
+@dataclass
+class AlgoOrderResult:
+    algo_cl_ord_id: str
+    algo_id: Optional[str] = None
+    status: str = "submitted"       # submitted / live / triggered / canceled / rejected
+    error: Optional[str] = None
+
+
+@dataclass
+class AmendResult:
+    algo_id: str
+    status: str                     # ok / failed / not_found / already_filled
+    error: Optional[str] = None
+
+
+@dataclass
+class CancelResult:
+    algo_id: str
+    status: str                     # ok / failed / not_found
+    error: Optional[str] = None
+
+
+@dataclass
+class Balance:
+    total_eq_usd: float
+    available_usd: float
+    raw: dict = field(default_factory=dict)
+
+
+# ── Health / Connectivity ───────────────────────────────────────────────
+
+@dataclass
+class ConnectivityStatus:
+    public_ws_ok: bool = False
+    private_ws_ok: bool = False
+    last_public_heartbeat_age_sec: float = 999.0
+    last_private_heartbeat_age_sec: float = 999.0
+    rest_last_latency_ms: Optional[float] = None
+    rest_circuit_tripped: bool = False
+    last_reconnect_ts: Optional[datetime] = None
+    consecutive_reconnect_fails: int = 0
+
+
+# ── Kill check / Reconciler ─────────────────────────────────────────────
+
+@dataclass
+class KillCheckResult:
+    """Returned by every kill_checks.* function."""
+    triggered: bool
+    trigger_id: Optional[str] = None       # e.g. "A4", "B1", "F2"
+    severity: Optional[KillSeverity] = None
+    reason: str = ""
+    context: dict = field(default_factory=dict)
+
+
+@dataclass
+class ReconciliationResult:
+    verdict: ReconciliationVerdict
+    detail: dict = field(default_factory=dict)
+    checked_at: datetime = field(default_factory=datetime.utcnow)
+
+
+# ── WS event types (mirror OKX wire format, decoded) ────────────────────
+
+@dataclass
+class OrderEvent:
+    cl_ord_id: str
+    ord_id: str
+    state: str                       # "live", "filled", "partially_filled", "canceled"
+    fill_price: Optional[float] = None
+    fill_size: Optional[int] = None
+    fee_usd: Optional[float] = None
+    ts: Optional[datetime] = None
+    raw: dict = field(default_factory=dict)
+
+
+@dataclass
+class PositionEvent:
+    inst_id: str
+    pos: float                       # +ve = long, -ve = short, 0 = flat
+    avg_price: float
+    ts: Optional[datetime] = None
+    raw: dict = field(default_factory=dict)
+
+
+@dataclass
+class BalanceEvent:
+    total_eq_usd: float
+    available_usd: float
+    ts: Optional[datetime] = None
+    raw: dict = field(default_factory=dict)
