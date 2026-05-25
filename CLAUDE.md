@@ -16,19 +16,41 @@
 不是「驗證夠了再上線」vs「不驗證就上線」的二元選擇。是「金額大小 × 風控深度 對齊
 edge 確信度」的漸進過程。
 
-| Stage | 描述 | Risk | 進階條件 |
-|---|---|---|---|
-| 0 | 純指標 + 推送 | 0 | (已過) |
-| 1 | **Paper trading**（虛擬 PnL，0 風險）| 0 | 100+ 筆穩定版本 trades + paper net > +5 bps × 4 週 |
-| 2 | Testnet executor（exchange 測試環境）| 0 | testnet 1-2 週無 bug + order flow 正確 |
-| 3 | Live tiny size（$100，輸光不痛）| 極小 | live 4 週 net positive + MDD < 20% |
-| 4 | 漸進加碼（每月 +50%）| 隨加碼 | 每階段 hit hard rules 不退出 |
+| Stage | 描述 | Risk | Leverage | 進階條件 |
+|---|---|---|---|---|
+| 0 | 純指標 + 推送 | 0 | n/a | (已過) |
+| 1 | **Paper trading**（虛擬 PnL，0 風險）| 0 | 1.0x | 100+ 筆穩定版本 trades + paper net > +5 bps × 4 週 |
+| 2 | Testnet executor（exchange 測試環境）| 0 | 1.0x | testnet 1-2 週無 bug + order flow 正確 |
+| 3 | Live tiny size（$100，輸光不痛）| 極小 | 1.0x | live 4 週 net positive + MDD < 20% |
+| 4a | 放大到 $1k（3 個月）| 小 | 1.0x | Stage 3 通過 + 0 kill trigger |
+| 4b | $1k（3 個月）| 小 | 1.2x | 4a 通過 + MDD < 10% |
+| 4c | $5k（6 個月）| 中 | 1.5x | 4b 通過 + 連續 6 個月 hit no kill rules |
+| 4d | $10k+（12 個月+）| 高 | **2.0x（絕對上限）** | 4c 通過 + 真實 Sharpe ≥ 1.5 |
 
 每個階段都有 hard rules，寫入 production 程式碼，**不靠紀律**：
 - drawdown trigger（cumulative drawdown 觸發 → 自動降階段）
 - connection loss kill switch（與 exchange 失聯 → 取消所有未平倉位）
 - position limit（單筆 / 總部位上限）
 - daily loss cap（單日累積虧損上限 → 暫停當日所有訊號）
+- **leverage cap**：當前 stage 的 leverage 上限寫進 config，超過則 executor 拒絕啟動
+
+### Leverage ladder 數學依據（2026-05-25 加入）
+
+2.0x 絕對上限不是拍腦袋，是基於當前 edge profile（μ=+5%，σ=30%）計算：
+- Kelly optimal: f* = μ/σ² ≈ 0.56x（已小於 1x）
+- Volatility drag: r_compound = E[r] - 0.5σ²L²
+  - L=2.0: drag = -18%（仍可被 edge 覆蓋）
+  - L=3.0: drag = -40.5%（drag > expected return，長期虧損）
+  - L=5.0: drag = -112%（mathematical ruin，不論 edge）
+- Stress Test 7 regime flip MDD scaling:
+  - 1.0x → -15%（kill switch 救援）
+  - 2.0x → -30%（painful 但可活）
+  - 3.0x → -45%（半條命，加滑點接近 wipeout）
+  - 5.0x → -75%（實質歸零）
+
+**何時可考慮放寬 2.0x 上限**:
+連續 24 個月實盤 Sharpe ≥ 3.0（目前 0.17-0.5）+ MDD 從未超過 -10%
++ 經過至少 2 個完整 regime flip 仍正 EV。在那之前，2.0x 是 hard cap。
 
 ## 當前 stage：Stage 1 (Paper Trading)
 - 入口：`/paper-perf` endpoint（HTML report）+ `indicator/paper_trading.py` (computation)
@@ -38,10 +60,12 @@ edge 確信度」的漸進過程。
 
 ## 仍然禁止的（避免在錯的階段做錯事）
 - **Stage 1**：禁寫 exchange execution code（連券商 API）；只計算虛擬 PnL
-- **Stage 2-3**：禁鬆 hard rules；禁未經 rules 驗證就加碼到下一階段
-- **Stage 4**：禁 leverage > 1（先驗證 cash spot 模式）
+- **Stage 2-3**：禁鬆 hard rules；禁未經 rules 驗證就加碼到下一階段；leverage hard cap = 1.0x
+- **Stage 4a-d**：leverage 階梯式放寬，**絕對上限 2.0x**；未 hit 各子階段條件不得進下一格
+- **Stage 4 後**：禁 leverage > 2.0x，除非滿足「24 個月實盤 Sharpe ≥ 3.0」（見 §Leverage ladder 數學依據）
 - 任何階段：strategy sweep 必須留 OOS hold-out，禁全資料 fit
 - 任何階段：禁因為「最近表現好」就跳階段——必須 hit hard rules
+- 任何階段：禁因為「想賺更多」就改 leverage cap——cap 來自數學不是情緒
 
 ## 系統架構（v7 Dual-Model）
 Dual XGBoost 架構：Direction Regressor + Magnitude Regressor，獨立管線。
