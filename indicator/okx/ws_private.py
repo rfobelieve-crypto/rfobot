@@ -1,0 +1,339 @@
+"""OKX WebSocket private channel client (orders / positions / balance).
+
+Connection-resilience is the focus.  Real reconnect logic; the actual
+OKX message parsing is stubbed with `# TODO(stage2-impl)` markers.
+
+Reconnect strategy:
+  - Exponential backoff: 1s, 2s, 4s, 8s, 16s (cap 30s)
+  - Per docs: 3 consecutive fails → trigger A2 (demote)
+  - On reconnect: re-auth + re-subscribe + REST cross-check (to fill
+    any events missed during disconnect)
+
+Heartbeat:
+  - OKX sends ping/pong on its own.  We additionally send a manual
+    ping every 25s (OKX server-side timeout is 30s).  We track
+    last_msg_received_ts (any message resets it) for heartbeat age.
+"""
+from __future__ import annotations
+
+import base64
+import hashlib
+import hmac
+import json
+import logging
+import threading
+import time
+from collections import deque
+from datetime import datetime, timezone
+from typing import Callable, Optional
+
+import websocket  # websocket-client per CLAUDE.md coding rules
+
+from indicator.okx.config import OkxConfig
+from indicator.okx.types import (
+    BalanceEvent, ConnectivityStatus, OrderEvent, PositionEvent,
+)
+
+logger = logging.getLogger(__name__)
+
+
+# Type aliases for callbacks
+OrderCallback = Callable[[OrderEvent], None]
+PositionCallback = Callable[[PositionEvent], None]
+BalanceCallback = Callable[[BalanceEvent], None]
+
+
+class OkxWsPrivateClient:
+    """OKX private WS — order / position / balance push channels.
+
+    All WS message handling runs in a background daemon thread.  Callbacks
+    fire on that thread; consumers must do their own DB persistence
+    (don't keep state in memory — see okx_integration_design.md §6).
+    """
+
+    PING_INTERVAL_SEC = 25.0
+    BACKOFF_SEC = [1, 2, 4, 8, 16, 30]   # cap 30s
+
+    def __init__(self, cfg: OkxConfig):
+        self._cfg = cfg
+        self._ws: Optional[websocket.WebSocketApp] = None
+        self._ws_thread: Optional[threading.Thread] = None
+        self._stop_evt = threading.Event()
+        self._lock = threading.Lock()
+
+        # ── State (read by check_connectivity)
+        self._connected: bool = False
+        self._authenticated: bool = False
+        self._last_msg_ts: float = 0.0
+        self._consecutive_reconnect_fails: int = 0
+        self._last_reconnect_ts: Optional[datetime] = None
+        self._subscribed_channels: set[str] = set()
+
+        # ── Callbacks (set by consumer)
+        self._on_order: Optional[OrderCallback] = None
+        self._on_position: Optional[PositionCallback] = None
+        self._on_balance: Optional[BalanceCallback] = None
+
+    # ── Public API ─────────────────────────────────────────────────────
+
+    def start(self) -> None:
+        """Start the WS thread.  Returns immediately; connection is async."""
+        if self._ws_thread and self._ws_thread.is_alive():
+            return
+        self._stop_evt.clear()
+        self._ws_thread = threading.Thread(
+            target=self._run_loop, name="okx-ws-private", daemon=True,
+        )
+        self._ws_thread.start()
+        # Also start a manual ping thread
+        threading.Thread(target=self._ping_loop, name="okx-ws-ping",
+                         daemon=True).start()
+
+    def stop(self) -> None:
+        self._stop_evt.set()
+        with self._lock:
+            ws = self._ws
+        if ws is not None:
+            try:
+                ws.close()
+            except Exception:
+                pass
+
+    def subscribe_orders(self, callback: OrderCallback) -> None:
+        self._on_order = callback
+        self._subscribed_channels.add("orders")
+        self._try_subscribe(["orders"])
+
+    def subscribe_positions(self, callback: PositionCallback) -> None:
+        self._on_position = callback
+        self._subscribed_channels.add("positions")
+        self._try_subscribe(["positions"])
+
+    def subscribe_balance(self, callback: BalanceCallback) -> None:
+        self._on_balance = callback
+        self._subscribed_channels.add("account")
+        self._try_subscribe(["account"])
+
+    def connectivity(self) -> ConnectivityStatus:
+        now = time.time()
+        age = now - self._last_msg_ts if self._last_msg_ts > 0 else 999.0
+        return ConnectivityStatus(
+            public_ws_ok=False,                # other client handles public
+            private_ws_ok=self._connected and self._authenticated,
+            last_public_heartbeat_age_sec=999.0,
+            last_private_heartbeat_age_sec=age,
+            rest_last_latency_ms=None,
+            rest_circuit_tripped=False,
+            last_reconnect_ts=self._last_reconnect_ts,
+            consecutive_reconnect_fails=self._consecutive_reconnect_fails,
+        )
+
+    # ── Internal: connection loop ──────────────────────────────────────
+
+    def _run_loop(self) -> None:
+        """Main reconnect loop.  Runs until stop()."""
+        attempt = 0
+        while not self._stop_evt.is_set():
+            try:
+                logger.info("okx_ws_connecting attempt=%d", attempt)
+                self._connect_once()
+                # If we exit _connect_once cleanly (without exception),
+                # OKX closed our connection.  Count as a fail.
+                self._consecutive_reconnect_fails += 1
+            except Exception as e:
+                logger.warning("okx_ws_connect_failed attempt=%d err=%s",
+                               attempt, e)
+                self._consecutive_reconnect_fails += 1
+
+            if self._stop_evt.is_set():
+                break
+
+            # Backoff
+            delay_idx = min(attempt, len(self.BACKOFF_SEC) - 1)
+            delay = self.BACKOFF_SEC[delay_idx]
+            logger.info("okx_ws_reconnecting in %ds (fails=%d)",
+                        delay, self._consecutive_reconnect_fails)
+            self._last_reconnect_ts = datetime.now(tz=timezone.utc)
+            time.sleep(delay)
+            attempt += 1
+
+    def _connect_once(self) -> None:
+        """Blocks until WS closes."""
+        url = self._cfg.ws_private
+        # OKX simulated trading uses different URL? Per docs, same URL
+        # with simulated header — but for WS we use the param/path that
+        # OKX docs specify for testnet.
+        # TODO(stage2-impl): verify exact testnet WS URL.
+
+        def on_open(ws):
+            with self._lock:
+                self._connected = True
+                self._last_msg_ts = time.time()
+            logger.info("okx_ws_opened")
+            # Authenticate
+            self._send_auth(ws)
+
+        def on_message(ws, raw_msg: str):
+            self._last_msg_ts = time.time()
+            try:
+                self._handle_message(raw_msg)
+            except Exception:
+                # P1: never crash WS thread on a single bad message.
+                logger.exception("okx_ws_message_handler_failed")
+
+        def on_error(ws, err):
+            logger.warning("okx_ws_error err=%s", err)
+
+        def on_close(ws, code, msg):
+            with self._lock:
+                self._connected = False
+                self._authenticated = False
+            logger.warning("okx_ws_closed code=%s msg=%s", code, msg)
+
+        self._ws = websocket.WebSocketApp(
+            url, on_open=on_open, on_message=on_message,
+            on_error=on_error, on_close=on_close,
+        )
+        # run_forever blocks; ping_interval set for auto WS ping frames
+        # (separate from OKX-app-level ping)
+        self._ws.run_forever(ping_interval=20, ping_timeout=10)
+
+    # ── Internal: auth + subscribe ─────────────────────────────────────
+
+    def _send_auth(self, ws) -> None:
+        """OKX private WS login message.
+
+        Sign(ts + 'GET' + '/users/self/verify') with api_secret, base64.
+        """
+        ts = str(int(time.time()))
+        msg = f"{ts}GET/users/self/verify".encode()
+        secret = self._cfg.api_secret.encode()
+        sign = base64.b64encode(
+            hmac.new(secret, msg, hashlib.sha256).digest()
+        ).decode()
+        login = {
+            "op": "login",
+            "args": [{
+                "apiKey": self._cfg.api_key,
+                "passphrase": self._cfg.passphrase,
+                "timestamp": ts,
+                "sign": sign,
+            }],
+        }
+        try:
+            ws.send(json.dumps(login))
+            logger.info("okx_ws_login_sent")
+        except Exception:
+            logger.exception("okx_ws_login_send_failed")
+
+    def _try_subscribe(self, channels: list[str]) -> None:
+        """Send a subscribe message if currently connected + authenticated.
+
+        If not, channels are remembered and re-sent after auth completes.
+        """
+        if not (self._connected and self._authenticated):
+            return
+        try:
+            args = []
+            for ch in channels:
+                arg: dict = {"channel": ch}
+                if ch in ("positions", "orders"):
+                    arg["instType"] = "SWAP"
+                args.append(arg)
+            payload = {"op": "subscribe", "args": args}
+            if self._ws is not None:
+                self._ws.send(json.dumps(payload))
+                logger.info("okx_ws_subscribed channels=%s", channels)
+        except Exception:
+            logger.exception("okx_ws_subscribe_failed")
+
+    # ── Internal: message dispatch ─────────────────────────────────────
+
+    def _handle_message(self, raw: str) -> None:
+        msg = json.loads(raw)
+        # Auth response
+        if msg.get("event") == "login":
+            if msg.get("code") == "0":
+                self._authenticated = True
+                self._consecutive_reconnect_fails = 0
+                logger.info("okx_ws_authenticated")
+                # Re-subscribe everything we knew about
+                if self._subscribed_channels:
+                    self._try_subscribe(list(self._subscribed_channels))
+            else:
+                logger.error("okx_ws_login_failed msg=%s", msg)
+            return
+
+        # Subscribe ack
+        if msg.get("event") == "subscribe":
+            return
+
+        # Pong
+        if msg.get("event") == "pong" or msg == "pong":
+            return
+
+        # Data push
+        arg = msg.get("arg", {})
+        channel = arg.get("channel")
+        data = msg.get("data", [])
+
+        if channel == "orders":
+            for item in data:
+                # TODO(stage2-impl): parse OKX order item → OrderEvent
+                evt = OrderEvent(
+                    cl_ord_id=item.get("clOrdId", ""),
+                    ord_id=item.get("ordId", ""),
+                    state=item.get("state", "unknown"),
+                    raw=item,
+                )
+                if self._on_order is not None:
+                    try:
+                        self._on_order(evt)
+                    except Exception:
+                        logger.exception("on_order_callback_failed")
+
+        elif channel == "positions":
+            for item in data:
+                # TODO(stage2-impl): parse pos / avgPx etc.
+                evt = PositionEvent(
+                    inst_id=item.get("instId", ""),
+                    pos=float(item.get("pos", "0") or 0),
+                    avg_price=float(item.get("avgPx", "0") or 0),
+                    raw=item,
+                )
+                if self._on_position is not None:
+                    try:
+                        self._on_position(evt)
+                    except Exception:
+                        logger.exception("on_position_callback_failed")
+
+        elif channel == "account":
+            for item in data:
+                # TODO(stage2-impl): parse totalEq etc.
+                evt = BalanceEvent(
+                    total_eq_usd=float(item.get("totalEq", "0") or 0),
+                    available_usd=0.0,
+                    raw=item,
+                )
+                if self._on_balance is not None:
+                    try:
+                        self._on_balance(evt)
+                    except Exception:
+                        logger.exception("on_balance_callback_failed")
+
+    # ── Internal: manual ping loop ─────────────────────────────────────
+
+    def _ping_loop(self) -> None:
+        """OKX server times out client after 30s of silence.  Send ping
+        every 25s to keep alive (only when connected)."""
+        while not self._stop_evt.is_set():
+            time.sleep(self.PING_INTERVAL_SEC)
+            with self._lock:
+                ws = self._ws
+                connected = self._connected
+            if not connected or ws is None:
+                continue
+            try:
+                ws.send("ping")
+            except Exception:
+                logger.warning("okx_ws_ping_failed", exc_info=True)
