@@ -1333,12 +1333,287 @@ def _fetch_open_v7_with_pnl() -> dict | None:
         "entry_price": entry_price,
         "entry_tier": pos.get("entry_tier"),
         "current_stop": float(pos["current_stop"]),
+        "trail_extreme": float(pos.get("trail_extreme") or entry_price),
+        "atr_at_entry": float(pos.get("atr_at_entry") or 0),
+        "stop_dist": float(pos.get("stop_dist") or 0),
         "size_frac": float(pos["size_frac"]),
+        "notional_usd": float(pos.get("notional_usd") or 0),
         "last_close": last_close,
         "bars_held": bars_held,
         "live_pnl_pct": live_pnl_pct,
         "paused": int(pos.get("paused_at_signal", 0) or 0),
     }
+
+
+def _fetch_v7_recent_trades(limit: int = 10) -> pd.DataFrame:
+    """Last N closed V7 trades.  Returns empty df if table absent or none."""
+    sql = (
+        "SELECT id, entry_time, exit_time, direction, entry_tier, "
+        "       entry_price, exit_price, exit_reason, bars_held, "
+        "       net_pct, equity_ret_pct, equity_after, win, "
+        "       paused_at_signal "
+        "FROM v7_paper_positions "
+        "WHERE status='CLOSED' "
+        "ORDER BY exit_time DESC LIMIT %s"
+    )
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(sql, (int(limit),))
+                rows = cur.fetchall()
+            except Exception as exc:
+                if "doesn't exist" in str(exc).lower():
+                    return pd.DataFrame()
+                raise
+    finally:
+        conn.close()
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    df["entry_time"] = pd.to_datetime(df["entry_time"])
+    df["exit_time"] = pd.to_datetime(df["exit_time"])
+    for c in ("entry_price", "exit_price", "net_pct",
+              "equity_ret_pct", "equity_after"):
+        df[c] = df[c].astype(float)
+    df["bars_held"] = df["bars_held"].astype(int)
+    df["paused_at_signal"] = df["paused_at_signal"].fillna(0).astype(int)
+    return df
+
+
+def _format_v7_per_trade_table(trades: pd.DataFrame,
+                               show_n: int = 10) -> str:
+    """🅰 Per-trade detail — last N closed V7 trades.
+
+    One line per trade with all key attributes for at-a-glance review.
+    """
+    if trades.empty:
+        return ""
+    df = trades.head(show_n)
+    out = [f"\n<b>📋 最近 {len(df)} 筆 V7 trades</b>"]
+    for _, t in df.iterrows():
+        dir_icon = "🟢" if t["direction"] == "LONG" else "🔴"
+        win_icon = "✓" if int(t["win"]) == 1 else "✗"
+        tier_short = (t["entry_tier"] or "?")[:1]  # S / M
+        et = t["entry_time"].strftime("%m-%d %H:%M")
+        reason = (t["exit_reason"] or "?")[:11]
+        shadow = " [S]" if int(t.get("paused_at_signal") or 0) == 1 else ""
+        out.append(
+            f"  {win_icon} {et} {dir_icon}{tier_short} "
+            f"${t['entry_price']:,.0f}→${t['exit_price']:,.0f} "
+            f"{reason:<11} {t['bars_held']:>2}h "
+            f"{t['equity_ret_pct']:+.2f}% → ${t['equity_after']:,.0f}{shadow}"
+        )
+    return "\n".join(out)
+
+
+def _format_v7_open_position_detail(op: dict) -> str:
+    """🅱 Open position deep dive — full state of current open V7 trade.
+
+    Shows: entry, current, trail extreme, distance to stop in $/%,
+    bars held / time-cap remaining, ATR context.
+    """
+    if op is None:
+        return ""
+
+    arrow = "🟢▲ LONG" if op["direction"] == "LONG" else "🔴▼ SHORT"
+    shadow = " <i>[SHADOW]</i>" if op.get("paused") else ""
+    out = [f"\n<b>🔍 持倉深入</b> {arrow} (id={op['id']}){shadow}"]
+
+    entry = op["entry_price"]
+    stop = op["current_stop"]
+    trail = op["trail_extreme"]
+    atr = op["atr_at_entry"]
+    stop_dist = op["stop_dist"]
+    last = op["last_close"]
+    bars = op["bars_held"]
+    pnl_pct = op["live_pnl_pct"]
+    direction = op["direction"]
+
+    # Entry block
+    et = op["entry_time"].strftime("%m-%d %H:%M")
+    tier = op.get("entry_tier") or "?"
+    out.append(f"  ├─ Entry:        {et} @ ${entry:,.0f} ({tier})")
+
+    # Current price & PnL
+    if last is not None and pnl_pct is not None:
+        out.append(f"  ├─ Current:      ${last:,.0f}  PnL {pnl_pct:+.2f}%")
+        # MFE — trail_extreme represents the best price (favorable excursion)
+        if direction == "LONG":
+            mfe_pct = (trail / entry - 1.0) * 100
+        else:
+            mfe_pct = (entry / trail - 1.0) * 100
+        out.append(f"  ├─ Trail extreme: ${trail:,.0f}  (MFE {mfe_pct:+.2f}%)")
+
+    # Stop info — distance from current price
+    out.append(f"  ├─ Trailing stop: ${stop:,.0f}")
+    if last is not None:
+        if direction == "LONG":
+            dist_pct = (last / stop - 1.0) * 100  # +ve = breathing room
+        else:
+            dist_pct = (stop / last - 1.0) * 100
+        out.append(
+            f"  ├─ Stop distance: ${abs(last - stop):,.0f} "
+            f"({dist_pct:+.2f}% breathing room)"
+        )
+
+    # ATR context — original stop sizing
+    if atr > 0:
+        atr_pct = (atr / entry) * 100
+        stop_pct = (stop_dist / entry) * 100
+        out.append(
+            f"  ├─ ATR@entry:     ${atr:,.0f} ({atr_pct:.2f}%)  "
+            f"stop_dist=${stop_dist:,.0f} ({stop_pct:.2f}%, 3×ATR)"
+        )
+
+    # Time cap remaining
+    cap = 72  # V7 time_cap_hours
+    remaining = max(0, cap - bars)
+    cap_pct = (bars / cap) * 100 if cap > 0 else 0
+    cap_bar_filled = int(cap_pct / 10)
+    cap_bar = "█" * cap_bar_filled + "·" * (10 - cap_bar_filled)
+    out.append(
+        f"  ├─ Held:          {bars}h / {cap}h  "
+        f"[{cap_bar}] {remaining}h left"
+    )
+
+    # Notional / size info
+    notional = op.get("notional_usd", 0)
+    size_frac = op["size_frac"]
+    out.append(
+        f"  └─ Size:          {size_frac*100:.0f}% equity (${notional:,.0f} notional)"
+    )
+
+    return "\n".join(out)
+
+
+def _format_v7_exit_reason_detail(summary: dict) -> str:
+    """🅲 Exit reason breakdown — enhanced version with PF + avg_bars + net_bps.
+
+    Shows which exit type dominates and its real economics.
+    """
+    by_reason = summary.get("by_reason", {})
+    if not by_reason:
+        return ""
+    total_n = sum(m["n"] for m in by_reason.values()) or 1
+    out = ["\n<b>🚪 出場理由深入拆解</b>"]
+    # Sort by n descending
+    for reason, m in sorted(by_reason.items(),
+                            key=lambda kv: kv[1]["n"], reverse=True):
+        pct = (m["n"] / total_n) * 100
+        wr_pct = m["wr"] * 100
+        avg_pct = m["avg_eq_ret_pct"]
+        avg_bps = m["avg_net_bps"]
+        avg_bars = m.get("avg_hold_h", 0)
+        pf = m.get("profit_factor")
+        pf_str = (f"PF={pf:.2f}" if (pf is not None and pf != float("inf"))
+                  else "PF=∞" if pf == float("inf") else "PF=–")
+        # Verdict icon
+        if avg_bps >= 5:
+            verdict = "🟢"
+        elif avg_bps >= 0:
+            verdict = "🟡"
+        else:
+            verdict = "🔴"
+        out.append(
+            f"  {verdict} <b>{reason}</b> "
+            f"({m['n']}/{total_n}={pct:.0f}% of trades)"
+        )
+        out.append(
+            f"      WR={wr_pct:.0f}% | 每筆 {avg_pct:+.2f}% "
+            f"({avg_bps:+.1f}bps) | {pf_str} | avg {avg_bars:.0f}h"
+        )
+    return "\n".join(out)
+
+
+def _format_v7_backtest_drift(summary: dict) -> str:
+    """🅶 Backtest vs paper drift — side-by-side with color-coded delta.
+
+    Caveat: backtest Sharpe is annualized; paper 'sharpe_per_trade' is
+    per-trade.  We do NOT compare Sharpe directly to avoid misleading.
+    """
+    if summary.get("empty"):
+        return ""
+    paper = summary.get("overall") or {}
+    if paper.get("n", 0) == 0:
+        return ""
+    bt = V7_BACKTEST_BASELINE
+
+    def _badge(actual, target, tolerance_pp, higher_is_better=True):
+        """Color-code based on drift vs target."""
+        diff = actual - target
+        if higher_is_better:
+            if diff >= -tolerance_pp / 2:
+                return "🟢"
+            elif diff >= -tolerance_pp:
+                return "🟡"
+            return "🔴"
+        else:
+            # lower is better (e.g., MDD)
+            if diff <= tolerance_pp / 2:
+                return "🟢"
+            elif diff <= tolerance_pp:
+                return "🟡"
+            return "🔴"
+
+    out = ["\n<b>📐 Backtest ↔ Paper Drift</b>"]
+    out.append("  <i>(只比較同尺度的指標,Sharpe 因標尺不同省略)</i>")
+
+    # WR%
+    p_wr = paper["wr"] * 100
+    b_wr = bt["wr_pct"]
+    out.append(
+        f"  {_badge(p_wr, b_wr, tolerance_pp=10)} WR%       "
+        f"baseline {b_wr:.1f}%  paper {p_wr:.1f}%  Δ {p_wr - b_wr:+.1f}pp"
+    )
+
+    # avg per-trade % (paper) vs avg eq ret % (backtest)
+    p_avg = paper["avg_eq_ret_pct"]
+    b_avg = bt["avg_eq_ret_pct"]
+    out.append(
+        f"  {_badge(p_avg, b_avg, tolerance_pp=0.3)} 每筆 %    "
+        f"baseline {b_avg:+.2f}%  paper {p_avg:+.2f}%  Δ {p_avg - b_avg:+.2f}pp"
+    )
+
+    # MDD% (lower is better; pass negative tolerance flipped logic)
+    p_mdd = paper["mdd_pct"]      # negative number
+    b_mdd = -bt["mdd_pct"]        # baseline stored positive; flip to signed
+    # Compare as absolute magnitude with paper having less DD = better
+    p_mdd_abs = abs(p_mdd)
+    b_mdd_abs = bt["mdd_pct"]
+    diff_mdd = p_mdd_abs - b_mdd_abs
+    mdd_badge = ("🟢" if diff_mdd <= 2 else
+                 "🟡" if diff_mdd <= 5 else "🔴")
+    out.append(
+        f"  {mdd_badge} MDD%      "
+        f"baseline {b_mdd_abs:.1f}%  paper {p_mdd_abs:.1f}%  Δ {diff_mdd:+.1f}pp"
+    )
+
+    # Sample size context
+    out.append(
+        f"  📊 Sample:   baseline n={bt['n']}  paper n={paper['n']}  "
+        f"({100 * paper['n'] / bt['n']:.0f}% of baseline)"
+    )
+
+    # Overall verdict
+    paper_n = paper["n"]
+    if paper_n < 20:
+        out.append(
+            "  ⚠️ <i>paper n &lt; 20,任何 drift 都可能是 sampling noise,"
+            "不可下結論</i>"
+        )
+    elif p_avg < 0 and p_wr < b_wr - 10:
+        out.append(
+            "  🔴 <i>WR + 每筆都顯著低於 baseline — 嚴重檢視 edge 是否還在</i>"
+        )
+    elif p_avg < b_avg - 0.3:
+        out.append(
+            "  🟡 <i>每筆 return 低於 baseline 30bps — 注意但不致命</i>"
+        )
+    else:
+        out.append("  🟢 <i>drift 在合理範圍內,持續累積樣本</i>")
+
+    return "\n".join(out)
 
 
 def format_v7_html(s: dict) -> str:
@@ -1433,15 +1708,17 @@ def format_v7_html(s: dict) -> str:
         else:
             lines.append(f"\n<b>最近 {s['recent_window_days']} 天</b> (無樣本)")
 
-        if s.get("by_reason"):
-            lines.append("\n<b>出場原因</b>")
-            for reason, m in s["by_reason"].items():
-                lines.append(
-                    f"  {reason}: n={m['n']} WR={m['wr']*100:.0f}% "
-                    f"每筆 {m['avg_eq_ret_pct']:+.2f}%"
-                )
+        # 🅲 Enhanced exit reason breakdown — PF + avg bars + verdict icon
+        reason_block = _format_v7_exit_reason_detail(s)
+        if reason_block:
+            lines.append(reason_block)
 
-    # Open position
+        # 🅶 Backtest ↔ paper drift
+        drift_block = _format_v7_backtest_drift(s)
+        if drift_block:
+            lines.append(drift_block)
+
+    # Open position — quick view (unchanged for backward compat)
     try:
         op = _fetch_open_v7_with_pnl()
     except Exception as exc:
@@ -1469,6 +1746,24 @@ def format_v7_html(s: dict) -> str:
                 f"  trailing stop ${op['current_stop']:,.0f} | "
                 f"held {op['bars_held']}h"
             )
+
+        # 🅱 Open position deep dive — trail extreme, distance to stop,
+        # ATR context, time-cap progress
+        try:
+            detail_block = _format_v7_open_position_detail(op)
+            if detail_block:
+                lines.append(detail_block)
+        except Exception as exc:
+            logger.warning("v7 open position detail failed: %s", exc)
+
+    # 🅰 Per-trade detail table — last 10 closed trades
+    try:
+        recent_trades = _fetch_v7_recent_trades(limit=10)
+        trades_block = _format_v7_per_trade_table(recent_trades, show_n=10)
+        if trades_block:
+            lines.append(trades_block)
+    except Exception as exc:
+        logger.warning("v7 recent trades fetch failed: %s", exc)
 
     # Stage 1 → Stage 2 progress + LONG-side guard at the bottom
     lines.append(_format_v7_stage2_progress(s))
