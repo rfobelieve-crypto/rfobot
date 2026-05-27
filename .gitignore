@@ -40,6 +40,8 @@ indicator/state/
 market_data/raw_data/
 research/ml_data/
 research/eda_charts/
+research/cache/
+.cache/
 .claude/worktrees/
 
 # Local scripts with secrets
