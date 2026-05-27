@@ -257,9 +257,80 @@ def send_message(chat_id: str, text: str) -> None:
             timeout=10
         )
         if resp.status_code != 200:
-            logger.error("Telegram sendMessage failed: %s - %s", resp.status_code, resp.text)
+            logger.error("Telegram sendMessage failed: %s - %s",
+                         resp.status_code, resp.text[:300])
+            # Fallback: try without parse_mode (so a busted HTML tag
+            # doesn't leave the user with zero feedback).
+            if "parse" in resp.text.lower() or resp.status_code == 400:
+                try:
+                    resp2 = requests.post(
+                        f"{API_URL}/sendMessage",
+                        data={"chat_id": chat_id, "text": text},
+                        timeout=10,
+                    )
+                    if resp2.status_code != 200:
+                        logger.error("Telegram fallback also failed: %s",
+                                     resp2.text[:300])
+                except Exception:
+                    logger.exception("fallback send failed")
     except Exception as e:
         logger.exception("send_message error: %s", e)
+
+
+def _chunk_text_safe(text: str, max_len: int = 3900) -> list[str]:
+    """Split a long HTML message into chunks at \\n\\n boundaries.
+
+    All <b>/<i>/<code> tags in our reports are within a single line, so
+    splitting at blank-line boundaries never breaks a tag.  Lines that
+    individually exceed max_len fall back to \\n split, then hard slice.
+    """
+    if len(text) <= max_len:
+        return [text]
+    chunks: list[str] = []
+    current = ""
+    # Use \n\n as primary boundary
+    for block in text.split("\n\n"):
+        candidate = current + ("\n\n" if current else "") + block
+        if len(candidate) <= max_len:
+            current = candidate
+            continue
+        if current:
+            chunks.append(current)
+            current = ""
+        # block itself may be > max_len — split on \n
+        if len(block) > max_len:
+            buf = ""
+            for line in block.split("\n"):
+                cand = buf + ("\n" if buf else "") + line
+                if len(cand) <= max_len:
+                    buf = cand
+                    continue
+                if buf:
+                    chunks.append(buf)
+                    buf = ""
+                if len(line) > max_len:
+                    # last resort hard-slice (rare)
+                    for i in range(0, len(line), max_len):
+                        chunks.append(line[i:i + max_len])
+                else:
+                    buf = line
+            if buf:
+                current = buf
+        else:
+            current = block
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def send_long_message(chat_id: str, text: str, max_chunk: int = 3900) -> None:
+    """Send a Telegram message, chunking at safe HTML boundaries."""
+    chunks = _chunk_text_safe(text, max_len=max_chunk)
+    total = len(chunks)
+    for i, chunk in enumerate(chunks, 1):
+        if total > 1:
+            chunk = f"<i>({i}/{total})</i>\n{chunk}"
+        send_message(chat_id, chunk)
 
 
 # =========================================================
@@ -1754,11 +1825,8 @@ def _handle_ldc_stats(chat_id: str):
         if not msg_parts:
             send_message(chat_id, f"❌ Indicator 服務未就緒 (paper={paper.status_code} status={status.status_code})")
             return
-        # Telegram message length cap = 4096; truncate if needed
         combined = "\n\n────────\n\n".join(msg_parts)
-        if len(combined) > 3900:
-            combined = combined[:3850] + "\n... (訊息過長已截斷)"
-        send_message(chat_id, combined)
+        send_long_message(chat_id, combined)
     except Exception as e:
         logger.exception("ldc stats fetch error: %s", e)
         send_message(chat_id, f"❌ 取得 LDC 統計失敗: {e}")
@@ -1783,9 +1851,7 @@ def _handle_v7_stats(chat_id: str):
         if not text:
             send_message(chat_id, "❌ paper-perf 無內容")
             return
-        if len(text) > 3900:
-            text = text[:3850] + "\n... (訊息過長已截斷)"
-        send_message(chat_id, text)
+        send_long_message(chat_id, text)
     except Exception as e:
         logger.exception("v7 stats fetch error: %s", e)
         send_message(chat_id, f"❌ 取得 V7 統計失敗: {e}")
