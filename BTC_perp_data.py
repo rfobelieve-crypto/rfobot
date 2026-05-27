@@ -259,13 +259,17 @@ def send_message(chat_id: str, text: str) -> None:
         if resp.status_code != 200:
             logger.error("Telegram sendMessage failed: %s - %s",
                          resp.status_code, resp.text[:300])
-            # Fallback: try without parse_mode (so a busted HTML tag
-            # doesn't leave the user with zero feedback).
+            # Fallback: strip HTML tags + send without parse_mode so the
+            # user sees clean text instead of literal <b>...</b>.
             if "parse" in resp.text.lower() or resp.status_code == 400:
                 try:
+                    import re as _re
+                    # Strip simple HTML tags (no nested attrs, no scripts —
+                    # our reports only use <b>/<i>/<code>/<pre>).
+                    plain = _re.sub(r"<[^>]+>", "", text)
                     resp2 = requests.post(
                         f"{API_URL}/sendMessage",
-                        data={"chat_id": chat_id, "text": text},
+                        data={"chat_id": chat_id, "text": plain},
                         timeout=10,
                     )
                     if resp2.status_code != 200:

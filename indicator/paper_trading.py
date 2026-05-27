@@ -719,7 +719,7 @@ def _compute_ldc_alerts(summary: dict) -> list[str]:
         if rn < 0:
             alerts.append(
                 f"🔴 近 {summary['recent_window_days']} 天 net "
-                f"{rn:+.1f} bps < 0 — Stage 2 進階倒退 (門檻 +{LDC_STAGE2_NET_BPS:.0f} bps)"
+                f"{rn:+.1f} bps &lt; 0 — Stage 2 進階倒退 (門檻 +{LDC_STAGE2_NET_BPS:.0f} bps)"
             )
         elif rn < LDC_STAGE2_NET_BPS:
             alerts.append(
@@ -733,7 +733,7 @@ def _compute_ldc_alerts(summary: dict) -> list[str]:
         bad = [w for w in weeks if w["avg_net_bps"] < 0]
         if bad:
             alerts.append(
-                f"⚠️ 最近 4 週中有 {len(bad)} 週 net < 0 "
+                f"⚠️ 最近 4 週中有 {len(bad)} 週 net &lt; 0 "
                 f"(連續 4 週正 EV 才能進階)"
             )
 
@@ -1193,7 +1193,7 @@ def _compute_v7_alerts(summary: dict) -> list[str]:
         long_net = long_m.get("avg_net_bps", 0.0)
         if long_net < V7_LONG_GUARD_MIN_NET_BPS:
             alerts.append(
-                f"🔴 LONG-side guard: n={n_long} avg_net {long_net:+.1f} bps < "
+                f"🔴 LONG-side guard: n={n_long} avg_net {long_net:+.1f} bps &lt; "
                 f"+{V7_LONG_GUARD_MIN_NET_BPS:.0f} bps — 整體可能只是空方 "
                 f"撐起,不符合進階條件"
             )
@@ -1219,7 +1219,7 @@ def _compute_v7_alerts(summary: dict) -> list[str]:
         if rn < 0:
             alerts.append(
                 f"🔴 V7 近 {summary['recent_window_days']} 天 net {rn:+.1f} bps "
-                f"< 0 — Stage 2 進階倒退 (門檻 +{V7_STAGE2_NET_BPS:.0f} bps)"
+                f"&lt; 0 — Stage 2 進階倒退 (門檻 +{V7_STAGE2_NET_BPS:.0f} bps)"
             )
         elif rn < V7_STAGE2_NET_BPS:
             alerts.append(
@@ -1232,7 +1232,7 @@ def _compute_v7_alerts(summary: dict) -> list[str]:
         bad = [w for w in weeks if w["avg_net_bps"] < 0]
         if bad:
             alerts.append(
-                f"⚠️ V7 最近 4 週中有 {len(bad)} 週 net < 0 "
+                f"⚠️ V7 最近 4 週中有 {len(bad)} 週 net &lt; 0 "
                 f"(連續 4 週正 EV 才能進階)"
             )
 
@@ -1266,7 +1266,7 @@ def _format_v7_stage2_progress(summary: dict) -> str:
     elif long_net >= V7_LONG_GUARD_MIN_NET_BPS:
         long_status = f"✅ 通過 ({long_net:+.1f} bps, n={long_n})"
     else:
-        long_status = (f"❌ 未通過 ({long_net:+.1f} bps < "
+        long_status = (f"❌ 未通過 ({long_net:+.1f} bps &lt; "
                        f"+{V7_LONG_GUARD_MIN_NET_BPS:.0f} bps, n={long_n})")
 
     lines = ["\n<b>🎯 Stage 2 進階進度</b>"]
