@@ -73,12 +73,10 @@ def _make_reply_markup():
         ],
         [
             {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
-            {"text": "\U0001f4c8 LDC Chart", "callback_data": "ldc_chart"},
-            {"text": "\U0001f4c9 LDC Stats", "callback_data": "ldc_stats"},
-        ],
-        [
             {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
             {"text": "\U0001f916 V7 Stats", "callback_data": "v7_stats"},
+        ],
+        [
             {"text": "\U0001f4cb Meeting", "callback_data": "meeting"},
         ],
     ]})
@@ -110,75 +108,6 @@ def _send_telegram_photo(png: bytes, caption: str) -> str:
     except Exception as e:
         logger.error("Telegram photo send failed: %s", e)
         return f"error: {e}"
-
-
-def _fmt_v9(v9: dict | None) -> str:
-    if not v9 or v9.get("p_long") is None:
-        return ""
-    return f"\nv9: P_long={v9['p_long']:.3f} P_short={v9['p_short']:.3f}"
-
-
-def _send_ldc_swing_alerts(result: dict, paused: bool) -> None:
-    """Translate ldc_swing_executor.run_cycle result into Telegram messages."""
-    if not result:
-        return
-    action = result.get("action")
-    if action not in ("open", "close", "reverse", "v9_veto"):
-        return  # hold/none: silent
-
-    pause_tag = " <i>[PAUSED — shadow only]</i>" if paused else ""
-    msgs = []
-    if action == "open":
-        d = result["opened_direction"]
-        emoji = "🟢" if d == "LONG" else "🔴"
-        msgs.append(
-            f"{emoji} <b>LDC {d} OPEN</b>{pause_tag}\n"
-            f"Entry: ${result['entry_price']:,.2f}\n"
-            f"Strategy: jdehorty LDC swing + v9 filter + min hold 4h\n"
-            f"Notional $1000 × 3x leverage"
-            f"{_fmt_v9(result.get('v9'))}"
-        )
-    elif action == "close":
-        c = result["closed"]
-        emoji = "✅" if c["win"] else "❌"
-        net_lev = c["net_pct"] * 100 * 3.0  # 3x leverage applied to net %
-        skip_tag = ""
-        if "skipped_reverse" in result:
-            skip_tag = f"\n<i>(Reverse {result['skipped_reverse']} skipped: v9 veto)</i>"
-        msgs.append(
-            f"{emoji} <b>LDC {c['direction']} CLOSE</b>\n"
-            f"Exit: ${c['exit_price']:,.2f} ({c['reason']})\n"
-            f"Held: {c['bars_held']}h | "
-            f"Net: {c['net_pct']*100:+.2f}% (1x) / <b>{net_lev:+.2f}% (3x)</b>"
-            f"{skip_tag}"
-            f"{_fmt_v9(result.get('v9'))}"
-        )
-    elif action == "reverse":
-        c = result["closed"]
-        new_d = result["opened_direction"]
-        emoji_close = "✅" if c["win"] else "❌"
-        emoji_open = "🟢" if new_d == "LONG" else "🔴"
-        net_lev = c["net_pct"] * 100 * 3.0
-        msgs.append(
-            f"🔄 <b>LDC FLIP</b>{pause_tag}\n"
-            f"{emoji_close} CLOSE {c['direction']} @ ${c['exit_price']:,.2f}\n"
-            f"  Net: {c['net_pct']*100:+.2f}% (1x) / <b>{net_lev:+.2f}% (3x)</b>\n"
-            f"{emoji_open} OPEN {new_d} @ ${result['entry_price']:,.2f}"
-            f"{_fmt_v9(result.get('v9'))}"
-        )
-    elif action == "v9_veto":
-        v9 = result.get("v9", {})
-        d = result.get("skipped_direction", "?")
-        msgs.append(
-            f"⚠️ <b>LDC {d} VETOED</b> by v9\n"
-            f"Price: ${result.get('entry_price', 0):,.2f}\n"
-            f"{v9.get('reason', '')}"
-        )
-    for m in msgs:
-        try:
-            _send_telegram_text(m)
-        except Exception as exc:
-            logger.warning("LDC swing alert send failed: %s", exc)
 
 
 def _send_v7_paper_alerts(result: dict) -> None:
@@ -767,29 +696,8 @@ def update_cycle() -> dict:
         except Exception as e:
             logger.warning("Signal tracker backfill failed: %s", e)
 
-        # ── Path 2: LDC Swing executor (jdehorty original, min hold 4h, 3x).
-        # Replaced v9+LDC must-agree hybrid on 2026-05-12.
-        # Independent path — failures MUST NOT break v7 outputs.
-        try:
-            from indicator.hybrid_monitor import (
-                check_and_update_pause_state, is_paused,
-            )
-            check_and_update_pause_state()
-            ldc_paused = is_paused()
-        except Exception as e:
-            logger.warning("LDC monitor failed (defaulting to NOT paused): %s", e)
-            ldc_paused = False
-
-        try:
-            from indicator.ldc_swing_executor import run_cycle as run_ldc_cycle
-            ldc_result = run_ldc_cycle(klines, features=features, paused=ldc_paused)
-            _send_ldc_swing_alerts(ldc_result, ldc_paused)
-            _record_executor_success("LDC swing executor")
-        except Exception as e:
-            _record_executor_failure("LDC swing executor", e)
-
-        # ── Path 3: V7 paper executor (v7.1 signal-exit + 3xATR trailing).
-        # Parallel Stage-1 paper cohort — runs alongside LDC, LDC untouched.
+        # ── V7 paper executor (v7.1 signal-exit + 3xATR trailing).
+        # Sole paper cohort post-LDC removal (2026-05-27).
         try:
             from indicator.v7_paper_executor import run_cycle as run_v7_cycle
             from indicator.model_version import get_current_model_version

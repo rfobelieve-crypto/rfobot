@@ -1678,10 +1678,6 @@ _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
         {"text": "\U0001f4e6 DB", "callback_data": "db"},
     ],
     [
-        {"text": "\U0001f4c8 LDC Chart", "callback_data": "ldc_chart"},
-        {"text": "\U0001f4c9 LDC Stats", "callback_data": "ldc_stats"},
-    ],
-    [
         {"text": "\U0001f916 V7 Stats", "callback_data": "v7_stats"},
     ],
 ]})
@@ -1793,54 +1789,10 @@ def _handle_alpha_decay(chat_id: str):
         send_message(chat_id, f"❌ Alpha decay 檢查失敗: {e}")
 
 
-def _handle_ldc_chart(chat_id: str):
-    """Send link to interactive LDC swing signal chart."""
-    if not INDICATOR_SERVICE_URL:
-        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
-        return
-    url_link = f"{INDICATOR_SERVICE_URL}/hybrid-chart"
-    demo_link = f"{INDICATOR_SERVICE_URL}/hybrid-chart?demo=1"
-    send_message(chat_id,
-        f"\U0001f4c8 <b>LDC Swing 進出場圖表</b>\n\n"
-        f"<a href=\"{url_link}\">即時訊號（production）</a>\n"
-        f"<a href=\"{demo_link}\">5.5 月 walk-forward demo</a>\n\n"
-        f"標記:\n"
-        f"  ▲ 綠色 = LONG 進場\n"
-        f"  ▼ 紅色 = SHORT 進場\n"
-        f"  ● 綠色 = 獲利出場\n"
-        f"  ● 紅色 = 虧損出場\n"
-        f"  exit 標籤: Cross (dynamic) / Reverse / 數字 = net%")
-
-
-def _handle_ldc_stats(chat_id: str):
-    """Fetch LDC swing strategy stats from indicator service."""
-    if not INDICATOR_SERVICE_URL:
-        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
-        return
-    try:
-        # paper-perf includes LDC swing cohort section after 2026-05-12 refactor
-        paper = requests.get(f"{INDICATOR_SERVICE_URL}/paper-perf", timeout=30)
-        status = requests.get(f"{INDICATOR_SERVICE_URL}/hybrid-status", timeout=15)
-        msg_parts = []
-        if status.status_code == 200:
-            msg_parts.append(status.json().get("text", ""))
-        if paper.status_code == 200:
-            msg_parts.append(paper.json().get("text", ""))
-        if not msg_parts:
-            send_message(chat_id, f"❌ Indicator 服務未就緒 (paper={paper.status_code} status={status.status_code})")
-            return
-        combined = "\n\n────────\n\n".join(msg_parts)
-        send_long_message(chat_id, combined)
-    except Exception as e:
-        logger.exception("ldc stats fetch error: %s", e)
-        send_message(chat_id, f"❌ 取得 LDC 統計失敗: {e}")
-
-
 def _handle_v7_stats(chat_id: str):
     """Fetch V7 paper-trading stats from indicator service.
 
-    /paper-perf returns the combined report; the V7 cohort section
-    (🤖 V7 Paper) is included alongside the indicator + LDC cohorts.
+    /paper-perf returns the combined report (V7 + legacy paper).
     """
     if not INDICATOR_SERVICE_URL:
         send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
@@ -1936,7 +1888,6 @@ def _send_help(chat_id: str):
         "/chart - 4h 多空預測指標圖\n"
         "/ichart - 互動圖表 (可放大/十字線)\n"
         "/perf - 模型表現 + Strong 信號績效\n"
-        "/ldc - LDC swing 績效 (paper trading)\n"
         "/db - 資料庫累積狀態\n"
         "/ind_status - 指標系統狀態\n"
         "\n<b>--- 流動性監控 ---</b>\n"
@@ -2026,10 +1977,6 @@ def webhook():
                         f"功能: 放大縮小 / 拖曳平移 / 十字線游標")
                 else:
                     send_message(cb_chat_id, "INDICATOR_SERVICE_URL 未設定")
-            elif cb_data == "ldc_chart":
-                threading.Thread(target=_handle_ldc_chart, args=(cb_chat_id,), daemon=True).start()
-            elif cb_data == "ldc_stats":
-                threading.Thread(target=_handle_ldc_stats, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "v7_stats":
                 threading.Thread(target=_handle_v7_stats, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "decay":
@@ -2117,9 +2064,6 @@ def webhook():
 
         elif cmd == "/perf":
             threading.Thread(target=_handle_indicator_perf, args=(chat_id,), daemon=True).start()
-
-        elif cmd == "/ldc":
-            threading.Thread(target=_handle_ldc_stats, args=(chat_id,), daemon=True).start()
 
         elif cmd == "/decay":
             threading.Thread(target=_handle_alpha_decay, args=(chat_id,), daemon=True).start()

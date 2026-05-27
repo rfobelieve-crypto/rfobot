@@ -1779,27 +1779,15 @@ def format_v7_html(s: dict) -> str:
 def get_paper_trading_report() -> str:
     """One-call helper for the /paper-perf endpoint.
 
-    Returns combined v7 indicator (tracked_signals) + LDC swing
-    + V7 paper (v7_paper_positions) + legacy hybrid report.
+    Returns indicator paper-trading (tracked_signals) + V7 paper cohort
+    (v7_paper_positions).  LDC swing + legacy hybrid removed 2026-05-27
+    (V7-only focus).  Historical data preserved in DB; the compute/format
+    fns for LDC + hybrid are left in the module for ad-hoc queries.
     """
-    v7_html = format_paper_trading_html(compute_paper_trading_summary())
-    try:
-        ldc_html = format_ldc_swing_html(compute_ldc_swing_summary())
-    except Exception as exc:
-        logger.warning("ldc_swing summary failed: %s", exc)
-        ldc_html = "\n\n📈 <b>LDC Swing</b>\n(查詢失敗 — 表格可能尚未建立)"
+    paper_html = format_paper_trading_html(compute_paper_trading_summary())
     try:
         v7_paper_html = format_v7_html(compute_v7_summary())
     except Exception as exc:
         logger.warning("v7 paper summary failed: %s", exc)
         v7_paper_html = "\n\n🤖 <b>V7 Paper</b>\n(查詢失敗 — 表格可能尚未建立)"
-    try:
-        hybrid_summary = compute_hybrid_summary()
-        if hybrid_summary.get("empty") and not hybrid_summary.get("note"):
-            hybrid_html = ""  # don't show empty legacy section
-        else:
-            hybrid_html = format_hybrid_html(hybrid_summary)
-    except Exception as exc:
-        logger.warning("hybrid summary failed: %s", exc)
-        hybrid_html = ""
-    return v7_html + ldc_html + v7_paper_html + hybrid_html
+    return paper_html + v7_paper_html
