@@ -52,20 +52,48 @@ edge 確信度」的漸進過程。
 連續 24 個月實盤 Sharpe ≥ 3.0（目前 0.17-0.5）+ MDD 從未超過 -10%
 + 經過至少 2 個完整 regime flip 仍正 EV。在那之前，2.0x 是 hard cap。
 
-## 當前 stage：Stage 1 (Paper Trading)
-- 入口：`/paper-perf` endpoint（HTML report）+ `indicator/paper_trading.py` (computation)
-- 觀察項：每週看「最近 30 天」cohort 的 net_bps、WR、Sharpe、Drawdown
-- **本 stage 仍可改進指標模型**（feature、訓練、信心公式等），改完即新 cohort 開始
-- 進階前必須等：穩定版本下 100+ 筆 trades 且 4 週連續正 EV
+## 當前策略：研究 + Small Live 並進（2026-05-27 決策）
+
+**背景**：原 staged framework 要求 Stage 1 滿 100 trades + 4 週才進 Stage 2，按目前 9 天 6 筆的節奏需 5 個月。使用者選擇接受 informed risk：用 $100 live 作為「**operational stress test + edge 二次驗證**」，paper cohort 同時繼續累積。
+
+**改動的規則**：
+- Stage 1 → Stage 2 不再硬要求 100 trades + 4 週；改成「OKX skeleton TODO 全填完 + unit tests 過 + 3-5 天 testnet shakeout」
+- Stage 2 → Stage 3 ($100 live) 不再硬要求 38 項 checklist 全跑完；改成「testnet 連續 3 天對帳 100% + 0 unhandled exception + manual approval 模式跑過 5 筆」
+
+**保留的不可鬆綁**：
+- **金額**：$100 live = Stage 3 上限，未進 Stage 4a 不准加碼（即使 $100 賺到 $200 也是 $100 keep + $100 不再用）
+- **Hard kill switches 必須先驗證能觸發**（不是只寫進 code）：unit test + testnet 至少一次故意觸發
+- **Manual approval 模式必須跑過 5+ 筆**，人工 review 沒問題才能切自動
+- **Paper cohort 不停**：作為 edge 是否真實的並行驗證；live + paper 結果 > 2 週嚴重背離 → halt
+- **Leverage 1.0x 不准動**（Stage 3 階段）
+- **Stage 3 → Stage 4 仍照原硬條件**：live 4 週 net positive + MDD < 20% + 0 kill trigger
+
+**做這個決策的代價自負**：
+- 第一筆 live 訂單 = OKX REST/WS code 第一次真實執行 = 有 ops bug 的風險（mitigations 寫在上面）
+- Edge 若是 fake，$100 是發現的成本（mistake.md 應記：用 $100 換 edge 真假驗證，比 5 個月等更便宜）
+- 一旦 hit 任何 kill trigger，**回到 Stage 1 重新驗證**不是「凹下去」
+
+## Staged 進階條件對照表（更新版）
+
+| Stage | 描述 | Risk | Leverage | 進階條件 |
+|---|---|---|---|---|
+| 1 | Paper trading | 0 | 1.0x | 已 active；live 啟動後**不停**作 baseline |
+| 2 | Testnet shakeout | 0 | 1.0x | OKX TODO 填完 + unit tests 過 + 3-5 天對帳 100% + 0 unhandled exception |
+| 3 | **Live $100**（當前目標）| -$100 上限 | 1.0x | testnet 通過 + manual approval 跑 5 筆 |
+| 4a | $1k（3 個月）| 小 | 1.0x | Stage 3 跑 4 週 + net positive + MDD < 20% + 0 kill trigger |
+| 4b | $1k 1.2x | 小 | 1.2x | 4a 通過 + MDD < 10% |
+| 4c | $5k | 中 | 1.5x | 4b 通過 + 連續 6 個月 hit no kill rules |
+| 4d | $10k+ | 高 | **2.0x（絕對上限）** | 4c 通過 + 真實 Sharpe ≥ 1.5 |
 
 ## 仍然禁止的（避免在錯的階段做錯事）
-- **Stage 1**：禁寫 exchange execution code（連券商 API）；只計算虛擬 PnL
-- **Stage 2-3**：禁鬆 hard rules；禁未經 rules 驗證就加碼到下一階段；leverage hard cap = 1.0x
+- **Stage 2-3**：禁鬆 hard kill switches；leverage hard cap = 1.0x
+- **Stage 3**：禁未經 manual approval 5 筆就切自動；禁 paper cohort 停寫
 - **Stage 4a-d**：leverage 階梯式放寬，**絕對上限 2.0x**；未 hit 各子階段條件不得進下一格
 - **Stage 4 後**：禁 leverage > 2.0x，除非滿足「24 個月實盤 Sharpe ≥ 3.0」（見 §Leverage ladder 數學依據）
 - 任何階段：strategy sweep 必須留 OOS hold-out，禁全資料 fit
 - 任何階段：禁因為「最近表現好」就跳階段——必須 hit hard rules
 - 任何階段：禁因為「想賺更多」就改 leverage cap——cap 來自數學不是情緒
+- 任何階段：hit kill trigger 必須降階重驗，不准「我覺得這次例外」
 
 ## 系統架構（v7 Dual-Model）
 Dual XGBoost 架構：Direction Regressor + Magnitude Regressor，獨立管線。
