@@ -1,8 +1,8 @@
 """OKX REST client with retry / backoff / circuit breaker.
 
-Connection-resilience focus per user request (2026-05-25). Actual OKX
-endpoint integration marked `# TODO(stage2-impl)` — fill those in when
-demo API key is available.
+Connection-resilience + response parsers complete (2026-05-28).
+Remaining TODO at L124 is the partial-fill → reconciler hook, which
+is a future feature, not a blocker for Stage 3 $100.
 
 Retry policy (per docs/okx_integration_design.md §10.2):
   - Order submit: 3x, 1s/2s/4s, idempotency via clOrdId
@@ -158,10 +158,7 @@ class OkxRestClient:
                 algo_cl_ord_id=algo_cl_ord_id, status="rejected",
                 error="all_retries_exhausted",
             )
-        # TODO(stage2-impl): parse OKX response → AlgoOrderResult
-        return AlgoOrderResult(algo_cl_ord_id=algo_cl_ord_id,
-                               algo_id=None, status="submitted",
-                               error="not_implemented")
+        return self._parse_algo_order_response(result, algo_cl_ord_id)
 
     def amend_algo_stop(self, *, algo_id: str,
                         new_trigger_px: float) -> AmendResult:
@@ -178,9 +175,7 @@ class OkxRestClient:
         if result is None:
             return AmendResult(algo_id=algo_id, status="failed",
                                error="all_retries_exhausted")
-        # TODO(stage2-impl): parse response. Handle 51400 already_filled.
-        return AmendResult(algo_id=algo_id, status="ok",
-                           error="not_implemented")
+        return self._parse_amend_response(result, algo_id)
 
     def cancel_algo_stop(self, *, algo_id: str) -> CancelResult:
         path = "/api/v5/trade/cancel-algos"
@@ -203,8 +198,7 @@ class OkxRestClient:
         )
         if result is None:
             return []
-        # TODO(stage2-impl): parse result["data"] into Position[]
-        return []
+        return self._parse_positions_response(result)
 
     def get_balance(self) -> Optional[Balance]:
         """Get total equity in USD-equivalent.  3x retry, demote on full fail."""
@@ -214,8 +208,7 @@ class OkxRestClient:
         )
         if result is None:
             return None
-        # TODO(stage2-impl): parse total_eq / available
-        return Balance(total_eq_usd=0.0, available_usd=0.0)
+        return self._parse_balance_response(result)
 
     def get_account_config(self) -> dict:
         """Get account-level settings + API key permissions.
@@ -239,8 +232,7 @@ class OkxRestClient:
         )
         if result is None:
             return None
-        # TODO(stage2-impl): parse result["data"][0]["ts"] (ms) / 1000
-        return None
+        return self._parse_server_time(result)
 
     # ── Health surface ─────────────────────────────────────────────────
 
@@ -362,21 +354,166 @@ class OkxRestClient:
     # ── Internal: response parsing ─────────────────────────────────────
 
     def _parse_order_response(self, raw: dict, cl_ord_id: str) -> OrderResult:
-        """Parse OKX submit_order response into OrderResult.
+        """Parse POST /api/v5/trade/order response into OrderResult.
 
-        OKX response shape (for reference):
-          { "code": "0", "msg": "",
-            "data": [{ "ordId": "...", "clOrdId": "...",
-                       "sCode": "0", "sMsg": "" }] }
+        Two failure layers:
+          - top-level `code != "0"`: request was rejected outright
+          - per-order `sCode != "0"`: order-level reject (e.g. 51008 balance)
         """
-        # TODO(stage2-impl): parse real response
         code = raw.get("code", "")
         if code != "0":
             return OrderResult(cl_ord_id=cl_ord_id, status="rejected",
                                error=f"okx_code_{code}_{raw.get('msg', '')}")
-        data = (raw.get("data") or [{}])[0]
+        data_list = raw.get("data") or []
+        if not data_list:
+            # Top code=0 but no data — treat as submitted with unknown ord_id
+            return OrderResult(cl_ord_id=cl_ord_id, status="submitted",
+                               ord_id=None)
+        data = data_list[0]
+        s_code = data.get("sCode", "0")
+        if s_code != "0":
+            return OrderResult(
+                cl_ord_id=cl_ord_id, status="rejected",
+                error=f"okx_sCode_{s_code}_{data.get('sMsg', '')}",
+            )
         return OrderResult(
             cl_ord_id=cl_ord_id,
-            ord_id=data.get("ordId"),
+            ord_id=data.get("ordId") or None,
             status="submitted",
         )
+
+    def _parse_algo_order_response(self, raw: dict,
+                                   algo_cl_ord_id: str) -> AlgoOrderResult:
+        """Parse POST /api/v5/trade/order-algo response into AlgoOrderResult."""
+        code = raw.get("code", "")
+        if code != "0":
+            return AlgoOrderResult(
+                algo_cl_ord_id=algo_cl_ord_id, status="rejected",
+                error=f"okx_code_{code}_{raw.get('msg', '')}",
+            )
+        data_list = raw.get("data") or []
+        if not data_list:
+            return AlgoOrderResult(
+                algo_cl_ord_id=algo_cl_ord_id, status="submitted",
+                algo_id=None,
+            )
+        data = data_list[0]
+        s_code = data.get("sCode", "0")
+        if s_code != "0":
+            return AlgoOrderResult(
+                algo_cl_ord_id=algo_cl_ord_id, status="rejected",
+                algo_id=data.get("algoId") or None,
+                error=f"okx_sCode_{s_code}_{data.get('sMsg', '')}",
+            )
+        return AlgoOrderResult(
+            algo_cl_ord_id=algo_cl_ord_id, status="submitted",
+            algo_id=data.get("algoId") or None,
+        )
+
+    # OKX algo-amend response code → AmendResult.status mapping
+    _AMEND_CODE_MAP = {
+        "0": "ok",
+        "51400": "already_filled",   # docs/stage2_kill_criteria B3 boundary
+        "51401": "not_found",
+    }
+
+    def _parse_amend_response(self, raw: dict, algo_id: str) -> AmendResult:
+        """Parse POST /api/v5/trade/amend-algos response.
+
+        Handles 51400 (already_filled — race with stop trigger) and
+        51401 (order does not exist) per kill_criteria B3.
+        """
+        code = raw.get("code", "")
+        if code != "0":
+            return AmendResult(algo_id=algo_id, status="failed",
+                               error=f"okx_code_{code}_{raw.get('msg', '')}")
+        data_list = raw.get("data") or []
+        if not data_list:
+            return AmendResult(algo_id=algo_id, status="ok")
+        data = data_list[0]
+        s_code = data.get("sCode", "0")
+        status = self._AMEND_CODE_MAP.get(s_code, "failed")
+        error = None
+        if status == "failed":
+            error = f"okx_sCode_{s_code}_{data.get('sMsg', '')}"
+        return AmendResult(algo_id=algo_id, status=status, error=error)
+
+    def _parse_positions_response(self, raw: dict) -> list[Position]:
+        """Parse GET /api/v5/account/positions data list into Position[].
+
+        Handles both net_mode (posSide="net", pos signed) and long_short
+        mode (posSide="long"/"short", pos positive).  size_contracts is
+        always the absolute magnitude; direction is the human label.
+        """
+        out: list[Position] = []
+        for item in raw.get("data") or []:
+            pos_str = item.get("pos") or "0"
+            try:
+                pos_signed = float(pos_str)
+            except ValueError:
+                pos_signed = 0.0
+            pos_side = (item.get("posSide") or "net").lower()
+            if pos_signed == 0:
+                direction = "FLAT"
+            elif pos_side == "long":
+                direction = "LONG"
+            elif pos_side == "short":
+                direction = "SHORT"
+            else:
+                # net_mode: sign of pos carries direction
+                direction = "LONG" if pos_signed > 0 else "SHORT"
+            try:
+                avg_price = float(item.get("avgPx") or 0)
+            except ValueError:
+                avg_price = 0.0
+            try:
+                upl = float(item.get("upl") or 0)
+            except ValueError:
+                upl = 0.0
+            out.append(Position(
+                inst_id=item.get("instId", ""),
+                direction=direction,
+                size_contracts=int(abs(pos_signed)),
+                avg_price=avg_price,
+                unrealized_pnl_usd=upl,
+                raw=item,
+            ))
+        return out
+
+    def _parse_balance_response(self, raw: dict) -> Optional[Balance]:
+        """Parse GET /api/v5/account/balance response.
+
+        Picks USDT row from details[] for available; falls back to 0 if
+        no USDT row found.  Returns None if data array is empty.
+        """
+        data_list = raw.get("data") or []
+        if not data_list:
+            return None
+        data = data_list[0]
+        try:
+            total_eq = float(data.get("totalEq") or 0)
+        except ValueError:
+            total_eq = 0.0
+        available = 0.0
+        for ccy_row in data.get("details") or []:
+            if (ccy_row.get("ccy") or "").upper() == "USDT":
+                try:
+                    available = float(ccy_row.get("availBal") or 0)
+                except ValueError:
+                    available = 0.0
+                break
+        return Balance(total_eq_usd=total_eq, available_usd=available,
+                       raw=data)
+
+    def _parse_server_time(self, raw: dict) -> Optional[float]:
+        """Parse GET /api/v5/public/time → Unix seconds (float)."""
+        data_list = raw.get("data") or []
+        if not data_list:
+            return None
+        ts_ms_str = data_list[0].get("ts")
+        if not ts_ms_str:
+            return None
+        try:
+            return float(ts_ms_str) / 1000.0
+        except (ValueError, TypeError):
+            return None

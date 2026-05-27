@@ -1,8 +1,6 @@
 """OKX WebSocket private channel client (orders / positions / balance).
 
-Connection-resilience is the focus.  Real reconnect logic; the actual
-OKX message parsing is stubbed with `# TODO(stage2-impl)` markers.
-
+Connection-resilience + message parsers complete (2026-05-28).
 Reconnect strategy:
   - Exponential backoff: 1s, 2s, 4s, 8s, 16s (cap 30s)
   - Per docs: 3 consecutive fails → trigger A2 (demote)
@@ -41,6 +39,89 @@ logger = logging.getLogger(__name__)
 OrderCallback = Callable[[OrderEvent], None]
 PositionCallback = Callable[[PositionEvent], None]
 BalanceCallback = Callable[[BalanceEvent], None]
+
+
+# ── Wire-format parsers ────────────────────────────────────────────────
+
+def _parse_optional_float(value) -> Optional[float]:
+    """OKX often sends empty strings instead of nulls.  Treat both as None."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_ts_ms(value) -> Optional[datetime]:
+    """Decode OKX uTime millisecond-epoch string into UTC datetime."""
+    if value is None or value == "":
+        return None
+    try:
+        ms = int(value)
+    except (TypeError, ValueError):
+        return None
+    return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
+
+
+def _parse_order_event(item: dict) -> OrderEvent:
+    """Decode OKX 'orders' channel item → OrderEvent.
+
+    OKX wire format:
+      ordId, clOrdId, state (live/partially_filled/filled/canceled),
+      fillPx, fillSz (last-fill size, "" if no fill),
+      accFillSz (cumulative), fee (signed, negative when user pays),
+      uTime (ms epoch as string).
+    """
+    fill_px = _parse_optional_float(item.get("fillPx"))
+    fill_sz_raw = _parse_optional_float(item.get("fillSz"))
+    fill_sz: Optional[int] = (
+        int(fill_sz_raw) if fill_sz_raw is not None else None
+    )
+    fee = _parse_optional_float(item.get("fee"))
+    return OrderEvent(
+        cl_ord_id=item.get("clOrdId", "") or "",
+        ord_id=item.get("ordId", "") or "",
+        state=item.get("state", "unknown") or "unknown",
+        fill_price=fill_px,
+        fill_size=fill_sz,
+        fee_usd=fee,
+        ts=_parse_ts_ms(item.get("uTime")),
+        raw=item,
+    )
+
+
+def _parse_position_event(item: dict) -> PositionEvent:
+    """Decode OKX 'positions' channel item → PositionEvent.
+
+    pos is signed in net_mode; direction inferred upstream.
+    """
+    return PositionEvent(
+        inst_id=item.get("instId", "") or "",
+        pos=_parse_optional_float(item.get("pos")) or 0.0,
+        avg_price=_parse_optional_float(item.get("avgPx")) or 0.0,
+        ts=_parse_ts_ms(item.get("uTime")),
+        raw=item,
+    )
+
+
+def _parse_balance_event(item: dict) -> BalanceEvent:
+    """Decode OKX 'account' channel item → BalanceEvent.
+
+    Pulls USDT available balance from details[] (multi-ccy account).
+    """
+    total_eq = _parse_optional_float(item.get("totalEq")) or 0.0
+    available = 0.0
+    for ccy_row in item.get("details") or []:
+        if (ccy_row.get("ccy") or "").upper() == "USDT":
+            available = _parse_optional_float(ccy_row.get("availBal")) or 0.0
+            break
+    return BalanceEvent(
+        total_eq_usd=total_eq,
+        available_usd=available,
+        ts=_parse_ts_ms(item.get("uTime")),
+        raw=item,
+    )
 
 
 class OkxWsPrivateClient:
@@ -157,13 +238,21 @@ class OkxWsPrivateClient:
             time.sleep(delay)
             attempt += 1
 
+    def _ws_url(self) -> str:
+        """Return the WS URL to connect to.
+
+        OKX testnet (demo trading) uses a different host:
+            wss://wspap.okx.com:8443/ws/v5/private
+        per https://www.okx.com/docs-v5/en/#overview-demo-trading-services
+        Live keeps the configured ws_private value.
+        """
+        if self._cfg.is_simulated == 1:
+            return "wss://wspap.okx.com:8443/ws/v5/private"
+        return self._cfg.ws_private
+
     def _connect_once(self) -> None:
         """Blocks until WS closes."""
-        url = self._cfg.ws_private
-        # OKX simulated trading uses different URL? Per docs, same URL
-        # with simulated header — but for WS we use the param/path that
-        # OKX docs specify for testnet.
-        # TODO(stage2-impl): verify exact testnet WS URL.
+        url = self._ws_url()
 
         def on_open(ws):
             with self._lock:
@@ -279,13 +368,7 @@ class OkxWsPrivateClient:
 
         if channel == "orders":
             for item in data:
-                # TODO(stage2-impl): parse OKX order item → OrderEvent
-                evt = OrderEvent(
-                    cl_ord_id=item.get("clOrdId", ""),
-                    ord_id=item.get("ordId", ""),
-                    state=item.get("state", "unknown"),
-                    raw=item,
-                )
+                evt = _parse_order_event(item)
                 if self._on_order is not None:
                     try:
                         self._on_order(evt)
@@ -294,13 +377,7 @@ class OkxWsPrivateClient:
 
         elif channel == "positions":
             for item in data:
-                # TODO(stage2-impl): parse pos / avgPx etc.
-                evt = PositionEvent(
-                    inst_id=item.get("instId", ""),
-                    pos=float(item.get("pos", "0") or 0),
-                    avg_price=float(item.get("avgPx", "0") or 0),
-                    raw=item,
-                )
+                evt = _parse_position_event(item)
                 if self._on_position is not None:
                     try:
                         self._on_position(evt)
@@ -309,12 +386,7 @@ class OkxWsPrivateClient:
 
         elif channel == "account":
             for item in data:
-                # TODO(stage2-impl): parse totalEq etc.
-                evt = BalanceEvent(
-                    total_eq_usd=float(item.get("totalEq", "0") or 0),
-                    available_usd=0.0,
-                    raw=item,
-                )
+                evt = _parse_balance_event(item)
                 if self._on_balance is not None:
                     try:
                         self._on_balance(evt)
