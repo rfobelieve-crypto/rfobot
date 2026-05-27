@@ -1131,11 +1131,10 @@ def compute_v7_summary(days_recent: int = 30) -> dict:
 
     by_reason: dict = {}
     for reason, sub in df.groupby("exit_reason"):
-        by_reason[str(reason)] = {
-            "n": int(len(sub)),
-            "avg_eq_ret_pct": float(sub["equity_ret_pct"].mean()),
-            "wr": float((sub["win"] == 1).mean()),
-        }
+        # Use full _slice_v7_metrics so by_reason has same shape as
+        # by_dir / by_tier (avg_net_bps, profit_factor, avg_hold_h, …).
+        # Required by _format_v7_exit_reason_detail.
+        by_reason[str(reason)] = _slice_v7_metrics(sub)
 
     return {
         "empty": False, "label": "v7_paper",
@@ -1709,14 +1708,20 @@ def format_v7_html(s: dict) -> str:
             lines.append(f"\n<b>最近 {s['recent_window_days']} 天</b> (無樣本)")
 
         # 🅲 Enhanced exit reason breakdown — PF + avg bars + verdict icon
-        reason_block = _format_v7_exit_reason_detail(s)
-        if reason_block:
-            lines.append(reason_block)
+        try:
+            reason_block = _format_v7_exit_reason_detail(s)
+            if reason_block:
+                lines.append(reason_block)
+        except Exception as exc:
+            logger.warning("v7 exit reason detail failed: %s", exc)
 
         # 🅶 Backtest ↔ paper drift
-        drift_block = _format_v7_backtest_drift(s)
-        if drift_block:
-            lines.append(drift_block)
+        try:
+            drift_block = _format_v7_backtest_drift(s)
+            if drift_block:
+                lines.append(drift_block)
+        except Exception as exc:
+            logger.warning("v7 backtest drift failed: %s", exc)
 
     # Open position — quick view (unchanged for backward compat)
     try:
