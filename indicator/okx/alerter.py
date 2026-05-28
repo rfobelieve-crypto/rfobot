@@ -62,3 +62,29 @@ def format_kill_alert(*, trigger_id: str, severity: str, reason: str,
         f"trigger: `{trigger_id}` ({severity})\n"
         f"reason: {reason}{ctx_lines}"
     )
+
+
+def format_entry_alert(*, stage_label: str, direction: str, tier: str,
+                        entry_price: float, size_contracts: int,
+                        notional_usd: float, stop_price: float,
+                        atr: float) -> str:
+    """Safety belt #8 — every entry must produce a Telegram push."""
+    return (
+        f"*OKX {stage_label.upper()} ENTRY*\n"
+        f"{direction} {tier} @ {entry_price:.2f}\n"
+        f"size: {size_contracts} contracts  notional: ${notional_usd:.2f}\n"
+        f"stop: {stop_price:.2f}  ATR(14): {atr:.2f}"
+    )
+
+
+def format_exit_alert(*, stage_label: str, direction: str, reason: str,
+                       entry_price: float, exit_price: float,
+                       gross_pct: float, net_pct: float,
+                       equity_after: float) -> str:
+    """Exit (manual close — algo-stop fills routed via WS event)."""
+    return (
+        f"*OKX {stage_label.upper()} EXIT* ({reason})\n"
+        f"{direction} {entry_price:.2f} → {exit_price:.2f}\n"
+        f"gross {gross_pct * 100:+.2f}%  net {net_pct * 100:+.2f}%\n"
+        f"equity: ${equity_after:.2f}"
+    )

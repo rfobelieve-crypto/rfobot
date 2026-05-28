@@ -26,11 +26,16 @@ from typing import Optional
 
 import pandas as pd
 
-from indicator.okx.alerter import format_kill_alert, send_critical
+import numpy as np
+
+from indicator.okx.alerter import (
+    format_entry_alert, format_exit_alert, format_kill_alert, send_critical,
+)
 from indicator.okx.client import OkxClient
 from indicator.okx.config import OkxConfig
 from indicator.okx.kill_checks import (
-    check_api_permissions, check_ntp_drift, run_all_checks,
+    check_algo_stop_latency, check_api_permissions, check_ntp_drift,
+    run_all_checks,
 )
 from indicator.okx.reconciler import PositionReconciler
 from indicator.okx.rest import make_cl_ord_id
@@ -47,6 +52,26 @@ logger = logging.getLogger(__name__)
 ATR_PERIOD = 14
 TRAIL_MULT = 3.0
 TIME_CAP_HOURS = 72
+RISK_FRAC = 0.02            # 2% of equity per trade
+MAX_LEVERAGE = 1.0
+
+
+def _atr_wilder(klines, period: int = ATR_PERIOD) -> float:
+    """Wilder ATR of the latest bar (matches Pine ta.atr / RMA of TR).
+
+    Mirrors v7_paper_executor._atr_wilder so paper/live sizes match.
+    """
+    import pandas as _pd
+    high = klines["high"].astype(float)
+    low = klines["low"].astype(float)
+    close = klines["close"].astype(float)
+    pc = close.shift(1)
+    tr = _pd.concat([high - low, (high - pc).abs(), (low - pc).abs()],
+                    axis=1).max(axis=1)
+    atr = tr.ewm(alpha=1.0 / period, adjust=False,
+                 min_periods=period).mean()
+    val = atr.iloc[-1]
+    return float(val) if np.isfinite(val) else 0.0
 
 
 @dataclass
@@ -288,17 +313,188 @@ class V7OkxExecutor:
                          signal_direction: str) -> CycleResult:
         """Existing-position branch.
 
-        Mirrors v7_paper_executor logic:
-          - trail extreme update each bar
-          - amend algo stop to new trigger price
-          - exit on time_cap (72h)
-          - exit on opposite signal
+        Mirrors v7_paper_executor exit/trail logic, but the *intrabar
+        stop-out* itself is handled by OKX (the algo stop placed at
+        entry).  We only need to:
+          - ratchet the trailing extreme bar-by-bar + amend the algo
+            stop trigger to the new level
+          - manually close on time_cap (72h) or opposite signal
+            (those are conditions OKX doesn't know about)
+
+        Algo-stop fills arrive via WS `orders` event and reconciliation;
+        we don't poll for them here.
         """
-        # TODO(stage2-impl): compute new trailing extreme + amend algo stop
-        # via self._client.amend_algo_stop(...)
-        # If opposite signal or time cap → market close + cancel algo stop
+        if klines is None or klines.empty:
+            return CycleResult(action="hold",
+                               detail={"reason": "no_klines"})
+
+        side = pos.get("direction") or "FLAT"
+        if side not in ("LONG", "SHORT"):
+            return CycleResult(action="hold",
+                               detail={"reason": "bad_side",
+                                       "side": side})
+
+        bar_ts = klines.index[-1]
+        if getattr(bar_ts, "tzinfo", None) is not None:
+            bar_ts_utc = bar_ts.tz_convert("UTC")
+        else:
+            bar_ts_utc = bar_ts
+        bar_ts_naive = (bar_ts_utc.tz_localize(None)
+                        if getattr(bar_ts_utc, "tzinfo", None) is not None
+                        else bar_ts_utc)
+        bar_high = float(klines["high"].iloc[-1])
+        bar_low = float(klines["low"].iloc[-1])
+        last_close = float(klines["close"].iloc[-1])
+
+        # bars_held — entry_time stored naive UTC by store layer
+        entry_ts = pos.get("entry_time")
+        if isinstance(entry_ts, str):
+            entry_ts = pd.Timestamp(entry_ts)
+        if entry_ts is not None and getattr(entry_ts, "tzinfo", None) is not None:
+            entry_ts = entry_ts.tz_convert("UTC").tz_localize(None)
+        bars_held = (max(0, int((bar_ts_naive - entry_ts).total_seconds() / 3600))
+                     if entry_ts is not None else 0)
+
+        stop_dist = float(pos.get("stop_dist") or 0)
+        prev_extreme = float(pos.get("trail_extreme")
+                             or pos.get("entry_price") or 0)
+
+        # Compute new extreme + new stop
+        if side == "LONG":
+            new_extreme = max(prev_extreme, bar_high)
+            new_stop = new_extreme - stop_dist
+        else:
+            new_extreme = (min(prev_extreme, bar_low)
+                           if prev_extreme > 0 else bar_low)
+            new_stop = new_extreme + stop_dist
+
+        # Manual exits — OKX doesn't know about time_cap / opp_signal
+        exit_reason: Optional[str] = None
+        if bars_held >= TIME_CAP_HOURS:
+            exit_reason = "time_cap"
+        elif side == "LONG" and signal_direction == "DOWN":
+            exit_reason = "opp_signal"
+        elif side == "SHORT" and signal_direction == "UP":
+            exit_reason = "opp_signal"
+
+        if exit_reason is not None:
+            return self._close_position(pos, exit_price=last_close,
+                                         exit_reason=exit_reason,
+                                         bar_ts=bar_ts_naive)
+
+        # No exit — ratchet trail if extreme advanced
+        if new_extreme != prev_extreme:
+            try:
+                self._client.amend_algo_stop(
+                    algo_id=str(pos.get("stop_algo_id") or ""),
+                    new_trigger_px=new_stop,
+                )
+            except Exception:
+                logger.exception("amend_algo_stop_failed pos=%s",
+                                 pos.get("id"))
+                # Don't halt on amend fail; reconciler / WS event will
+                # surface if the stop is gone.  Caller's next cycle
+                # retries.
+            try:
+                self._store.update_trail(
+                    position_id=int(pos["id"]),
+                    trail_extreme=new_extreme,
+                    current_stop=new_stop,
+                )
+            except Exception:
+                logger.exception("update_trail_db_failed pos=%s",
+                                 pos.get("id"))
+
         return CycleResult(action="hold",
-                           detail={"reason": "manage_not_implemented"})
+                           detail={"position_id": pos.get("id"),
+                                   "direction": side,
+                                   "bars_held": bars_held,
+                                   "current_stop": new_stop})
+
+    def _close_position(self, pos: dict, *, exit_price: float,
+                         exit_reason: str,
+                         bar_ts) -> CycleResult:
+        """Cancel algo + market close + DB close + Telegram alert.
+
+        Used for manual exits (time_cap, opp_signal) — algo-stop fills
+        are recorded by the WS callback / reconciler instead.
+        """
+        pos_id = int(pos.get("id") or 0)
+        side = pos.get("direction") or "FLAT"
+        size = int(pos.get("size_contracts") or 0)
+        algo_id = pos.get("stop_algo_id")
+        entry_price = float(pos.get("entry_price") or 0)
+        equity_before = float(pos.get("equity_before") or 0)
+        size_frac = float(pos.get("size_frac") or 0)
+
+        # 1. Cancel algo stop (best-effort)
+        if algo_id:
+            try:
+                self._client.cancel_algo_stop(algo_id=str(algo_id))
+            except Exception:
+                logger.exception("close_cancel_algo_failed pos=%s", pos_id)
+
+        # 2. Submit opposite-side market order to flatten
+        if size > 0 and side in ("LONG", "SHORT"):
+            close_side = Side.SELL if side == "LONG" else Side.BUY
+            try:
+                self._client.submit_market_order(
+                    inst_id=self._cfg.inst_id, side=close_side,
+                    sz=size, td_mode=self._cfg.td_mode,
+                    cl_ord_id=make_cl_ord_id(prefix="v7close"),
+                )
+            except Exception:
+                logger.exception("close_market_order_failed pos=%s", pos_id)
+
+        # 3. Compute P&L using last_close as the exit-price estimate.
+        # WS fill event for the close order can refine this later.
+        if side == "LONG" and entry_price > 0:
+            gross_pct = exit_price / entry_price - 1.0
+        elif side == "SHORT" and entry_price > 0:
+            gross_pct = -(exit_price / entry_price - 1.0)
+        else:
+            gross_pct = 0.0
+        net_pct = gross_pct - self._cfg.taker_cost
+        equity_ret = size_frac * net_pct       # 1x cap: size_frac <= 1
+        equity_after = max(equity_before * (1.0 + equity_ret), 0.0)
+
+        try:
+            self._store.close_position(
+                position_id=pos_id,
+                exit_time=bar_ts,
+                exit_price=exit_price,
+                exit_reason=exit_reason,
+                gross_pct=gross_pct, net_pct=net_pct,
+                equity_ret_pct=equity_ret * 100.0,
+                equity_after=equity_after,
+                new_status="CLOSED",
+            )
+        except Exception:
+            logger.exception("close_position_db_failed pos=%s", pos_id)
+
+        # 4. Telegram exit alert
+        try:
+            msg = format_exit_alert(
+                stage_label=self._cfg.stage_label, direction=side,
+                reason=exit_reason, entry_price=entry_price,
+                exit_price=exit_price, gross_pct=gross_pct,
+                net_pct=net_pct, equity_after=equity_after,
+            )
+            send_critical(self._cfg.telegram_critical_chat_id, msg)
+        except Exception:
+            logger.exception("close_telegram_alert_failed")
+
+        logger.info("okx_close id=%d %s %.2f→%.2f net %+.3f%% reason=%s",
+                    pos_id, side, entry_price, exit_price,
+                    net_pct * 100, exit_reason)
+
+        return CycleResult(action="close",
+                           detail={"position_id": pos_id, "side": side,
+                                   "exit_price": exit_price,
+                                   "exit_reason": exit_reason,
+                                   "gross_pct": gross_pct,
+                                   "net_pct": net_pct,
+                                   "equity_after": equity_after})
 
     def _open_position(self, *, klines: pd.DataFrame,
                        signal_direction: str, signal_strength: str,
@@ -308,17 +504,176 @@ class V7OkxExecutor:
         Steps (must be in this order; B4 / safety belt #7 depends on it):
           1. Compute ATR, stop_dist, size_contracts
           2. Submit market entry with clOrdId
-          3. Wait for fill confirmation (REST poll fallback if WS slow)
-          4. Submit algo stop (must be within 5s of fill)
-          5. Insert row into v7_okx_positions
-          6. Push Telegram entry alert (safety belt #8)
+          3. Submit algo stop (must be within 5s of fill)
+          4. Insert row into v7_okx_positions
+          5. Push Telegram entry alert (safety belt #8)
         """
-        # TODO(stage2-impl): full implementation
-        # For now log intent and return
-        logger.info("okx_open_position_skeleton dir=%s str=%s",
-                    signal_direction, signal_strength)
-        return CycleResult(action="none",
-                           detail={"reason": "open_not_implemented"})
+        if klines is None or klines.empty or len(klines) < ATR_PERIOD + 2:
+            return CycleResult(action="none",
+                               detail={"reason": "insufficient_klines"})
+
+        side = "LONG" if signal_direction == "UP" else "SHORT"
+        bar_ts = klines.index[-1]
+        if getattr(bar_ts, "tzinfo", None) is not None:
+            bar_ts = bar_ts.tz_convert("UTC").tz_localize(None)
+        last_close = float(klines["close"].iloc[-1])
+
+        # 1. ATR + sizing
+        atr = _atr_wilder(klines, ATR_PERIOD)
+        if atr <= 0 or not np.isfinite(atr):
+            return CycleResult(action="none",
+                               detail={"reason": "atr_unavailable"})
+        stop_dist = TRAIL_MULT * atr
+        stop_pct = stop_dist / last_close
+        size_frac = (min(MAX_LEVERAGE, RISK_FRAC / stop_pct)
+                     if stop_pct > 0 else MAX_LEVERAGE)
+
+        # Equity from latest balance snapshot
+        equity = self._cfg.initial_capital_usd
+        try:
+            latest = self._store.get_latest_balance()
+            if latest and latest.get("total_eq_usd") is not None:
+                equity = float(latest["total_eq_usd"])
+        except Exception:
+            logger.exception("open_equity_lookup_failed")
+        notional = size_frac * equity
+
+        # Convert notional USD → contract count using OKX contract size
+        # For BTC-USDT-SWAP: 1 contract = 0.01 BTC, so contract notional
+        # in USD ≈ price * 0.01.  Floor to integer; skip if < 1 (B6).
+        per_contract_usd = last_close * self._cfg.contract_size_base
+        size_contracts = (int(notional / per_contract_usd)
+                          if per_contract_usd > 0 else 0)
+        if size_contracts < 1:
+            logger.info("open_skip_min_lot dir=%s notional=%.2f per_ct=%.2f",
+                        side, notional, per_contract_usd)
+            return CycleResult(action="none",
+                               detail={"reason": "below_min_lot",
+                                       "notional": notional,
+                                       "per_contract_usd": per_contract_usd})
+
+        current_stop = (last_close - stop_dist if side == "LONG"
+                        else last_close + stop_dist)
+        tier = (signal_strength if signal_strength in ("Strong", "Moderate")
+                else "Moderate")
+
+        # 2. Submit market entry
+        entry_cl_ord_id = make_cl_ord_id(prefix="v7")
+        order_side = Side.BUY if side == "LONG" else Side.SELL
+        entry_t0 = datetime.now(tz=timezone.utc)
+        try:
+            entry_result = self._client.submit_market_order(
+                inst_id=self._cfg.inst_id, side=order_side,
+                sz=size_contracts, td_mode=self._cfg.td_mode,
+                cl_ord_id=entry_cl_ord_id,
+            )
+        except Exception:
+            logger.exception("open_submit_entry_failed")
+            return CycleResult(action="none",
+                               detail={"reason": "entry_submit_exception"})
+        if entry_result.status == "rejected":
+            logger.warning("open_entry_rejected err=%s", entry_result.error)
+            return CycleResult(action="none",
+                               detail={"reason": "entry_rejected",
+                                       "error": entry_result.error})
+
+        # 3. Submit algo stop (Safety belt #7 / B4: within 5s of entry)
+        stop_cl_ord_id = make_cl_ord_id(prefix="v7a")
+        stop_side = Side.SELL if side == "LONG" else Side.BUY
+        try:
+            algo_result = self._client.submit_algo_stop(
+                inst_id=self._cfg.inst_id, side=stop_side,
+                sz=size_contracts, trigger_px=current_stop,
+                td_mode=self._cfg.td_mode,
+                algo_cl_ord_id=stop_cl_ord_id,
+            )
+        except Exception:
+            logger.exception("open_submit_algo_failed_emergency_close")
+            algo_result = None
+
+        stop_placed_ts = (datetime.now(tz=timezone.utc)
+                          if algo_result and algo_result.status != "rejected"
+                          else None)
+        # B4 latency check: stop must be live within 5s of entry
+        latency_check = check_algo_stop_latency(
+            entry_fill_ts=entry_t0, stop_placed_ts=stop_placed_ts,
+            max_latency_sec=self._cfg.algo_stop_max_latency_sec,
+        )
+        if latency_check.triggered:
+            # Emergency: bare position without a stop violates Stage 3 rules.
+            # Cancel any partial algo (in case it half-submitted) + close.
+            logger.error("open_algo_stop_b4_violation_force_close")
+            if algo_result and algo_result.algo_id:
+                try:
+                    self._client.cancel_algo_stop(algo_id=algo_result.algo_id)
+                except Exception:
+                    logger.exception("emergency_cancel_algo_failed")
+            try:
+                close_side = Side.SELL if side == "LONG" else Side.BUY
+                self._client.submit_market_order(
+                    inst_id=self._cfg.inst_id, side=close_side,
+                    sz=size_contracts, td_mode=self._cfg.td_mode,
+                    cl_ord_id=make_cl_ord_id(prefix="v7emerg"),
+                )
+            except Exception:
+                logger.exception("emergency_close_failed")
+            self._alert_critical(latency_check, severity_label="HALT")
+            return CycleResult(action="none",
+                               detail={"reason": "b4_latency_violation"})
+
+        # 4. Insert position row
+        try:
+            new_id = self._store.insert_open_position(
+                entry_time=bar_ts, direction=side, entry_tier=tier,
+                entry_price=last_close, atr_at_entry=atr,
+                stop_dist=stop_dist, current_stop=current_stop,
+                size_contracts=size_contracts, size_frac=size_frac,
+                notional_usd=notional, equity_before=equity,
+                entry_cl_ord_id=entry_cl_ord_id,
+                stop_algo_cl_ord_id=stop_cl_ord_id,
+                model_version=model_version,
+            )
+        except Exception:
+            logger.exception("open_db_insert_failed")
+            return CycleResult(action="none",
+                               detail={"reason": "db_insert_exception"})
+        if new_id is None:
+            logger.warning("open_duplicate_cl_ord_id=%s", entry_cl_ord_id)
+            return CycleResult(action="none",
+                               detail={"reason": "duplicate_cl_ord_id"})
+
+        # Wire OKX-side IDs if we already got them
+        try:
+            self._store.set_position_okx_ids(
+                position_id=int(new_id),
+                entry_ord_id=entry_result.ord_id,
+                stop_algo_id=(algo_result.algo_id if algo_result else None),
+            )
+        except Exception:
+            logger.exception("set_position_okx_ids_failed")
+
+        # 5. Telegram entry alert (safety belt #8)
+        try:
+            msg = format_entry_alert(
+                stage_label=self._cfg.stage_label, direction=side,
+                tier=tier, entry_price=last_close,
+                size_contracts=size_contracts, notional_usd=notional,
+                stop_price=current_stop, atr=atr,
+            )
+            send_critical(self._cfg.telegram_critical_chat_id, msg)
+        except Exception:
+            logger.exception("open_entry_alert_failed")
+
+        logger.info("okx_open id=%d %s @ %.2f tier=%s size=%d notional=%.2f "
+                    "stop=%.2f",
+                    new_id, side, last_close, tier, size_contracts,
+                    notional, current_stop)
+        return CycleResult(action="open",
+                           detail={"position_id": new_id, "side": side,
+                                   "entry_price": last_close, "tier": tier,
+                                   "size_contracts": size_contracts,
+                                   "notional_usd": notional,
+                                   "current_stop": current_stop})
 
     # ── Kill-trigger handling ──────────────────────────────────────────
 

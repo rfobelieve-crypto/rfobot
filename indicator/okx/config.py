@@ -35,6 +35,10 @@ class OkxConfig:
     td_mode: Literal["cash", "cross", "isolated"] = "cross"
     pos_mode: str = "net_mode"
     leverage: int = 1                # HARD CAP 1 for Stage 2-3
+    # OKX SWAP contract size in base currency (BTC for BTC-USDT-SWAP = 0.01)
+    contract_size_base: float = 0.01
+    # Round-trip taker cost as a fraction (mirrors v7_paper_executor)
+    taker_cost: float = 0.0008
 
     # ── Risk caps (Stage 3 defaults; user accepted $100 + all 10 safety belts)
     initial_capital_usd: float = 100.0
