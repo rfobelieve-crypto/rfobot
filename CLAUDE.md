@@ -100,17 +100,25 @@ edge 確信度」的漸進過程。
 - 黑天鵝 -10% 級別 → 算下 -100% 直接歸零，連 cap 都來不及救
 - 這些情境發生過（2024-08, 2025-01），未來會再發生
 
-## Staged 進階條件對照表（更新版 2026-05-28）
+## Staged 進階條件對照表（更新版 2026-05-28，第 2 次 informed override）
+
+**2026-05-28 第二次 override**：使用者選擇**完全跳過 testnet shakeout**，直接接 live。理由是 $100 max loss 可接受，testnet 寶貴的「驗證 OKX 程式碼」功能可由 read-only live smoke 替代（同樣 0 風險）。Stage 2 從 "testnet shakeout 3-5 天" 改成 "read-only live smoke + manual approval"。
 
 | Stage | 描述 | Risk | Leverage | Daily/Total cap | 進階條件 |
 |---|---|---|---|---|---|
 | 1 | Paper trading | 0 | 1.0x | n/a | 已 active；live 啟動後**不停**作 baseline |
-| 2 | Testnet shakeout | 0 | 10x (demo) | -20% / -30% | OKX TODO 填完 + unit tests 過 + 3-5 天對帳 100% + 0 unhandled exception |
-| 3 | **Live $100**（當前目標）| -$100 上限 | **10x** | -20% / -30% | testnet 通過 + manual approval 跑 5 筆 |
+| 2 | **Read-only live smoke**（取代 testnet shakeout）| 0 | 10x | -20% / -30% | 連 OKX live：讀 balance ✓、server time NTP drift OK ✓、WS auth + 訂閱 ✓、reconciliation CONSISTENT ✓ |
+| 3 | **Live $100**（當前目標）| -$100 上限 | **10x** | -20% / -30% | Stage 2 smoke 全綠 + manual approval mode 跑 5 筆人工確認 |
 | 4a | $1k（3 個月）| 小 | 1.0x | -20% / -30% | Stage 3 跑 4 週 + net positive + MDD < 20% + 0 kill trigger |
 | 4b | $1k 1.2x | 小 | 1.2x | -15% / -25% | 4a 通過 + MDD < 10% |
 | 4c | $5k | 中 | 1.5x | -15% / -25% | 4b 通過 + 連續 6 個月 hit no kill rules |
 | 4d | $10k+ | 高 | **2.0x（絕對上限）** | -10% / -20% | 4c 通過 + 真實 Sharpe ≥ 1.5 |
+
+**跳過 testnet 的風險自負**：
+- 我們新寫的 200 行 OKX 程式碼從未在 demo 環境跑過；read-only smoke 只能驗 read path，trade path 第一次執行 = 真錢
+- 如果 _open_position 有 bug（例如算錯 size_contracts、submit 錯 side）→ 立刻真錢中招
+- Mitigation：manual approval 5 筆 = 你看著 Telegram 推的「準備下單 LONG 5 contracts @ 75000」每筆按 YES 才執行
+- 任何 manual approval 看到不對勁（方向錯、size 異常、價格離譜）→ 按 NO 取消 + 立刻回報
 
 **注意 Stage 3 → 4a 的 leverage 反而從 10x 降回 1x**：Stage 4a 起金額放大到 $1k，1 contract 不再是門檻，回到 Kelly-respecting 1x 是正解。Stage 3 的 10x 是「為了開門」的權宜，不是策略的一部分。
 
