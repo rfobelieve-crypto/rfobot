@@ -281,6 +281,63 @@ class OkxStateStore:
             finally:
                 conn.close()
 
+    # ── Balance snapshots ──────────────────────────────────────────────
+
+    def insert_balance_snapshot(self, *, total_eq_usd: float,
+                                 available_usd: float,
+                                 source: str = "ws") -> None:
+        """Persist a balance reading.  source in {'ws','rest','start'}."""
+        sql = (
+            f"INSERT INTO `{self._prefix}_balance_snapshots` "
+            "(ts, total_eq_usd, available_usd, source) "
+            "VALUES (NOW(), %s, %s, %s)"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (float(total_eq_usd),
+                                      float(available_usd), source))
+                conn.commit()
+            finally:
+                conn.close()
+
+    def get_latest_balance(self) -> Optional[dict]:
+        sql = (
+            f"SELECT * FROM `{self._prefix}_balance_snapshots` "
+            "ORDER BY ts DESC LIMIT 1"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                    return cur.fetchone()
+            finally:
+                conn.close()
+
+    def get_day_start_equity(self) -> Optional[float]:
+        """Latest snapshot from BEFORE today UTC midnight.
+
+        Used as the anchor for daily_loss_cap.  Returns None if no
+        pre-today snapshot exists (e.g. first day of operation).
+        """
+        sql = (
+            f"SELECT total_eq_usd FROM `{self._prefix}_balance_snapshots` "
+            "WHERE ts < UTC_DATE() ORDER BY ts DESC LIMIT 1"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                    row = cur.fetchone()
+                if row and row.get("total_eq_usd") is not None:
+                    return float(row["total_eq_usd"])
+                return None
+            finally:
+                conn.close()
+
     def get_consecutive_clean_days(self) -> int:
         """For Stage 3 graduation (GR-04)."""
         sql = (

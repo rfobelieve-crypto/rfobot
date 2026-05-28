@@ -26,14 +26,17 @@ from typing import Optional
 
 import pandas as pd
 
+from indicator.okx.alerter import format_kill_alert, send_critical
 from indicator.okx.client import OkxClient
 from indicator.okx.config import OkxConfig
-from indicator.okx.kill_checks import run_all_checks
+from indicator.okx.kill_checks import (
+    check_api_permissions, check_ntp_drift, run_all_checks,
+)
 from indicator.okx.reconciler import PositionReconciler
 from indicator.okx.rest import make_cl_ord_id
 from indicator.okx.state import OkxStateStore
 from indicator.okx.types import (
-    ExecutorStatus, KillCheckResult, KillSeverity, Side,
+    ExecutorStatus, KillCheckResult, KillSeverity, Position, Side,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,6 +65,8 @@ class V7OkxExecutor:
         self._cfg = cfg
         # In-memory status cache; persisted via store on every change.
         self._status: ExecutorStatus = ExecutorStatus.INIT
+        # NTP probe rate-limit: monotonic seconds of last probe.  0 = never.
+        self._last_ntp_probe: float = 0.0
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
@@ -72,10 +77,55 @@ class V7OkxExecutor:
         self._client.start_ws()
         # Wire WS callbacks to write into the store
         self._wire_ws_callbacks()
-        # Validate API key perms (safety belt #5)
-        # TODO(stage2-impl): query OKX, run check_api_permissions
-        # NTP check (safety belt #9)
-        # TODO(stage2-impl): query get_server_time, compute drift
+
+        # Safety belt #5: API key permission check
+        # Best-effort: OKX /account/config doesn't always expose perm field
+        # for main-account keys.  If we can't determine perms, log a warning
+        # but DON'T block startup — the credential set itself was already
+        # validated by validate_okx_config().
+        try:
+            acct_cfg = self._client.get_account_config() or {}
+            data_list = acct_cfg.get("data") or []
+            perm_str = ""
+            if data_list:
+                perm_str = (data_list[0].get("perm")
+                            or data_list[0].get("permissions") or "")
+            if perm_str:
+                perms = [p.strip() for p in perm_str.split(",") if p.strip()]
+                api_check = check_api_permissions(perms=perms)
+                if api_check.triggered:
+                    self._set_status(
+                        ExecutorStatus.DEMOTED,
+                        reason=f"api_perm_check_failed: {api_check.reason}",
+                        trigger_id="E4",
+                        context=api_check.context,
+                    )
+                    self._alert_critical(api_check, severity_label="DEMOTE")
+                    return
+            else:
+                logger.warning(
+                    "okx_api_perm_check_skipped_no_perm_field "
+                    "verify withdraw=OFF manually in OKX UI"
+                )
+        except Exception:
+            logger.exception("okx_api_perm_query_failed_continuing")
+
+        # Safety belt #9: NTP drift check at boot
+        ntp_check = self._probe_ntp(force=True)
+        if ntp_check is not None and ntp_check.triggered:
+            severity = ntp_check.severity
+            self._set_status(
+                ExecutorStatus.DEMOTED if severity == KillSeverity.DEMOTE
+                else ExecutorStatus.HALTED,
+                reason=f"ntp_at_start: {ntp_check.reason}",
+                trigger_id=ntp_check.trigger_id,
+                context=ntp_check.context,
+            )
+            self._alert_critical(ntp_check,
+                                  severity_label=(severity.value
+                                                  if severity else "?"))
+            return
+
         # Cold-start reconciliation
         recon = self._reconciler.reconcile_cycle()
         from indicator.okx.types import ReconciliationVerdict
@@ -85,8 +135,59 @@ class V7OkxExecutor:
                              trigger_id="A4",
                              context=recon.detail)
             return
+
+        # Anchor day_start_equity with a snapshot if none for today
+        self._snapshot_balance_if_missing()
+
         self._set_status(ExecutorStatus.READY, reason="cold_start_ok")
         self._set_status(ExecutorStatus.ACTIVE, reason="ready_to_trade")
+
+    def _probe_ntp(self, *, force: bool = False) -> Optional[KillCheckResult]:
+        """Query OKX server time, run check_ntp_drift.
+
+        Returns None if the probe itself failed (network/parse) — caller
+        treats absence as "no new evidence", not a trigger.  Rate-limited
+        to cfg.ntp_check_interval_sec between probes unless force=True.
+        """
+        now = time.monotonic()
+        if not force:
+            interval = float(self._cfg.ntp_check_interval_sec)
+            if now - self._last_ntp_probe < interval:
+                return None
+        self._last_ntp_probe = now
+        server_ts = self._client.get_server_time()
+        if server_ts is None:
+            logger.warning("okx_ntp_probe_failed_skipping_check")
+            return None
+        local_ts = time.time()
+        return check_ntp_drift(
+            local_ts_sec=local_ts,
+            server_ts_sec=server_ts,
+            halt_threshold_sec=self._cfg.ntp_drift_halt_sec,
+            demote_threshold_sec=self._cfg.ntp_drift_demote_sec,
+        )
+
+    def _snapshot_balance_if_missing(self) -> None:
+        """Write a 'start' balance snapshot if none recorded yet today.
+
+        Anchors get_day_start_equity().  Safe to skip if balance query
+        fails — daily_loss_cap will silently default to no-anchor.
+        """
+        try:
+            day_start = self._store.get_day_start_equity()
+            latest = self._store.get_latest_balance() if day_start else None
+            if day_start is not None and latest is not None:
+                return
+            balance = self._client.get_balance()
+            if balance is None:
+                return
+            self._store.insert_balance_snapshot(
+                total_eq_usd=balance.total_eq_usd,
+                available_usd=balance.available_usd,
+                source="start",
+            )
+        except Exception:
+            logger.exception("okx_balance_snapshot_at_start_failed")
 
     def stop(self) -> None:
         self._client.close()
@@ -117,24 +218,43 @@ class V7OkxExecutor:
 
         # 3. Kill checks aggregate
         connectivity = self._client.connectivity()
-        local_positions = self._store.get_all_open_positions()
-        # Compute equity from balance (stub for now)
-        # TODO(stage2-impl): use real balance & track day_start_equity
+        local_position_dicts = self._store.get_all_open_positions() or []
+        local_positions = self._dicts_to_positions(local_position_dicts)
+
+        # Equity from latest balance snapshot (WS-pushed); day_start_equity
+        # from pre-today snapshot.  Both fall back to initial_capital_usd
+        # when no snapshot exists yet (boot day before first WS event).
         equity_usd = self._cfg.initial_capital_usd
         day_start_equity = self._cfg.initial_capital_usd
+        try:
+            latest = self._store.get_latest_balance()
+            if latest and latest.get("total_eq_usd") is not None:
+                equity_usd = float(latest["total_eq_usd"])
+            day_start = self._store.get_day_start_equity()
+            if day_start is not None:
+                day_start_equity = day_start
+            else:
+                # No pre-today anchor yet — use current as the day's anchor
+                day_start_equity = equity_usd
+        except Exception:
+            logger.exception("equity_lookup_failed_using_initial")
 
-        # NTP drift check uses absolute diff; compute lazily
-        ntp_drift: Optional[float] = None
-        # TODO(stage2-impl): periodic NTP probe (every cfg.ntp_check_interval_sec)
-
+        # Periodic NTP probe (rate-limited inside _probe_ntp).
+        # If the probe itself failed we skip the NTP check this cycle.
+        ntp_result = self._probe_ntp(force=False)
+        # run_all_checks expects either None (skip NTP) or (server_ts_sec).
+        # We surface the already-computed trigger separately to preserve
+        # the trigger_id (C5 vs C6) instead of re-running check_ntp_drift.
         triggered = run_all_checks(
             cfg=self._cfg, equity_usd=equity_usd,
             day_start_equity_usd=day_start_equity,
-            local_positions=[],   # TODO: convert dicts to Position
+            local_positions=local_positions,
             reconciliation=recon,
             connectivity=connectivity,
-            ntp_drift_sec=ntp_drift,
+            ntp_drift_sec=None,
         )
+        if ntp_result is not None and ntp_result.triggered:
+            triggered.append(ntp_result)
 
         if triggered:
             self._handle_triggers(triggered)
@@ -230,7 +350,11 @@ class V7OkxExecutor:
             except Exception:
                 logger.exception("log_kill_trigger_failed")
 
-        # TODO(stage2-impl): Telegram critical alert with worst.trigger_id
+        # Telegram critical alert — severity carries from `worst`
+        self._alert_critical(
+            worst,
+            severity_label=(worst.severity.value if worst.severity else "?"),
+        )
 
         if worst.severity == KillSeverity.HARD_FREEZE:
             # Pause paper too — coordinated via ExecutorRouter
@@ -257,11 +381,61 @@ class V7OkxExecutor:
     def _force_close_all(self) -> None:
         """Cancel all algo orders + market-close all positions.
 
-        Used on DEMOTE.  Best-effort; logs failures.
+        Used on DEMOTE.  Best-effort; each step is independently
+        try/except'd so a failure in one position doesn't block the
+        others.  We're already in a terminal state; can't make it worse.
         """
-        # TODO(stage2-impl): iterate open positions, cancel stop algo,
-        # submit opposite-side market order, update DB.
-        logger.warning("force_close_all_skeleton_not_implemented")
+        try:
+            rows = self._store.get_all_open_positions() or []
+        except Exception:
+            logger.exception("force_close_all_load_positions_failed")
+            return
+
+        for row in rows:
+            pos_id = row.get("id")
+            direction = row.get("direction") or "FLAT"
+            size = int(row.get("size_contracts") or 0)
+            algo_id = row.get("stop_algo_id")
+
+            # Step 1: cancel algo stop (if we have its OKX id)
+            if algo_id:
+                try:
+                    self._client.cancel_algo_stop(algo_id=str(algo_id))
+                except Exception:
+                    logger.exception("force_close_cancel_algo_failed pos=%s",
+                                     pos_id)
+
+            # Step 2: submit opposite-side market order to flatten
+            if size > 0 and direction in ("LONG", "SHORT"):
+                close_side = Side.SELL if direction == "LONG" else Side.BUY
+                try:
+                    self._client.submit_market_order(
+                        inst_id=self._cfg.inst_id, side=close_side,
+                        sz=size, td_mode=self._cfg.td_mode,
+                        cl_ord_id=make_cl_ord_id(prefix="v7close"),
+                    )
+                except Exception:
+                    logger.exception("force_close_market_close_failed pos=%s",
+                                     pos_id)
+
+            # Step 3: mark closed in local DB (best-effort)
+            if pos_id is not None:
+                try:
+                    self._store.close_position(
+                        position_id=int(pos_id),
+                        exit_time=datetime.now(tz=timezone.utc),
+                        exit_price=float(row.get("entry_price") or 0),
+                        exit_reason="force_close",
+                        gross_pct=0.0, net_pct=0.0,
+                        equity_ret_pct=0.0,
+                        equity_after=float(row.get("equity_before") or 0),
+                        new_status="DEMOTED",
+                    )
+                except Exception:
+                    logger.exception("force_close_db_update_failed pos=%s",
+                                     pos_id)
+
+        logger.warning("force_close_all_complete n=%d", len(rows))
 
     # ── Status mgmt ────────────────────────────────────────────────────
 
@@ -294,10 +468,26 @@ class V7OkxExecutor:
         from indicator.okx.types import OrderEvent, PositionEvent, BalanceEvent
 
         def on_order(evt: OrderEvent) -> None:
-            # TODO(stage2-impl): on filled, update v7_okx_positions
-            # entry_ord_id and (if stop) algo_id mappings.
-            logger.info("ws_order_event cl_ord=%s state=%s",
-                        evt.cl_ord_id, evt.state)
+            # On fill, map OKX ord_id back into v7_okx_positions row by
+            # cl_ord_id.  Full position open/close lifecycle is owned by
+            # _open_position/_manage_position (next iteration).
+            logger.info("ws_order_event cl_ord=%s state=%s fill_px=%s",
+                        evt.cl_ord_id, evt.state, evt.fill_price)
+            try:
+                pos = self._store.get_open_position()
+                if not pos:
+                    return
+                pos_id = pos.get("id")
+                if pos_id is None:
+                    return
+                # Match by cl_ord_id to avoid cross-row contamination
+                if pos.get("entry_cl_ord_id") == evt.cl_ord_id and evt.ord_id:
+                    self._store.set_position_okx_ids(
+                        position_id=int(pos_id),
+                        entry_ord_id=evt.ord_id,
+                    )
+            except Exception:
+                logger.exception("on_order_ws_persist_failed")
 
         def on_position(evt: PositionEvent) -> None:
             # We don't auto-mutate local from this.  Reconciler does
@@ -306,10 +496,57 @@ class V7OkxExecutor:
                          evt.pos, evt.avg_price)
 
         def on_balance(evt: BalanceEvent) -> None:
-            # Used by daily_loss_cap check; persist latest
-            # TODO(stage2-impl): write balance snapshot to a separate table
-            logger.debug("ws_balance_event eq=%.2f", evt.total_eq_usd)
+            # Persist for daily_loss_cap check; insert is small (single
+            # row), runs on WS thread but doesn't block reads.
+            try:
+                self._store.insert_balance_snapshot(
+                    total_eq_usd=evt.total_eq_usd,
+                    available_usd=evt.available_usd,
+                    source="ws",
+                )
+            except Exception:
+                logger.exception("on_balance_ws_persist_failed")
 
         self._client.subscribe_orders(on_order)
         self._client.subscribe_positions(on_position)
         self._client.subscribe_balance(on_balance)
+
+    # ── Internal helpers ──────────────────────────────────────────────
+
+    def _dicts_to_positions(self,
+                             rows: list[dict]) -> list[Position]:
+        """Convert v7_okx_positions row dicts → typed Position objects.
+
+        Used only as input to check_max_position; we drop columns we
+        don't need.  Direction is stored as the human label so no
+        sign-inference needed.
+        """
+        out: list[Position] = []
+        for r in rows:
+            try:
+                out.append(Position(
+                    inst_id=self._cfg.inst_id,
+                    direction=r.get("direction") or "FLAT",
+                    size_contracts=int(r.get("size_contracts") or 0),
+                    avg_price=float(r.get("entry_price") or 0),
+                    raw=r,
+                ))
+            except Exception:
+                logger.exception("dicts_to_positions_row_failed row_id=%s",
+                                 r.get("id"))
+        return out
+
+    def _alert_critical(self, check: KillCheckResult, *,
+                         severity_label: str) -> None:
+        """Send Telegram critical alert.  Never raises."""
+        try:
+            msg = format_kill_alert(
+                trigger_id=check.trigger_id or "?",
+                severity=severity_label,
+                reason=check.reason,
+                stage_label=self._cfg.stage_label,
+                context=check.context,
+            )
+            send_critical(self._cfg.telegram_critical_chat_id, msg)
+        except Exception:
+            logger.exception("alert_critical_send_failed")

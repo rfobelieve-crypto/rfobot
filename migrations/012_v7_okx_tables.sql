@@ -80,3 +80,14 @@ CREATE TABLE IF NOT EXISTS `v7_okx_executor_status` (
   `trigger_id`      VARCHAR(16),
   `context`         JSON
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── Balance snapshots (for daily_loss_cap day-start anchor) ─────────
+
+CREATE TABLE IF NOT EXISTS `v7_okx_balance_snapshots` (
+  `id`             BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `ts`             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `total_eq_usd`   DOUBLE NOT NULL,
+  `available_usd` DOUBLE NOT NULL,
+  `source`         VARCHAR(16) NOT NULL,        -- 'ws' / 'rest' / 'start'
+  KEY `idx_ts` (`ts`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
