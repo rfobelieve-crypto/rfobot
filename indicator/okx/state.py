@@ -338,6 +338,146 @@ class OkxStateStore:
             finally:
                 conn.close()
 
+    # ── Approvals (manual-approval gate) ───────────────────────────────
+
+    def insert_pending_approval(self, *, intent_json: str,
+                                 expires_at: datetime) -> int:
+        sql = (
+            f"INSERT INTO `{self._prefix}_approvals` "
+            "(created_at, expires_at, status, intent) "
+            "VALUES (NOW(), %s, 'PENDING', %s)"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (expires_at, intent_json))
+                    new_id = cur.lastrowid
+                conn.commit()
+                return int(new_id)
+            finally:
+                conn.close()
+
+    def get_approval(self, approval_id: int) -> Optional[dict]:
+        sql = (
+            f"SELECT * FROM `{self._prefix}_approvals` "
+            "WHERE id=%s LIMIT 1"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (int(approval_id),))
+                    return cur.fetchone()
+            finally:
+                conn.close()
+
+    def decide_approval(self, *, approval_id: int, decision: str,
+                         decided_by: str) -> bool:
+        """Set status to APPROVED or DENIED.  Only succeeds if currently
+        PENDING and not expired.  Returns True on transition."""
+        assert decision in ("APPROVED", "DENIED")
+        sql = (
+            f"UPDATE `{self._prefix}_approvals` "
+            "SET status=%s, decided_at=NOW(), decided_by=%s "
+            "WHERE id=%s AND status='PENDING' AND expires_at > NOW()"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (decision, decided_by, int(approval_id)))
+                    affected = cur.rowcount
+                conn.commit()
+                return affected > 0
+            finally:
+                conn.close()
+
+    def mark_approval_executed(self, *, approval_id: int,
+                                position_id: int) -> None:
+        sql = (
+            f"UPDATE `{self._prefix}_approvals` "
+            "SET status='EXECUTED', exec_position_id=%s "
+            "WHERE id=%s AND status='APPROVED'"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (int(position_id), int(approval_id)))
+                conn.commit()
+            finally:
+                conn.close()
+
+    def mark_approval_stale(self, *, approval_id: int,
+                             reason: str = "stale") -> None:
+        sql = (
+            f"UPDATE `{self._prefix}_approvals` "
+            "SET status='STALE', decided_at=NOW(), decided_by=%s "
+            "WHERE id=%s AND status='APPROVED'"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (reason, int(approval_id)))
+                conn.commit()
+            finally:
+                conn.close()
+
+    def expire_old_approvals(self) -> int:
+        """Move PENDING rows past expires_at to EXPIRED.  Returns count."""
+        sql = (
+            f"UPDATE `{self._prefix}_approvals` "
+            "SET status='EXPIRED' "
+            "WHERE status='PENDING' AND expires_at <= NOW()"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                    affected = cur.rowcount
+                conn.commit()
+                return int(affected)
+            finally:
+                conn.close()
+
+    def get_executed_approval_count(self) -> int:
+        """Total trades approved via manual gate so far.
+
+        Used by ApprovalGate to flip into auto mode after threshold.
+        """
+        sql = (
+            f"SELECT COUNT(*) AS n FROM `{self._prefix}_approvals` "
+            "WHERE status='EXECUTED'"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                    row = cur.fetchone()
+                return int(row["n"] or 0) if row else 0
+            finally:
+                conn.close()
+
+    def get_latest_pending_approval(self) -> Optional[dict]:
+        """Used by /yes /no shortcut when user doesn't supply an id."""
+        sql = (
+            f"SELECT * FROM `{self._prefix}_approvals` "
+            "WHERE status='PENDING' AND expires_at > NOW() "
+            "ORDER BY id DESC LIMIT 1"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                    return cur.fetchone()
+            finally:
+                conn.close()
+
     def get_consecutive_clean_days(self) -> int:
         """For Stage 3 graduation (GR-04)."""
         sql = (

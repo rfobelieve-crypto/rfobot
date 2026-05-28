@@ -359,6 +359,132 @@ class TestManagePosition:
 # ── close_position P&L math ──────────────────────────────────────────
 
 
+class TestApprovalGateRouting:
+    """_open_position behavior when an ApprovalGate is attached."""
+
+    def test_manual_mode_creates_approval_no_submit(self):
+        exe, client, store, _ = _mk_executor()
+        gate = MagicMock()
+        gate.is_auto_mode.return_value = False
+        gate.request_approval.return_value = 77
+        exe._approval = gate
+
+        result = exe._open_position(klines=_mk_klines(),
+                                     signal_direction="UP",
+                                     signal_strength="Strong",
+                                     model_version="v1")
+        assert result.action == "pending_approval"
+        assert result.detail["approval_id"] == 77
+        # No order submitted
+        client.submit_market_order.assert_not_called()
+        # Intent passed to gate
+        intent = gate.request_approval.call_args.args[0]
+        assert intent.direction == "LONG"
+        assert intent.tier == "Strong"
+
+    def test_auto_mode_executes_directly(self):
+        exe, client, store, _ = _mk_executor()
+        gate = MagicMock()
+        gate.is_auto_mode.return_value = True
+        exe._approval = gate
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            result = exe._open_position(klines=_mk_klines(),
+                                         signal_direction="UP",
+                                         signal_strength="Strong",
+                                         model_version="v1")
+        assert result.action == "open"
+        client.submit_market_order.assert_called_once()
+        # No approval requested
+        gate.request_approval.assert_not_called()
+
+    def test_no_gate_executes_directly(self):
+        # Backward-compat: existing tests pass approval_gate=None
+        exe, client, store, _ = _mk_executor()
+        assert exe._approval is None
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            result = exe._open_position(klines=_mk_klines(),
+                                         signal_direction="UP",
+                                         signal_strength="Strong",
+                                         model_version="v1")
+        assert result.action == "open"
+
+    def test_approval_request_failure_returns_none(self):
+        exe, client, store, _ = _mk_executor()
+        gate = MagicMock()
+        gate.is_auto_mode.return_value = False
+        gate.request_approval.return_value = None   # DB or TG failure
+        exe._approval = gate
+        result = exe._open_position(klines=_mk_klines(),
+                                     signal_direction="UP",
+                                     signal_strength="Strong",
+                                     model_version="v1")
+        assert result.action == "none"
+        assert result.detail["reason"] == "approval_request_failed"
+        client.submit_market_order.assert_not_called()
+
+    def test_below_min_lot_returns_before_approval(self):
+        # If intent is invalid (too small to trade), don't waste an approval
+        cfg = _mk_cfg(initial_capital_usd=0.01)
+        exe, client, store, _ = _mk_executor(cfg=cfg)
+        store.get_latest_balance.return_value = {"total_eq_usd": 0.01,
+                                                  "available_usd": 0.01}
+        gate = MagicMock()
+        gate.is_auto_mode.return_value = False
+        exe._approval = gate
+        result = exe._open_position(klines=_mk_klines(),
+                                     signal_direction="UP",
+                                     signal_strength="Strong",
+                                     model_version="v1")
+        assert result.action == "none"
+        assert result.detail["reason"] == "below_min_lot"
+        gate.request_approval.assert_not_called()
+
+
+class TestExecuteApprovedIntent:
+    """execute_approved_intent: called by webhook after /yes."""
+
+    def test_executes_and_marks_approval(self):
+        from indicator.okx.approval import TradeIntent
+        exe, client, store, _ = _mk_executor()
+        gate = MagicMock()
+        exe._approval = gate
+
+        intent = TradeIntent(
+            direction="LONG", tier="Strong",
+            entry_price=75000.0, stop_price=74550.0,
+            atr=150.0, stop_dist=450.0,
+            size_contracts=5, size_frac=0.5,
+            notional_usd=375.0, equity_before=100.0,
+            bar_ts_iso="2026-05-28T12:00:00",
+            model_version="v1",
+        )
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            result = exe.execute_approved_intent(intent, approval_id=77)
+        assert result.action == "open"
+        # Approval marked executed with the position id
+        gate.mark_executed.assert_called_once()
+        kwargs = gate.mark_executed.call_args.kwargs
+        assert kwargs["approval_id"] == 77
+        assert kwargs["position_id"] == 42   # store fixture returns 42
+
+    def test_no_approval_id_does_not_mark(self):
+        from indicator.okx.approval import TradeIntent
+        exe, client, store, _ = _mk_executor()
+        gate = MagicMock()
+        exe._approval = gate
+        intent = TradeIntent(
+            direction="LONG", tier="Strong",
+            entry_price=75000.0, stop_price=74550.0,
+            atr=150.0, stop_dist=450.0,
+            size_contracts=5, size_frac=0.5,
+            notional_usd=375.0, equity_before=100.0,
+            bar_ts_iso="2026-05-28T12:00:00",
+        )
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            exe.execute_approved_intent(intent, approval_id=None)
+        gate.mark_executed.assert_not_called()
+
+
 class TestClosePnL:
     def test_long_profit(self):
         exe, client, store, _ = _mk_executor()

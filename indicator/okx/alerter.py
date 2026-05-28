@@ -88,3 +88,28 @@ def format_exit_alert(*, stage_label: str, direction: str, reason: str,
         f"gross {gross_pct * 100:+.2f}%  net {net_pct * 100:+.2f}%\n"
         f"equity: ${equity_after:.2f}"
     )
+
+
+def format_approval_request(*, approval_id: int, stage_label: str,
+                              direction: str, tier: str,
+                              entry_price: float,
+                              size_contracts: int,
+                              notional_usd: float,
+                              stop_price: float,
+                              atr: float,
+                              count_so_far: int,
+                              threshold: int) -> str:
+    """Telegram message asking the operator to confirm a pending trade.
+
+    The operator replies with /yes_<id> or /no_<id> (the suffix lets
+    multiple pending approvals be unambiguous).  count_so_far/threshold
+    shows progress toward auto-mode unlock.
+    """
+    return (
+        f"*OKX {stage_label.upper()} PENDING #{approval_id}*\n"
+        f"{direction} {tier} {size_contracts} contracts @ {entry_price:.2f}\n"
+        f"notional: ${notional_usd:.2f}  stop: {stop_price:.2f}\n"
+        f"ATR(14): {atr:.2f}\n"
+        f"Reply: `/yes_{approval_id}` or `/no_{approval_id}`\n"
+        f"(manual approvals: {count_so_far}/{threshold} before auto)"
+    )

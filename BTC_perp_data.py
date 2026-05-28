@@ -1934,6 +1934,78 @@ def _send_help(chat_id: str):
 
 
 @app.route(f"/{TOKEN}", methods=["POST"])
+def _handle_okx_approval_response(chat_id: str, raw_cmd: str) -> None:
+    """Worker thread: route /yes_<id> /no_<id> to the approval gate.
+
+    Each step's failure is reported back to the chat so the operator
+    knows whether to retry, re-issue manually, or escalate.
+    """
+    try:
+        raw = raw_cmd.strip()
+        verb_part, _, id_part = raw.partition("_")
+        verb = verb_part.lower().lstrip("/")
+        try:
+            approval_id = int(id_part)
+        except ValueError:
+            send_message(chat_id,
+                f"⚠️ 無效的 approval id: `{id_part}`\n格式: /yes_42 或 /no_42")
+            return
+
+        from indicator.okx import runner as okx_runner
+        gate = okx_runner.get_approval_gate()
+        if gate is None:
+            send_message(chat_id, "⚠️ OKX executor 未啟用 (OKX_EXECUTOR_ENABLED!=1)")
+            return
+
+        if verb == "no":
+            decision = gate.deny(approval_id, decided_by=chat_id)
+            if decision.ok:
+                send_message(chat_id, f"❌ Approval #{approval_id} DENIED")
+            else:
+                send_message(chat_id,
+                    f"⚠️ Approval #{approval_id} 拒絕失敗: {decision.status}")
+            return
+
+        # verb == "yes"
+        decision = gate.approve(approval_id, decided_by=chat_id)
+        if not decision.ok or decision.intent is None:
+            send_message(chat_id,
+                f"⚠️ Approval #{approval_id} 核准失敗: {decision.status} {decision.reason}")
+            return
+
+        executor = okx_runner.get_executor()
+        if executor is None:
+            send_message(chat_id,
+                "⚠️ Executor 已停用 — 核准記錄保留但無法執行")
+            return
+
+        # Optional drift check: pull a fresh price via REST balance ping
+        # is not the right signal; for now we trust the intent (operator
+        # is the human gate).  Drift detection is wired but not used
+        # until we have a cheap latest-price source.
+        result = executor.execute_approved_intent(
+            decision.intent, approval_id=approval_id,
+        )
+        if result.action == "open":
+            d = result.detail
+            send_message(chat_id,
+                f"✅ Approval #{approval_id} EXECUTED\n"
+                f"pos #{d.get('position_id')} {d.get('side')} "
+                f"@ {d.get('entry_price'):.2f}\n"
+                f"size: {d.get('size_contracts')} contracts  "
+                f"stop: {d.get('current_stop'):.2f}")
+        else:
+            send_message(chat_id,
+                f"⚠️ Approval #{approval_id} 核准但執行失敗: "
+                f"{result.action} {result.detail}")
+    except Exception:
+        logger.exception("okx_approval_response_failed")
+        try:
+            send_message(chat_id, f"⚠️ Approval 處理失敗 (見 log): `{raw_cmd}`")
+        except Exception:
+            pass
+
+
 def webhook():
     try:
         data = request.get_json(silent=True)
@@ -2098,6 +2170,15 @@ def webhook():
 
         elif cmd in ["/start", "/help"]:
             _send_help(chat_id)
+
+        elif cmd.startswith("/yes_") or cmd.startswith("/no_"):
+            # OKX Stage 3 manual-approval response.  /yes_<id> approves
+            # the pending trade and submits it; /no_<id> denies.
+            threading.Thread(
+                target=_handle_okx_approval_response,
+                args=(chat_id, raw_text),
+                daemon=True,
+            ).start()
 
         else:
             send_message(chat_id, "❓未知指令，輸入 /help 查看支援功能")

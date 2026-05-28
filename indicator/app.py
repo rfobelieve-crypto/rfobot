@@ -709,6 +709,25 @@ def update_cycle() -> dict:
         except Exception as e:
             _record_executor_failure("V7 paper executor", e)
 
+        # ── V7 OKX executor (Stage 3 — env-gated, 2026-05-28).
+        # Runs alongside paper cohort; paper remains the baseline.
+        # Disabled unless OKX_EXECUTOR_ENABLED=1 — see indicator/okx/runner.py
+        try:
+            from indicator.okx import runner as okx_runner
+            okx_executor = okx_runner.get_executor()
+            if okx_executor is not None:
+                from indicator.model_version import get_current_model_version
+                okx_result = okx_executor.cycle(
+                    klines=klines, signal_direction=direction,
+                    signal_strength=strength,
+                    model_version=get_current_model_version(),
+                )
+                logger.info("okx_cycle action=%s detail=%s",
+                            okx_result.action, okx_result.detail)
+                _record_executor_success("V7 OKX executor")
+        except Exception as e:
+            _record_executor_failure("V7 OKX executor", e)
+
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
 

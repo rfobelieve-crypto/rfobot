@@ -31,6 +31,7 @@ import numpy as np
 from indicator.okx.alerter import (
     format_entry_alert, format_exit_alert, format_kill_alert, send_critical,
 )
+from indicator.okx.approval import ApprovalGate, TradeIntent
 from indicator.okx.client import OkxClient
 from indicator.okx.config import OkxConfig
 from indicator.okx.kill_checks import (
@@ -83,11 +84,15 @@ class CycleResult:
 class V7OkxExecutor:
 
     def __init__(self, *, client: OkxClient, store: OkxStateStore,
-                 reconciler: PositionReconciler, cfg: OkxConfig):
+                 reconciler: PositionReconciler, cfg: OkxConfig,
+                 approval_gate: Optional[ApprovalGate] = None):
         self._client = client
         self._store = store
         self._reconciler = reconciler
         self._cfg = cfg
+        # Optional: when set, _open_position routes through approval gate
+        # until N successful manual approvals have accumulated.
+        self._approval = approval_gate
         # In-memory status cache; persisted via store on every change.
         self._status: ExecutorStatus = ExecutorStatus.INIT
         # NTP probe rate-limit: monotonic seconds of last probe.  0 = never.
@@ -501,12 +506,43 @@ class V7OkxExecutor:
                        model_version: Optional[str]) -> CycleResult:
         """Flat → open position branch.
 
-        Steps (must be in this order; B4 / safety belt #7 depends on it):
-          1. Compute ATR, stop_dist, size_contracts
-          2. Submit market entry with clOrdId
-          3. Submit algo stop (must be within 5s of fill)
-          4. Insert row into v7_okx_positions
-          5. Push Telegram entry alert (safety belt #8)
+        Routes through approval_gate if attached:
+          - Auto mode (5+ manual approvals): execute immediately
+          - Manual mode: build intent, push Telegram, return pending
+        """
+        intent = self._build_intent(
+            klines=klines, signal_direction=signal_direction,
+            signal_strength=signal_strength, model_version=model_version,
+        )
+        if isinstance(intent, CycleResult):
+            return intent   # short-circuit from validation failure
+
+        # Approval gate routing
+        if self._approval is not None and not self._approval.is_auto_mode():
+            approval_id = self._approval.request_approval(intent)
+            if approval_id is None:
+                return CycleResult(action="none",
+                                   detail={"reason": "approval_request_failed",
+                                           "intent": intent.direction})
+            return CycleResult(
+                action="pending_approval",
+                detail={"approval_id": approval_id,
+                        "direction": intent.direction,
+                        "tier": intent.tier,
+                        "size_contracts": intent.size_contracts,
+                        "entry_price": intent.entry_price},
+            )
+
+        # Auto mode (or no gate) → execute now
+        return self.execute_approved_intent(intent, approval_id=None)
+
+    def _build_intent(self, *, klines: pd.DataFrame, signal_direction: str,
+                       signal_strength: str,
+                       model_version: Optional[str]):
+        """Pure pre-trade computation: ATR / sizing / contract floor.
+
+        Returns a TradeIntent on success, or a CycleResult(action='none')
+        on validation failure (insufficient klines, bad ATR, below min lot).
         """
         if klines is None or klines.empty or len(klines) < ATR_PERIOD + 2:
             return CycleResult(action="none",
@@ -518,7 +554,6 @@ class V7OkxExecutor:
             bar_ts = bar_ts.tz_convert("UTC").tz_localize(None)
         last_close = float(klines["close"].iloc[-1])
 
-        # 1. ATR + sizing
         atr = _atr_wilder(klines, ATR_PERIOD)
         if atr <= 0 or not np.isfinite(atr):
             return CycleResult(action="none",
@@ -528,7 +563,6 @@ class V7OkxExecutor:
         size_frac = (min(MAX_LEVERAGE, RISK_FRAC / stop_pct)
                      if stop_pct > 0 else MAX_LEVERAGE)
 
-        # Equity from latest balance snapshot
         equity = self._cfg.initial_capital_usd
         try:
             latest = self._store.get_latest_balance()
@@ -536,11 +570,9 @@ class V7OkxExecutor:
                 equity = float(latest["total_eq_usd"])
         except Exception:
             logger.exception("open_equity_lookup_failed")
-        notional = size_frac * equity
+        # Leverage-adjusted buying power: at 10x, $100 controls $1000.
+        notional = size_frac * equity * float(self._cfg.leverage)
 
-        # Convert notional USD → contract count using OKX contract size
-        # For BTC-USDT-SWAP: 1 contract = 0.01 BTC, so contract notional
-        # in USD ≈ price * 0.01.  Floor to integer; skip if < 1 (B6).
         per_contract_usd = last_close * self._cfg.contract_size_base
         size_contracts = (int(notional / per_contract_usd)
                           if per_contract_usd > 0 else 0)
@@ -557,7 +589,43 @@ class V7OkxExecutor:
         tier = (signal_strength if signal_strength in ("Strong", "Moderate")
                 else "Moderate")
 
-        # 2. Submit market entry
+        return TradeIntent(
+            direction=side, tier=tier,
+            entry_price=last_close, stop_price=current_stop,
+            atr=atr, stop_dist=stop_dist,
+            size_contracts=size_contracts, size_frac=size_frac,
+            notional_usd=notional, equity_before=equity,
+            bar_ts_iso=bar_ts.isoformat(),
+            model_version=model_version,
+        )
+
+    def execute_approved_intent(self, intent: TradeIntent, *,
+                                  approval_id: Optional[int]) -> CycleResult:
+        """Submit OKX market entry + algo stop + DB insert per intent.
+
+        Called from:
+          - _open_position when in auto mode (approval_id=None)
+          - app.py /yes webhook handler after gate.approve returns
+            (approval_id=<id> so we can mark_executed)
+        """
+        side = intent.direction
+        size_contracts = intent.size_contracts
+        last_close = intent.entry_price
+        current_stop = intent.stop_price
+        atr = intent.atr
+        tier = intent.tier
+        notional = intent.notional_usd
+        equity = intent.equity_before
+
+        # Re-parse bar_ts from ISO; falls back to now if absent
+        try:
+            bar_ts = datetime.fromisoformat(intent.bar_ts_iso)
+            if bar_ts.tzinfo is not None:
+                bar_ts = bar_ts.astimezone(timezone.utc).replace(tzinfo=None)
+        except Exception:
+            bar_ts = datetime.utcnow()
+
+        # 1. Submit market entry
         entry_cl_ord_id = make_cl_ord_id(prefix="v7")
         order_side = Side.BUY if side == "LONG" else Side.SELL
         entry_t0 = datetime.now(tz=timezone.utc)
@@ -577,7 +645,7 @@ class V7OkxExecutor:
                                detail={"reason": "entry_rejected",
                                        "error": entry_result.error})
 
-        # 3. Submit algo stop (Safety belt #7 / B4: within 5s of entry)
+        # 2. Submit algo stop (Safety belt #7 / B4: within 5s of entry)
         stop_cl_ord_id = make_cl_ord_id(prefix="v7a")
         stop_side = Side.SELL if side == "LONG" else Side.BUY
         try:
@@ -594,14 +662,11 @@ class V7OkxExecutor:
         stop_placed_ts = (datetime.now(tz=timezone.utc)
                           if algo_result and algo_result.status != "rejected"
                           else None)
-        # B4 latency check: stop must be live within 5s of entry
         latency_check = check_algo_stop_latency(
             entry_fill_ts=entry_t0, stop_placed_ts=stop_placed_ts,
             max_latency_sec=self._cfg.algo_stop_max_latency_sec,
         )
         if latency_check.triggered:
-            # Emergency: bare position without a stop violates Stage 3 rules.
-            # Cancel any partial algo (in case it half-submitted) + close.
             logger.error("open_algo_stop_b4_violation_force_close")
             if algo_result and algo_result.algo_id:
                 try:
@@ -621,17 +686,18 @@ class V7OkxExecutor:
             return CycleResult(action="none",
                                detail={"reason": "b4_latency_violation"})
 
-        # 4. Insert position row
+        # 3. Insert position row
         try:
             new_id = self._store.insert_open_position(
                 entry_time=bar_ts, direction=side, entry_tier=tier,
                 entry_price=last_close, atr_at_entry=atr,
-                stop_dist=stop_dist, current_stop=current_stop,
-                size_contracts=size_contracts, size_frac=size_frac,
+                stop_dist=intent.stop_dist, current_stop=current_stop,
+                size_contracts=size_contracts,
+                size_frac=intent.size_frac,
                 notional_usd=notional, equity_before=equity,
                 entry_cl_ord_id=entry_cl_ord_id,
                 stop_algo_cl_ord_id=stop_cl_ord_id,
-                model_version=model_version,
+                model_version=intent.model_version,
             )
         except Exception:
             logger.exception("open_db_insert_failed")
@@ -642,7 +708,6 @@ class V7OkxExecutor:
             return CycleResult(action="none",
                                detail={"reason": "duplicate_cl_ord_id"})
 
-        # Wire OKX-side IDs if we already got them
         try:
             self._store.set_position_okx_ids(
                 position_id=int(new_id),
@@ -652,7 +717,12 @@ class V7OkxExecutor:
         except Exception:
             logger.exception("set_position_okx_ids_failed")
 
-        # 5. Telegram entry alert (safety belt #8)
+        # Mark approval EXECUTED if we went through the gate
+        if approval_id is not None and self._approval is not None:
+            self._approval.mark_executed(approval_id=approval_id,
+                                          position_id=int(new_id))
+
+        # 4. Telegram entry alert (safety belt #8)
         try:
             msg = format_entry_alert(
                 stage_label=self._cfg.stage_label, direction=side,
@@ -665,15 +735,16 @@ class V7OkxExecutor:
             logger.exception("open_entry_alert_failed")
 
         logger.info("okx_open id=%d %s @ %.2f tier=%s size=%d notional=%.2f "
-                    "stop=%.2f",
+                    "stop=%.2f approval=%s",
                     new_id, side, last_close, tier, size_contracts,
-                    notional, current_stop)
+                    notional, current_stop, approval_id)
         return CycleResult(action="open",
                            detail={"position_id": new_id, "side": side,
                                    "entry_price": last_close, "tier": tier,
                                    "size_contracts": size_contracts,
                                    "notional_usd": notional,
-                                   "current_stop": current_stop})
+                                   "current_stop": current_stop,
+                                   "approval_id": approval_id})
 
     # ── Kill-trigger handling ──────────────────────────────────────────
 
