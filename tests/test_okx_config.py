@@ -26,6 +26,7 @@ def _valid_cfg(**overrides) -> OkxConfig:
         passphrase="test-pass",
         telegram_critical_chat_id="critical-chat-123",
         is_simulated=1,
+        leverage=1,   # tests target old 1x semantics; new default is 10x
     )
     for k, v in overrides.items():
         setattr(base, k, v)
@@ -46,17 +47,25 @@ class TestValidConfig:
         validate_okx_config(_valid_cfg(td_mode="cash"))
 
 
-# ── Leverage cap (E1) ─────────────────────────────────────────────────
+# ── Leverage cap (E1) — Stage 3 informed override allows 1..10 ────────
 
 
 class TestLeverageCap:
-    def test_leverage_2_fails(self):
-        with pytest.raises(RuntimeError, match="E1"):
-            validate_okx_config(_valid_cfg(leverage=2))
+    def test_leverage_1_passes(self):
+        # 1x is the Kelly-respecting default for Stage 4+
+        validate_okx_config(_valid_cfg(leverage=1))
 
-    def test_leverage_3_fails(self):
+    def test_leverage_10_passes(self):
+        # 10x is the Stage 3 informed-override ceiling (2026-05-28)
+        validate_okx_config(_valid_cfg(leverage=10))
+
+    def test_leverage_11_fails(self):
         with pytest.raises(RuntimeError, match="E1"):
-            validate_okx_config(_valid_cfg(leverage=3))
+            validate_okx_config(_valid_cfg(leverage=11))
+
+    def test_leverage_25_fails(self):
+        with pytest.raises(RuntimeError, match="E1"):
+            validate_okx_config(_valid_cfg(leverage=25))
 
     def test_leverage_0_fails(self):
         with pytest.raises(RuntimeError, match="E1"):

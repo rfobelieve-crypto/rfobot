@@ -73,26 +73,56 @@ edge 確信度」的漸進過程。
 - Edge 若是 fake，$100 是發現的成本（mistake.md 應記：用 $100 換 edge 真假驗證，比 5 個月等更便宜）
 - 一旦 hit 任何 kill trigger，**回到 Stage 1 重新驗證**不是「凹下去」
 
-## Staged 進階條件對照表（更新版）
+## 10x leverage informed override (2026-05-28)
 
-| Stage | 描述 | Risk | Leverage | 進階條件 |
-|---|---|---|---|---|
-| 1 | Paper trading | 0 | 1.0x | 已 active；live 啟動後**不停**作 baseline |
-| 2 | Testnet shakeout | 0 | 1.0x | OKX TODO 填完 + unit tests 過 + 3-5 天對帳 100% + 0 unhandled exception |
-| 3 | **Live $100**（當前目標）| -$100 上限 | 1.0x | testnet 通過 + manual approval 跑 5 筆 |
-| 4a | $1k（3 個月）| 小 | 1.0x | Stage 3 跑 4 週 + net positive + MDD < 20% + 0 kill trigger |
-| 4b | $1k 1.2x | 小 | 1.2x | 4a 通過 + MDD < 10% |
-| 4c | $5k | 中 | 1.5x | 4b 通過 + 連續 6 個月 hit no kill rules |
-| 4d | $10k+ | 高 | **2.0x（絕對上限）** | 4c 通過 + 真實 Sharpe ≥ 1.5 |
+**背景**：BTC-USDT-SWAP 1 contract = 0.01 BTC ≈ $750 notional。$100 + 1x leverage 連 1 contract 都開不了 → Stage 3 完全卡死。使用者選擇接受 informed override：保 $100 capital、鬆 leverage cap 到 10x 讓 1 contract 開得起來。
+
+**這條 override 違反兩條既有規則**：
+- §Leverage ladder 數學依據：Kelly optimal 0.56x，1x 已超過 Kelly；10x 是 17.8x Kelly
+- §仍然禁止的：「禁因為想賺更多就改 leverage cap——cap 來自數學不是情緒」
+
+**為什麼接受**：
+- 這次不是「想賺更多」，是「為了讓 testnet/live 能跑出第一筆有意義 trade」
+- 沒 leverage 鬆，Stage 3 永遠走不到（連 1 contract 都開不了）
+- Stage 3 的本意是 operational stress test + edge 二次驗證，不是 alpha 機器；$100 全輸的成本可接受
+
+**為了補償 10x 的數學風險，kill switches 同步收緊**：
+- daily_loss_cap_pct: -50% → **-20%**（10x 下 -20% account ≈ -2% BTC，stop-out 3 筆觸發）
+- total_loss_cap_pct: -50% → **-30%**（career-end，Stage 3 結束）
+
+**10x 下單筆風險**：
+- 3xATR stop 在 10x = 約 -6% account = -$6 per stop-out
+- 3 連虧 = -18% = 接近 daily cap → halt
+- 5 連虧 = -30% = total cap → Stage 3 終結
+
+**真會死的情境**（必須接受才能走這條）：
+- BTC 一晚 -3% 跳空（leverage 算下 -30% account 直接掃 total cap）
+- 黑天鵝 -10% 級別 → 算下 -100% 直接歸零，連 cap 都來不及救
+- 這些情境發生過（2024-08, 2025-01），未來會再發生
+
+## Staged 進階條件對照表（更新版 2026-05-28）
+
+| Stage | 描述 | Risk | Leverage | Daily/Total cap | 進階條件 |
+|---|---|---|---|---|---|
+| 1 | Paper trading | 0 | 1.0x | n/a | 已 active；live 啟動後**不停**作 baseline |
+| 2 | Testnet shakeout | 0 | 10x (demo) | -20% / -30% | OKX TODO 填完 + unit tests 過 + 3-5 天對帳 100% + 0 unhandled exception |
+| 3 | **Live $100**（當前目標）| -$100 上限 | **10x** | -20% / -30% | testnet 通過 + manual approval 跑 5 筆 |
+| 4a | $1k（3 個月）| 小 | 1.0x | -20% / -30% | Stage 3 跑 4 週 + net positive + MDD < 20% + 0 kill trigger |
+| 4b | $1k 1.2x | 小 | 1.2x | -15% / -25% | 4a 通過 + MDD < 10% |
+| 4c | $5k | 中 | 1.5x | -15% / -25% | 4b 通過 + 連續 6 個月 hit no kill rules |
+| 4d | $10k+ | 高 | **2.0x（絕對上限）** | -10% / -20% | 4c 通過 + 真實 Sharpe ≥ 1.5 |
+
+**注意 Stage 3 → 4a 的 leverage 反而從 10x 降回 1x**：Stage 4a 起金額放大到 $1k，1 contract 不再是門檻，回到 Kelly-respecting 1x 是正解。Stage 3 的 10x 是「為了開門」的權宜，不是策略的一部分。
 
 ## 仍然禁止的（避免在錯的階段做錯事）
-- **Stage 2-3**：禁鬆 hard kill switches；leverage hard cap = 1.0x
+- **Stage 2-3**：禁鬆 hard kill switches 以外的 trigger；leverage hard cap = 10x（不可再放寬）
 - **Stage 3**：禁未經 manual approval 5 筆就切自動；禁 paper cohort 停寫
+- **Stage 3 → 4a**：leverage 必須降回 1.0x；不能因為 $100 賺到 $200 就用 10x 加碼
 - **Stage 4a-d**：leverage 階梯式放寬，**絕對上限 2.0x**；未 hit 各子階段條件不得進下一格
 - **Stage 4 後**：禁 leverage > 2.0x，除非滿足「24 個月實盤 Sharpe ≥ 3.0」（見 §Leverage ladder 數學依據）
 - 任何階段：strategy sweep 必須留 OOS hold-out，禁全資料 fit
 - 任何階段：禁因為「最近表現好」就跳階段——必須 hit hard rules
-- 任何階段：禁因為「想賺更多」就改 leverage cap——cap 來自數學不是情緒
+- 任何階段：禁再鬆 leverage cap——10x 已經是「informed 一次」的極限；下次再要鬆要寫進 mistake.md
 - 任何階段：hit kill trigger 必須降階重驗，不准「我覺得這次例外」
 
 ## 系統架構（v7 Dual-Model）

@@ -46,16 +46,15 @@ def _mk_klines(n: int = 40, start_price: float = 75000.0,
 
 
 def _mk_cfg(**overrides) -> OkxConfig:
-    # NOTE: tests use a $10k notional so size_contracts > 0 with BTC at
-    # $75k (1 contract = 0.01 BTC = $750 notional).  The real Stage 3
-    # ceiling is $100 in CLAUDE.md — that's an open product issue
-    # (cannot fit 1 contract).  Tests verify *logic*, not viable sizes.
+    # Default tests use $10k so size_contracts > 0 cleanly.  The real
+    # Stage 3 ceiling is $100 + 10x leverage (informed override 2026-05-28).
     base = OkxConfig(
         api_key="k", api_secret="s", passphrase="p",
         telegram_critical_chat_id="critical-chat",
         initial_capital_usd=10000.0,
         contract_size_base=0.01,
         is_simulated=1,
+        leverage=10,
     )
     for k, v in overrides.items():
         setattr(base, k, v)

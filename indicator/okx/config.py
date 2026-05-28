@@ -34,18 +34,24 @@ class OkxConfig:
     inst_id: str = "BTC-USDT-SWAP"
     td_mode: Literal["cash", "cross", "isolated"] = "cross"
     pos_mode: str = "net_mode"
-    leverage: int = 1                # HARD CAP 1 for Stage 2-3
+    # Leverage hard cap = 10x (Stage 3 informed override 2026-05-28).
+    # Required for $100 capital to fit 1 BTC-USDT-SWAP contract
+    # (1 contract = 0.01 BTC ≈ $750 notional).  Trade-off documented
+    # in CLAUDE.md §"10x leverage informed override".
+    leverage: int = 10
     # OKX SWAP contract size in base currency (BTC for BTC-USDT-SWAP = 0.01)
     contract_size_base: float = 0.01
     # Round-trip taker cost as a fraction (mirrors v7_paper_executor)
     taker_cost: float = 0.0008
 
-    # ── Risk caps (Stage 3 defaults; user accepted $100 + all 10 safety belts)
+    # ── Risk caps (Stage 3 defaults; tightened for 10x leverage)
     initial_capital_usd: float = 100.0
     risk_frac: float = 0.02
     max_position_count: int = 1
-    daily_loss_cap_pct: float = -50.0   # Safety belt #3: -50% of capital
-    total_loss_cap_pct: float = -50.0   # Safety belt #4: -50% of capital
+    # Tightened on 2026-05-28 for 10x leverage.  At 10x, a 2% BTC move
+    # = 20% account move, so the old -50% cap was meaningless.
+    daily_loss_cap_pct: float = -20.0   # Safety belt #3
+    total_loss_cap_pct: float = -30.0   # Safety belt #4 (career-end)
 
     # ── Monitoring intervals
     reconciliation_interval_sec: int = 60
@@ -88,14 +94,14 @@ def validate_okx_config(cfg: OkxConfig) -> None:
     """Fail-fast validation.  Raises RuntimeError on violation.
 
     These checks correspond to kill_criteria.md §2E (should-never-happen):
-      E1: leverage > 1
+      E1: leverage outside Stage 3 informed-override range [1, 10]
       E2: posMode != net_mode
       E4: withdraw permission (checked separately via REST query in startup)
     """
-    # E1
-    if cfg.leverage != 1:
+    # E1 — Stage 3 informed override (2026-05-28): leverage may be 1..10
+    if not (1 <= cfg.leverage <= 10):
         raise RuntimeError(
-            f"E1: Stage 2-3 leverage hard cap = 1, got {cfg.leverage}"
+            f"E1: Stage 3 leverage must be in [1, 10], got {cfg.leverage}"
         )
     # E2
     if cfg.pos_mode != "net_mode":
