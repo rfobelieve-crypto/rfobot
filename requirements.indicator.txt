@@ -16,3 +16,4 @@ yfinance
 plotly
 shap
 anthropic
+websocket-client
