@@ -154,6 +154,14 @@ class OkxWsPrivateClient:
         self._auth_count: int = 0          # total successful auths
         self._connect_count: int = 0       # total connect attempts
         self._session_authed: bool = False  # auth status for current session
+        # Per-session breadcrumbs (overwritten each connect)
+        self._last_session_opened: bool = False
+        self._last_session_login_sent: bool = False
+        self._last_session_msgs_received: int = 0
+        self._last_session_close_code: Optional[int] = None
+        self._last_session_close_msg: Optional[str] = None
+        self._last_session_last_msg: Optional[str] = None  # first 200 chars
+        self._last_ws_error: Optional[str] = None
 
         # ── Callbacks (set by consumer)
         self._on_order: Optional[OrderCallback] = None
@@ -231,6 +239,16 @@ class OkxWsPrivateClient:
             "last_error": self._last_error,
             "subscribed_channels": sorted(self._subscribed_channels),
             "ws_url": self._ws_url(),
+            # Per-session breadcrumbs (latest session)
+            "last_session": {
+                "opened": self._last_session_opened,
+                "login_sent": self._last_session_login_sent,
+                "msgs_received": self._last_session_msgs_received,
+                "last_msg_preview": self._last_session_last_msg,
+                "close_code": self._last_session_close_code,
+                "close_msg": self._last_session_close_msg,
+                "ws_error": self._last_ws_error,
+            },
         }
 
     # ── Internal: connection loop ──────────────────────────────────────
@@ -248,6 +266,13 @@ class OkxWsPrivateClient:
         while not self._stop_evt.is_set():
             self._connect_count += 1
             self._session_authed = False    # reset per-session
+            self._last_session_opened = False
+            self._last_session_login_sent = False
+            self._last_session_msgs_received = 0
+            self._last_session_close_code = None
+            self._last_session_close_msg = None
+            self._last_session_last_msg = None
+            self._last_ws_error = None
             try:
                 logger.info("okx_ws_connecting attempt=%d", attempt)
                 self._connect_once()
@@ -296,6 +321,7 @@ class OkxWsPrivateClient:
         def on_open(ws):
             with self._lock:
                 self._connected = True
+                self._last_session_opened = True
                 self._last_msg_ts = time.time()
             logger.info("okx_ws_opened")
             # Authenticate
@@ -303,6 +329,8 @@ class OkxWsPrivateClient:
 
         def on_message(ws, raw_msg: str):
             self._last_msg_ts = time.time()
+            self._last_session_msgs_received += 1
+            self._last_session_last_msg = (raw_msg or "")[:200]
             try:
                 self._handle_message(raw_msg)
             except Exception:
@@ -311,11 +339,15 @@ class OkxWsPrivateClient:
 
         def on_error(ws, err):
             logger.warning("okx_ws_error err=%s", err)
+            self._last_ws_error = f"{type(err).__name__}: {err}"
 
         def on_close(ws, code, msg):
             with self._lock:
                 self._connected = False
                 self._authenticated = False
+                self._last_session_close_code = code
+                self._last_session_close_msg = (str(msg)[:200]
+                                                  if msg else None)
             logger.warning("okx_ws_closed code=%s msg=%s", code, msg)
 
         self._ws = websocket.WebSocketApp(
@@ -350,9 +382,11 @@ class OkxWsPrivateClient:
         }
         try:
             ws.send(json.dumps(login))
+            self._last_session_login_sent = True
             logger.info("okx_ws_login_sent")
-        except Exception:
+        except Exception as e:
             logger.exception("okx_ws_login_send_failed")
+            self._last_ws_error = f"login_send_exc: {e}"
 
     def _try_subscribe(self, channels: list[str]) -> None:
         """Send a subscribe message if currently connected + authenticated.
