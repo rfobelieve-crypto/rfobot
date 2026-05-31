@@ -963,30 +963,52 @@ def okx_status_api():
     """Inspect OKX runner singleton state.  Returns diagnostic info
     on whether the env flag is recognised, init has run, and what
     the executor's current state machine value is.
+
+    Defensively wrapped — every section's exception is captured so we
+    can see exactly where it fails on Railway without grepping logs.
     """
     import os
-    from indicator.okx import runner as okx_runner
+    import traceback
     out = {
         "env_OKX_EXECUTOR_ENABLED": os.environ.get(
             "OKX_EXECUTOR_ENABLED", "<unset>"),
         "env_STAGE": os.environ.get("STAGE", "<unset>"),
-        "env_OKX_API_KEY_LIVE": ("set" if os.environ.get(
-            "OKX_API_KEY_LIVE") else "<unset>"),
-        "env_OKX_API_SECRET_LIVE": ("set" if os.environ.get(
-            "OKX_API_SECRET_LIVE") else "<unset>"),
-        "env_OKX_PASSPHRASE_LIVE": ("set" if os.environ.get(
-            "OKX_PASSPHRASE_LIVE") else "<unset>"),
-        "env_TG_CRITICAL_CHAT_ID": ("set" if os.environ.get(
-            "TG_CRITICAL_CHAT_ID") else "<unset>"),
-        "runner_is_enabled": okx_runner.is_enabled(),
-        "runner_init_failed": okx_runner._INIT_FAILED,
-        "runner_instance_alive": okx_runner._INSTANCE is not None,
+        "env_OKX_API_KEY_LIVE_set": bool(os.environ.get(
+            "OKX_API_KEY_LIVE")),
+        "env_OKX_API_SECRET_LIVE_set": bool(os.environ.get(
+            "OKX_API_SECRET_LIVE")),
+        "env_OKX_PASSPHRASE_LIVE_set": bool(os.environ.get(
+            "OKX_PASSPHRASE_LIVE")),
+        "env_TG_CRITICAL_CHAT_ID_set": bool(os.environ.get(
+            "TG_CRITICAL_CHAT_ID")),
     }
-    if okx_runner._INSTANCE is not None:
-        try:
-            out["executor_status"] = okx_runner._INSTANCE.get_status().value
-        except Exception as e:
-            out["executor_status_err"] = str(e)
+    # Attempt import + introspection independently
+    try:
+        from indicator.okx import runner as okx_runner
+        out["runner_import"] = "ok"
+        out["runner_is_enabled"] = okx_runner.is_enabled()
+        out["runner_init_failed"] = okx_runner._INIT_FAILED
+        out["runner_instance_alive"] = okx_runner._INSTANCE is not None
+        if okx_runner._INSTANCE is not None:
+            try:
+                out["executor_status"] = (
+                    okx_runner._INSTANCE.get_status().value)
+            except Exception as e:
+                out["executor_status_err"] = repr(e)
+    except Exception as e:
+        out["runner_import"] = "FAIL"
+        out["runner_import_err"] = repr(e)
+        out["runner_import_traceback"] = traceback.format_exc()
+
+    # Also test approval module load independently
+    try:
+        from indicator.okx.approval import ApprovalGate
+        out["approval_import"] = "ok"
+    except Exception as e:
+        out["approval_import"] = "FAIL"
+        out["approval_import_err"] = repr(e)
+        out["approval_import_traceback"] = traceback.format_exc()
+
     return jsonify(out)
 
 
