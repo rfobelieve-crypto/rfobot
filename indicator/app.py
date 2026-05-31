@@ -995,6 +995,10 @@ def okx_status_api():
                     okx_runner._INSTANCE.get_status().value)
             except Exception as e:
                 out["executor_status_err"] = repr(e)
+            try:
+                out["ws_diag"] = okx_runner._INSTANCE._client.diag_state()
+            except Exception as e:
+                out["ws_diag_err"] = repr(e)
     except Exception as e:
         out["runner_import"] = "FAIL"
         out["runner_import_err"] = repr(e)

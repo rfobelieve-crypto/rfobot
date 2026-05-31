@@ -108,3 +108,11 @@ class OkxClient:
         status.rest_last_latency_ms = self._rest.last_latency_ms()
         status.rest_circuit_tripped = self._rest.is_circuit_tripped()
         return status
+
+    def diag_state(self) -> dict:
+        """Diagnostic snapshot — surface WS internals to /okx-status."""
+        return {
+            "ws_private": self._ws_private.diag_state(),
+            "rest_last_latency_ms": self._rest.last_latency_ms(),
+            "rest_circuit_tripped": self._rest.is_circuit_tripped(),
+        }

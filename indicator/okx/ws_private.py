@@ -149,6 +149,11 @@ class OkxWsPrivateClient:
         self._consecutive_reconnect_fails: int = 0
         self._last_reconnect_ts: Optional[datetime] = None
         self._subscribed_channels: set[str] = set()
+        # ── Diagnostic state (read by /okx-status)
+        self._last_error: Optional[str] = None
+        self._auth_count: int = 0          # total successful auths
+        self._connect_count: int = 0       # total connect attempts
+        self._session_authed: bool = False  # auth status for current session
 
         # ── Callbacks (set by consumer)
         self._on_order: Optional[OrderCallback] = None
@@ -209,22 +214,56 @@ class OkxWsPrivateClient:
             consecutive_reconnect_fails=self._consecutive_reconnect_fails,
         )
 
+    def diag_state(self) -> dict:
+        """Diagnostic snapshot for /okx-status; not used by executor."""
+        now = time.time()
+        return {
+            "connected": self._connected,
+            "authenticated": self._authenticated,
+            "session_authed": self._session_authed,
+            "connect_count": self._connect_count,
+            "auth_count": self._auth_count,
+            "consecutive_reconnect_fails": self._consecutive_reconnect_fails,
+            "last_msg_age_sec": (now - self._last_msg_ts
+                                  if self._last_msg_ts > 0 else None),
+            "last_reconnect_ts": (self._last_reconnect_ts.isoformat()
+                                   if self._last_reconnect_ts else None),
+            "last_error": self._last_error,
+            "subscribed_channels": sorted(self._subscribed_channels),
+            "ws_url": self._ws_url(),
+        }
+
     # ── Internal: connection loop ──────────────────────────────────────
 
     def _run_loop(self) -> None:
-        """Main reconnect loop.  Runs until stop()."""
+        """Main reconnect loop.  Runs until stop().
+
+        Counter semantics:
+          - consecutive_reconnect_fails counts SESSIONS that died WITHOUT
+            ever reaching successful auth.  A session that auth'd, ran,
+            then closed normally does NOT increment (that's a normal
+            OKX-side keepalive cycle, not a failure).
+        """
         attempt = 0
         while not self._stop_evt.is_set():
+            self._connect_count += 1
+            self._session_authed = False    # reset per-session
             try:
                 logger.info("okx_ws_connecting attempt=%d", attempt)
                 self._connect_once()
-                # If we exit _connect_once cleanly (without exception),
-                # OKX closed our connection.  Count as a fail.
-                self._consecutive_reconnect_fails += 1
+                # _connect_once returned → session ended.  If we never
+                # auth'd this session, count as a fail; otherwise treat
+                # the close as benign and reset the consecutive counter.
+                if self._session_authed:
+                    self._consecutive_reconnect_fails = 0
+                else:
+                    self._consecutive_reconnect_fails += 1
+                    self._last_error = "session_ended_without_auth"
             except Exception as e:
                 logger.warning("okx_ws_connect_failed attempt=%d err=%s",
                                attempt, e)
                 self._consecutive_reconnect_fails += 1
+                self._last_error = f"connect_exception: {type(e).__name__}: {e}"
 
             if self._stop_evt.is_set():
                 break
@@ -344,6 +383,8 @@ class OkxWsPrivateClient:
         if msg.get("event") == "login":
             if msg.get("code") == "0":
                 self._authenticated = True
+                self._session_authed = True
+                self._auth_count += 1
                 self._consecutive_reconnect_fails = 0
                 logger.info("okx_ws_authenticated")
                 # Re-subscribe everything we knew about
@@ -351,6 +392,7 @@ class OkxWsPrivateClient:
                     self._try_subscribe(list(self._subscribed_channels))
             else:
                 logger.error("okx_ws_login_failed msg=%s", msg)
+                self._last_error = f"login_failed: {msg}"
             return
 
         # Subscribe ack
