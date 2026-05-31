@@ -76,9 +76,6 @@ def _make_reply_markup():
             {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
             {"text": "\U0001f916 V7 Stats", "callback_data": "v7_stats"},
         ],
-        [
-            {"text": "\U0001f4cb Meeting", "callback_data": "meeting"},
-        ],
     ]})
 
 

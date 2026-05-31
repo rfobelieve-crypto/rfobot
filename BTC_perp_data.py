@@ -2053,9 +2053,6 @@ def webhook():
                 threading.Thread(target=_handle_v7_stats, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "decay":
                 threading.Thread(target=_handle_alpha_decay, args=(cb_chat_id,), daemon=True).start()
-            elif cb_data == "meeting":
-                send_message(cb_chat_id, "\U0001f4cb AI Meeting 啟動中... 5 個 agent 正在調查系統狀態，完成後會發送報告。")
-                threading.Thread(target=_handle_meeting, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "help":
                 _send_help(cb_chat_id)
             return "ok"
