@@ -1934,6 +1934,23 @@ def _send_help(chat_id: str):
 
 
 @app.route(f"/{TOKEN}", methods=["POST"])
+def _handle_okx_perf(chat_id: str) -> None:
+    """Fetch OKX live cohort report via the indicator service."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        resp = requests.get(
+            f"{INDICATOR_SERVICE_URL}/okx-perf", timeout=30,
+        )
+        data = resp.json() if resp.status_code == 200 else {}
+        text = data.get("text", "❌ OKX perf 查詢失敗")
+        send_message(chat_id, text)
+    except Exception as e:
+        logger.exception("okx_perf error: %s", e)
+        send_message(chat_id, f"❌ OKX perf 查詢失敗: {e}")
+
+
 def _handle_okx_approval_response(chat_id: str, raw_cmd: str) -> None:
     """Worker thread: route /yes_<id> /no_<id> to the approval gate.
 
@@ -2053,6 +2070,8 @@ def webhook():
                 threading.Thread(target=_handle_v7_stats, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "decay":
                 threading.Thread(target=_handle_alpha_decay, args=(cb_chat_id,), daemon=True).start()
+            elif cb_data == "okx_perf":
+                threading.Thread(target=_handle_okx_perf, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "help":
                 _send_help(cb_chat_id)
             return "ok"
@@ -2167,6 +2186,11 @@ def webhook():
 
         elif cmd in ["/start", "/help"]:
             _send_help(chat_id)
+
+        elif cmd in ("/okx_perf", "/okxperf"):
+            threading.Thread(
+                target=_handle_okx_perf, args=(chat_id,), daemon=True,
+            ).start()
 
         elif cmd.startswith("/yes_") or cmd.startswith("/no_"):
             # OKX Stage 3 manual-approval response.  /yes_<id> approves

@@ -462,7 +462,14 @@ class V7OkxExecutor:
         else:
             gross_pct = 0.0
         net_pct = gross_pct - self._cfg.taker_cost
-        equity_ret = size_frac * net_pct       # 1x cap: size_frac <= 1
+        # implied leverage = notional / equity_before; with 10x cfg the
+        # equity move is 10x the gross trade %.  Previously this missed
+        # the leverage factor and under-recorded equity changes by 10x.
+        notional = float(pos.get("notional_usd") or 0)
+        if equity_before > 0 and notional > 0:
+            equity_ret = (notional / equity_before) * net_pct
+        else:
+            equity_ret = size_frac * net_pct   # fallback for very old rows
         equity_after = max(equity_before * (1.0 + equity_ret), 0.0)
 
         try:

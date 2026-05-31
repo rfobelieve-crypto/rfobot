@@ -55,10 +55,17 @@ ATR_PERIOD = 14
 TRAIL_MULT = 3.0            # 3 x ATR(14) trailing stop
 TIME_CAP_HOURS = 72         # safety cap on holding period
 TAKER_COST = 0.0008         # round-trip 8 bps
-INITIAL_CAPITAL_USD = 1000.0
 RISK_FRAC = 0.02            # 2% of equity risked per trade (see risk_manager.py)
-MAX_LEVERAGE = 1.0          # leverage cap (notional <= 1x equity)
+MAX_LEVERAGE_FRAC = 1.0     # size_frac cap (notional ≤ MAX_LEVERAGE_FRAC × equity)
 TRANSITION_PAUSE_HOURS = 48  # shadow V7 entries for 48h after a model retrain
+
+# Live mirror mode (2026-06-01): paper now reflects what live OKX would
+# do — same leverage, same starting capital.  Trades opened before the
+# cutover stay legacy 1x and finish on the original equity track; trades
+# opened at/after cutover use LEVERAGE for sizing AND P&L.
+LEVERAGE = 10.0
+INITIAL_CAPITAL_USD = 155.0   # was 1000.0 (1x era)
+COHORT_CUTOVER = pd.Timestamp("2026-06-01T00:00:00")  # naive UTC
 
 TABLE = "v7_paper_positions"
 
@@ -144,17 +151,24 @@ def get_open_position() -> Optional[dict]:
 
 
 def get_current_equity() -> float:
-    """Latest equity = equity_after of the most recent CLOSED trade, else seed."""
+    """Latest equity = equity_after of the most recent CLOSED trade in
+    the current cohort (post-COHORT_CUTOVER), else seed.
+
+    Legacy 1x trades (entry_time < COHORT_CUTOVER) are excluded so the
+    10x live-mirror cohort starts cleanly from INITIAL_CAPITAL_USD.
+    """
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
             try:
                 cur.execute(f"""
                     SELECT equity_after FROM `{TABLE}`
-                    WHERE status = 'CLOSED' AND equity_after IS NOT NULL
+                    WHERE status = 'CLOSED'
+                      AND equity_after IS NOT NULL
+                      AND entry_time >= %s
                     ORDER BY exit_time DESC, id DESC
                     LIMIT 1
-                """)
+                """, (COHORT_CUTOVER.strftime("%Y-%m-%d %H:%M:%S"),))
                 row = cur.fetchone()
             except Exception as exc:
                 if "doesn't exist" in str(exc).lower():
@@ -218,18 +232,29 @@ def update_trail(position_id: int, trail_extreme: float,
 
 def close_position(pos: dict, exit_time: datetime, exit_price: float,
                    exit_reason: str, bars_held: int) -> dict:
-    """Close an open position; fill outcome + compounded equity columns."""
+    """Close an open position; fill outcome + compounded equity columns.
+
+    P&L uses the position's own implied leverage = notional / equity_before
+    so legacy 1x rows and new 10x rows both compute correctly without a
+    schema change.  (notional was recorded at open time with whatever
+    LEVERAGE was in effect then.)
+    """
     direction = pos["direction"]
     entry_price = float(pos["entry_price"])
-    size_frac = float(pos["size_frac"])
     equity_before = float(pos["equity_before"])
+    notional = float(pos.get("notional_usd") or equity_before)
 
     if direction == "LONG":
         gross_pct = exit_price / entry_price - 1.0
     else:
         gross_pct = -(exit_price / entry_price - 1.0)
     net_pct = gross_pct - TAKER_COST
-    equity_ret = size_frac * net_pct                 # 1x cap: size_frac <= 1
+    # implied_leverage = notional / equity_before
+    # equity_ret      = implied_leverage × net_pct
+    if equity_before > 0:
+        equity_ret = (notional / equity_before) * net_pct
+    else:
+        equity_ret = 0.0
     equity_after = max(equity_before * (1.0 + equity_ret), 0.0)
     win = int(gross_pct > 0)
 
@@ -452,9 +477,10 @@ def run_cycle(klines: pd.DataFrame, signal_direction: str,
     side = "LONG" if direction_up else "SHORT"
     stop_dist = TRAIL_MULT * atr
     stop_pct = stop_dist / last_close
-    size_frac = min(MAX_LEVERAGE, RISK_FRAC / stop_pct) if stop_pct > 0 else MAX_LEVERAGE
+    size_frac = (min(MAX_LEVERAGE_FRAC, RISK_FRAC / stop_pct)
+                 if stop_pct > 0 else MAX_LEVERAGE_FRAC)
     equity = get_current_equity()
-    notional = size_frac * equity
+    notional = size_frac * equity * LEVERAGE   # live-mirror: 10x notional
     current_stop = (last_close - stop_dist if side == "LONG"
                     else last_close + stop_dist)
     tier = signal_strength if signal_strength in ("Strong", "Moderate") else "Moderate"

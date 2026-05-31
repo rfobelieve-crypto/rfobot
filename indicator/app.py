@@ -76,6 +76,9 @@ def _make_reply_markup():
             {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
             {"text": "\U0001f916 V7 Stats", "callback_data": "v7_stats"},
         ],
+        [
+            {"text": "\U0001f4b0 OKX Perf", "callback_data": "okx_perf"},
+        ],
     ]})
 
 
@@ -1484,6 +1487,23 @@ def hybrid_chart_api():
     except Exception as e:
         logger.exception("Hybrid chart failed")
         return f"<h3>Hybrid chart 失敗: {e}</h3>", 500
+
+
+@app.route("/okx-perf", methods=["GET"])
+def okx_perf_api():
+    """OKX live Stage 3 cohort report — equity / WR / Sharpe / open pos.
+
+    HTML body for direct browser viewing; the JSON shape ({"text": ...})
+    mirrors /paper-perf so a Telegram /okx-perf command can reuse the
+    same handler pattern.
+    """
+    try:
+        from indicator.okx.report import get_okx_report
+        report = get_okx_report()
+        return jsonify({"text": report})
+    except Exception as e:
+        logger.exception("OKX perf failed")
+        return jsonify({"text": f"❌ OKX perf query failed: {e}"}), 500
 
 
 @app.route("/paper-perf", methods=["GET"])
