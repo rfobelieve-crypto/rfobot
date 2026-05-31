@@ -958,6 +958,38 @@ def prediction_json():
     return jsonify(pred)
 
 
+@app.route("/okx-status", methods=["GET"])
+def okx_status_api():
+    """Inspect OKX runner singleton state.  Returns diagnostic info
+    on whether the env flag is recognised, init has run, and what
+    the executor's current state machine value is.
+    """
+    import os
+    from indicator.okx import runner as okx_runner
+    out = {
+        "env_OKX_EXECUTOR_ENABLED": os.environ.get(
+            "OKX_EXECUTOR_ENABLED", "<unset>"),
+        "env_STAGE": os.environ.get("STAGE", "<unset>"),
+        "env_OKX_API_KEY_LIVE": ("set" if os.environ.get(
+            "OKX_API_KEY_LIVE") else "<unset>"),
+        "env_OKX_API_SECRET_LIVE": ("set" if os.environ.get(
+            "OKX_API_SECRET_LIVE") else "<unset>"),
+        "env_OKX_PASSPHRASE_LIVE": ("set" if os.environ.get(
+            "OKX_PASSPHRASE_LIVE") else "<unset>"),
+        "env_TG_CRITICAL_CHAT_ID": ("set" if os.environ.get(
+            "TG_CRITICAL_CHAT_ID") else "<unset>"),
+        "runner_is_enabled": okx_runner.is_enabled(),
+        "runner_init_failed": okx_runner._INIT_FAILED,
+        "runner_instance_alive": okx_runner._INSTANCE is not None,
+    }
+    if okx_runner._INSTANCE is not None:
+        try:
+            out["executor_status"] = okx_runner._INSTANCE.get_status().value
+        except Exception as e:
+            out["executor_status_err"] = str(e)
+    return jsonify(out)
+
+
 @app.route("/indicator-status", methods=["GET"])
 def indicator_status_api():
     """API for main bot to fetch indicator status text."""
