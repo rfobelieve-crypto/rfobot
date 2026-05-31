@@ -129,8 +129,9 @@ def check_total_loss_cap(*, initial_capital_usd: float,
 def check_api_permissions(*, perms: list[str]) -> KillCheckResult:
     """API key MUST NOT have withdraw or transfer permission.
 
-    Called once at startup after querying OKX /api/v5/users/subaccount/list
-    or /api/v5/account/config to get key perms.
+    Called once at startup after querying OKX /api/v5/account/config.
+    OKX V5 returns perms as a comma-joined list including "read_only",
+    "trade", "withdraw" — we normalise so callers can pass either form.
     """
     forbidden = ("withdraw", "transfer")
     perms_lower = [p.lower() for p in perms]
@@ -142,8 +143,14 @@ def check_api_permissions(*, perms: list[str]) -> KillCheckResult:
             reason=f"API key has forbidden permissions: {bad}",
             context={"perms": perms_lower, "forbidden": bad},
         )
-    required = ("trade", "read")
-    missing = [p for p in required if p not in perms_lower]
+    # OKX returns "read_only" not "read"; accept either as satisfying read.
+    has_read = "read" in perms_lower or "read_only" in perms_lower
+    has_trade = "trade" in perms_lower
+    missing = []
+    if not has_read:
+        missing.append("read")
+    if not has_trade:
+        missing.append("trade")
     if missing:
         return KillCheckResult(
             triggered=True, trigger_id="E4",

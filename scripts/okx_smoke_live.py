@@ -174,7 +174,7 @@ def main(stage: str = "live") -> int:
             )
         return f"verdict={result.verdict.value}"
     try:
-        _step("reconciliation (local DB ↔ OKX)", step_recon)
+        _step("reconciliation (local DB vs OKX)", step_recon)
     except StepFailed:
         return 6
 

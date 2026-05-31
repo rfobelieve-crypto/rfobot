@@ -485,6 +485,81 @@ class TestExecuteApprovedIntent:
         gate.mark_executed.assert_not_called()
 
 
+class TestLongShortModePosSide:
+    """In long_short_mode, every order needs posSide + algo stops use reduceOnly."""
+
+    def test_long_entry_passes_pos_side_long(self):
+        cfg = _mk_cfg(pos_mode="long_short_mode")
+        exe, client, store, _ = _mk_executor(cfg=cfg)
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            exe._open_position(klines=_mk_klines(),
+                                signal_direction="UP",
+                                signal_strength="Strong",
+                                model_version="v1")
+        entry_kwargs = client.submit_market_order.call_args.kwargs
+        assert entry_kwargs["pos_side"] == "long"
+        # Algo stop matches the LONG position and is reduce_only
+        algo_kwargs = client.submit_algo_stop.call_args.kwargs
+        assert algo_kwargs["pos_side"] == "long"
+        assert algo_kwargs["reduce_only"] is True
+
+    def test_short_entry_passes_pos_side_short(self):
+        cfg = _mk_cfg(pos_mode="long_short_mode")
+        exe, client, store, _ = _mk_executor(cfg=cfg)
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            exe._open_position(klines=_mk_klines(),
+                                signal_direction="DOWN",
+                                signal_strength="Moderate",
+                                model_version="v1")
+        assert (client.submit_market_order.call_args.kwargs["pos_side"]
+                == "short")
+        algo_kwargs = client.submit_algo_stop.call_args.kwargs
+        assert algo_kwargs["pos_side"] == "short"
+        assert algo_kwargs["reduce_only"] is True
+
+    def test_net_mode_omits_pos_side(self):
+        cfg = _mk_cfg(pos_mode="net_mode")
+        exe, client, store, _ = _mk_executor(cfg=cfg)
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            exe._open_position(klines=_mk_klines(),
+                                signal_direction="UP",
+                                signal_strength="Strong",
+                                model_version="v1")
+        # pos_side kwarg is None (gets omitted from request body by REST)
+        assert client.submit_market_order.call_args.kwargs["pos_side"] is None
+        assert client.submit_algo_stop.call_args.kwargs["pos_side"] is None
+
+    def test_manual_close_carries_pos_side_and_reduce_only(self):
+        cfg = _mk_cfg(pos_mode="long_short_mode")
+        exe, client, store, _ = _mk_executor(cfg=cfg)
+        klines = _mk_klines()
+        bar_ts_naive = klines.index[-1].tz_convert("UTC").tz_localize(None)
+        from datetime import timedelta
+        # Hours-old LONG → time_cap triggers close
+        pos = _open_pos(side="LONG",
+                         entry_time=bar_ts_naive - timedelta(hours=80))
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            exe._manage_position(pos, klines=klines,
+                                  signal_direction="NEUTRAL")
+        # The close order is the only one this cycle
+        close_kwargs = client.submit_market_order.call_args.kwargs
+        assert close_kwargs["pos_side"] == "long"
+        assert close_kwargs["reduce_only"] is True
+
+    def test_force_close_all_carries_pos_side_and_reduce_only(self):
+        cfg = _mk_cfg(pos_mode="long_short_mode")
+        exe, client, store, _ = _mk_executor(cfg=cfg)
+        store.get_all_open_positions.return_value = [{
+            "id": 1, "direction": "SHORT", "size_contracts": 3,
+            "entry_price": 75000.0, "equity_before": 100.0,
+            "stop_algo_id": "algo-x",
+        }]
+        exe._force_close_all()
+        close_kwargs = client.submit_market_order.call_args.kwargs
+        assert close_kwargs["pos_side"] == "short"
+        assert close_kwargs["reduce_only"] is True
+
+
 class TestClosePnL:
     def test_long_profit(self):
         exe, client, store, _ = _mk_executor()

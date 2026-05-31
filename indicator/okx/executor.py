@@ -447,6 +447,8 @@ class V7OkxExecutor:
                     inst_id=self._cfg.inst_id, side=close_side,
                     sz=size, td_mode=self._cfg.td_mode,
                     cl_ord_id=make_cl_ord_id(prefix="v7close"),
+                    pos_side=self._cfg.pos_side_for(side),
+                    reduce_only=True,
                 )
             except Exception:
                 logger.exception("close_market_order_failed pos=%s", pos_id)
@@ -628,12 +630,15 @@ class V7OkxExecutor:
         # 1. Submit market entry
         entry_cl_ord_id = make_cl_ord_id(prefix="v7")
         order_side = Side.BUY if side == "LONG" else Side.SELL
+        # posSide for long_short_mode; None in net_mode (omitted)
+        pos_side = self._cfg.pos_side_for(side)
         entry_t0 = datetime.now(tz=timezone.utc)
         try:
             entry_result = self._client.submit_market_order(
                 inst_id=self._cfg.inst_id, side=order_side,
                 sz=size_contracts, td_mode=self._cfg.td_mode,
                 cl_ord_id=entry_cl_ord_id,
+                pos_side=pos_side,
             )
         except Exception:
             logger.exception("open_submit_entry_failed")
@@ -654,6 +659,8 @@ class V7OkxExecutor:
                 sz=size_contracts, trigger_px=current_stop,
                 td_mode=self._cfg.td_mode,
                 algo_cl_ord_id=stop_cl_ord_id,
+                pos_side=pos_side,           # match the position side
+                reduce_only=True,            # algo only closes, never opens
             )
         except Exception:
             logger.exception("open_submit_algo_failed_emergency_close")
@@ -679,6 +686,7 @@ class V7OkxExecutor:
                     inst_id=self._cfg.inst_id, side=close_side,
                     sz=size_contracts, td_mode=self._cfg.td_mode,
                     cl_ord_id=make_cl_ord_id(prefix="v7emerg"),
+                    pos_side=pos_side, reduce_only=True,
                 )
             except Exception:
                 logger.exception("emergency_close_failed")
@@ -839,6 +847,8 @@ class V7OkxExecutor:
                         inst_id=self._cfg.inst_id, side=close_side,
                         sz=size, td_mode=self._cfg.td_mode,
                         cl_ord_id=make_cl_ord_id(prefix="v7close"),
+                        pos_side=self._cfg.pos_side_for(direction),
+                        reduce_only=True,
                     )
                 except Exception:
                     logger.exception("force_close_market_close_failed pos=%s",

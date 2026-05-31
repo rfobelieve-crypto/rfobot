@@ -47,18 +47,23 @@ class OkxClient:
 
     def submit_market_order(self, *, inst_id: str, side: Side, sz: int,
                             td_mode: str,
-                            cl_ord_id: Optional[str] = None) -> OrderResult:
+                            cl_ord_id: Optional[str] = None,
+                            pos_side: Optional[str] = None,
+                            reduce_only: bool = False) -> OrderResult:
         return self._rest.submit_market_order(
             inst_id=inst_id, side=side, sz=sz, td_mode=td_mode,
-            cl_ord_id=cl_ord_id,
+            cl_ord_id=cl_ord_id, pos_side=pos_side, reduce_only=reduce_only,
         )
 
     def submit_algo_stop(self, *, inst_id: str, side: Side, sz: int,
                          trigger_px: float, td_mode: str,
-                         algo_cl_ord_id: Optional[str] = None) -> AlgoOrderResult:
+                         algo_cl_ord_id: Optional[str] = None,
+                         pos_side: Optional[str] = None,
+                         reduce_only: bool = False) -> AlgoOrderResult:
         return self._rest.submit_algo_stop(
             inst_id=inst_id, side=side, sz=sz, trigger_px=trigger_px,
             td_mode=td_mode, algo_cl_ord_id=algo_cl_ord_id,
+            pos_side=pos_side, reduce_only=reduce_only,
         )
 
     def amend_algo_stop(self, *, algo_id: str,

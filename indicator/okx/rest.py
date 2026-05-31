@@ -105,8 +105,15 @@ class OkxRestClient:
 
     def submit_market_order(self, *, inst_id: str, side: Side, sz: int,
                             td_mode: str,
-                            cl_ord_id: Optional[str] = None) -> OrderResult:
+                            cl_ord_id: Optional[str] = None,
+                            pos_side: Optional[str] = None,
+                            reduce_only: bool = False) -> OrderResult:
         """Submit a market order.  Idempotent via clOrdId.
+
+        pos_side: "long"/"short" required in long_short_mode, omitted in
+        net_mode.  reduce_only: True ensures the order only reduces an
+        existing position (defensive; redundant in long_short_mode where
+        side+posSide is unambiguous, but harmless).
 
         Retry policy: 3x exponential backoff on 5xx; do NOT retry on 4xx
         (4xx means our request is malformed/rejected — retrying won't help).
@@ -121,6 +128,10 @@ class OkxRestClient:
             "sz": str(sz),
             "clOrdId": cl_ord_id,
         }
+        if pos_side is not None:
+            body["posSide"] = pos_side
+        if reduce_only:
+            body["reduceOnly"] = True
         # TODO(stage2-impl): on partial fill we should pass into reconciler.
         result = self._retry_post(
             path=path, body=body, retries=3, backoff_base=1.0,
@@ -135,8 +146,15 @@ class OkxRestClient:
 
     def submit_algo_stop(self, *, inst_id: str, side: Side, sz: int,
                          trigger_px: float, td_mode: str,
-                         algo_cl_ord_id: Optional[str] = None) -> AlgoOrderResult:
-        """Submit conditional stop-market algo order (the trailing stop)."""
+                         algo_cl_ord_id: Optional[str] = None,
+                         pos_side: Optional[str] = None,
+                         reduce_only: bool = False) -> AlgoOrderResult:
+        """Submit conditional stop-market algo order (the trailing stop).
+
+        pos_side / reduce_only: same semantics as submit_market_order.
+        For long_short_mode the stop's posSide must match the position
+        it protects (LONG position → posSide='long').
+        """
         algo_cl_ord_id = algo_cl_ord_id or make_cl_ord_id(prefix="v7a")
         path = "/api/v5/trade/order-algo"
         body = {
@@ -149,6 +167,10 @@ class OkxRestClient:
             "orderPx": "-1",        # market on trigger
             "algoClOrdId": algo_cl_ord_id,
         }
+        if pos_side is not None:
+            body["posSide"] = pos_side
+        if reduce_only:
+            body["reduceOnly"] = True
         result = self._retry_post(
             path=path, body=body, retries=3, backoff_base=1.0,
             retry_on_4xx=False,
@@ -292,6 +314,17 @@ class OkxRestClient:
             logger.warning("rest_call_skipped_circuit_tripped path=%s", path)
             return None
 
+        # OKX HMAC signs (ts + method + requestPath + body) where
+        # requestPath must include the query string for GETs.  If we
+        # signed just `/api/v5/account/positions` but actually fetched
+        # `/api/v5/account/positions?instId=...`, OKX returns 50113.
+        signed_path = path
+        if method == "GET" and params:
+            from urllib.parse import urlencode
+            qs = urlencode(params)
+            if qs:
+                signed_path = f"{path}?{qs}"
+
         last_err: Optional[Exception] = None
         for attempt in range(retries + 1):
             if attempt > 0:
@@ -306,7 +339,8 @@ class OkxRestClient:
                 resp = self._session.request(
                     method=method, url=url, params=params,
                     data=body_str if method != "GET" else None,
-                    headers=self._headers(method, path, body_str, auth=auth),
+                    headers=self._headers(method, signed_path, body_str,
+                                          auth=auth),
                     timeout=self._timeout,
                 )
                 self._last_latency_ms = (time.time() - t0) * 1000

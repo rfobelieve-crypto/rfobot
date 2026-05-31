@@ -145,6 +145,59 @@ class TestSigningHeaders:
 # ── Retry / backoff (no real sleep) ──────────────────────────────────
 
 
+class TestSignedPathIncludesQuery:
+    """Regression test for OKX 50113 Invalid Sign on GETs with params.
+
+    OKX requires the HMAC requestPath segment to include the query
+    string.  Previously _retry signed just the path; positions endpoint
+    failed because it carries ?instId=BTC-USDT-SWAP.
+    """
+
+    def test_get_with_params_signs_path_with_query(self):
+        captured = {}
+        session = MagicMock()
+
+        def fake_request(**kwargs):
+            captured["headers"] = kwargs["headers"]
+            captured["url"] = kwargs["url"]
+            captured["params"] = kwargs.get("params")
+            return _mk_resp(200, {"code": "0", "data": []})
+
+        session.request.side_effect = fake_request
+        client = _mk_client(session=session)
+
+        # Patch _sign to capture what path it was called with
+        signed_paths: list[str] = []
+        original_sign = client._sign
+
+        def capturing_sign(ts, method, path, body):
+            signed_paths.append(path)
+            return original_sign(ts, method, path, body)
+
+        client._sign = capturing_sign
+        client._retry_get(path="/api/v5/account/positions",
+                          params={"instId": "BTC-USDT-SWAP"},
+                          retries=0, backoff_base=0.01)
+        assert signed_paths, "sign was never called"
+        assert "instId=BTC-USDT-SWAP" in signed_paths[0]
+
+    def test_get_without_params_signs_path_unchanged(self):
+        session = MagicMock()
+        session.request.return_value = _mk_resp(200, {"code": "0", "data": []})
+        client = _mk_client(session=session)
+        signed_paths: list[str] = []
+        orig = client._sign
+
+        def cap(ts, method, path, body):
+            signed_paths.append(path)
+            return orig(ts, method, path, body)
+
+        client._sign = cap
+        client._retry_get(path="/api/v5/account/balance", params={},
+                          retries=0, backoff_base=0.01)
+        assert signed_paths[0] == "/api/v5/account/balance"
+
+
 class TestRetryLogic:
     def test_200_success_no_retry(self):
         session = MagicMock()
@@ -252,6 +305,70 @@ class TestRetryLogic:
                                    retries=3, backoff_base=0.01)
         assert result is None
         assert client.is_circuit_tripped()
+
+
+# ── posSide / reduceOnly body fields ──────────────────────────────────
+
+
+class TestOrderBodyFields:
+    """Verifies long_short_mode kwargs land in the OKX request body."""
+
+    def _capture_body(self):
+        """Patch session and return the captured request body dict."""
+        session = MagicMock()
+        session.request.return_value = _mk_resp(200,
+            {"code": "0", "data": [{"ordId": "1", "sCode": "0"}]})
+        client = _mk_client(session=session)
+        return client, session
+
+    def test_market_order_omits_pos_side_when_none(self):
+        from indicator.okx.types import Side
+        client, session = self._capture_body()
+        client.submit_market_order(
+            inst_id="BTC-USDT-SWAP", side=Side.BUY, sz=1,
+            td_mode="cross", cl_ord_id="v7-x", pos_side=None,
+        )
+        import json
+        body = json.loads(session.request.call_args.kwargs["data"])
+        assert "posSide" not in body
+        assert "reduceOnly" not in body
+
+    def test_market_order_includes_pos_side_long(self):
+        from indicator.okx.types import Side
+        client, session = self._capture_body()
+        client.submit_market_order(
+            inst_id="BTC-USDT-SWAP", side=Side.BUY, sz=1,
+            td_mode="cross", cl_ord_id="v7-x", pos_side="long",
+        )
+        import json
+        body = json.loads(session.request.call_args.kwargs["data"])
+        assert body["posSide"] == "long"
+
+    def test_market_order_includes_reduce_only_when_true(self):
+        from indicator.okx.types import Side
+        client, session = self._capture_body()
+        client.submit_market_order(
+            inst_id="BTC-USDT-SWAP", side=Side.SELL, sz=1,
+            td_mode="cross", cl_ord_id="v7-x",
+            pos_side="long", reduce_only=True,
+        )
+        import json
+        body = json.loads(session.request.call_args.kwargs["data"])
+        assert body["reduceOnly"] is True
+        assert body["posSide"] == "long"
+
+    def test_algo_stop_includes_pos_side_and_reduce_only(self):
+        from indicator.okx.types import Side
+        client, session = self._capture_body()
+        client.submit_algo_stop(
+            inst_id="BTC-USDT-SWAP", side=Side.SELL, sz=1,
+            trigger_px=74500.0, td_mode="cross",
+            algo_cl_ord_id="v7a-x", pos_side="long", reduce_only=True,
+        )
+        import json
+        body = json.loads(session.request.call_args.kwargs["data"])
+        assert body["posSide"] == "long"
+        assert body["reduceOnly"] is True
 
 
 # ── Latency tracking ──────────────────────────────────────────────────

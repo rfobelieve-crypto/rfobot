@@ -76,13 +76,34 @@ class TestLeverageCap:
 
 
 class TestPosMode:
-    def test_long_short_pos_mode_fails(self):
+    def test_net_mode_passes(self):
+        validate_okx_config(_valid_cfg(pos_mode="net_mode"))
+
+    def test_long_short_mode_passes(self):
+        # Both modes are supported as of 2026-05-31 — executor branches
+        # on cfg.pos_mode to decide whether to include posSide on orders.
+        validate_okx_config(_valid_cfg(pos_mode="long_short_mode"))
+
+    def test_typo_long_short_no_suffix_fails(self):
+        # OKX returns exactly "long_short_mode"; bare "long_short" is wrong
         with pytest.raises(RuntimeError, match="E2"):
             validate_okx_config(_valid_cfg(pos_mode="long_short"))
 
     def test_arbitrary_string_fails(self):
         with pytest.raises(RuntimeError, match="E2"):
             validate_okx_config(_valid_cfg(pos_mode="unknown"))
+
+
+class TestPosSideHelper:
+    def test_net_mode_omits_pos_side(self):
+        cfg = _valid_cfg(pos_mode="net_mode")
+        assert cfg.pos_side_for("LONG") is None
+        assert cfg.pos_side_for("SHORT") is None
+
+    def test_long_short_mode_maps_to_lowercase_long_short(self):
+        cfg = _valid_cfg(pos_mode="long_short_mode")
+        assert cfg.pos_side_for("LONG") == "long"
+        assert cfg.pos_side_for("SHORT") == "short"
 
 
 # ── td_mode sanity ───────────────────────────────────────────────────

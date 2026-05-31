@@ -33,7 +33,11 @@ class OkxConfig:
     # ── Instrument
     inst_id: str = "BTC-USDT-SWAP"
     td_mode: Literal["cash", "cross", "isolated"] = "cross"
-    pos_mode: str = "net_mode"
+    # OKX default for new accounts is long_short_mode (sides separate).
+    # net_mode (single signed net position) is also supported; the
+    # executor branches on this field to decide whether to include
+    # posSide / reduceOnly on each order.
+    pos_mode: Literal["net_mode", "long_short_mode"] = "long_short_mode"
     # Leverage hard cap = 10x (Stage 3 informed override 2026-05-28).
     # Required for $100 capital to fit 1 BTC-USDT-SWAP contract
     # (1 contract = 0.01 BTC ≈ $750 notional).  Trade-off documented
@@ -74,6 +78,18 @@ class OkxConfig:
     # ── DB
     table_prefix: str = "v7_okx"
 
+    # ── Helpers ────────────────────────────────────────────────────────
+
+    def pos_side_for(self, direction: str) -> "Optional[str]":
+        """Map our LONG/SHORT direction → OKX posSide field.
+
+        In net_mode the field is omitted (OKX infers from signed pos).
+        In long_short_mode every order must carry an explicit posSide.
+        """
+        if self.pos_mode == "net_mode":
+            return None
+        return "long" if direction == "LONG" else "short"
+
 
 def load_okx_config_from_env(stage: Literal["testnet", "live"] = "testnet") -> OkxConfig:
     """Read env vars, return OkxConfig.  Does NOT validate (call validate
@@ -103,10 +119,11 @@ def validate_okx_config(cfg: OkxConfig) -> None:
         raise RuntimeError(
             f"E1: Stage 3 leverage must be in [1, 10], got {cfg.leverage}"
         )
-    # E2
-    if cfg.pos_mode != "net_mode":
+    # E2 — both modes supported; executor branches on cfg.pos_mode
+    if cfg.pos_mode not in ("net_mode", "long_short_mode"):
         raise RuntimeError(
-            f"E2: Stage 2 posMode must be net_mode, got {cfg.pos_mode!r}"
+            f"E2: posMode must be 'net_mode' or 'long_short_mode', "
+            f"got {cfg.pos_mode!r}"
         )
     # td_mode sanity
     if cfg.td_mode not in ("cash", "cross", "isolated"):

@@ -130,12 +130,21 @@ class TestTotalLossCap:
 
 
 class TestApiPermissions:
-    def test_trade_and_read_only_passes(self):
+    def test_trade_and_read_passes(self):
         result = check_api_permissions(perms=["trade", "read"])
+        assert not result.triggered
+
+    def test_trade_and_okx_native_read_only_passes(self):
+        # OKX /api/v5/account/config returns "read_only" not "read"
+        result = check_api_permissions(perms=["read_only", "trade"])
         assert not result.triggered
 
     def test_case_insensitive_match(self):
         result = check_api_permissions(perms=["Trade", "READ"])
+        assert not result.triggered
+
+    def test_case_insensitive_read_only_match(self):
+        result = check_api_permissions(perms=["Read_Only", "TRADE"])
         assert not result.triggered
 
     def test_withdraw_perm_blocks_startup(self):
