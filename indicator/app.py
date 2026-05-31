@@ -968,19 +968,36 @@ def okx_status_api():
     can see exactly where it fails on Railway without grepping logs.
     """
     import os
+    import time as _time
     import traceback
+
+    def _fingerprint(s: str) -> dict:
+        """Non-secret leak: length + first/last 2 chars.  Lets us spot
+        whitespace / truncation / quoting issues without exposing the
+        value."""
+        if not s:
+            return {"set": False}
+        return {
+            "set": True, "len": len(s),
+            "first2": s[:2], "last2": s[-2:],
+            "has_leading_ws": s != s.lstrip(),
+            "has_trailing_ws": s != s.rstrip(),
+            "has_quote": '"' in s or "'" in s,
+        }
+
     out = {
         "env_OKX_EXECUTOR_ENABLED": os.environ.get(
             "OKX_EXECUTOR_ENABLED", "<unset>"),
         "env_STAGE": os.environ.get("STAGE", "<unset>"),
-        "env_OKX_API_KEY_LIVE_set": bool(os.environ.get(
-            "OKX_API_KEY_LIVE")),
-        "env_OKX_API_SECRET_LIVE_set": bool(os.environ.get(
-            "OKX_API_SECRET_LIVE")),
-        "env_OKX_PASSPHRASE_LIVE_set": bool(os.environ.get(
-            "OKX_PASSPHRASE_LIVE")),
+        "env_OKX_API_KEY_LIVE": _fingerprint(
+            os.environ.get("OKX_API_KEY_LIVE", "")),
+        "env_OKX_API_SECRET_LIVE": _fingerprint(
+            os.environ.get("OKX_API_SECRET_LIVE", "")),
+        "env_OKX_PASSPHRASE_LIVE": _fingerprint(
+            os.environ.get("OKX_PASSPHRASE_LIVE", "")),
         "env_TG_CRITICAL_CHAT_ID_set": bool(os.environ.get(
             "TG_CRITICAL_CHAT_ID")),
+        "local_time_unix": int(_time.time()),
     }
     # Attempt import + introspection independently
     try:
