@@ -49,7 +49,11 @@ class OkxConfig:
     taker_cost: float = 0.0008
 
     # ── Risk caps (Stage 3 defaults; tightened for 10x leverage)
-    initial_capital_usd: float = 100.0
+    # Default bumped 100→155 on 2026-06-01: user deposited $154.86 to
+    # OKX trading account; CAP-2 (equity > 1.5×initial → HALT) was
+    # tripping immediately because $154 > $150.  Configurable via
+    # OKX_INITIAL_CAPITAL_USD env var if you adjust the deposit later.
+    initial_capital_usd: float = 155.0
     risk_frac: float = 0.02
     max_position_count: int = 1
     # Tightened on 2026-05-28 for 10x leverage.  At 10x, a 2% BTC move
@@ -93,9 +97,13 @@ class OkxConfig:
 
 def load_okx_config_from_env(stage: Literal["testnet", "live"] = "testnet") -> OkxConfig:
     """Read env vars, return OkxConfig.  Does NOT validate (call validate
-    separately so test code can inject incomplete configs)."""
+    separately so test code can inject incomplete configs).
+
+    OKX_INITIAL_CAPITAL_USD overrides the default 155.0 — useful when
+    you change the OKX deposit without redeploying code.
+    """
     suffix = "_TESTNET" if stage == "testnet" else "_LIVE"
-    return OkxConfig(
+    kwargs: dict = dict(
         is_simulated=1 if stage == "testnet" else 0,
         stage_label=stage,
         api_key=os.environ.get(f"OKX_API_KEY{suffix}", ""),
@@ -104,6 +112,13 @@ def load_okx_config_from_env(stage: Literal["testnet", "live"] = "testnet") -> O
         telegram_alert_chat_id=os.environ.get("TG_ALERT_CHAT_ID", ""),
         telegram_critical_chat_id=os.environ.get("TG_CRITICAL_CHAT_ID", ""),
     )
+    cap_override = os.environ.get("OKX_INITIAL_CAPITAL_USD", "").strip()
+    if cap_override:
+        try:
+            kwargs["initial_capital_usd"] = float(cap_override)
+        except ValueError:
+            pass
+    return OkxConfig(**kwargs)
 
 
 def validate_okx_config(cfg: OkxConfig) -> None:
