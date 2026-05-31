@@ -107,15 +107,22 @@ class ApprovalGate:
     """Manual-approval state machine.
 
     All persistence goes through OkxStateStore so restart-safe.
+    Threshold lowered from 5 → 1 on 2026-05-31 (user override): a single
+    first-trade confirmation is enough to spot gross code bugs; ongoing
+    operation should remain fully automated to preserve the point of
+    algorithmic trading.
     """
 
-    AUTO_MODE_THRESHOLD = 5
+    AUTO_MODE_THRESHOLD = 1
 
     def __init__(self, *, store: OkxStateStore, alert_chat_id: str,
-                 stage_label: str = "live"):
+                 stage_label: str = "live",
+                 threshold: Optional[int] = None):
         self._store = store
         self._chat_id = alert_chat_id
         self._stage_label = stage_label
+        self._threshold = (threshold if threshold is not None
+                            else self.AUTO_MODE_THRESHOLD)
 
     # ── Mode ──────────────────────────────────────────────────────────
 
@@ -123,7 +130,7 @@ class ApprovalGate:
         """True once threshold executed approvals have accumulated."""
         try:
             return (self._store.get_executed_approval_count()
-                    >= self.AUTO_MODE_THRESHOLD)
+                    >= self._threshold)
         except Exception:
             logger.exception("approval_count_failed_defaulting_manual")
             # Fail closed → stay in manual mode on DB error
@@ -135,7 +142,7 @@ class ApprovalGate:
             n = self._store.get_executed_approval_count()
         except Exception:
             n = 0
-        return n, self.AUTO_MODE_THRESHOLD
+        return n, self._threshold
 
     # ── Request flow ──────────────────────────────────────────────────
 

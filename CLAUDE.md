@@ -63,7 +63,7 @@ edge 確信度」的漸進過程。
 **保留的不可鬆綁**：
 - **金額**：$100 live = Stage 3 上限，未進 Stage 4a 不准加碼（即使 $100 賺到 $200 也是 $100 keep + $100 不再用）
 - **Hard kill switches 必須先驗證能觸發**（不是只寫進 code）：unit test + testnet 至少一次故意觸發
-- **Manual approval 模式必須跑過 5+ 筆**，人工 review 沒問題才能切自動
+- **Manual approval 第 1 筆強制人工確認**（2026-05-31 從 5 → 1）：第一次真實執行 OKX trade path 必須 operator 確認 size/方向/stop 都對；之後 auto，因為「量化交易要自動」是 quant 本質
 - **Paper cohort 不停**：作為 edge 是否真實的並行驗證；live + paper 結果 > 2 週嚴重背離 → halt
 - **Leverage 1.0x 不准動**（Stage 3 階段）
 - **Stage 3 → Stage 4 仍照原硬條件**：live 4 週 net positive + MDD < 20% + 0 kill trigger

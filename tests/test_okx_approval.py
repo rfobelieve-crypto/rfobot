@@ -76,19 +76,23 @@ def _sample_intent() -> TradeIntent:
 
 
 class TestAutoMode:
+    """Default threshold = 1 (2026-05-31 override).  Tests parametrise
+    via gate's instance threshold so behaviour is independent of the
+    class constant value."""
+
     def test_zero_count_is_manual(self):
         gate = _mk_gate()
         assert not gate.is_auto_mode()
 
-    def test_below_threshold_still_manual(self):
+    def test_one_below_threshold_still_manual(self):
         store = MagicMock()
-        store.get_executed_approval_count.return_value = 4
+        store.get_executed_approval_count.return_value = ApprovalGate.AUTO_MODE_THRESHOLD - 1
         gate = _mk_gate(store=store)
         assert not gate.is_auto_mode()
 
     def test_at_threshold_flips_to_auto(self):
         store = MagicMock()
-        store.get_executed_approval_count.return_value = 5
+        store.get_executed_approval_count.return_value = ApprovalGate.AUTO_MODE_THRESHOLD
         gate = _mk_gate(store=store)
         assert gate.is_auto_mode()
 
@@ -96,6 +100,15 @@ class TestAutoMode:
         store = MagicMock()
         store.get_executed_approval_count.return_value = 25
         gate = _mk_gate(store=store)
+        assert gate.is_auto_mode()
+
+    def test_explicit_threshold_override_at_5(self):
+        # Explicit higher threshold works (callers who want extra caution)
+        store = MagicMock()
+        store.get_executed_approval_count.return_value = 4
+        gate = ApprovalGate(store=store, alert_chat_id="c", threshold=5)
+        assert not gate.is_auto_mode()
+        store.get_executed_approval_count.return_value = 5
         assert gate.is_auto_mode()
 
     def test_db_failure_fails_closed_to_manual(self):
