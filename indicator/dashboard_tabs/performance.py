@@ -17,10 +17,12 @@ logger = logging.getLogger(__name__)
 
 def render_performance() -> str:
     parts = [
+        section("🔴 OKX LIVE Stage 3 ($100 + 10x)", "okxlive", True,
+                _build_okx_live()),
         section("Alpha Decay Monitor", "decay", True, _build_alpha_decay()),
         section("IC / 勝率趨勢 (7 天)", "ictrend", True, _build_ic_trend()),
         section("信號累計曲線", "equity", True, _build_equity_curve()),
-        section("V7 Paper 策略 (訊號出場 + 3×ATR trailing)", "v7paper", True,
+        section("V7 Paper (Shadow Baseline)", "v7paper", False,
                 _build_v7_paper()),
         section("信心分佈 (48h)", "confdist", True, _build_confidence_dist()),
         section("預測 vs 實際 (24h)", "predva", True, _build_pred_vs_actual()),
@@ -28,6 +30,142 @@ def render_performance() -> str:
         section("時段勝率熱力圖", "hourly_wr", True, _build_hourly_heatmap()),
     ]
     return "\n".join(parts)
+
+
+# ── OKX LIVE Stage 3 cohort ──────────────────────────────────────────
+
+
+def _build_okx_live() -> str:
+    """Live OKX trading state — equity, executor status, Sharpe, trades.
+
+    Pulls from indicator.okx.report.compute_okx_summary which reads the
+    v7_okx_* tables populated by the production executor on Railway.
+    """
+    try:
+        from indicator.okx.report import compute_okx_summary
+        s = compute_okx_summary()
+    except Exception as e:
+        return f'<div style="color:#FF3366">OKX live cohort 載入失敗: {e}</div>'
+
+    eq = s.get("current_equity_usd")
+    avail = s.get("available_usd")
+    initial = s.get("initial_capital_usd", 155.0)
+    delta_pct = s.get("eq_pct_from_initial")
+    age = s.get("balance_age_sec")
+    status = s.get("executor_status") or "UNKNOWN"
+    reason = s.get("executor_reason") or ""
+
+    status_color = {
+        "ACTIVE": "#00CC80",
+        "HALTED": "#FFB400",
+        "DEMOTED": "#FF3366",
+        "INIT": "rgba(0,240,255,0.4)",
+        "CONNECTING": "rgba(0,240,255,0.6)",
+        "READY": "#00F0FF",
+    }.get(status, "rgba(0,240,255,0.4)")
+
+    # ── Row 1: account state
+    if eq is not None:
+        eq_color = "#00CC80" if (delta_pct or 0) >= 0 else "#FF3366"
+        delta_str = f"{delta_pct:+.2f}% vs ${initial:.0f}"
+        age_str = f"{age:.0f}s 前更新" if age is not None else "--"
+        row1 = f"""
+        <div class="grid grid-4" style="margin-bottom:12px">
+          {card("Equity", f"${eq:.2f}", delta_str, eq_color)}
+          {card("Available", f"${avail or 0:.2f}", age_str)}
+          {card("Executor", status, reason[:40] if reason else "", status_color)}
+          {card("Starting Capital", f"${initial:.0f}", "Stage 3 baseline")}
+        </div>"""
+    else:
+        row1 = f"""
+        <div class="grid grid-2" style="margin-bottom:12px">
+          {card("Equity", "--", "尚無 balance snapshot")}
+          {card("Executor", status, reason[:40] if reason else "", status_color)}
+        </div>"""
+
+    # ── Row 2: trade stats
+    n_closed = s.get("n_closed", 0)
+    if n_closed == 0:
+        trade_block = (
+            '<div style="color:rgba(0,240,255,0.5);font-size:12px;'
+            'margin-bottom:10px">📊 <i>尚無已平倉 trade — '
+            '等下一個 Strong/Moderate 訊號 + manual approval (/yes_1)</i></div>'
+        )
+    else:
+        wr = s.get("win_rate_pct", 0)
+        avg_bps = s.get("avg_net_bps", 0)
+        cum_pct = s.get("cum_net_pct", 0)
+        cum_eq_pct = s.get("cum_equity_pct", 0)
+        pt_sharpe = s.get("sharpe_per_trade")
+        ann_sharpe = s.get("sharpe_annualised")
+        wr_color = "#00CC80" if wr >= 55 else "#CC4444"
+        cum_color = "#00CC80" if cum_pct >= 0 else "#FF3366"
+        sharpe_str = (f"per-trade {pt_sharpe:.2f}"
+                       if pt_sharpe is not None else "n<2")
+        sharpe_sub = (f"年化 {ann_sharpe:.2f}"
+                       if ann_sharpe is not None else "")
+        trade_block = f"""
+        <div class="grid grid-4" style="margin-bottom:12px">
+          {card("Closed Trades", str(n_closed), f"勝/敗 {s.get('wins',0)}/{n_closed - s.get('wins',0)}")}
+          {card("勝率", f"{wr:.1f}%", "", wr_color)}
+          {card("累計", f"{cum_pct:+.2f}%", f"equity Δ {cum_eq_pct:+.2f}%", cum_color)}
+          {card("Sharpe", sharpe_str, sharpe_sub)}
+        </div>"""
+
+    # ── Row 3: open position
+    op = s.get("open_position")
+    if op:
+        from datetime import datetime as _dt
+        et = op.get("entry_time")
+        held_h = ((_dt.utcnow() - et).total_seconds() / 3600
+                  if et else 0)
+        dir_color = "#00CC80" if op.get("direction") == "LONG" else "#FF3366"
+        open_block = f"""
+        <div style="color:rgba(0,240,255,0.55);font-size:11px;margin-bottom:6px">
+          🔓 當前持倉 #{op.get('id')}
+        </div>
+        <div class="grid grid-4" style="margin-bottom:12px">
+          {card(op.get('direction','?'), f"${op.get('entry_price',0):.1f}",
+                op.get('entry_tier','--'), dir_color)}
+          {card("Stop", f"${op.get('current_stop',0):.1f}", "")}
+          {card("Size", f"{op.get('size_contracts',0)} contracts",
+                f"notional ${op.get('notional_usd',0):.0f}")}
+          {card("Held", f"{held_h:.1f}h", "time_cap 72h")}
+        </div>"""
+    else:
+        open_block = (
+            '<div style="color:rgba(0,240,255,0.4);font-size:12px;'
+            'margin-bottom:10px">🔓 <i>flat — 無開倉</i></div>'
+        )
+
+    # ── Row 4: kill log alerts (7 days)
+    kills = s.get("kill_log_7d") or []
+    if kills:
+        alert_lines = []
+        for k in kills[:5]:
+            ts = k.get("ts")
+            ts_str = ts.strftime("%m/%d %H:%M") if hasattr(ts, "strftime") else str(ts)
+            alert_lines.append(
+                f'<tr><td style="color:#FF3366">⚠</td>'
+                f'<td>{ts_str}</td>'
+                f'<td><b>{k.get("trigger_id","?")}</b></td>'
+                f'<td>{k.get("severity","?")}</td></tr>'
+            )
+        kill_block = f"""
+        <div style="color:rgba(0,240,255,0.55);font-size:11px;margin-bottom:6px">
+          ⚠️ Kill log (近 7 天 — {len(kills)} 筆)
+        </div>
+        <table>
+          <tr><th></th><th>時間</th><th>Trigger</th><th>Severity</th></tr>
+          {''.join(alert_lines)}
+        </table>"""
+    else:
+        kill_block = (
+            '<div style="color:rgba(0,204,128,0.6);font-size:12px;margin-top:8px">'
+            '✓ 近 7 天無 kill trigger 觸發</div>'
+        )
+
+    return row1 + trade_block + open_block + kill_block
 
 
 # ── V7 Paper Cohort ──────────────────────────────────────────────────
