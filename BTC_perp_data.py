@@ -1933,7 +1933,6 @@ def _send_help(chat_id: str):
         logger.warning("Help send failed: %s", e)
 
 
-@app.route(f"/{TOKEN}", methods=["POST"])
 def _handle_okx_perf(chat_id: str) -> None:
     """Fetch OKX live cohort report via the indicator service."""
     if not INDICATOR_SERVICE_URL:
@@ -2023,6 +2022,7 @@ def _handle_okx_approval_response(chat_id: str, raw_cmd: str) -> None:
             pass
 
 
+@app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     try:
         data = request.get_json(silent=True)
