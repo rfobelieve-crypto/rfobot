@@ -4,6 +4,34 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-05-31: Edit 把新函式塞進 `@app.route` 跟 `def webhook()` 之間，decorator 被靜默搶走，Telegram bot 全死
+
+**What happened:**
+commit c758336 加 `_handle_okx_perf` 函式時，我用 Edit 工具改 BTC_perp_data.py 的 old_string = `def _handle_okx_approval_response(...):`，new_string = `def _handle_okx_perf(...): ...\n\n\ndef _handle_okx_approval_response(...):`。結果新函式被插入到 `_handle_okx_approval_response` 之前。
+
+`_handle_okx_approval_response` 本來就是我之前（commit e531b2c）用同樣手法插在 `def webhook():` 之前的——那一次也是把 webhook 上方的 `@app.route(f"/{TOKEN}", methods=["POST"])` decorator 跟 `def webhook()` 拆開了，但因為 `_handle_okx_approval_response` 的 signature 是 `(chat_id, raw_cmd)`，Flask 路由把 POST 進來時 Werkzeug 報 "TypeError: missing argument" → 變成 500 給 Telegram。**那次沒爆只是因為 Telegram 平常不會故意打 webhook 來驗證，Flask app 也沒在啟動時報錯**。直到我這次再插一個 `_handle_okx_perf` 在更前面，decorator 又被搶過去——這一次完全相同的問題終於在用戶按 V7 Stats 按鈕時暴露。
+
+症狀很迷惑：bot service 的 `/` 主頁回 200 「OKX BTC Liquidity Outcome Bot is running」(因為 `/` 的 decorator 跟 def 是黏在一起的，沒被動到)，但 Telegram getWebhookInfo 顯示 `last_error_message: "Wrong response from the webhook: 500 Internal Server Error"`，每個指令、每個按鈕都死，**包括完全沒碰過的 /help**。用戶看起來就是「bot 沒反應」，沒有任何錯誤訊息能讓他自己 diagnose。
+
+Python 語法檢查、import 檢查、unit test 全都過——因為這個 bug 是「decorator 綁錯函式」，不是任何 lint 工具會抓的。要等到 HTTP request 真的進來、Flask 帶錯誤參數 call 那個函式，才會炸。
+
+**Root cause:**
+我把 `def webhook():` 之前的某行（裡面有獨立函式 `_handle_okx_approval_response` 或 `_handle_okx_perf`）當成 anchor 點插入新函式，沒注意到該函式緊鄰 `@app.route(...)` decorator，而 Python decorator 是 syntactically 綁到「decorator 下面那一個 def」上的——我的 Edit 把新 def 塞在中間，等於把 decorator 從 `def webhook` 拔走、轉嫁到我新插的 def 上。
+
+更深層原因：Flask 的 `@app.route` 沒有「綁定檢查」——decorator 隨便綁到哪個函式它都不會 raise，只是綁的那個函式變成 endpoint。Runtime 在 Telegram 打過來、Flask 用沒給 chat_id 參數的方式 call 它時才出 TypeError。再加上 Flask app 對 unhandled exception 的預設行為是回 500 給 client，沒任何 startup-time 警報。
+
+放大因素：我寫 commit message 的時候 grep 路徑下的 `@app.route` 看其它路由還在，但沒去看每個 decorator 是不是綁到「原本應該的 def」上。 sanity check 是「routes 都存在」而不是「routes 都綁對函式」。
+
+**Correct approach:**
+1. 任何 Edit 動到「Flask / Django route 檔案中、靠近 `@app.route` 或 `@app.get` 之類 decorator 的位置」，必須**讀 Edit 後的整段** 至少 ±10 行，確認 decorator 跟原本的 def 仍然黏著。
+2. 加新 helper 函式時，**找一個遠離 route handler 的安全位置**插入。例如：放到檔尾、或一個獨立的 `# === Helpers ===` 區塊。不要見縫插針地塞在現有 route 旁邊。
+3. push 前如果改了 Flask app 檔案，用 `python -c "from BTC_perp_data import app; print([str(r) for r in app.url_map.iter_rules()])"` 檢查所有 route 跟 view function 的對應關係。`url_map` 印出來會看到 `<Rule '/<token>' (POST) -> webhook>`，如果看到 `-> _handle_okx_perf` 就是綁錯了。
+4. Bot service 應該有一個 startup smoke——例如「啟動後對自己 webhook POST 一個空 JSON，預期回 200 ok」，啟動失敗的話 Railway 部署應該直接 fail，而不是部署成功讓 silent failure 跑半天。
+
+**Rule:** 用 Edit 工具改 Flask / Django / FastAPI route 檔案時，**絕對不要把 anchor 點選在 `@app.route` decorator 下方那行**。如果一定要插入，要連同 decorator 一起包進 old_string，或選擇遠離任何 decorator 的位置（例如 helper section、檔尾）。Edit 後務必目視確認每個 decorator 還黏在原本的 view function 上。Python decorator 跟 def 沒有任何語法保護，綁錯了 lint/syntax/import 都不會炸，只在 runtime 有人打 endpoint 時才以「500 + missing positional argument」現身。**Symptom 是「Flask 主頁活著但某個 route 全死」、「Telegram 顯示 500 但 code 看起來沒問題」**——下次看到這種模式，第一個查 `app.url_map`。
+
+---
+
 ## 2026-04-22: 新特徵邏輯貼進錯誤的 helper 函數，signature 不符導致 NameError 整夜停機
 
 **What happened:**
