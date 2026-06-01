@@ -54,3 +54,9 @@ indicator/model_artifacts/*_backup.parquet
 
 # Local only
 .claude/settings.local.json
+
+# Remotion video output / deps / generated VO mp3s
+promo_video/node_modules/
+promo_video/out/
+promo_video/.remotion/
+promo_video/public/audio/*.mp3
