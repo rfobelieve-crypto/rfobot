@@ -232,6 +232,29 @@ class OkxStateStore:
 
     # ── Kill log ───────────────────────────────────────────────────────
 
+    def resolve_open_kills(self, resolution: str = "auto_recovery") -> int:
+        """Mark all unresolved kill_log entries as resolved.
+
+        Called when executor transitions from HALTED back to ACTIVE so
+        the M6 (kill recovery validation) milestone + dashboard reflect
+        the recovery.  Returns number of rows updated.
+        """
+        sql = (
+            f"UPDATE `{self._prefix}_kill_log` "
+            "SET resolved_at=NOW(), resolution=%s "
+            "WHERE resolved_at IS NULL"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (resolution,))
+                    n = cur.rowcount
+                conn.commit()
+                return int(n)
+            finally:
+                conn.close()
+
     def log_kill_trigger(self, *, trigger_id: str, severity: str,
                          context: dict) -> None:
         sql = (

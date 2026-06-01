@@ -296,6 +296,16 @@ class V7OkxExecutor:
         # If we're in HALTED state but no triggers now → auto-resume to ACTIVE
         if self._status == ExecutorStatus.HALTED:
             self._set_status(ExecutorStatus.ACTIVE, reason="triggers_cleared")
+            # Mark prior unresolved kill_log entries as resolved
+            # (M6 milestone + dashboard 'Recovery History' reflect this)
+            try:
+                n_resolved = self._store.resolve_open_kills(
+                    resolution="auto_recovery_to_active",
+                )
+                if n_resolved > 0:
+                    logger.info("okx_kill_log_auto_resolved n=%d", n_resolved)
+            except Exception:
+                logger.exception("kill_log_auto_resolve_failed")
 
         # 4. Manage existing position
         pos = self._store.get_open_position()

@@ -186,6 +186,9 @@ def render_dashboard_shell() -> str:
   <button class="tab" data-tab="agents">
     <span class="tab-icon">&#129302;</span>Agent
   </button>
+  <button class="tab" data-tab="stability">
+    <span class="tab-icon">&#128737;</span>穩定性
+  </button>
 </div>
 
 <div class="content" id="tab-content">
@@ -287,6 +290,9 @@ def render_tab(tab_name: str, state: dict, engine) -> str:
         elif tab_name == "agents":
             from indicator.dashboard_tabs.agents import render_agents
             return render_agents()
+        elif tab_name == "stability":
+            from indicator.dashboard_tabs.stability import render_stability
+            return render_stability()
         else:
             return f'<div style="color:#FF3366">未知的 Tab: {tab_name}</div>'
     except Exception as e:
