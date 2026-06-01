@@ -4,6 +4,36 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-06-01: walk-forward univariate IC 漂亮但加進 ensemble 沒 lift（feature redundancy）
+
+**What happened:**
+為驗證使用者「market moves to least resistance」的訂單流原則，我跑了一輪 walk-forward IC sweep（`research/liquidity_proxy_features.py`）。8 大類 21 個 microstructure proxy 特徵，做了 30d-train / 7d-OOS / 4-fold rolling 走勢驗證。結果非常漂亮：
+
+- 12 個 feature 通過 |mean_IC| > 0.05 + 4/4 fold 同向
+- 最強 `A_swing_high_dist_168h` mean_IC **+0.207**（V7 既有最強 feature ~0.07，看起來是 3x lift）
+- 7 個獨立特徵（greedy de-dup |corr|<0.5）全部 4/4 同向
+
+看起來非常有信心。於是寫了 A/B retrain script（`research/dual_model/train_with_liq_features.py`），用相同 XGB 超參數 + 77-fold WF split 比較「V7 baseline (136 features) vs V7 + 7 liq features (143 features)」。**結果：sign_AUC 從 0.5208 掉到 0.5178（-0.0030），IC 兩者都 ≈0**。
+
+也就是說：univariate WF IC 看起來強的 feature，加進 ensemble **完全沒有 marginal information value**。
+
+**Root cause:**
+**Feature redundancy 在 XGBoost ensemble 裡是常見現象**。V7 的 136 個既有 feature（CVD divergence、OI delta、vol_kurtosis、impact_asymmetry、各種 z-score、return lag）已經透過 tree split 重組出類似 swing distance、sweep magnitude 的訊息。新加的 raw 特徵雖然 univariately 有訊號，但 **conditional on 既有 features 的訊號=零**。
+
+更深的問題是我**只看 univariate IC 就下結論「這是 V7 強 3 倍的新 alpha」**。正確比較應該是「marginal IC given V7 model」— 也就是 V7 預測 residual 跟新 feature 的 IC。如果 V7 residual 跟新 feature 不相關，新 feature 對 V7 才有 lift。我這次直接用 raw IC 比較 V7 整體 IC，是 apples-to-oranges：raw IC 量「跟 target 相關」，但 V7 IC 量「ensemble 預測誤差」。一個 feature 可以很 univariately 相關但對 ensemble 全無 lift。
+
+放大因素：walk-forward N=4 folds 太少。frac_positive=4/4 看起來很穩，但隨機 4/4 同向機率 = 1/16 = 6.25%。7 個獨立特徵全 4/4 同向是不太可能（聯合機率極低），但**每個獨立 feature 的 IC 估計值本身仍有大量 noise**。可能我看到的 +0.207 在更多 folds 之後會收斂到 +0.05 或更低 — 還是有 signal，但沒「3x V7」這麼誇張。
+
+**Correct approach:**
+1. **加新 feature 前永遠跑 ensemble A/B**，不是只看 univariate IC。Univariate IC 量的是「跟 target 的 raw 相關性」，ensemble 已經透過 tree split 吸了大半。要看 lift 必須是「加進去 ensemble 後 OOS AUC 是否提升 +0.005 以上」。
+2. **若一定要用 univariate metric 做篩選**，用 **conditional IC**：先用 V7 baseline 預測，算 residual = y - pred，然後算新 feature vs residual 的 IC。Conditional IC 顯著 > 0 才值得進 ensemble。原始 IC 顯著只證明「跟 target 有關」，沒證明「V7 沒抓到」。
+3. **WF fold 數 N < 10 時的「全 fold 同向」結論要打折**。N=4 同向看起來 4/4，實際統計強度約等於 binomial p=0.5 下 4 trials 全成功，p-value = 1/16 = 0.0625（剛過 5% 邊界）。要 N≥10 同向結論才篤定。
+4. **負面結果一樣要記下來**，未來別人不會（或自己不會）重複跑同樣的 univariate IC sweep 結果 hyped。`research/orderbook_liq_features.py` 跟 `research/liquidity_proxy_features.py` 一起留作「univariate IC 高但 ensemble 沒 lift」的案例。
+
+**Rule:** 任何「新 feature 加進 V7 / V8 ensemble」的決定必須基於 **ensemble A/B retrain 的 sign_AUC 或 IC lift**，不是 univariate WF IC。Univariate IC 高表示「跟 target 有 raw correlation」，但 conditional on ensemble 的剩餘 signal 才是真正的 marginal alpha。看到 univariate IC 比 V7 既有 feature 高 2-3 倍時 — **特別**要警覺，這往往是已經被 V7 吸收的訊息以另一種包裝出現。下次先跑「conditional IC vs V7 residual」 → 若顯著再 ensemble A/B → 都過才整合。
+
+---
+
 ## 2026-05-31: Edit 把新函式塞進 `@app.route` 跟 `def webhook()` 之間，decorator 被靜默搶走，Telegram bot 全死
 
 **What happened:**
