@@ -32,6 +32,8 @@ Record logic errors and bad decisions to avoid repeating them.
 
 **Rule:** 任何「新 feature 加進 V7 / V8 ensemble」的決定必須基於 **ensemble A/B retrain 的 sign_AUC 或 IC lift**，不是 univariate WF IC。Univariate IC 高表示「跟 target 有 raw correlation」，但 conditional on ensemble 的剩餘 signal 才是真正的 marginal alpha。看到 univariate IC 比 V7 既有 feature 高 2-3 倍時 — **特別**要警覺，這往往是已經被 V7 吸收的訊息以另一種包裝出現。下次先跑「conditional IC vs V7 residual」 → 若顯著再 ensemble A/B → 都過才整合。
 
+**Update 2026-06-02:** 重跑 A/B 用 production training function（`research/dual_model/rerun_liq_ab_with_prod_trainer.py`，import `train_direction_reg_walk_forward` 直接）驗證上面結論：BASELINE V7 sign_AUC 0.6030 / IC 0.180（跟 canonical OOS 0.593/0.170 對齊），NEW V7 + 9 liq features sign_AUC 0.6036 / IC 0.186 — **+0.0006 AUC、+0.006 IC**，仍遠低於 +0.005 部署門檻。原始結論「不要部署」**仍然成立**，但要注意：上次第一版 A/B baseline 訓練設定有差（custom eval_set 早停太凶導致預測退化），所以兩個 broken model 之間「無 lift」的觀察方向對，但**比較的絕對值都是錯的**。下次 A/B 要**直接 import 生產訓練函式**避免 hyperparam drift。
+
 ---
 
 ## 2026-05-31: Edit 把新函式塞進 `@app.route` 跟 `def webhook()` 之間，decorator 被靜默搶走，Telegram bot 全死

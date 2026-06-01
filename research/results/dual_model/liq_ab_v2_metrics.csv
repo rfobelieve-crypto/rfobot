@@ -1,0 +1,9 @@
+metric,baseline,new
+mae,0.0043057844327570646,0.004310879485213079
+rmse,0.006518160576046327,0.0065217399595911725
+spearman_ic,0.1801311004989555,0.18612333216793794
+auc_sign,0.6029509188654733,0.6035617093111936
+strong_sweep,"{'thr_0.006': {'n': 6, 'n_long': 6, 'n_short': 0, 'wr': 1.0, 'fire_rate': 0.0016233766233766235, 'wr_long': 1.0, 'wr_short': nan}, 'thr_0.008': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}, 'thr_0.010': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}, 'thr_0.012': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}, 'thr_0.015': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}}","{'thr_0.006': {'n': 1, 'n_long': 1, 'n_short': 0, 'wr': 1.0, 'fire_rate': 0.00027056277056277056, 'wr_long': 1.0, 'wr_short': nan}, 'thr_0.008': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}, 'thr_0.010': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}, 'thr_0.012': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}, 'thr_0.015': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}}"
+n_folds,77,77
+n_features,136,145
+objective,mse,mse
