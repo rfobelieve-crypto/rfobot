@@ -1,0 +1,11 @@
+{
+  "baseline_symmetric_thr": 0.0008,
+  "baseline_combined_wr": 0.6666666666666666,
+  "baseline_n_total": 819,
+  "recommended_thr_long": 0.002,
+  "recommended_thr_short": 0.0005,
+  "recommended_combined_wr": 0.6787709497206704,
+  "recommended_n_total": 716,
+  "wr_lift_pp": 1.2104283054003795,
+  "deploy_recommendation": "marginal \u2014 needs more data"
+}
