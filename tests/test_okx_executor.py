@@ -175,6 +175,25 @@ class TestCycle:
         assert result.action == "none"
         assert result.detail["status"] == "INIT"
 
+    def test_halted_to_active_auto_resolves_kills(self):
+        """Recovery path: HALTED → triggers cleared → ACTIVE → kill log
+        auto-resolved (M6 milestone enabler)."""
+        exe, client, store, recon = _mk_executor()
+        exe.start()
+        # Force HALTED state directly
+        from indicator.okx.types import ExecutorStatus
+        exe._status = ExecutorStatus.HALTED
+        # Next cycle: clean reconciliation, no triggers → should resume
+        recon.reconcile_cycle.return_value = _consistent_recon()
+        result = exe.cycle(klines=pd.DataFrame(),
+                            signal_direction="NEUTRAL",
+                            signal_strength="Weak")
+        assert exe.get_status() == ExecutorStatus.ACTIVE
+        # resolve_open_kills should have been called
+        store.resolve_open_kills.assert_called_once()
+        kw = store.resolve_open_kills.call_args.kwargs
+        assert "auto" in kw.get("resolution", "").lower()
+
     def test_kill_trigger_returns_halted(self):
         exe, client, store, recon = _mk_executor()
         exe.start()
