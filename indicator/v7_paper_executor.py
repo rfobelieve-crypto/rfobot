@@ -116,6 +116,21 @@ def init_table() -> None:
                     KEY `ix_entry_time` (`entry_time`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
+            # Additive migrations — safe to re-run.
+            for col_name, col_def in (
+                ("entry_reason", "TEXT DEFAULT NULL"),
+                ("exit_reason_text", "TEXT DEFAULT NULL"),
+            ):
+                cur.execute("""
+                    SELECT COUNT(*) AS n FROM information_schema.columns
+                    WHERE table_schema = DATABASE() AND table_name = %s
+                      AND column_name = %s
+                """, (TABLE, col_name))
+                if int(cur.fetchone()["n"]) == 0:
+                    cur.execute(
+                        f"ALTER TABLE `{TABLE}` ADD COLUMN `{col_name}` {col_def}"
+                    )
+                    logger.info("Added %s column to %s", col_name, TABLE)
         conn.commit()
     finally:
         conn.close()
@@ -185,7 +200,8 @@ def insert_open(entry_time: datetime, direction: str, entry_price: float,
                 entry_tier: str, atr_at_entry: float, stop_dist: float,
                 current_stop: float, size_frac: float, notional_usd: float,
                 equity_before: float, paused: bool = False,
-                model_version: Optional[str] = None) -> Optional[int]:
+                model_version: Optional[str] = None,
+                entry_reason: Optional[str] = None) -> Optional[int]:
     """Insert a new OPEN position. Returns row id, or None if duplicate ts."""
     conn = _get_conn()
     try:
@@ -195,9 +211,9 @@ def insert_open(entry_time: datetime, direction: str, entry_price: float,
                   (entry_time, direction, entry_price, entry_tier, status,
                    atr_at_entry, stop_dist, trail_extreme, current_stop,
                    size_frac, notional_usd, equity_before,
-                   paused_at_signal, model_version)
+                   paused_at_signal, model_version, entry_reason)
                 VALUES (%s, %s, %s, %s, 'OPEN',
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 entry_time.strftime("%Y-%m-%d %H:%M:%S"),
                 direction, float(entry_price), entry_tier,
@@ -205,6 +221,7 @@ def insert_open(entry_time: datetime, direction: str, entry_price: float,
                 float(entry_price),               # trail_extreme starts at entry
                 float(current_stop), float(size_frac), float(notional_usd),
                 float(equity_before), int(paused), model_version,
+                entry_reason,
             ))
             inserted = cur.rowcount > 0
             new_id = cur.lastrowid if inserted else None
@@ -231,7 +248,8 @@ def update_trail(position_id: int, trail_extreme: float,
 
 
 def close_position(pos: dict, exit_time: datetime, exit_price: float,
-                   exit_reason: str, bars_held: int) -> dict:
+                   exit_reason: str, bars_held: int,
+                   exit_reason_text: Optional[str] = None) -> dict:
     """Close an open position; fill outcome + compounded equity columns.
 
     P&L uses the position's own implied leverage = notional / equity_before
@@ -266,13 +284,14 @@ def close_position(pos: dict, exit_time: datetime, exit_price: float,
                     status='CLOSED',
                     exit_time=%s, exit_price=%s, exit_reason=%s, bars_held=%s,
                     gross_pct=%s, net_pct=%s, equity_ret_pct=%s,
-                    equity_after=%s, win=%s
+                    equity_after=%s, win=%s, exit_reason_text=%s
                 WHERE id=%s
             """, (
                 exit_time.strftime("%Y-%m-%d %H:%M:%S"),
                 float(exit_price), exit_reason, int(bars_held),
                 float(gross_pct), float(net_pct), float(equity_ret * 100.0),
-                float(equity_after), win, int(pos["id"]),
+                float(equity_after), win, exit_reason_text,
+                int(pos["id"]),
             ))
         conn.commit()
     finally:
@@ -284,6 +303,7 @@ def close_position(pos: dict, exit_time: datetime, exit_price: float,
         "equity_ret_pct": equity_ret * 100.0, "equity_after": equity_after,
         "win": win, "bars_held": bars_held, "reason": exit_reason,
         "paused": int(pos.get("paused_at_signal", 0) or 0),
+        "exit_reason_text": exit_reason_text,
     }
 
 
@@ -378,15 +398,25 @@ def _is_in_transition_window(model_version: Optional[str],
 
 def run_cycle(klines: pd.DataFrame, signal_direction: str,
               signal_strength: str = "",
-              model_version: Optional[str] = None) -> dict:
+              model_version: Optional[str] = None,
+              shap_result: Optional[dict] = None,
+              dir_prob_up: Optional[float] = None,
+              confidence: float = 0.0,
+              regime: str = "") -> dict:
     """Run one V7 paper cycle on the latest closed bar.
 
     signal_direction : v7.1 decoded direction for the latest bar
                        ("UP" / "DOWN" / "NEUTRAL").
     signal_strength  : "Strong" / "Moderate" / "Weak" (stored for reporting;
                        not gated on — direction != NEUTRAL is the signal).
+    shap_result      : SHAP output from signal_explainer.explain_signal(); used
+                       to humanize entry/exit reasons (None → fallback text).
+    dir_prob_up      : raw p_up from the model (needed to describe the opp
+                       signal at exit time).
 
-    Returns a dict: {action: "open"|"close"|"hold"|"none", ...}.
+    Returns a dict: {action: "open"|"close"|"hold"|"none", ...}. When the
+    action is "open" the dict contains entry_reason; when "close" it contains
+    exit_reason_text.
     """
     try:
         init_table()
@@ -458,13 +488,40 @@ def run_cycle(klines: pd.DataFrame, signal_direction: str,
                     "direction": side, "bars_held": bars_held,
                     "current_stop": new_stop}
 
-        closed = close_position(pos, bar_ts, exit_price, exit_reason, bars_held)
+        # Build humanized exit reason (independent of close_position math).
+        try:
+            from indicator.signal_explainer import humanize_exit_reason
+            opp_info = None
+            if exit_reason == "opp_signal":
+                opp_dir = "UP" if direction_up else "DOWN"
+                opp_info = {
+                    "direction": opp_dir,
+                    "conf": float(confidence or 0.0),
+                    "p_up": float(dir_prob_up) if dir_prob_up is not None else 0.5,
+                }
+            # We don't have net_pct yet — close_position computes it. Pass 0
+            # here and the text gives the *reason*; the final net/PnL is
+            # already in the closed dict for the Telegram alert.
+            exit_text = humanize_exit_reason(
+                exit_reason=exit_reason,
+                direction=side,
+                net_pct=0.0,
+                bars_held=bars_held,
+                opp_info=opp_info,
+            )
+        except Exception as exc:
+            logger.warning("humanize_exit_reason failed: %s", exc)
+            exit_text = None
+
+        closed = close_position(pos, bar_ts, exit_price, exit_reason, bars_held,
+                                exit_reason_text=exit_text)
         logger.info("V7 paper CLOSE id=%d %s @ %.2f net=%+.3f%% "
                     "eq_ret=%+.3f%% equity=%.2f reason=%s",
                     pos["id"], side, exit_price, closed["net_pct"] * 100,
                     closed["equity_ret_pct"], closed["equity_after"],
                     exit_reason)
-        return {"action": "close", "closed": closed}
+        return {"action": "close", "closed": closed,
+                "exit_reason_text": exit_text}
 
     # ─── Case B: flat — check for entry ──
     if not (direction_up or direction_dn):
@@ -486,11 +543,25 @@ def run_cycle(klines: pd.DataFrame, signal_direction: str,
     tier = signal_strength if signal_strength in ("Strong", "Moderate") else "Moderate"
     paused = _is_in_transition_window(model_version, bar_ts)
 
+    # Build humanized entry reason from SHAP (fallback to plain text if SHAP
+    # is unavailable — entry must NEVER be blocked by explainer failure).
+    try:
+        from indicator.signal_explainer import humanize_entry_reason
+        direction_str = "UP" if side == "LONG" else "DOWN"
+        entry_reason_text = humanize_entry_reason(
+            shap_result=shap_result, direction=direction_str,
+            regime=regime, conf=float(confidence or 0.0), tier=tier,
+        )
+    except Exception as exc:
+        logger.warning("humanize_entry_reason failed: %s", exc)
+        entry_reason_text = None
+
     new_id = insert_open(
         entry_time=bar_ts, direction=side, entry_price=last_close,
         entry_tier=tier, atr_at_entry=atr, stop_dist=stop_dist,
         current_stop=current_stop, size_frac=size_frac, notional_usd=notional,
-        equity_before=equity, paused=paused, model_version=model_version)
+        equity_before=equity, paused=paused, model_version=model_version,
+        entry_reason=entry_reason_text)
     if not new_id:
         return {"action": "none", "note": "dup entry timestamp"}
     logger.info("V7 paper OPEN id=%d %s @ %.2f tier=%s size=%.0f%% "
@@ -500,7 +571,8 @@ def run_cycle(klines: pd.DataFrame, signal_direction: str,
     return {"action": "open", "opened_id": new_id, "opened_direction": side,
             "entry_price": last_close, "entry_tier": tier,
             "size_frac": size_frac, "notional_usd": notional,
-            "current_stop": current_stop, "paused": paused}
+            "current_stop": current_stop, "paused": paused,
+            "entry_reason": entry_reason_text}
 
 
 # ── Status helper ────────────────────────────────────────────────────────────

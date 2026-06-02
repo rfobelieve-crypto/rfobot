@@ -111,7 +111,12 @@ def _send_telegram_photo(png: bytes, caption: str) -> str:
 
 
 def _send_v7_paper_alerts(result: dict) -> None:
-    """Translate v7_paper_executor.run_cycle result into Telegram messages."""
+    """Translate v7_paper_executor.run_cycle result into Telegram messages.
+
+    Only fires when paper actually opens/closes a position (action in
+    ("open", "close")). Includes humanized entry/exit reason so the user can
+    see WHY without checking the dashboard.
+    """
     if not result:
         return
     action = result.get("action")
@@ -123,6 +128,8 @@ def _send_v7_paper_alerts(result: dict) -> None:
         emoji = "🟢" if d == "LONG" else "🔴"
         shadow = (" <i>[SHADOW — 模型轉換窗口, 不計入 cohort]</i>"
                   if result.get("paused") else "")
+        reason = result.get("entry_reason") or ""
+        reason_block = f"\n\n<b>進場理由</b>\n<pre>{reason}</pre>" if reason else ""
         msg = (
             f"{emoji} <b>V7 {d} OPEN</b>{shadow}\n"
             f"Entry: ${result['entry_price']:,.2f} "
@@ -131,16 +138,21 @@ def _send_v7_paper_alerts(result: dict) -> None:
             f"Size: {result['size_frac']*100:.0f}% equity "
             f"(${result['notional_usd']:,.0f}) | "
             f"stop ${result['current_stop']:,.2f}"
+            f"{reason_block}"
         )
     elif action == "close":
         c = result["closed"]
         emoji = "✅" if c["win"] else "❌"
         shadow = " <i>[SHADOW — 不計入 cohort]</i>" if c.get("paused") else ""
+        reason_text = (result.get("exit_reason_text")
+                       or c.get("exit_reason_text") or "")
+        reason_block = f"\n\n<b>出場理由</b>\n<pre>{reason_text}</pre>" if reason_text else ""
         msg = (
             f"{emoji} <b>V7 {c['direction']} CLOSE</b>{shadow}\n"
             f"Exit: ${c['exit_price']:,.2f} ({c['reason']})\n"
             f"Held: {c['bars_held']}h | Net: {c['net_pct']*100:+.2f}%\n"
             f"Equity: {c['equity_ret_pct']:+.2f}% → ${c['equity_after']:,.0f}"
+            f"{reason_block}"
         )
     if msg:
         try:
@@ -614,6 +626,10 @@ def update_cycle() -> dict:
         tg_result = _send_telegram_photo(png, caption)
         dc_result = _send_discord_photo(png, caption)
 
+        # Pre-init so they're always defined before run_v7_cycle below.
+        shap_result = None
+        shap_json_str = ""
+
         # Signal alert (Telegram + Discord push for Strong + Moderate)
         if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
             regime = str(last_row.get("regime", "?"))
@@ -637,18 +653,22 @@ def update_cycle() -> dict:
             else:
                 mag_tier_line = f"\n⚠️ Mag Weak (p{mag_pct:.0f})"
 
-            # SHAP explanation for Strong signals only
+            # SHAP explanation for Strong + Moderate signals (Moderate also
+            # records SHAP so paper trade entry_reason can be populated).
             shap_text = ""
-            shap_json_str = ""
-            if is_strong:
+            if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
                 try:
-                    from indicator.signal_explainer import explain_strong_signal, format_shap_for_telegram
+                    from indicator.signal_explainer import explain_signal, format_shap_for_telegram
                     import json as _json
                     last_features = features.iloc[-1].to_dict() if len(features) > 0 else {}
-                    shap_result = explain_strong_signal(last_features, direction)
+                    shap_result = explain_signal(last_features, direction)
                     if shap_result:
-                        shap_text = format_shap_for_telegram(shap_result, direction)
                         shap_json_str = _json.dumps(shap_result, ensure_ascii=False)
+                        # Only attach SHAP block to the *Strong* Telegram alert
+                        # to avoid spam; Moderate uses SHAP for paper-trade
+                        # entry_reason via run_v7_cycle below.
+                        if is_strong:
+                            shap_text = format_shap_for_telegram(shap_result, direction)
                 except Exception as e:
                     logger.warning("SHAP explanation failed (non-critical): %s", e)
 
@@ -676,7 +696,8 @@ def update_cycle() -> dict:
                 sig_time = indicator_df.index[-1]
                 if hasattr(sig_time, 'to_pydatetime'):
                     sig_time = sig_time.to_pydatetime()
-                shap_json_str = shap_json_str if strength == "Strong" else ""
+                # Strong + Moderate both store SHAP json now (Moderate's SHAP
+                # powers paper trade entry_reason; still useful as history).
                 record_signal(
                     signal_time=sig_time, direction=direction,
                     strength=strength,
@@ -703,7 +724,10 @@ def update_cycle() -> dict:
             from indicator.model_version import get_current_model_version
             v7_result = run_v7_cycle(
                 klines, signal_direction=direction, signal_strength=strength,
-                model_version=get_current_model_version())
+                model_version=get_current_model_version(),
+                shap_result=shap_result, dir_prob_up=float(dir_prob),
+                confidence=float(conf),
+                regime=str(last_row.get("regime", "")))
             _send_v7_paper_alerts(v7_result)
             _record_executor_success("V7 paper executor")
         except Exception as e:
