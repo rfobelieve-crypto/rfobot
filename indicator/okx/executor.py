@@ -449,19 +449,84 @@ class V7OkxExecutor:
             except Exception:
                 logger.exception("close_cancel_algo_failed pos=%s", pos_id)
 
-        # 2. Submit opposite-side market order to flatten
+        # 2. Submit opposite-side market order to flatten.
+        # Capture the result — unlike open path which checks rejection,
+        # the prior close path discarded it.  A 4xx from OKX returns
+        # status="rejected" WITHOUT raising, so the try/except below
+        # would not catch it.  Failing to detect this caused the
+        # "V7 says closed, OKX still has the position" bug.
+        close_submit_failed = False
+        close_error: Optional[str] = None
         if size > 0 and side in ("LONG", "SHORT"):
             close_side = Side.SELL if side == "LONG" else Side.BUY
             try:
-                self._client.submit_market_order(
+                close_result = self._client.submit_market_order(
                     inst_id=self._cfg.inst_id, side=close_side,
                     sz=size, td_mode=self._cfg.td_mode,
                     cl_ord_id=make_cl_ord_id(prefix="v7close"),
                     pos_side=self._cfg.pos_side_for(side),
                     reduce_only=True,
                 )
-            except Exception:
+                if close_result.status == "rejected":
+                    close_submit_failed = True
+                    close_error = close_result.error or "okx_rejected"
+                    logger.error(
+                        "close_market_order_rejected pos=%s side=%s "
+                        "size=%d posSide=%s err=%s",
+                        pos_id, close_side.value, size,
+                        self._cfg.pos_side_for(side), close_error,
+                    )
+            except Exception as exc:
+                close_submit_failed = True
+                close_error = f"exception: {exc}"
                 logger.exception("close_market_order_failed pos=%s", pos_id)
+
+        # If close submission failed, leave DB state OPEN so the next
+        # cycle retries.  Cancel the algo-stop cancel we did above —
+        # actually re-place it so the position keeps protection.
+        if close_submit_failed:
+            logger.error(
+                "okx_close_FAILED pos=%s side=%s — OKX position likely "
+                "still open. DB left as OPEN; next cycle will retry. "
+                "Halting executor to prevent further state divergence.",
+                pos_id, side,
+            )
+            # Try to re-place the algo stop we just canceled, otherwise
+            # the position is now naked.
+            try:
+                algo_side = Side.SELL if side == "LONG" else Side.BUY
+                self._client.submit_algo_stop(
+                    inst_id=self._cfg.inst_id, side=algo_side, sz=size,
+                    trigger_px=float(pos.get("current_stop") or 0),
+                    td_mode=self._cfg.td_mode,
+                    pos_side=self._cfg.pos_side_for(side),
+                    reduce_only=True,
+                )
+            except Exception:
+                logger.exception("close_failed_algo_replace_also_failed "
+                                 "pos=%s — position now NAKED", pos_id)
+            # Critical alert + halt
+            try:
+                send_critical(
+                    self._cfg.telegram_critical_chat_id,
+                    f"🔴 <b>OKX CLOSE FAILED</b> pos id={pos_id}\n"
+                    f"side={side} size={size} reason={exit_reason}\n"
+                    f"err: {close_error}\n"
+                    f"Position likely still open on OKX. Executor halted; "
+                    f"will retry next cycle. Manually verify OKX state.",
+                )
+            except Exception:
+                logger.exception("close_failed_alert_send_also_failed")
+            self._set_status(
+                ExecutorStatus.HALTED,
+                reason=f"close_market_order_failed: {close_error}",
+                trigger_id="CLOSE-FAIL",
+                context={"pos_id": pos_id, "side": side,
+                         "exit_reason": exit_reason},
+            )
+            return CycleResult(action="close_failed",
+                               detail={"position_id": pos_id,
+                                       "error": close_error})
 
         # 3. Compute P&L using last_close as the exit-price estimate.
         # WS fill event for the close order can refine this later.
