@@ -653,22 +653,29 @@ def update_cycle() -> dict:
             else:
                 mag_tier_line = f"\n⚠️ Mag Weak (p{mag_pct:.0f})"
 
-            # SHAP explanation for Strong + Moderate signals (Moderate also
-            # records SHAP so paper trade entry_reason can be populated).
+            # SHAP explanation for Strong + Moderate (user 2026-06-02:
+            # 「全部每個訊號都寫詳細理由」 — both tiers get full SHAP block
+            # + humanized 1-line intro).
             shap_text = ""
             if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
                 try:
-                    from indicator.signal_explainer import explain_signal, format_shap_for_telegram
+                    from indicator.signal_explainer import (
+                        explain_signal, format_shap_for_telegram,
+                        humanize_entry_reason,
+                    )
                     import json as _json
                     last_features = features.iloc[-1].to_dict() if len(features) > 0 else {}
                     shap_result = explain_signal(last_features, direction)
                     if shap_result:
                         shap_json_str = _json.dumps(shap_result, ensure_ascii=False)
-                        # Only attach SHAP block to the *Strong* Telegram alert
-                        # to avoid spam; Moderate uses SHAP for paper-trade
-                        # entry_reason via run_v7_cycle below.
-                        if is_strong:
-                            shap_text = format_shap_for_telegram(shap_result, direction)
+                        # Human-readable intro (top groups in plain language)
+                        human_line = humanize_entry_reason(
+                            shap_result, direction,
+                            regime=regime, conf=float(conf), tier=strength,
+                        )
+                        # Full driver factor analysis (technical detail)
+                        detail = format_shap_for_telegram(shap_result, direction)
+                        shap_text = f"\n<pre>{human_line}</pre>{detail}"
                 except Exception as e:
                     logger.warning("SHAP explanation failed (non-critical): %s", e)
 
