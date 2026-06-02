@@ -157,14 +157,19 @@ class OkxRestClient:
         """
         algo_cl_ord_id = algo_cl_ord_id or make_cl_ord_id(prefix="v7a")
         path = "/api/v5/trade/order-algo"
+        # OKX conditional orders require slTriggerPx + slOrdPx for stop loss
+        # (triggerPx alone returns 50015 "Either parameter tpTriggerPx or
+        # slTriggerPx is required").  Discovered 2026-06-02 when first live
+        # algo stop submission failed.
         body = {
             "instId": inst_id,
             "tdMode": td_mode,
             "side": side.value,
             "ordType": "conditional",
             "sz": str(sz),
-            "triggerPx": str(trigger_px),
-            "orderPx": "-1",        # market on trigger
+            "slTriggerPx": str(trigger_px),
+            "slOrdPx": "-1",              # market on trigger
+            "slTriggerPxType": "last",    # trigger on last price
             "algoClOrdId": algo_cl_ord_id,
         }
         if pos_side is not None:
@@ -184,11 +189,15 @@ class OkxRestClient:
 
     def amend_algo_stop(self, *, algo_id: str,
                         new_trigger_px: float) -> AmendResult:
-        """Atomic amend.  P6: NEVER cancel-then-new."""
+        """Atomic amend.  P6: NEVER cancel-then-new.
+
+        OKX amend-algos for stop-loss requires newSlTriggerPx (not the
+        generic newTriggerPx).  Same fix as submit_algo_stop above.
+        """
         path = "/api/v5/trade/amend-algos"
         body = {
             "algoId": algo_id,
-            "newTriggerPx": str(new_trigger_px),
+            "newSlTriggerPx": str(new_trigger_px),
         }
         result = self._retry_post(
             path=path, body=body, retries=2, backoff_base=1.0,
