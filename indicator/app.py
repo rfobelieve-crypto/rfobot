@@ -992,6 +992,114 @@ def prediction_json():
     return jsonify(pred)
 
 
+@app.route("/okx-admin/heal", methods=["GET"])
+def okx_admin_heal_api():
+    """Emergency heal endpoint for the V7 OKX executor.
+
+    Use case: executor stuck in DEMOTED/HALTED with orphan_local
+    rows from a missed WS algo fill or a long WS disconnect.  Mobile-
+    friendly: just hit the URL from a browser, no SQL needed.
+
+    Behaviour:
+      - GET /okx-admin/heal              → dry-run preview (safe)
+      - GET /okx-admin/heal?confirm=YES  → actually heal
+
+    Heal actions:
+      1. Close every v7_okx_positions row currently OPEN
+         (exit_reason='admin_heal', zero P&L)
+      2. Reset v7_okx_executor_status from DEMOTED/HALTED to INIT
+         (next cycle will reconnect WS + transition INIT→CONNECTING→
+         READY→ACTIVE, same as a fresh start)
+      3. Re-fetch positions from OKX via REST so reconciler starts
+         from accurate state next cycle
+
+    Requires ADMIN_HEAL_TOKEN env match if set; otherwise open (use
+    a Railway env var to lock down in production).
+    """
+    from flask import request, jsonify
+    confirm = request.args.get("confirm", "").upper() == "YES"
+    expected_token = os.environ.get("ADMIN_HEAL_TOKEN", "")
+    if expected_token:
+        provided = request.args.get("token", "")
+        if provided != expected_token:
+            return jsonify({"error": "missing/invalid ?token"}), 403
+
+    from shared.db import get_db_conn
+    open_rows: list[dict] = []
+    status_row: dict | None = None
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, status, direction, size_contracts, "
+                    "entry_price, entry_time, entry_cl_ord_id, stop_algo_id "
+                    "FROM v7_okx_positions WHERE status='OPEN' ORDER BY id"
+                )
+                open_rows = list(cur.fetchall() or [])
+                cur.execute(
+                    "SELECT status, reason, trigger_id, last_changed_at "
+                    "FROM v7_okx_executor_status WHERE id=1"
+                )
+                status_row = cur.fetchone()
+
+                if confirm:
+                    n_closed = 0
+                    if open_rows:
+                        cur.execute(
+                            "UPDATE v7_okx_positions "
+                            "SET status='CLOSED', "
+                            "    exit_time=NOW(), "
+                            "    exit_reason='admin_heal', "
+                            "    exit_price=COALESCE(exit_price, entry_price), "
+                            "    gross_pct=0.0, net_pct=0.0, "
+                            "    equity_ret_pct=0.0, "
+                            "    equity_after=equity_before "
+                            "WHERE status='OPEN'"
+                        )
+                        n_closed = cur.rowcount
+                    cur.execute(
+                        "UPDATE v7_okx_executor_status "
+                        "SET status='INIT', "
+                        "    last_changed_at=NOW(), "
+                        "    reason='admin_heal', "
+                        "    trigger_id=NULL "
+                        "WHERE id=1"
+                    )
+                    cur.execute(
+                        "UPDATE v7_okx_kill_log "
+                        "SET resolved_at=NOW(), "
+                        "    resolution='admin_heal' "
+                        "WHERE resolved_at IS NULL"
+                    )
+                    conn.commit()
+                    return jsonify({
+                        "healed": True,
+                        "positions_closed": n_closed,
+                        "executor_reset_to": "INIT (will reconnect on next cycle)",
+                        "kill_log_resolved": True,
+                        "note": "wait 1 cycle (≤60min) for executor "
+                                "to re-init through INIT→CONNECTING→READY→ACTIVE.",
+                    })
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.exception("okx_admin_heal failed")
+        return jsonify({"error": f"DB op failed: {e}"}), 500
+
+    return jsonify({
+        "dry_run": True,
+        "current_status": status_row,
+        "open_positions": open_rows,
+        "would_close_n_positions": len(open_rows),
+        "would_reset_executor_to": "INIT",
+        "how_to_apply": (
+            "Re-open this URL with ?confirm=YES appended"
+            + (" and &token=<your-token>" if expected_token else "")
+        ),
+    })
+
+
 @app.route("/okx-status", methods=["GET"])
 def okx_status_api():
     """Inspect OKX runner singleton state.  Returns diagnostic info
