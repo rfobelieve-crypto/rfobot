@@ -728,6 +728,21 @@ class V7OkxExecutor:
                                detail={"reason": "entry_submit_exception"})
         if entry_result.status == "rejected":
             logger.warning("open_entry_rejected err=%s", entry_result.error)
+            # Surface to operator — without this, user sees a signal in
+            # the indicator but no OKX position, and no idea why.
+            try:
+                send_critical(
+                    self._cfg.telegram_critical_chat_id,
+                    f"🔴 <b>OKX OPEN FAILED</b>\n"
+                    f"dir={intent.direction} tier={intent.tier} "
+                    f"size={intent.size_contracts} contracts\n"
+                    f"intended entry: ${intent.entry_price:,.2f}\n"
+                    f"posSide={self._cfg.pos_side_for(intent.direction)}\n"
+                    f"err: {entry_result.error}\n"
+                    f"No position opened. Next signal will retry.",
+                )
+            except Exception:
+                logger.exception("open_failed_alert_send_failed")
             return CycleResult(action="none",
                                detail={"reason": "entry_rejected",
                                        "error": entry_result.error})
