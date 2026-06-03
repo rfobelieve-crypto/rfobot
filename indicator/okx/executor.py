@@ -777,19 +777,50 @@ class V7OkxExecutor:
                     self._client.cancel_algo_stop(algo_id=algo_result.algo_id)
                 except Exception:
                     logger.exception("emergency_cancel_algo_failed")
+            emerg_close_ok = False
+            emerg_close_err: Optional[str] = None
             try:
                 close_side = Side.SELL if side == "LONG" else Side.BUY
-                self._client.submit_market_order(
+                emerg_result = self._client.submit_market_order(
                     inst_id=self._cfg.inst_id, side=close_side,
                     sz=size_contracts, td_mode=self._cfg.td_mode,
                     cl_ord_id=make_cl_ord_id(prefix="v7emerg"),
                     pos_side=pos_side, reduce_only=True,
                 )
-            except Exception:
+                if emerg_result.status == "rejected":
+                    emerg_close_err = emerg_result.error or "okx_rejected"
+                else:
+                    emerg_close_ok = True
+            except Exception as exc:
+                emerg_close_err = f"exception: {exc}"
                 logger.exception("emergency_close_failed")
+            # If emergency close FAILED, we have a NAKED position on OKX
+            # with NO DB record (we haven't inserted yet) and NO algo stop.
+            # This is the worst possible state — user must manually close.
+            if not emerg_close_ok:
+                try:
+                    send_critical(
+                        self._cfg.telegram_critical_chat_id,
+                        f"🚨 <b>NAKED POSITION ON OKX</b> 🚨\n"
+                        f"Entry submitted SUCCESSFULLY but algo stop failed\n"
+                        f"AND emergency close failed.\n\n"
+                        f"<b>OKX has an open {side} {size_contracts} contract "
+                        f"position with NO stop loss and NO DB record.</b>\n\n"
+                        f"Direction: {side}\n"
+                        f"Size: {size_contracts} contracts\n"
+                        f"Approx entry: ${last_close:,.2f}\n"
+                        f"Entry clOrdId: {entry_cl_ord_id}\n"
+                        f"posSide: {pos_side}\n"
+                        f"Emergency close err: {emerg_close_err}\n\n"
+                        f"⚠️ GO TO OKX IMMEDIATELY AND MANUALLY CLOSE.\n"
+                        f"Executor will be HALTED.",
+                    )
+                except Exception:
+                    logger.exception("naked_position_alert_failed")
             self._alert_critical(latency_check, severity_label="HALT")
             return CycleResult(action="none",
-                               detail={"reason": "b4_latency_violation"})
+                               detail={"reason": "b4_latency_violation",
+                                       "naked_position": not emerg_close_ok})
 
         # 3. Insert position row
         try:
@@ -936,22 +967,53 @@ class V7OkxExecutor:
                     logger.exception("force_close_cancel_algo_failed pos=%s",
                                      pos_id)
 
-            # Step 2: submit opposite-side market order to flatten
+            # Step 2: submit opposite-side market order to flatten.
+            # Capture result — silent close-fail here means OKX leaves
+            # the position open while we mark it DEMOTED in DB.
+            close_ok = False
+            close_err: Optional[str] = None
             if size > 0 and direction in ("LONG", "SHORT"):
                 close_side = Side.SELL if direction == "LONG" else Side.BUY
                 try:
-                    self._client.submit_market_order(
+                    fc_result = self._client.submit_market_order(
                         inst_id=self._cfg.inst_id, side=close_side,
                         sz=size, td_mode=self._cfg.td_mode,
                         cl_ord_id=make_cl_ord_id(prefix="v7close"),
                         pos_side=self._cfg.pos_side_for(direction),
                         reduce_only=True,
                     )
-                except Exception:
+                    if fc_result.status == "rejected":
+                        close_err = fc_result.error or "okx_rejected"
+                    else:
+                        close_ok = True
+                except Exception as exc:
+                    close_err = f"exception: {exc}"
                     logger.exception("force_close_market_close_failed pos=%s",
                                      pos_id)
+            else:
+                # size==0 or direction missing → nothing to close, treat as OK
+                close_ok = True
 
-            # Step 3: mark closed in local DB (best-effort)
+            # If force-close FAILED, leave DB OPEN so reconciler keeps
+            # reporting orphan_local AND send a critical alert listing
+            # exactly which position needs manual handling.
+            if not close_ok:
+                try:
+                    send_critical(
+                        self._cfg.telegram_critical_chat_id,
+                        f"🚨 <b>FORCE-CLOSE FAILED on DEMOTE</b>\n"
+                        f"Position id={pos_id} dir={direction} "
+                        f"size={size} could NOT be closed during demote.\n"
+                        f"DB left as OPEN; reconciler will keep alerting.\n"
+                        f"err: {close_err}\n\n"
+                        f"⚠️ GO TO OKX AND MANUALLY CLOSE.",
+                    )
+                except Exception:
+                    logger.exception("force_close_alert_failed pos=%s", pos_id)
+                # Skip DB update — leave row OPEN
+                continue
+
+            # Step 3: mark closed in local DB (only if close succeeded)
             if pos_id is not None:
                 try:
                     self._store.close_position(
