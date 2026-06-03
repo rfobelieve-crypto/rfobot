@@ -992,6 +992,76 @@ class V7OkxExecutor:
 
     # ── WS callback wiring ─────────────────────────────────────────────
 
+    def _sync_close_from_algo_fill(self, pos: dict, evt) -> None:
+        """OKX trail-stop algo fired → close our DB row + alert.
+
+        Called from on_order WS callback when an algo stop fill is
+        detected.  Computes P&L from the fill price (preferred) or
+        the current stop trigger (fallback when fill_price absent).
+
+        Idempotent: close_position SQL is WHERE status='OPEN', so a
+        duplicate WS event (or race with cycle close) is a no-op.
+        """
+        from datetime import datetime as _dt
+
+        pos_id = int(pos.get("id") or 0)
+        side = pos.get("direction") or "FLAT"
+        entry_price = float(pos.get("entry_price") or 0)
+        equity_before = float(pos.get("equity_before") or 0)
+        notional = float(pos.get("notional_usd") or 0)
+        # Prefer fill_price; fall back to the stop trigger if WS omitted it
+        exit_price = (
+            evt.fill_price
+            if evt.fill_price is not None and evt.fill_price > 0
+            else float(pos.get("current_stop") or entry_price)
+        )
+
+        if side == "LONG" and entry_price > 0:
+            gross_pct = exit_price / entry_price - 1.0
+        elif side == "SHORT" and entry_price > 0:
+            gross_pct = -(exit_price / entry_price - 1.0)
+        else:
+            gross_pct = 0.0
+        net_pct = gross_pct - self._cfg.taker_cost
+        if equity_before > 0 and notional > 0:
+            equity_ret = (notional / equity_before) * net_pct
+        else:
+            equity_ret = float(pos.get("size_frac") or 0) * net_pct
+        equity_after = max(equity_before * (1.0 + equity_ret), 0.0)
+
+        exit_time = evt.ts or _dt.utcnow()
+
+        try:
+            self._store.close_position(
+                position_id=pos_id,
+                exit_time=exit_time,
+                exit_price=exit_price,
+                exit_reason="trail_stop",
+                gross_pct=gross_pct, net_pct=net_pct,
+                equity_ret_pct=equity_ret * 100.0,
+                equity_after=equity_after,
+                new_status="CLOSED",
+            )
+        except Exception:
+            logger.exception("ws_algo_fill_db_close_failed pos=%s", pos_id)
+            return
+
+        try:
+            msg = format_exit_alert(
+                stage_label=self._cfg.stage_label, direction=side,
+                reason="trail_stop", entry_price=entry_price,
+                exit_price=exit_price, gross_pct=gross_pct,
+                net_pct=net_pct, equity_after=equity_after,
+            )
+            send_critical(self._cfg.telegram_critical_chat_id, msg)
+        except Exception:
+            logger.exception("ws_algo_fill_alert_failed pos=%s", pos_id)
+
+        logger.info(
+            "okx_close_via_ws_algo pos=%d %s %.2f→%.2f net %+.3f%%",
+            pos_id, side, entry_price, exit_price, net_pct * 100,
+        )
+
     def _wire_ws_callbacks(self) -> None:
         """Wire WS event callbacks to store-level persistence.
 
@@ -1001,9 +1071,12 @@ class V7OkxExecutor:
         from indicator.okx.types import OrderEvent, PositionEvent, BalanceEvent
 
         def on_order(evt: OrderEvent) -> None:
-            # On fill, map OKX ord_id back into v7_okx_positions row by
-            # cl_ord_id.  Full position open/close lifecycle is owned by
-            # _open_position/_manage_position (next iteration).
+            # WS order events serve two purposes:
+            # 1. Entry fill → record OKX ord_id back into our row
+            # 2. Algo stop fill (OKX-triggered trail close) → close our row
+            #    AND send the exit Telegram alert.  Without (2) the DB row
+            #    stays OPEN forever after OKX auto-closes a position, and
+            #    the reconciler flags orphan_local every cycle (HALT loop).
             logger.info("ws_order_event cl_ord=%s state=%s fill_px=%s",
                         evt.cl_ord_id, evt.state, evt.fill_price)
             try:
@@ -1013,12 +1086,21 @@ class V7OkxExecutor:
                 pos_id = pos.get("id")
                 if pos_id is None:
                     return
-                # Match by cl_ord_id to avoid cross-row contamination
+                # (1) Entry fill — match by entry cl_ord_id
                 if pos.get("entry_cl_ord_id") == evt.cl_ord_id and evt.ord_id:
                     self._store.set_position_okx_ids(
                         position_id=int(pos_id),
                         entry_ord_id=evt.ord_id,
                     )
+                    return
+                # (2) Algo stop fill — match by stop algo cl_ord_id and
+                # require state="filled" so we don't act on "live" events.
+                # On match, sync DB to CLOSED + push exit alert.
+                stop_cl_ord = pos.get("stop_algo_cl_ord_id") or ""
+                if (stop_cl_ord
+                        and stop_cl_ord == evt.cl_ord_id
+                        and evt.state == "filled"):
+                    self._sync_close_from_algo_fill(pos, evt)
             except Exception:
                 logger.exception("on_order_ws_persist_failed")
 
