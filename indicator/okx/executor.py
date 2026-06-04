@@ -655,18 +655,28 @@ class V7OkxExecutor:
         except Exception:
             logger.exception("open_equity_lookup_failed")
         # Leverage-adjusted buying power: at 10x, $100 controls $1000.
-        notional = size_frac * equity * float(self._cfg.leverage)
+        # `target_notional` is the buying-power TARGET; the actual position
+        # notional is smaller after flooring to whole contracts.  We use
+        # target for size_contracts calc but store the ACHIEVED notional
+        # below so P&L math matches reality.
+        target_notional = size_frac * equity * float(self._cfg.leverage)
 
         per_contract_usd = last_close * self._cfg.contract_size_base
-        size_contracts = (int(notional / per_contract_usd)
+        size_contracts = (int(target_notional / per_contract_usd)
                           if per_contract_usd > 0 else 0)
         if size_contracts < 1:
-            logger.info("open_skip_min_lot dir=%s notional=%.2f per_ct=%.2f",
-                        side, notional, per_contract_usd)
+            logger.info("open_skip_min_lot dir=%s target_notional=%.2f per_ct=%.2f",
+                        side, target_notional, per_contract_usd)
             return CycleResult(action="none",
                                detail={"reason": "below_min_lot",
-                                       "notional": notional,
+                                       "target_notional": target_notional,
                                        "per_contract_usd": per_contract_usd})
+
+        # Achieved notional after floor — this is what OKX actually opens
+        # and what P&L scales against. Storing the target inflated the
+        # close-time equity_ret calc by target/achieved ratio (often ~1.5x
+        # when 10x leverage / small capital / 1-contract floor bites).
+        notional = size_contracts * per_contract_usd
 
         current_stop = (last_close - stop_dist if side == "LONG"
                         else last_close + stop_dist)
