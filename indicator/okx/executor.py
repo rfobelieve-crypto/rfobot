@@ -97,6 +97,12 @@ class V7OkxExecutor:
         self._status: ExecutorStatus = ExecutorStatus.INIT
         # NTP probe rate-limit: monotonic seconds of last probe.  0 = never.
         self._last_ntp_probe: float = 0.0
+        # Orphan-local auto-heal: track consecutive reconcile cycles where
+        # DB has OPEN but OKX is flat.  After AUTO_HEAL_AFTER_CYCLES, we
+        # auto-close DB to clear the HALT loop (WS algo-fill events are
+        # known to miss; reconciler is the safety net).  Reset on any
+        # consistent or non-orphan_local result.
+        self._orphan_local_streak: int = 0
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
@@ -246,6 +252,18 @@ class V7OkxExecutor:
         # 2. Pre-cycle reconciliation (every cycle, per design P2)
         recon = self._reconciler.reconcile_cycle()
 
+        # 2b. Auto-heal persistent orphan_local.
+        # WS algo-fill events (OKX trail stop firing) sometimes arrive
+        # late or get dropped during brief WS hiccups, leaving DB OPEN
+        # while OKX is actually flat. Without this, each occurrence
+        # halts the executor and requires manual /okx-admin/heal.
+        # Logic: after 2 consecutive cycles of orphan_local (both via
+        # REST query in reconciler), auto-close the DB row(s) and
+        # override recon to CONSISTENT so kill_checks doesn't HALT.
+        # Only acts when OKX is genuinely flat — orphan_exchange /
+        # size_diff / direction_diff still HALT (those are unsafe).
+        recon = self._maybe_auto_heal_orphan_local(recon)
+
         # 3. Kill checks aggregate
         connectivity = self._client.connectivity()
         local_position_dicts = self._store.get_all_open_positions() or []
@@ -321,6 +339,108 @@ class V7OkxExecutor:
                                        model_version=model_version)
 
         return CycleResult(action="none", detail={"reason": "no_signal_no_pos"})
+
+    # ── Auto-heal ──────────────────────────────────────────────────────
+
+    # Wait this many consecutive cycles before auto-healing. 2 = give the
+    # late WS event one extra cycle to arrive before we mutate state.
+    AUTO_HEAL_AFTER_CYCLES: int = 2
+
+    def _maybe_auto_heal_orphan_local(self, recon):
+        """If orphan_local persists for N cycles, auto-close DB rows.
+
+        Returns: the recon result, possibly overridden to CONSISTENT
+        after a successful heal so kill_checks doesn't fire A4 HALT.
+
+        Why this is safe: orphan_local means OKX is FLAT (reconciler
+        queried REST). Closing the DB row aligns our state to truth.
+        No risk of opening a hidden naked position.
+
+        Why this is NOT done immediately: WS events sometimes arrive
+        late (network jitter). Waiting one extra cycle gives a real
+        algo-fill event time to land via the normal path (which
+        produces accurate P&L from fill_price). Auto-heal is the
+        last-resort safety net with zeroed P&L.
+        """
+        from indicator.okx.types import (
+            ReconciliationResult, ReconciliationVerdict,
+        )
+
+        if recon.verdict != ReconciliationVerdict.MISMATCH:
+            self._orphan_local_streak = 0
+            return recon
+        if (recon.detail or {}).get("type") != "orphan_local":
+            # Other mismatch types (orphan_exchange / size_diff /
+            # direction_diff) are NOT safe to auto-heal — keep HALT path.
+            self._orphan_local_streak = 0
+            return recon
+
+        self._orphan_local_streak += 1
+        if self._orphan_local_streak < self.AUTO_HEAL_AFTER_CYCLES:
+            logger.warning(
+                "orphan_local streak=%d (will auto-heal at %d); "
+                "this cycle still HALTs",
+                self._orphan_local_streak, self.AUTO_HEAL_AFTER_CYCLES,
+            )
+            return recon  # let A4 fire this cycle
+
+        # Persistent → auto-heal
+        logger.warning(
+            "orphan_local streak=%d ≥ %d → AUTO-HEALING",
+            self._orphan_local_streak, self.AUTO_HEAL_AFTER_CYCLES,
+        )
+        healed_n = self._auto_heal_orphan_local()
+        self._orphan_local_streak = 0
+        return ReconciliationResult(
+            verdict=ReconciliationVerdict.CONSISTENT,
+            detail={"auto_healed_from_orphan_local": True,
+                    "healed_n": healed_n},
+        )
+
+    def _auto_heal_orphan_local(self) -> int:
+        """Close all DB OPEN rows + push informational Telegram.
+
+        Returns count of rows actually closed.
+        """
+        from datetime import datetime as _dt
+        rows = self._store.get_all_open_positions() or []
+        n = 0
+        for row in rows:
+            pos_id = int(row.get("id") or 0)
+            try:
+                # Use entry price as exit (zeroed P&L). OKX cash balance
+                # is authoritative for true equity; this just clears the
+                # DB row so reconciler returns CONSISTENT.
+                fallback_exit = float(
+                    row.get("current_stop") or row.get("entry_price") or 0
+                )
+                self._store.close_position(
+                    position_id=pos_id,
+                    exit_time=_dt.utcnow(),
+                    exit_price=fallback_exit,
+                    exit_reason="auto_heal_orphan_local",
+                    gross_pct=0.0, net_pct=0.0,
+                    equity_ret_pct=0.0,
+                    equity_after=float(row.get("equity_before") or 0),
+                    new_status="CLOSED",
+                )
+                n += 1
+            except Exception:
+                logger.exception("auto_heal_close_failed pos=%s", pos_id)
+        if n > 0:
+            try:
+                send_critical(
+                    self._cfg.telegram_critical_chat_id,
+                    f"🟡 <b>AUTO-HEAL orphan_local</b>\n"
+                    f"OKX confirmed flat for "
+                    f"{self.AUTO_HEAL_AFTER_CYCLES} cycles.\n"
+                    f"Closed {n} stuck DB row(s) — executor continues.\n"
+                    f"Likely cause: WS algo-fill event missed.\n"
+                    f"True P&L: see OKX wallet (DB row's P&L zeroed).",
+                )
+            except Exception:
+                logger.exception("auto_heal_alert_failed")
+        return n
 
     # ── Cycle steps ────────────────────────────────────────────────────
 
