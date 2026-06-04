@@ -1155,13 +1155,27 @@ class V7OkxExecutor:
                         entry_ord_id=evt.ord_id,
                     )
                     return
-                # (2) Algo stop fill — match by stop algo cl_ord_id and
-                # require state="filled" so we don't act on "live" events.
-                # On match, sync DB to CLOSED + push exit alert.
+                # (2) Algo stop fill — when OKX's algo triggers and creates
+                # the closing market order, the fill event carries
+                # algoClOrdId / algoId, NOT the usual clOrdId (which may be
+                # empty or auto-generated). Match on algo_cl_ord_id first,
+                # fall back to algo_id (which we may have stored from the
+                # submit response). Only act when state="filled".
                 stop_cl_ord = pos.get("stop_algo_cl_ord_id") or ""
-                if (stop_cl_ord
-                        and stop_cl_ord == evt.cl_ord_id
-                        and evt.state == "filled"):
+                stop_algo_id = str(pos.get("stop_algo_id") or "")
+                algo_match = (
+                    (stop_cl_ord and stop_cl_ord == evt.algo_cl_ord_id)
+                    or (stop_algo_id and stop_algo_id == evt.algo_id)
+                )
+                if algo_match and evt.state == "filled":
+                    logger.info(
+                        "ws_algo_fill_matched pos_id=%s via=%s "
+                        "evt_algo_cl_ord=%s evt_algo_id=%s",
+                        pos.get("id"),
+                        "cl_ord_id" if stop_cl_ord == evt.algo_cl_ord_id
+                        else "algo_id",
+                        evt.algo_cl_ord_id, evt.algo_id,
+                    )
                     self._sync_close_from_algo_fill(pos, evt)
             except Exception:
                 logger.exception("on_order_ws_persist_failed")
