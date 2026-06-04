@@ -331,14 +331,61 @@ class V7OkxExecutor:
             return self._manage_position(pos, klines=klines,
                                          signal_direction=signal_direction)
 
-        # 5. Open new position if signal valid
+        # 5. Open new position if signal valid + paper-OKX sync gate.
+        # If paper executor is holding from a prior cycle (e.g., OKX was
+        # HALTED/DEMOTED while paper kept running), DON'T open OKX —
+        # wait for paper to flat first, so the next signal opens both
+        # together. Otherwise the two cohorts permanently drift out of
+        # sync (paper holds 1 trade longer than OKX, then OKX opens a
+        # different trade than paper's next, etc.).
         if signal_direction in ("UP", "DOWN"):
+            if self._is_paper_holding():
+                logger.info(
+                    "okx_open_skipped_paper_holding sig=%s str=%s",
+                    signal_direction, signal_strength,
+                )
+                return CycleResult(
+                    action="none",
+                    detail={"reason": "paper_open_waiting_sync",
+                            "signal_direction": signal_direction},
+                )
             return self._open_position(klines=klines,
                                        signal_direction=signal_direction,
                                        signal_strength=signal_strength,
                                        model_version=model_version)
 
         return CycleResult(action="none", detail={"reason": "no_signal_no_pos"})
+
+    # ── Paper/OKX sync gate ───────────────────────────────────────────
+
+    def _is_paper_holding(self) -> bool:
+        """True if V7 paper executor currently has an OPEN position.
+
+        Used by cycle() to gate OKX entries: if OKX is flat (e.g., just
+        recovered from HALT/DEMOTE) but paper still holds a trade from
+        a prior cycle, skip the next OKX open and wait until paper
+        flats. Both cohorts then re-enter together on a fresh signal,
+        keeping the live-vs-paper comparison meaningful.
+
+        Read-only DB check on v7_paper_positions. Fail-open: if the
+        check itself errors, we let OKX open (don't block trading on
+        a diagnostic-layer failure).
+        """
+        from shared.db import get_db_conn
+        try:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT id FROM v7_paper_positions "
+                        "WHERE status='OPEN' LIMIT 1"
+                    )
+                    return cur.fetchone() is not None
+            finally:
+                conn.close()
+        except Exception:
+            logger.exception("paper_holding_check_failed")
+            return False
 
     # ── Auto-heal ──────────────────────────────────────────────────────
 
