@@ -524,3 +524,38 @@ class OkxStateStore:
                 return clean
             finally:
                 conn.close()
+
+
+# ── Chart overlay ──────────────────────────────────────────────────────────
+
+def fetch_okx_positions_for_chart(start_dt: datetime, end_dt: datetime) -> list:
+    """LIVE OKX positions whose holding window intersects [start_dt, end_dt].
+
+    Drop-in replacement for the old v7_paper_executor.fetch_positions_for_chart:
+    returns the same dict shape (entry_time, direction, entry_price, entry_tier,
+    status, exit_time, exit_price, exit_reason, win) so both charts can overlay
+    the real live entries/exits. `win` is derived from gross_pct (the OKX table
+    has no win column). Times are naive UTC. Returns [] if the table is absent.
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    "SELECT entry_time, direction, entry_price, entry_tier, "
+                    "       status, exit_time, exit_price, exit_reason, "
+                    "       CASE WHEN gross_pct > 0 THEN 1 ELSE 0 END AS win "
+                    "FROM `v7_okx_positions` "
+                    "WHERE entry_time <= %s "
+                    "  AND (exit_time IS NULL OR exit_time >= %s) "
+                    "ORDER BY entry_time ASC",
+                    (end_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                     start_dt.strftime("%Y-%m-%d %H:%M:%S")))
+                rows = cur.fetchall()
+            except Exception as exc:
+                if "doesn't exist" in str(exc).lower():
+                    return []
+                raise
+    finally:
+        conn.close()
+    return list(rows or [])

@@ -35,8 +35,6 @@ def render_stability() -> str:
     parts = [
         section("Stage 3 → 4 進階里程碑", "milestones", True,
                 _build_milestones()),
-        section("Paper vs Live PnL Drift", "drift", True,
-                _build_drift_monitor()),
         section("Kill Trigger Recovery History", "kills", True,
                 _build_kill_recovery()),
         section("Operational Uptime (update_cycle coverage)", "uptime", True,
@@ -344,92 +342,6 @@ def _kill_recovery_count() -> int:
                 return 0
     finally:
         conn.close()
-
-
-# ── Paper vs Live drift monitor ──────────────────────────────────────
-
-
-def _build_drift_monitor() -> str:
-    """Side-by-side WR comparison for same time window."""
-    conn = get_db_conn()
-    try:
-        with conn.cursor() as cur:
-            try:
-                cur.execute("""
-                    SELECT
-                        COUNT(*) AS n,
-                        SUM(CASE WHEN win=1 THEN 1 ELSE 0 END) AS wins,
-                        ROUND(AVG(net_pct)*10000, 1) AS avg_bps,
-                        ROUND(SUM(net_pct)*100, 2) AS cum_pct
-                    FROM v7_paper_positions
-                    WHERE status='CLOSED'
-                      AND exit_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                """)
-                paper = cur.fetchone() or {}
-            except Exception:
-                paper = {}
-            try:
-                cur.execute("""
-                    SELECT
-                        COUNT(*) AS n,
-                        SUM(CASE WHEN gross_pct>0 THEN 1 ELSE 0 END) AS wins,
-                        ROUND(AVG(net_pct)*10000, 1) AS avg_bps,
-                        ROUND(SUM(equity_ret_pct), 2) AS cum_eq_pct
-                    FROM v7_okx_positions
-                    WHERE status IN ('CLOSED','DEMOTED')
-                      AND exit_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                """)
-                live = cur.fetchone() or {}
-            except Exception:
-                live = {}
-    finally:
-        conn.close()
-
-    p_n = int(paper.get("n", 0) or 0)
-    l_n = int(live.get("n", 0) or 0)
-    if p_n == 0 and l_n == 0:
-        return ('<div style="color:rgba(0,240,255,0.4);font-style:italic">'
-                '尚無 paper 或 live trade — drift monitor 待 trade 寫入</div>')
-
-    p_wr = (paper.get("wins") or 0) / p_n * 100 if p_n else 0
-    l_wr = (live.get("wins") or 0) / l_n * 100 if l_n else 0
-    drift_wr = abs(p_wr - l_wr) if (p_n and l_n) else None
-    drift_alert = ""
-    if drift_wr is not None and drift_wr > 15:
-        drift_alert = (
-            '<div style="color:#FF3366;font-weight:600;margin-top:8px">'
-            f'⚠ WR drift {drift_wr:.1f}pp > 15pp threshold — '
-            'paper/live divergence, check execution slippage/fills</div>'
-        )
-
-    return f"""
-    <div class="grid grid-2" style="margin-bottom:8px">
-      <div>
-        <div style="color:rgba(0,240,255,0.6);font-size:11px;margin-bottom:4px">
-          📄 Paper (last 30 days)
-        </div>
-        <div class="grid grid-3">
-          {card("trades", str(p_n), "")}
-          {card("WR", f"{p_wr:.1f}%" if p_n else "—", "")}
-          {card("avg bps", str(paper.get('avg_bps') or '—'), "")}
-        </div>
-      </div>
-      <div>
-        <div style="color:rgba(0,240,255,0.6);font-size:11px;margin-bottom:4px">
-          💰 Live OKX (last 30 days)
-        </div>
-        <div class="grid grid-3">
-          {card("trades", str(l_n), "")}
-          {card("WR", f"{l_wr:.1f}%" if l_n else "—", "")}
-          {card("avg bps", str(live.get('avg_bps') or '—'), "")}
-        </div>
-      </div>
-    </div>
-    {drift_alert}
-    <div style="color:rgba(0,240,255,0.45);font-size:11px;margin-top:8px;
-                font-style:italic">
-      drift &gt; 15pp WR alert threshold (operational divergence indicator)
-    </div>"""
 
 
 # ── Kill recovery history ────────────────────────────────────────────

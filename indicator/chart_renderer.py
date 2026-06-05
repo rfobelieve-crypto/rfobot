@@ -193,11 +193,12 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
                          color=color, alpha=alpha, edgecolors="white",
                          linewidths=1.2 if is_strong else 0.8, zorder=5)
 
-    # ── V7 paper-trade entry/exit overlay ────────────────────────────────
-    # Blue hollow circle = V7 entry; X = exit (green win / red loss); a thin
+    # ── LIVE OKX entry/exit overlay ──────────────────────────────────────
+    # Blue hollow circle = live entry; X = exit (green win / red loss); a thin
     # line connects entry→exit. Non-critical — never break the chart.
     try:
-        from indicator.v7_paper_executor import fetch_positions_for_chart
+        from indicator.okx.state import (
+            fetch_okx_positions_for_chart as fetch_positions_for_chart)
         bar_idx = {}
         for _ib, _tb in enumerate(sig.index):
             _key = _tb.tz_convert("UTC").tz_localize(None).replace(
@@ -233,7 +234,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
                                  facecolors="none", edgecolors="#2962ff",
                                  linewidths=1.6, zorder=6)
     except Exception as exc:
-        logger.warning("V7 chart overlay failed (non-critical): %s", exc)
+        logger.warning("LIVE chart overlay failed (non-critical): %s", exc)
 
     ax_price.set_ylabel("Price (USD)", fontsize=10)
     ax_price.grid(True, alpha=0.15)

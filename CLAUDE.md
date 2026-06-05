@@ -19,7 +19,7 @@ edge 確信度」的漸進過程。
 | Stage | 描述 | Risk | Leverage | 進階條件 |
 |---|---|---|---|---|
 | 0 | 純指標 + 推送 | 0 | n/a | (已過) |
-| 1 | **Paper trading**（虛擬 PnL，0 風險）| 0 | 1.0x | 100+ 筆穩定版本 trades + paper net > +5 bps × 4 週 |
+| 1 | ~~Paper trading~~（**2026-06-05 移除**，原 gate 轉 LIVE 衡量）| 0 | 1.0x | ~~100+ 筆 paper trades + paper net > +5 bps × 4 週~~ → 改由 LIVE 績效衡量 |
 | 2 | Testnet executor（exchange 測試環境）| 0 | 1.0x | testnet 1-2 週無 bug + order flow 正確 |
 | 3 | Live tiny size（$100，輸光不痛）| 極小 | 1.0x | live 4 週 net positive + MDD < 20% |
 | 4a | 放大到 $1k（3 個月）| 小 | 1.0x | Stage 3 通過 + 0 kill trigger |
@@ -52,6 +52,23 @@ edge 確信度」的漸進過程。
 連續 24 個月實盤 Sharpe ≥ 3.0（目前 0.17-0.5）+ MDD 從未超過 -10%
 + 經過至少 2 個完整 regime flip 仍正 EV。在那之前，2.0x 是 hard cap。
 
+## Paper cohort 移除（2026-06-05 決策）
+
+**背景**：$100 live（Stage 3, 10x）已上線並穩定運行（reconciliation 連續 CONSISTENT）。使用者決定 **LIVE 是主力**，paper cohort 不再需要——整個移除，系統只留 LIVE。
+
+**觸發點**：2026-06-04 一場 `orphan_local` HALT 把 OKX id4 用 admin_heal 歸零，導致 live 錯過一筆 paper 仍在跑的 trade，兩 cohort 永久交叉。使用者判斷：與其維護「paper 對 live 對齊」的複雜同步邏輯，不如直接砍掉 paper，承認 live 就是真相來源。
+
+**改動**：
+- 刪 `indicator/v7_paper_executor.py`；移除 `v7_paper_positions` 的所有讀寫（DB 表 archive 留底，不再寫入）
+- 兩張圖表（靜態 PNG + 互動）的進出場三角形改抓 `v7_okx_positions`（LIVE 真實進出場）
+- 移除 OKX executor 的 paper-sync gate（`_is_paper_holding`）——live 不再等 paper
+- Telegram「V7 Stats」按鈕 → 改指向既有的 LIVE 報表（`/okx-perf`）
+- dashboard 移除「V7 Paper shadow」+「Paper vs Live drift」區塊
+
+**stage 計畫轉移到 LIVE**：原本 §staged framework 中由 paper 衡量的進階 gate（net bps / WR / 連續週數），全部改由 **LIVE 實盤績效**衡量。Stage 1「paper trading」這格視為已歷史化，當前真實所在 = Stage 3 ($100 live, 10x)。
+
+**代價自負**：失去「paper 作為 edge 真假的獨立並行驗證」。但 live 已是真錢樣本，本身就是最硬的 edge 驗證；維護兩套 cohort + 同步邏輯的複雜度 > 並行驗證的邊際價值。**保留的不可鬆綁規則（金額上限、kill switch、leverage cap、manual approval）完全不受影響**——這次移除的只是「影子 paper」，不是任何風控。
+
 ## 當前策略：研究 + Small Live 並進（2026-05-27 決策）
 
 **背景**：原 staged framework 要求 Stage 1 滿 100 trades + 4 週才進 Stage 2，按目前 9 天 6 筆的節奏需 5 個月。使用者選擇接受 informed risk：用 $100 live 作為「**operational stress test + edge 二次驗證**」，paper cohort 同時繼續累積。
@@ -64,7 +81,7 @@ edge 確信度」的漸進過程。
 - **金額**：$100 live = Stage 3 上限，未進 Stage 4a 不准加碼（即使 $100 賺到 $200 也是 $100 keep + $100 不再用）
 - **Hard kill switches 必須先驗證能觸發**（不是只寫進 code）：unit test + testnet 至少一次故意觸發
 - **Manual approval 第 1 筆強制人工確認**（2026-05-31 從 5 → 1）：第一次真實執行 OKX trade path 必須 operator 確認 size/方向/stop 都對；之後 auto，因為「量化交易要自動」是 quant 本質
-- **Paper cohort 不停**：作為 edge 是否真實的並行驗證；live + paper 結果 > 2 週嚴重背離 → halt
+- ~~**Paper cohort 不停**~~：**2026-06-05 廢止**——paper cohort 已整個移除，LIVE 成為唯一 cohort（見 §Paper cohort 移除）。原本由 paper 衡量的 stage 進階條件全部轉由 LIVE 實盤衡量
 - **Leverage 1.0x 不准動**（Stage 3 階段）
 - **Stage 3 → Stage 4 仍照原硬條件**：live 4 週 net positive + MDD < 20% + 0 kill trigger
 
@@ -106,7 +123,7 @@ edge 確信度」的漸進過程。
 
 | Stage | 描述 | Risk | Leverage | Daily/Total cap | 進階條件 |
 |---|---|---|---|---|---|
-| 1 | Paper trading | 0 | 1.0x | n/a | 已 active；live 啟動後**不停**作 baseline |
+| ~~1~~ | ~~Paper trading~~ | — | — | n/a | **2026-06-05 移除**：paper cohort 整個拔掉，LIVE 成為唯一 cohort + 唯一圖表記錄來源 |
 | 2 | **Read-only live smoke**（取代 testnet shakeout）| 0 | 10x | -20% / -30% | 連 OKX live：讀 balance ✓、server time NTP drift OK ✓、WS auth + 訂閱 ✓、reconciliation CONSISTENT ✓ |
 | 3 | **Live $100**（當前目標）| -$100 上限 | **10x** | -20% / -30% | Stage 2 smoke 全綠 + manual approval mode 跑 5 筆人工確認 |
 | 4a | $1k（3 個月）| 小 | 1.0x | -20% / -30% | Stage 3 跑 4 週 + net positive + MDD < 20% + 0 kill trigger |
@@ -124,7 +141,7 @@ edge 確信度」的漸進過程。
 
 ## 仍然禁止的（避免在錯的階段做錯事）
 - **Stage 2-3**：禁鬆 hard kill switches 以外的 trigger；leverage hard cap = 10x（不可再放寬）
-- **Stage 3**：禁未經 manual approval 5 筆就切自動；禁 paper cohort 停寫
+- **Stage 3**：禁未經 manual approval 5 筆就切自動（paper cohort 已於 2026-06-05 移除，不再有「paper 停寫」這條）
 - **Stage 3 → 4a**：leverage 必須降回 1.0x；不能因為 $100 賺到 $200 就用 10x 加碼
 - **Stage 4a-d**：leverage 階梯式放寬，**絕對上限 2.0x**；未 hit 各子階段條件不得進下一格
 - **Stage 4 後**：禁 leverage > 2.0x，除非滿足「24 個月實盤 Sharpe ≥ 3.0」（見 §Leverage ladder 數學依據）

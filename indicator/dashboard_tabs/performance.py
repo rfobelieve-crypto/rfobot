@@ -22,8 +22,6 @@ def render_performance() -> str:
         section("Alpha Decay Monitor", "decay", True, _build_alpha_decay()),
         section("IC / 勝率趨勢 (7 天)", "ictrend", True, _build_ic_trend()),
         section("信號累計曲線", "equity", True, _build_equity_curve()),
-        section("V7 Paper (Shadow Baseline)", "v7paper", False,
-                _build_v7_paper()),
         section("信心分佈 (48h)", "confdist", True, _build_confidence_dist()),
         section("預測 vs 實際 (24h)", "predva", True, _build_pred_vs_actual()),
         section("連續錯誤追蹤", "drawdown", True, _build_drawdown()),
@@ -166,61 +164,6 @@ def _build_okx_live() -> str:
         )
 
     return row1 + trade_block + open_block + kill_block
-
-
-# ── V7 Paper Cohort ──────────────────────────────────────────────────
-
-def _build_v7_paper() -> str:
-    """V7 paper-trading cohort — backtest baseline + live forward stats."""
-    try:
-        from indicator.paper_trading import (
-            compute_v7_summary, V7_BACKTEST_BASELINE,
-        )
-        s = compute_v7_summary()
-    except Exception as e:
-        return f'<div style="color:#FF3366">V7 cohort 載入失敗: {e}</div>'
-
-    b = V7_BACKTEST_BASELINE
-    bt = f"""
-    <div style="color:rgba(0,240,255,0.55);font-size:11px;margin-bottom:6px">
-      📦 Backtest 基準 — {b['config']} · WF-OOS · n={b['n']}
-      <span style="color:rgba(255,180,0,0.7)">（{b['note']}）</span>
-    </div>
-    <div class="grid grid-4" style="margin-bottom:14px">
-      {card("回測 ROI", f"{b['roi_pct']:+.1f}%", "5 個月")}
-      {card("回測勝率", f"{b['wr_pct']:.1f}%", "")}
-      {card("回測 MDD", f"{b['mdd_pct']:.1f}%", "")}
-      {card("回測 Sharpe", f"{b['sharpe']:.2f}", f"每筆 {b['avg_eq_ret_pct']:+.2f}%")}
-    </div>"""
-
-    if s.get("empty"):
-        live = ('<div style="color:rgba(0,240,255,0.4);font-size:12px">'
-                '🤖 實盤 paper — 尚無已平倉 V7 訊號（與 LDC 並行中，'
-                '等下一個 v7.1 Strong/Moderate 訊號開倉）</div>')
-    else:
-        o = s["overall"]
-        roi_c = "#00CC80" if o["roi_pct"] >= 0 else "#FF3366"
-        wr_c = "#00CC80" if o["wr"] >= 0.55 else "#CC4444"
-        live = f"""
-        <div style="color:rgba(0,240,255,0.55);font-size:11px;margin-bottom:6px">
-          🤖 實盤 paper — 本金 $1000 · 2% 風險 / 1x / 複利 · n={o['n']}</div>
-        <div class="grid grid-4">
-          {card("實盤 ROI", f"{o['roi_pct']:+.1f}%", f"${o['final_equity']:,.0f}", roi_c)}
-          {card("實盤勝率", f"{o['wr']*100:.1f}%", f"{o['n']} 筆", wr_c)}
-          {card("實盤 MDD", f"{o['mdd_pct']:.1f}%", "")}
-          {card("每筆均報", f"{o['avg_eq_ret_pct']:+.2f}%", f"持倉 {o['avg_hold_h']:.0f}h")}
-        </div>"""
-        r = s.get("recent", {})
-        if r.get("n", 0) > 0:
-            live += (f'<div style="color:rgba(0,240,255,0.5);font-size:11px;'
-                     f'margin-top:8px">最近 {s["recent_window_days"]} 天: '
-                     f'n={r["n"]} · WR {r["wr"]*100:.1f}% · '
-                     f'每筆 {r["avg_eq_ret_pct"]:+.2f}%</div>')
-    if s.get("n_shadow"):
-        live += (f'<div style="color:rgba(255,180,0,0.65);font-size:11px;'
-                 f'margin-top:6px">⚠ {s["n_shadow"]} 筆 shadow 已排除 '
-                 f'— 模型轉換窗口 (前 48h)，不計入 cohort</div>')
-    return bt + live
 
 
 # ── Alpha Decay Monitor ──────────────────────────────────────────────

@@ -1678,7 +1678,7 @@ _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
         {"text": "\U0001f4e6 DB", "callback_data": "db"},
     ],
     [
-        {"text": "\U0001f916 V7 Stats", "callback_data": "v7_stats"},
+        {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
     ],
 ]})
 
@@ -1787,30 +1787,6 @@ def _handle_alpha_decay(chat_id: str):
     except Exception as e:
         logger.exception("alpha decay error: %s", e)
         send_message(chat_id, f"❌ Alpha decay 檢查失敗: {e}")
-
-
-def _handle_v7_stats(chat_id: str):
-    """Fetch V7 paper-trading stats from indicator service.
-
-    /paper-perf returns the combined report (V7 + legacy paper).
-    """
-    if not INDICATOR_SERVICE_URL:
-        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
-        return
-    try:
-        paper = requests.get(f"{INDICATOR_SERVICE_URL}/paper-perf", timeout=30)
-        if paper.status_code != 200:
-            send_message(chat_id,
-                         f"❌ Indicator 服務未就緒 (paper={paper.status_code})")
-            return
-        text = paper.json().get("text", "")
-        if not text:
-            send_message(chat_id, "❌ paper-perf 無內容")
-            return
-        send_long_message(chat_id, text)
-    except Exception as e:
-        logger.exception("v7 stats fetch error: %s", e)
-        send_message(chat_id, f"❌ 取得 V7 統計失敗: {e}")
 
 
 def _handle_signal_perf(chat_id: str):
@@ -2066,8 +2042,6 @@ def webhook():
                         f"功能: 放大縮小 / 拖曳平移 / 十字線游標")
                 else:
                     send_message(cb_chat_id, "INDICATOR_SERVICE_URL 未設定")
-            elif cb_data == "v7_stats":
-                threading.Thread(target=_handle_v7_stats, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "decay":
                 threading.Thread(target=_handle_alpha_decay, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "okx_perf":

@@ -74,10 +74,9 @@ def _make_reply_markup():
         [
             {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
             {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
-            {"text": "\U0001f916 V7 Stats", "callback_data": "v7_stats"},
         ],
         [
-            {"text": "\U0001f4b0 OKX Perf", "callback_data": "okx_perf"},
+            {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
         ],
     ]})
 
@@ -108,57 +107,6 @@ def _send_telegram_photo(png: bytes, caption: str) -> str:
     except Exception as e:
         logger.error("Telegram photo send failed: %s", e)
         return f"error: {e}"
-
-
-def _send_v7_paper_alerts(result: dict) -> None:
-    """Translate v7_paper_executor.run_cycle result into Telegram messages.
-
-    Only fires when paper actually opens/closes a position (action in
-    ("open", "close")). Includes humanized entry/exit reason so the user can
-    see WHY without checking the dashboard.
-    """
-    if not result:
-        return
-    action = result.get("action")
-    if action not in ("open", "close"):
-        return  # hold/none: silent
-    msg = None
-    if action == "open":
-        d = result["opened_direction"]
-        emoji = "🟢" if d == "LONG" else "🔴"
-        shadow = (" <i>[SHADOW — 模型轉換窗口, 不計入 cohort]</i>"
-                  if result.get("paused") else "")
-        reason = result.get("entry_reason") or ""
-        reason_block = f"\n\n<b>進場理由</b>\n<pre>{reason}</pre>" if reason else ""
-        msg = (
-            f"{emoji} <b>V7 {d} OPEN</b>{shadow}\n"
-            f"Entry: ${result['entry_price']:,.2f} "
-            f"({result.get('entry_tier', '')})\n"
-            f"Strategy: v7.1 signal-exit + 3×ATR trailing stop\n"
-            f"Size: {result['size_frac']*100:.0f}% equity "
-            f"(${result['notional_usd']:,.0f}) | "
-            f"stop ${result['current_stop']:,.2f}"
-            f"{reason_block}"
-        )
-    elif action == "close":
-        c = result["closed"]
-        emoji = "✅" if c["win"] else "❌"
-        shadow = " <i>[SHADOW — 不計入 cohort]</i>" if c.get("paused") else ""
-        reason_text = (result.get("exit_reason_text")
-                       or c.get("exit_reason_text") or "")
-        reason_block = f"\n\n<b>出場理由</b>\n<pre>{reason_text}</pre>" if reason_text else ""
-        msg = (
-            f"{emoji} <b>V7 {c['direction']} CLOSE</b>{shadow}\n"
-            f"Exit: ${c['exit_price']:,.2f} ({c['reason']})\n"
-            f"Held: {c['bars_held']}h | Net: {c['net_pct']*100:+.2f}%\n"
-            f"Equity: {c['equity_ret_pct']:+.2f}% → ${c['equity_after']:,.0f}"
-            f"{reason_block}"
-        )
-    if msg:
-        try:
-            _send_telegram_text(msg)
-        except Exception as exc:
-            logger.warning("V7 paper alert send failed: %s", exc)
 
 
 def _send_telegram_text(message: str, chat_id: str = ""):
@@ -626,7 +574,7 @@ def update_cycle() -> dict:
         tg_result = _send_telegram_photo(png, caption)
         dc_result = _send_discord_photo(png, caption)
 
-        # Pre-init so they're always defined before run_v7_cycle below.
+        # Pre-init so they're always defined before the signal-alert block.
         shap_result = None
         shap_json_str = ""
 
@@ -724,24 +672,9 @@ def update_cycle() -> dict:
         except Exception as e:
             logger.warning("Signal tracker backfill failed: %s", e)
 
-        # ── V7 paper executor (v7.1 signal-exit + 3xATR trailing).
-        # Sole paper cohort post-LDC removal (2026-05-27).
-        try:
-            from indicator.v7_paper_executor import run_cycle as run_v7_cycle
-            from indicator.model_version import get_current_model_version
-            v7_result = run_v7_cycle(
-                klines, signal_direction=direction, signal_strength=strength,
-                model_version=get_current_model_version(),
-                shap_result=shap_result, dir_prob_up=float(dir_prob),
-                confidence=float(conf),
-                regime=str(last_row.get("regime", "")))
-            _send_v7_paper_alerts(v7_result)
-            _record_executor_success("V7 paper executor")
-        except Exception as e:
-            _record_executor_failure("V7 paper executor", e)
-
         # ── V7 OKX executor (Stage 3 — env-gated, 2026-05-28).
-        # Runs alongside paper cohort; paper remains the baseline.
+        # Sole cohort post paper-removal (2026-06-05); LIVE is now the
+        # baseline and the only thing recorded on the charts.
         # Disabled unless OKX_EXECUTOR_ENABLED=1 — see indicator/okx/runner.py
         try:
             from indicator.okx import runner as okx_runner
@@ -1643,24 +1576,6 @@ def okx_perf_api():
     except Exception as e:
         logger.exception("OKX perf failed")
         return jsonify({"text": f"❌ OKX perf query failed: {e}"}), 500
-
-
-@app.route("/paper-perf", methods=["GET"])
-def paper_perf_api():
-    """API: paper-trading virtual PnL report (Stage 1 of auto-trading roadmap).
-
-    Reads tracked_signals + assumes 4h-hold blind execution + 13 bps cost.
-    Used to monitor whether the indicator's signals are net-positive after
-    realistic trading frictions, as a precondition for moving toward live
-    auto-trading stages.
-    """
-    try:
-        from indicator.paper_trading import get_paper_trading_report
-        report = get_paper_trading_report()
-        return jsonify({"text": report})
-    except Exception as e:
-        logger.exception("Paper perf failed")
-        return jsonify({"text": f"❌ Paper trading 查詢失敗: {e}"}), 500
 
 
 @app.route("/meeting", methods=["GET", "POST"])
