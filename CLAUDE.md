@@ -90,6 +90,19 @@ edge 確信度」的漸進過程。
 - Edge 若是 fake，$100 是發現的成本（mistake.md 應記：用 $100 換 edge 真假驗證，比 5 個月等更便宜）
 - 一旦 hit 任何 kill trigger，**回到 Stage 1 重新驗證**不是「凹下去」
 
+## 分數合約 sizing「B」取代 10x 權宜 (2026-06-06)
+
+**前提推翻**：下面 2026-05-28 的「10x override 是為了讓 1 contract 開得起」整段，**前提是錯的**。OKX BTC-USDT-SWAP 的真實 `minSz`/`lotSz` = **0.01 張**（$6 notional，已用 public instruments API 驗證），根本不是「1 張最小」。會卡在 1 張是 executor 自己的 `int(target_notional/per_contract)` 把 size 無條件捨去成整數張——這是 code 的鍋，不是交易所限制。手動爆倉那天（2026-06-05）的「$89 被逼 ~7x」就是這個 int() 造成的假性 over-leverage。
+
+**現行 sizing（commit 9cc2a64）**：
+- **名目 notional = NOTIONAL_LEV_MULT (2.0) × equity**，round 到 0.01 張。隨 equity 自動縮放（賺多下多、虧多下少，無 leverage creep）。
+- **有效槓桿 = 2x**（對 equity）；$89 → ~$178 名目 / 0.29 張 / ~$18 保證金。
+- 169-trade WF 模擬 + 注入 −10% 跳空：2x 活得下來、10x 一筆歸零。
+- **OKX 帳戶的 leverage 設定（10x）只剩「決定鎖多少保證金」的作用，不再是策略風險槓桿**。真實風險槓桿由 NOTIONAL_LEV_MULT 決定 = 2x。
+- 整條 pipeline 已改成支援小數張（DB DECIMAL、所有 int(size_contracts)→float、對帳容差 0.005）。
+
+**對 leverage 紀律的影響**：實際有效槓桿 2x 落在 §Leverage ladder 數學依據可接受範圍內（Kelly 0.56x 的 ~3.6x，但 2x 的 vol drag 仍可被 edge 覆蓋；遠低於 hard cap 2.0x 的精神…註：2x = 剛好等於 Stage 4d 絕對上限，但這是「為了小帳戶開得起單」的有效槓桿，非加碼意圖，且帳戶極小、kill switch −20%/−30% 收緊中）。下面 2026-05-28 的 10x 段落保留作歷史，但**實務上 sizing 已不靠 10x**。
+
 ## 10x leverage informed override (2026-05-28)
 
 **背景**：BTC-USDT-SWAP 1 contract = 0.01 BTC ≈ $750 notional。$100 + 1x leverage 連 1 contract 都開不了 → Stage 3 完全卡死。使用者選擇接受 informed override：保 $100 capital、鬆 leverage cap 到 10x 讓 1 contract 開得起來。
