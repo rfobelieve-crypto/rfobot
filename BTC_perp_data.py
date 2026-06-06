@@ -38,7 +38,7 @@ def load_config():
     allowed_users_raw = os.getenv("ALLOWED_USERS")
 
     if token:
-        debug_mode = str(debug_raw or "true").lower() == "true"
+        debug_mode = str(debug_raw or "false").lower() == "true"
         port = int(port_raw or 5000)
 
         allowed_users = []
@@ -1552,7 +1552,8 @@ def tradingview_webhook():
             logger.warning("Invalid TV webhook secret")
             return {"status": "forbidden"}, 403
 
-        logger.info("TV webhook received: %s", data)
+        logger.info("TV webhook received: %s",
+                    {k: v for k, v in data.items() if k != "secret"})
 
         event = str(data.get("event", "unknown")).strip()
         liquidity_side = str(data.get("liquidity_side", "unknown")).strip().lower()

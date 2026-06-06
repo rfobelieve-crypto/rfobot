@@ -850,8 +850,9 @@ def health():
 def test_telegram():
     """Send a test message to verify Telegram integration."""
     # Debug: show all TELEGRAM* env vars (masked)
-    tg_vars = {k: v[:6] + "****" for k, v in os.environ.items()
-                if "TELEGRAM" in k.upper() or "TG" in k.upper() or "BOT" in k.upper()}
+    # names only — never expose any chars of the token/chat values
+    tg_vars = sorted(k for k in os.environ
+                     if "TELEGRAM" in k.upper() or "TG" in k.upper() or "BOT" in k.upper())
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat = os.environ.get("TELEGRAM_CHAT_ID", "")
     if not token or not chat:
@@ -1054,7 +1055,6 @@ def okx_status_api():
             return {"set": False}
         return {
             "set": True, "len": len(s),
-            "first2": s[:2], "last2": s[-2:],
             "has_leading_ws": s != s.lstrip(),
             "has_trailing_ws": s != s.rstrip(),
             "has_quote": '"' in s or "'" in s,
@@ -1132,10 +1132,8 @@ def indicator_status_api():
 @app.route("/db-diag")
 def db_diagnostics():
     """Show MySQL env var names (no values) for debugging."""
-    mysql_vars = {k: f"{v[:3]}***" if v else "EMPTY"
-                  for k, v in os.environ.items()
-                  if "MYSQL" in k.upper() or "DB" in k.upper()}
-    all_env = sorted(os.environ.keys())
+    mysql_vars = sorted(k for k in os.environ
+                        if "MYSQL" in k.upper() or "DB" in k.upper())
     try:
         from shared.db import get_db_info
         db_info = get_db_info()
@@ -1144,7 +1142,6 @@ def db_diagnostics():
     return jsonify({
         "mysql_vars_found": mysql_vars,
         "db_info": db_info,
-        "all_env_names": all_env,
     })
 
 
@@ -1153,13 +1150,10 @@ def diagnostics():
     """Live diagnostics — check Coinglass API + indicator history state."""
     import math
 
-    # List ALL env var names in this container (no values, just names)
-    all_env_names = sorted(os.environ.keys())
     cg_key_raw = os.environ.get("COINGLASS_API_KEY", "")
     diag = {
         "coinglass_api_key_set": bool(cg_key_raw),
         "coinglass_api_key_len": len(cg_key_raw),
-        "all_env_var_names": all_env_names,
         "cg_status": _state.get("cg_status", "no update yet"),
     }
 
@@ -1807,7 +1801,7 @@ def admin_flow_bars_export():
     from shared.db import get_db_conn
     symbol = request.args.get("symbol", "BTC-USD")
     since_ms = int(request.args.get("since_ms", "0"))
-    limit = int(request.args.get("limit", "100000"))
+    limit = min(int(request.args.get("limit", "100000")), 50000)
     try:
         conn = get_db_conn()
     except Exception as e:

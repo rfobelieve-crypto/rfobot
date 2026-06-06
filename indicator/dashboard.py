@@ -6,6 +6,7 @@ Tab content is rendered server-side as HTML fragments.
 """
 from __future__ import annotations
 
+import html
 import logging
 from datetime import datetime, timezone, timedelta
 
@@ -294,12 +295,12 @@ def render_tab(tab_name: str, state: dict, engine) -> str:
             from indicator.dashboard_tabs.stability import render_stability
             return render_stability()
         else:
-            return f'<div style="color:#FF3366">未知的 Tab: {tab_name}</div>'
+            return f'<div style="color:#FF3366">未知的 Tab: {html.escape(str(tab_name))}</div>'
     except Exception as e:
         logger.exception("Dashboard tab %s render failed", tab_name)
         return (
             f'<div style="color:#FF3366;padding:20px">'
-            f'<b>Tab "{tab_name}" 渲染失敗</b><br>'
+            f'<b>Tab "{html.escape(str(tab_name))}" 渲染失敗</b><br>'
             f'<code>{type(e).__name__}: {e}</code></div>'
         )
 
