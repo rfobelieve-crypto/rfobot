@@ -589,6 +589,15 @@ def _inject_alt_historical(df: pd.DataFrame) -> None:
             ) * sign
             etf["etf_flow_delta_1d"] = etf["etf_net_flow_usd"].diff()
 
+            # NO-LOOK-AHEAD: each day's net flow summarizes that day's US session
+            # and is only reported AFTER the US close (~21:00 UTC). Stamped at
+            # day-D 00:00 + merge_asof backward leaks end-of-day flow into intraday
+            # day-D bars (confirmed 2026-06-06: same-day daily-IC vs v7 residual
+            # +0.40 leaky -> +0.06 p=0.49 once lagged). Shift +1 day so a bar on
+            # day D only sees day-(D-1) flow, which is fully reported. Trailing
+            # derived cols above are computed on the original daily order first.
+            etf.index = etf.index + pd.Timedelta(days=1)
+
             etf_reset = etf.reset_index().rename(columns={etf.index.name or "index": "dt"})
             if "dt" not in etf_reset.columns:
                 etf_reset = etf_reset.rename(columns={etf_reset.columns[0]: "dt"})
@@ -619,6 +628,12 @@ def _inject_alt_historical(df: pd.DataFrame) -> None:
             fg["fg_delta_7d"] = fg["fear_greed_value"].diff(7)
             fg["fg_extreme_fear"] = (fg["fear_greed_value"] < 20).astype(float)
             fg["fg_extreme_greed"] = (fg["fear_greed_value"] > 80).astype(float)
+
+            # NO-LOOK-AHEAD (conservative): F&G is daily; intraday publish timing
+            # is not guaranteed, so lag +1 day -> a day-D bar only sees day-(D-1)'s
+            # value. Cheap insurance (F&G is in no model); relax to 0 only if
+            # publish-at-00:00 is confirmed. Trailing deltas above use original order.
+            fg.index = fg.index + pd.Timedelta(days=1)
 
             fg_reset = fg.reset_index().rename(columns={fg.index.name or "index": "dt"})
             if "dt" not in fg_reset.columns:

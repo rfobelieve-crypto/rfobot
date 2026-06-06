@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def render_performance() -> str:
     parts = [
-        section("🔴 OKX LIVE Stage 3 ($100 + 10x)", "okxlive", True,
+        section("🔴 OKX LIVE Stage 3 ($100 · 2x 有效槓桿)", "okxlive", True,
                 _build_okx_live()),
         section("Alpha Decay Monitor", "decay", True, _build_alpha_decay()),
         section("IC / 勝率趨勢 (7 天)", "ictrend", True, _build_ic_trend()),
@@ -357,7 +357,7 @@ def _build_equity_curve() -> str:
     <div class="grid grid-3" style="margin-bottom:10px">
       {card("總信號", str(n), f"勝: {wins} / 敗: {losses}")}
       {card("勝率", f"{wr:.1f}%", "", "#00CC80" if wr >= 60 else "#CC4444")}
-      {card("累計回報", f"{total:+.1f}%", "方向性 paper return", final_color)}
+      {card("累計回報", f"{total:+.1f}%", "方向性 live 訊號回報", final_color)}
     </div>
     <div style="position:relative;height:160px">
       <canvas id="equityChart"></canvas>
