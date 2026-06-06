@@ -174,6 +174,32 @@ class TestOpenPosition:
         assert result.detail["reason"] == "below_min_lot"
         client.submit_market_order.assert_not_called()
 
+    def test_fractional_sizing_small_account(self):
+        # B sizing (2026-06-06): $89 account -> notional ~2x equity ->
+        # FRACTIONAL contracts (~0.24), NOT forced to 1 whole contract
+        # (the 2026-06-05 over-leverage bug) and NOT 0.
+        cfg = _mk_cfg(initial_capital_usd=89.0)
+        exe, client, store, _ = _mk_executor(cfg=cfg)
+        store.get_latest_balance.return_value = {"total_eq_usd": 89.0,
+                                                  "available_usd": 89.0}
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            result = exe._open_position(klines=_mk_klines(),
+                                         signal_direction="UP",
+                                         signal_strength="Strong",
+                                         model_version="v1")
+        assert result.action == "open"
+        ins = store.insert_open_position.call_args.kwargs
+        sz = float(ins["size_contracts"])
+        # fractional, between 0 and 1 (whole-contract floor is gone)
+        assert 0.0 < sz < 1.0
+        # snapped to the 0.01 lot step
+        assert abs(sz * 100 - round(sz * 100)) < 1e-6
+        # notional ~ 2x equity, effective leverage ~2x (NOT ~7x)
+        assert abs(float(ins["notional_usd"]) - 2 * 89.0) < 5.0
+        assert 1.8 < float(ins["notional_usd"]) / 89.0 < 2.2
+        # the order actually submitted the fractional size
+        assert float(client.submit_market_order.call_args.kwargs["sz"]) == sz
+
     def test_b4_latency_violation_force_closes(self):
         # If algo stop submission raises, we have no stop → force close
         exe, client, store, _ = _mk_executor()

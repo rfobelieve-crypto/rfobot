@@ -49,7 +49,7 @@ class Position:
     """A live position as reported by OKX (or our local mirror)."""
     inst_id: str
     direction: str                  # "LONG" / "SHORT" / "FLAT"
-    size_contracts: int             # signed not used; direction carries sign
+    size_contracts: float           # fractional lots allowed (OKX lotSz 0.01)
     avg_price: float
     unrealized_pnl_usd: float = 0.0
     raw: dict = field(default_factory=dict)  # original OKX payload

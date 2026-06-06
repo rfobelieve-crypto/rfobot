@@ -49,7 +49,7 @@ class TradeIntent:
     stop_price: float
     atr: float
     stop_dist: float
-    size_contracts: int
+    size_contracts: float     # fractional lots allowed (OKX lotSz 0.01)
     size_frac: float
     notional_usd: float
     equity_before: float
@@ -84,7 +84,7 @@ class TradeIntent:
             stop_price=float(d["stop_price"]),
             atr=float(d["atr"]),
             stop_dist=float(d["stop_dist"]),
-            size_contracts=int(d["size_contracts"]),
+            size_contracts=float(d["size_contracts"]),
             size_frac=float(d["size_frac"]),
             notional_usd=float(d["notional_usd"]),
             equity_before=float(d["equity_before"]),

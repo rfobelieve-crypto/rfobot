@@ -53,8 +53,19 @@ logger = logging.getLogger(__name__)
 ATR_PERIOD = 14
 TRAIL_MULT = 3.0
 TIME_CAP_HOURS = 72
-RISK_FRAC = 0.02            # 2% of equity per trade
+RISK_FRAC = 0.02            # 2% of equity per trade (legacy; unused by B sizing)
 MAX_LEVERAGE = 1.0
+
+# ── Fixed-notional sizing "B" (2026-06-06) ────────────────────────────
+# Position notional = NOTIONAL_LEV_MULT × equity, rounded to OKX's 0.01-contract
+# lot step.  Replaces the old 2%-risk × leverage formula whose int()-floor to
+# WHOLE contracts forced ~7x leverage on a small account (the 2026-06-05 setup).
+# Scales with equity (no leverage creep).  Sim (169-trade WF + injected -10% gap):
+# 2x survives the gap (-20% on it); 10x = ruin.  LOT_STEP/MIN_SZ verified via
+# OKX public instruments API (BTC-USDT-SWAP lotSz=minSz=0.01).
+NOTIONAL_LEV_MULT = 2.0
+LOT_STEP = 0.01
+MIN_SZ = 0.01
 
 
 def _atr_wilder(klines, period: int = ATR_PERIOD) -> float:
@@ -558,7 +569,7 @@ class V7OkxExecutor:
         """
         pos_id = int(pos.get("id") or 0)
         side = pos.get("direction") or "FLAT"
-        size = int(pos.get("size_contracts") or 0)
+        size = float(pos.get("size_contracts") or 0)
         algo_id = pos.get("stop_algo_id")
         entry_price = float(pos.get("entry_price") or 0)
         equity_before = float(pos.get("equity_before") or 0)
@@ -765,9 +776,6 @@ class V7OkxExecutor:
             return CycleResult(action="none",
                                detail={"reason": "atr_unavailable"})
         stop_dist = TRAIL_MULT * atr
-        stop_pct = stop_dist / last_close
-        size_frac = (min(MAX_LEVERAGE, RISK_FRAC / stop_pct)
-                     if stop_pct > 0 else MAX_LEVERAGE)
 
         equity = self._cfg.initial_capital_usd
         try:
@@ -776,17 +784,21 @@ class V7OkxExecutor:
                 equity = float(latest["total_eq_usd"])
         except Exception:
             logger.exception("open_equity_lookup_failed")
-        # Leverage-adjusted buying power: at 10x, $100 controls $1000.
-        # `target_notional` is the buying-power TARGET; the actual position
-        # notional is smaller after flooring to whole contracts.  We use
-        # target for size_contracts calc but store the ACHIEVED notional
-        # below so P&L math matches reality.
-        target_notional = size_frac * equity * float(self._cfg.leverage)
 
+        # Fixed-notional sizing "B": notional = NOTIONAL_LEV_MULT × equity,
+        # rounded to OKX's 0.01-contract lot step (NOT floored to whole
+        # contracts).  This gives ~2x effective leverage that scales with
+        # equity, instead of the old whole-contract floor that forced ~7x on
+        # a small account.  See the NOTIONAL_LEV_MULT block above.
         per_contract_usd = last_close * self._cfg.contract_size_base
-        size_contracts = (int(target_notional / per_contract_usd)
-                          if per_contract_usd > 0 else 0)
-        if size_contracts < 1:
+        if per_contract_usd <= 0:
+            return CycleResult(action="none",
+                               detail={"reason": "bad_contract_price"})
+        target_notional = NOTIONAL_LEV_MULT * equity
+        raw_contracts = target_notional / per_contract_usd
+        # round to lot step, then snap to 2 dp to kill float dust (0.01 lots)
+        size_contracts = round(round(raw_contracts / LOT_STEP) * LOT_STEP, 2)
+        if size_contracts < MIN_SZ:
             logger.info("open_skip_min_lot dir=%s target_notional=%.2f per_ct=%.2f",
                         side, target_notional, per_contract_usd)
             return CycleResult(action="none",
@@ -794,11 +806,11 @@ class V7OkxExecutor:
                                        "target_notional": target_notional,
                                        "per_contract_usd": per_contract_usd})
 
-        # Achieved notional after floor — this is what OKX actually opens
-        # and what P&L scales against. Storing the target inflated the
-        # close-time equity_ret calc by target/achieved ratio (often ~1.5x
-        # when 10x leverage / small capital / 1-contract floor bites).
+        # Achieved notional after lot rounding — what OKX actually opens and
+        # what P&L scales against.  size_frac is recorded as the achieved
+        # effective leverage (notional / equity), purely for display/records.
         notional = size_contracts * per_contract_usd
+        size_frac = notional / equity if equity > 0 else 0.0
 
         current_stop = (last_close - stop_dist if side == "LONG"
                         else last_close + stop_dist)
@@ -1088,7 +1100,7 @@ class V7OkxExecutor:
         for row in rows:
             pos_id = row.get("id")
             direction = row.get("direction") or "FLAT"
-            size = int(row.get("size_contracts") or 0)
+            size = float(row.get("size_contracts") or 0)
             algo_id = row.get("stop_algo_id")
 
             # Step 1: cancel algo stop (if we have its OKX id)
@@ -1350,7 +1362,7 @@ class V7OkxExecutor:
                 out.append(Position(
                     inst_id=self._cfg.inst_id,
                     direction=r.get("direction") or "FLAT",
-                    size_contracts=int(r.get("size_contracts") or 0),
+                    size_contracts=float(r.get("size_contracts") or 0),
                     avg_price=float(r.get("entry_price") or 0),
                     raw=r,
                 ))

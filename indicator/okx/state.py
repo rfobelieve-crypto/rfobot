@@ -45,7 +45,7 @@ class OkxStateStore:
                              entry_tier: str, entry_price: float,
                              atr_at_entry: float, stop_dist: float,
                              current_stop: float,
-                             size_contracts: int, size_frac: float,
+                             size_contracts: float, size_frac: float,
                              notional_usd: float, equity_before: float,
                              entry_cl_ord_id: str,
                              stop_algo_cl_ord_id: str,
@@ -72,7 +72,7 @@ class OkxStateStore:
                             entry_time, direction, entry_tier,
                             float(entry_price), float(atr_at_entry),
                             float(stop_dist), float(entry_price),  # trail_extreme starts at entry
-                            float(current_stop), int(size_contracts),
+                            float(current_stop), float(size_contracts),
                             float(size_frac), float(notional_usd),
                             float(equity_before), model_version,
                             1 if paused else 0, entry_cl_ord_id,

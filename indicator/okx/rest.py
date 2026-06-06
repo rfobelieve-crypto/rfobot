@@ -516,7 +516,7 @@ class OkxRestClient:
             out.append(Position(
                 inst_id=item.get("instId", ""),
                 direction=direction,
-                size_contracts=int(abs(pos_signed)),
+                size_contracts=float(abs(pos_signed)),
                 avg_price=avg_price,
                 unrealized_pnl_usd=upl,
                 raw=item,

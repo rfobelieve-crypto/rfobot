@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS `v7_okx_positions` (
   `stop_dist`       DOUBLE NOT NULL,
   `trail_extreme`   DOUBLE NOT NULL,
   `current_stop`    DOUBLE NOT NULL,
-  `size_contracts`  INT NOT NULL,                  -- OKX contract count
+  `size_contracts`  DECIMAL(12,4) NOT NULL,        -- OKX contract count (fractional, lotSz 0.01)
   `size_frac`       DOUBLE NOT NULL,               -- fraction of equity
   `notional_usd`    DOUBLE NOT NULL,
   `equity_before`   DOUBLE NOT NULL,
