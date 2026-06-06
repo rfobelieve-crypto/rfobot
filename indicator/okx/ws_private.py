@@ -79,9 +79,8 @@ def _parse_order_event(item: dict) -> OrderEvent:
     """
     fill_px = _parse_optional_float(item.get("fillPx"))
     fill_sz_raw = _parse_optional_float(item.get("fillSz"))
-    fill_sz: Optional[int] = (
-        int(fill_sz_raw) if fill_sz_raw is not None else None
-    )
+    # fractional fills allowed (OKX lotSz 0.01) — keep as float, no int() truncation
+    fill_sz: Optional[float] = fill_sz_raw
     fee = _parse_optional_float(item.get("fee"))
     return OrderEvent(
         cl_ord_id=item.get("clOrdId", "") or "",
@@ -151,7 +150,12 @@ class OkxWsPrivateClient:
         # ── State (read by check_connectivity)
         self._connected: bool = False
         self._authenticated: bool = False
-        self._last_msg_ts: float = 0.0
+        # Seed with construction time (NOT 0): a fresh WS that hasn't received
+        # its first message yet should report a SMALL heartbeat age (still
+        # connecting), not the 999 sentinel that instantly trips A1 DEMOTE on
+        # every restart.  A genuinely dead WS still grows age past the 300s
+        # A1 threshold within ~5 min, so real disconnects are still caught.
+        self._last_msg_ts: float = time.time()
         self._consecutive_reconnect_fails: int = 0
         self._last_reconnect_ts: Optional[datetime] = None
         self._subscribed_channels: set[str] = set()
