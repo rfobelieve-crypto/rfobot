@@ -5,6 +5,8 @@ import logging
 import time
 from datetime import datetime, timezone, timedelta
 
+from indicator.timeutil import fmt_tpe
+
 from indicator.dashboard_tabs._components import (
     card, dot, section, get_db_conn, TZ8,
 )
@@ -306,7 +308,7 @@ def _fresh_row(source: str, age_min: float, last_dt) -> dict:
     age_text = f"{age_min:.0f}min" if age_min < 120 else f"{age_min/60:.1f}h"
     last_time = ""
     if last_dt:
-        last_time = last_dt.astimezone(TZ8).strftime("%m/%d %H:%M")
+        last_time = fmt_tpe(last_dt)
     return {"source": source, "age_text": age_text, "last_time": last_time,
             "color": color}
 
@@ -414,7 +416,7 @@ def _build_alert_history() -> str:
             color = "#FF3366" if severity == "critical" else "#CC4444"
             t = row["timestamp"]
             if hasattr(t, "strftime"):
-                t = t.strftime("%m/%d %H:%M")
+                t = fmt_tpe(t)
             alerts.append(f'<tr><td>{t}</td><td style="color:{color}">'
                           f'{alert_type.split(":")[0][:30]}</td>'
                           f'<td>{alert_type[:120]}</td></tr>')

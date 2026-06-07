@@ -19,6 +19,8 @@ import json
 import logging
 from datetime import datetime, timezone, timedelta
 
+from indicator.timeutil import fmt_tpe
+
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
@@ -373,11 +375,11 @@ def _build_kill_recovery() -> str:
         resolved = r.get("resolved_at")
         ic = "✓" if resolved else "⚠"
         col = "#00CC80" if resolved else "#FFB400"
-        recovery_str = (f"resolved at {resolved.strftime('%m/%d %H:%M')}"
+        recovery_str = (f"resolved at {fmt_tpe(resolved)}"
                         if resolved else "<i>unresolved</i>")
         items.append(
             f'<tr><td style="color:{col}">{ic}</td>'
-            f'<td>{r["ts"].strftime("%m/%d %H:%M") if r["ts"] else "?"}</td>'
+            f'<td>{fmt_tpe(r["ts"]) if r["ts"] else "?"}</td>'
             f'<td><b>{r.get("trigger_id","?")}</b></td>'
             f'<td>{r.get("severity","?")}</td>'
             f'<td style="font-size:10px">{recovery_str}</td></tr>'

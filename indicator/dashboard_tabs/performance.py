@@ -5,6 +5,8 @@ import json as _json
 import logging
 from datetime import datetime, timezone, timedelta
 
+from indicator.timeutil import fmt_tpe
+
 import numpy as np
 import pandas as pd
 
@@ -142,7 +144,7 @@ def _build_okx_live() -> str:
         alert_lines = []
         for k in kills[:5]:
             ts = k.get("ts")
-            ts_str = ts.strftime("%m/%d %H:%M") if hasattr(ts, "strftime") else str(ts)
+            ts_str = fmt_tpe(ts) if hasattr(ts, "strftime") else str(ts)
             alert_lines.append(
                 f'<tr><td style="color:#FF3366">⚠</td>'
                 f'<td>{ts_str}</td>'
@@ -260,7 +262,7 @@ def _build_ic_trend() -> str:
         else:
             wr = None
 
-        labels.append(chunk["dt"].iloc[-1].strftime("%m/%d %H:%M"))
+        labels.append(fmt_tpe(chunk["dt"].iloc[-1]))
         ics.append(round(float(ic), 3) if not np.isnan(ic) else 0)
         wrs.append(round(float(wr), 1) if wr is not None else None)
 
@@ -340,7 +342,7 @@ def _build_equity_curve() -> str:
         total += ret * 100  # in percentage points
         t = r["signal_time"]
         if hasattr(t, "strftime"):
-            labels.append(t.strftime("%m/%d"))
+            labels.append(fmt_tpe(t, "%m/%d"))
         else:
             labels.append(str(t)[:10])
         cum_ret.append(round(total, 2))
@@ -478,11 +480,10 @@ def _build_pred_vs_actual() -> str:
     labels, prices, colors_list, sizes = [], [], [], []
     for r in rows:
         dt = r["dt"]
-        if hasattr(dt, "replace"):
-            dt_local = dt.replace(tzinfo=timezone.utc).astimezone(TZ8)
+        if hasattr(dt, "strftime"):
+            labels.append(fmt_tpe(dt, "%H:%M"))
         else:
-            dt_local = dt
-        labels.append(dt_local.strftime("%H:%M"))
+            labels.append(str(dt))
         prices.append(round(float(r["close"]), 0))
         d = int(r["pred_direction_code"] or 0)
         s = int(r["strength_code"] or 1)

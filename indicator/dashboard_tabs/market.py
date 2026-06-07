@@ -5,6 +5,8 @@ import json as _json
 import logging
 from datetime import datetime, timezone, timedelta
 
+from indicator.timeutil import fmt_tpe
+
 import numpy as np
 import pandas as pd
 
@@ -146,7 +148,7 @@ def _build_mag_vs_realized() -> str:
     if len(df) < 5:
         return '<div style="color:rgba(0,240,255,0.3)">等待 4h 回填中</div>'
 
-    labels = [dt.strftime("%m/%d %H:%M") for dt in df["dt"]]
+    labels = [fmt_tpe(dt) for dt in df["dt"]]
     mag_preds = [round(float(v) * 100, 3) for v in df["mag_pred"]]
     realized = [round(float(v) * 100, 3) for v in df["realized_4h"]]
 
@@ -240,7 +242,7 @@ def _build_funding_env() -> str:
         sentiment = "中性"
         sent_color = "rgba(0,240,255,0.5)"
 
-    labels = [r["dt"].strftime("%m/%d %H:%M") if hasattr(r["dt"], "strftime")
+    labels = [fmt_tpe(r["dt"]) if hasattr(r["dt"], "strftime")
               else str(r["dt"])[:16] for _, r in df.iterrows()]
     values = df["funding_pct"].round(4).tolist()
 
@@ -317,7 +319,7 @@ def _build_oi_section() -> str:
     chg_4h = (current_oi / oi_4h_ago - 1) * 100 if oi_4h_ago else 0
     chg_24h = (current_oi / oi_24h_ago - 1) * 100 if oi_24h_ago else 0
 
-    labels = [dt.strftime("%m/%d %H:%M") for dt in df["dt"]]
+    labels = [fmt_tpe(dt) for dt in df["dt"]]
     oi_vals = [round(float(v) / 1e9, 3) for v in df["oi"]]  # in billions
 
     return f"""
@@ -388,7 +390,7 @@ def _build_ls_ratio() -> str:
     df["ls"] = df["cg_ls_ratio"].astype(float)
     current_ls = df["ls"].iloc[-1]
 
-    labels = [dt.strftime("%m/%d %H:%M") for dt in df["dt"]]
+    labels = [fmt_tpe(dt) for dt in df["dt"]]
     ls_vals = df["ls"].round(3).tolist()
 
     datasets = f"""{{ label: 'L/S Ratio', data: {_json.dumps(ls_vals)},

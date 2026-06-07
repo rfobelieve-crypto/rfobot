@@ -5,6 +5,8 @@ import json as _json
 import logging
 from datetime import datetime, timezone, timedelta
 
+from indicator.timeutil import fmt_tpe
+
 import numpy as np
 import pandas as pd
 
@@ -63,8 +65,7 @@ def _build_signal_price_chart() -> str:
 
     labels = []
     for dt in df["dt"]:
-        dt_local = dt.tz_localize("UTC").tz_convert("Asia/Taipei") if dt.tzinfo is None else dt.astimezone(TZ8)
-        labels.append(dt_local.strftime("%m/%d %H:%M"))
+        labels.append(fmt_tpe(dt))
 
     prices = [round(float(r), 0) for r in df["close"]]
 
@@ -240,7 +241,7 @@ def _build_equity_by_tier() -> str:
         if r["direction"] == "DOWN":
             ret = -ret
         t = r["signal_time"]
-        lbl = t.strftime("%m/%d %H:%M") if hasattr(t, "strftime") else str(t)[:16]
+        lbl = fmt_tpe(t) if hasattr(t, "strftime") else str(t)[:16]
         combined.append((lbl, r["strength"], ret * 100))
 
     combined.sort(key=lambda x: x[0])
@@ -340,7 +341,7 @@ def _build_rolling_ic() -> str:
     step = max(1, len(df) // 60)
 
     for i in range(window_7d, len(df), step):
-        labels.append(df["dt"].iloc[i].strftime("%m/%d"))
+        labels.append(fmt_tpe(df["dt"].iloc[i], "%m/%d"))
 
         chunk_7 = df.iloc[max(0, i - window_7d):i]
         if len(chunk_7) >= 20 and chunk_7["pred_return_4h"].std() > 1e-10:
@@ -706,9 +707,8 @@ def _build_signal_heatmap() -> str:
         if conf < 60:
             continue
         t = r["signal_time"]
-        if hasattr(t, "replace"):
-            t_local = t.replace(tzinfo=timezone.utc).astimezone(TZ8)
-            date_str = t_local.strftime("%m/%d")
+        if hasattr(t, "strftime"):
+            date_str = fmt_tpe(t, "%m/%d")
         else:
             date_str = str(t)[:10]
 

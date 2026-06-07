@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from shared.db import get_db_conn
+from indicator.timeutil import fmt_tpe
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +308,7 @@ def format_okx_report(summary: dict) -> str:
             bps = (t.get("net_pct") or 0) * 10000
             sign = "+" if bps >= 0 else ""
             lines.append(
-                f"   #{t['id']} {t.get('entry_time','')} {t['direction']} "
+                f"   #{t['id']} {fmt_tpe(t.get('entry_time'))} {t['direction']} "
                 f"→ {t.get('exit_reason','')} {sign}{bps:.0f} bps")
         lines.append("")
 
@@ -316,7 +317,7 @@ def format_okx_report(summary: dict) -> str:
     if kills:
         lines.append(f"⚠️ Kill log (7d, {len(kills)} entries):")
         for k in kills[:3]:
-            lines.append(f"   {k['ts']} {k['trigger_id']} {k['severity']}")
+            lines.append(f"   {fmt_tpe(k['ts'])} {k['trigger_id']} {k['severity']}")
     return "\n".join(lines)
 
 
