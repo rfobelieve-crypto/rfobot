@@ -926,7 +926,7 @@ def prediction_json():
     return jsonify(pred)
 
 
-@app.route("/okx-admin/heal", methods=["GET"])
+@app.route("/okx-admin/heal", methods=["GET", "POST"])
 def okx_admin_heal_api():
     """Emergency heal endpoint for the V7 OKX executor.
 
@@ -951,12 +951,20 @@ def okx_admin_heal_api():
     a Railway env var to lock down in production).
     """
     from flask import request, jsonify
-    confirm = request.args.get("confirm", "").upper() == "YES"
+    # SAFETY (2026-06-07): the destructive heal is POST-only. A GET — even
+    # with ?confirm=YES — is dry-run ONLY. Link-preview bots, browser
+    # prefetch and uptime probes all issue GETs, and a stored
+    # ".../heal?confirm=YES" URL got auto-fetched and zeroed a live position
+    # twice (orphan_exchange). See mistake.md 2026-06-07.
+    execute = (
+        request.method == "POST"
+        and request.values.get("confirm", "").upper() == "YES"
+    )
     expected_token = os.environ.get("ADMIN_HEAL_TOKEN", "")
-    if expected_token:
-        provided = request.args.get("token", "")
+    if execute and expected_token:
+        provided = request.values.get("token", "")
         if provided != expected_token:
-            return jsonify({"error": "missing/invalid ?token"}), 403
+            return jsonify({"error": "missing/invalid token"}), 403
 
     from shared.db import get_db_conn
     open_rows: list[dict] = []
@@ -977,7 +985,40 @@ def okx_admin_heal_api():
                 )
                 status_row = cur.fetchone()
 
-                if confirm:
+                if execute:
+                    # SAFETY (2026-06-07): never zero a DB position OKX still
+                    # holds — that is exactly what created today's
+                    # orphan_exchange. Heal is only for orphan_local (DB has
+                    # rows, OKX is flat). If OKX is NOT flat, refuse.
+                    try:
+                        from indicator.okx.runner import _stage_label
+                        from indicator.okx.config import load_okx_config_from_env
+                        from indicator.okx.rest import OkxRestClient
+                        _cli = OkxRestClient(
+                            load_okx_config_from_env(stage=_stage_label()))
+                        live_pos = [
+                            p for p in _cli.get_positions(inst_id="BTC-USDT-SWAP")
+                            if p.direction != "FLAT" and abs(p.size_contracts) > 0
+                        ]
+                    except Exception as e:
+                        return jsonify({
+                            "error": f"OKX position check failed, refusing to heal: {e}"
+                        }), 502
+                    if live_pos:
+                        return jsonify({
+                            "error": "refused: OKX still holds live position(s); "
+                                     "zeroing DB would create orphan_exchange",
+                            "okx_positions": [
+                                {"direction": p.direction,
+                                 "size": p.size_contracts,
+                                 "avg_price": p.avg_price,
+                                 "upl_usd": p.unrealized_pnl_usd}
+                                for p in live_pos
+                            ],
+                            "fix": "close the OKX position first (manually or let "
+                                   "the executor manage it), then heal. Heal only "
+                                   "clears orphan_local (DB rows with OKX flat).",
+                        }), 409
                     n_closed = 0
                     if open_rows:
                         cur.execute(
@@ -1028,8 +1069,10 @@ def okx_admin_heal_api():
         "would_close_n_positions": len(open_rows),
         "would_reset_executor_to": "INIT",
         "how_to_apply": (
-            "Re-open this URL with ?confirm=YES appended"
-            + (" and &token=<your-token>" if expected_token else "")
+            "POST to this URL with confirm=YES"
+            + (" and token=<your-token>" if expected_token else "")
+            + ". GET is always dry-run; heal also REFUSES if OKX still "
+              "holds a position (orphan_exchange guard)."
         ),
     })
 

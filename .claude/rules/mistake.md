@@ -4,6 +4,102 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-06-07: admin_heal 第二次造孤兒倉——破壞性操作掛在無認證 GET + 只改 DB 不平 OKX
+
+**What happened:**
+`/okx-admin/heal` 這個 endpoint 在 06-07 08:26 自動把一筆 live SHORT 0.29（id=6，executor 02:00 正常開的）在 DB 裡標成 `status=CLOSED`（exit_reason=admin_heal），但**完全沒去 OKX 平倉**。09:02 對帳發現「OKX 有、DB active 沒有」→ `orphan_exchange` → executor DEMOTE，推了一條「MANUAL INTERFERENCE DETECTED」假警報（其實不是手動，是 endpoint 被自動觸發）。
+
+時間線鐵證：08:02 對帳還 CONSISTENT（兩邊都有 SHORT）→ 08:26 admin_heal 抹 DB → 09:02 orphan_exchange。OKX 唯讀查證實 SHORT 還活著、強平價 $97K（離現價 +55%、碰不到）、stop algo 還 live @ 63148——所以**根本沒有風險事件，只有人造的狀態不一致**。
+
+這是 **6/4 admin_heal 事件的第二次重演**（6/4 是 orphan_local，CLAUDE.md 記過）。第一次只處理了當次孤兒倉，沒根治 endpoint 本身，於是換個方向（orphan_exchange）又炸一次。
+
+**Root cause:**
+兩個疊加的設計缺陷：
+1. **破壞性操作掛在無認證 GET**：`@app.route("/okx-admin/heal", methods=["GET"])`，要 `?confirm=YES` 才執行。問題是一個存過的 `.../heal?confirm=YES` 完整鏈接（Telegram 訊息/文檔/監控配置裡），會被 **link-preview bot / 瀏覽器預取 / uptime probe 連 query string 一起 GET**，自動帶 confirm=YES 觸發歸零。GET 依設計應幂等只讀，把「歸零 live 倉位」放 GET = 等著被預取誤觸。
+2. **heal 只 UPDATE DB、不碰 OKX**：函數體全是 SQL（close DB rows + reset executor + resolve kill_log），注釋 L947 聲稱「Re-fetch positions from OKX via REST」但**代碼根本沒這段**。所以一旦 OKX 實際有倉，歸零 DB 必然製造 orphan_exchange。
+
+**Correct approach（已修，commit 待 push）:**
+1. **破壞性路徑改 POST-only**：`methods=["GET","POST"]`，但 `execute = request.method=="POST" and confirm=="YES"`。GET 永遠 dry-run，link-preview/預取（都是 GET）再也觸發不了歸零。
+2. **歸零前先查 OKX，有倉則拒絕**：execute 前 `OkxRestClient.get_positions("BTC-USDT-SWAP")`，只要 OKX 還有非 FLAT 倉位就回 409 拒絕，附 OKX 倉位明細 + 「先平 OKX 再 heal」提示。heal 從此只能清真正的 orphan_local（DB 有 rows、OKX flat）。
+3. 驗證：py_compile + `app.url_map` 確認 `/okx-admin/heal → okx_admin_heal_api [GET,POST]` 綁定沒脫鉤。
+
+**Rule:** 任何會改變**真實交易所狀態 / 真錢**的 endpoint，**絕不可掛在 GET**——GET 必須幂等只讀，否則 link-preview / 預取 / 重載會在你不知情時觸發。破壞性 admin 操作 = POST + token + **執行前先核對真實外部狀態**（never zero local state that the exchange still holds）。修一個 ops bug 時，要修**機制本身**不是只清當次的髒數據——6/4 只清了孤兒倉沒修 endpoint，6/7 就用另一個方向重演。對帳出現 orphan 時，第一個問「是不是某個 heal/reset 工具只動了單邊（DB 或 exchange）」。
+
+---
+
+## 2026-06-02: aggregate AUC lift 被 2 個 outlier folds 撐起來，per-fold mean 是負的
+
+**What happened:**
+為了突破 V7 0.54 AUC ceiling，我跑 WorldQuant 101 alphas adapted for single-asset（rank → ts_rank），跑 conditional IC 找出 6 個強候選（alpha008/047/005/020/024/084，cond_IC > 0.03 + frac_pos > 65%）。然後用 production trainer (`train_direction_reg_walk_forward`) 跑 ensemble A/B：V7 baseline 136 features vs V7 + 6 alphas (142 features)。
+
+**Aggregate 結果看起來 GO**：
+- sign_AUC: 0.59755 → 0.60473 = **+0.00718**（剛過 +0.005 部署門檻）
+- Strong thr=0.008 WR: 83% → 100%（6 笔全勝）
+- Strong thr=0.010：新門檻達成 1 trade 100% WR
+
+我寫了 verdict 文字「DEPLOY: WQ101 candidates bring measurable lift」，準備推 user 走 2 週 paper validation。差一步就 commit。
+
+幸好部署前最後一個 sanity check：**per-fold AUC lift 分布**——只花 5 分鐘，但翻盤：
+- Mean lift: **-0.00442**（負的！）
+- Median lift: -0.00529（負的）
+- Positive lift folds: **37/77 = 48.1%**（不到一半）
+- Std: 0.091（極不穩）
+- Worst fold: -0.318，Best fold: +0.279
+- Capped mean (clip ±0.05): +0.00023（等同 0）
+- Bootstrap 95% CI: [-0.026, +0.016]（含 0）
+- Bootstrap p(lift ≤ 0): **0.666**（66% 機率根本沒 lift）
+
+aggregate +0.0072 是被 1-2 個極端 fold（max +0.28）撐起來的。**Median 是 -0.0053**。
+
+**Root cause:**
+**Aggregate AUC 跟 per-fold mean AUC 是不同 metric**。
+- **Aggregate**：把所有 fold 的 OOS predictions pool 起來再算一次 AUC
+- **Per-fold mean**：每個 fold 各算 AUC 後平均
+
+當有 1-2 個 fold 有極端 improvement（例如某段 quiet market 剛好 alpha008 抓到 momentum），會把 aggregate 拉高，但 per-fold 平均不變。Pooled metric 對 outlier 敏感，per-fold 才是真實 generalization 訊號。
+
+更深問題：**conditional IC 顯著 ≠ ensemble A/B 過**。
+- Conditional IC 量「**alpha 跟 V7 線性 residual** 的相關」
+- Ensemble A/B 量「XGB 加 alpha 後**非線性 ensemble** 預測是否改善」
+- 兩者可以背離：XGB 已透過 tree splits 非線性捕捉類似 pattern → 加 raw alpha 變成 noise
+
+也就是說 conditional IC 顯著只證明「**alpha 帶 V7 沒有的線性訊息**」，但 XGB ensemble 可能透過 conditional split 隱式抓到了 → 加進去**反而 hurt**（看到 best fold +0.28 但 worst fold -0.32 = high-variance signal）。
+
+放大因素：6/2 之前的 [[mistake 2026-06-01]] 已經建立了「conditional IC > raw IC 篩選」紀律，但**還缺一步 per-fold sanity**。我以為 aggregate 過了就 deploy，差點重蹈覆轍。
+
+**Correct approach:**
+任何 ensemble A/B 的 verdict 必須**同時看**：
+1. **Aggregate lift > +0.005**
+2. **Per-fold mean lift > +0.001**
+3. **Frac_positive folds > 55%**
+4. **Bootstrap 95% CI 不含 0**
+
+4 條都過才算「真實 lift」，缺一就**疑似 outlier 撐起來的假 lift**。
+
+具體實作：寫進 `wq101_ab.py` 之類的 A/B script 末段——
+
+```python
+fold_lifts = [auc(new_fold) - auc(base_fold) for fold in folds]
+n_pos = sum(1 for x in fold_lifts if x > 0)
+boot_p = bootstrap_p_value(fold_lifts, hypothesis="lift > 0", n=2000)
+
+if (aggregate_lift > 0.005
+    and np.mean(fold_lifts) > 0.001
+    and n_pos / len(fold_lifts) > 0.55
+    and boot_p < 0.05):
+    verdict = "DEPLOY"
+else:
+    verdict = "NO-GO (aggregate may be outlier-driven)"
+```
+
+**Rule:** Ensemble A/B 看到 aggregate AUC lift 過門檻時，**強制再算 per-fold mean + frac_positive + bootstrap CI 4 條 sanity**。光看 aggregate 等於 [[mistake 2026-06-01]] 在升級版重演——只是這次「univariate IC 過」變成「aggregate AUC 過」，本質都是「**outlier 撐起 averaged metric 但 generalization 不行**」。Conditional IC 過只是「值得試 A/B」的 trigger，不是「值得 deploy」的證據；ensemble A/B aggregate 過也只是「值得 per-fold sanity」的 trigger，不是 deploy 證據。**驗證鏈條每加深一層都要重新 sanity check**。
+
+更實務的紀律：**如果 5 分鐘的額外 check 能省下 2 週 paper validation，永遠先做這個 check**。今天這個 sanity 省下了：(a) 中斷現有 V7 paper cohort (b) 訓練 new model 等 1 小時 (c) 2 週 wait 然後發現沒差 (d) 浪費 14 天 paper baseline 比較性。**Validation discipline 的 ROI 是「上游 5 分鐘擋下下游 2 週的浪費」**。
+
+**Update**: 證實 V7 對「OHLCV + Coinglass + Deribit + Binance order flow」這幾個 data source 已飽和。突破方向必須是**異源 channel**：(1) options gamma exposure (paid Deribit/Glassnode), (2) whale on-chain wallet flow (Glassnode), (3) Bitcoin ETF AUM/flow (CoinGecko 開放), (4) Twitter/Reddit sentiment (DIY scraper)。優先順序按「取得成本 vs 預期 lift」評估。
+
+---
+
 ## 2026-06-01: walk-forward univariate IC 漂亮但加進 ensemble 沒 lift（feature redundancy）
 
 **What happened:**
