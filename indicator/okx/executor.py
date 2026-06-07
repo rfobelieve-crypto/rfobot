@@ -36,7 +36,7 @@ from indicator.okx.client import OkxClient
 from indicator.okx.config import OkxConfig
 from indicator.okx.kill_checks import (
     check_algo_stop_latency, check_api_permissions, check_ntp_drift,
-    run_all_checks,
+    check_presubmit_order, run_all_checks,
 )
 from indicator.okx.reconciler import PositionReconciler
 from indicator.okx.rest import make_cl_ord_id
@@ -853,6 +853,45 @@ class V7OkxExecutor:
         except Exception:
             bar_ts = datetime.utcnow()
 
+        # 0. Pre-submit order guard (defense-in-depth).  Last line before a
+        # real order hits OKX: refuse to send if the ACTUAL size/notional
+        # implies leverage above the strategy cap — even if _build_intent's
+        # sizing logic is buggy (this is the int()-floor 7x bug class from
+        # 2026-06-05).  Skip the trade + alert; do NOT halt (single bad
+        # intent is a sizing bug, not a system failure).
+        presubmit = check_presubmit_order(
+            size_contracts=size_contracts, notional_usd=notional,
+            equity_usd=equity,
+            max_effective_leverage=self._cfg.max_effective_leverage,
+            min_size_contracts=MIN_SZ,
+        )
+        if presubmit.triggered:
+            logger.error("presubmit_guard_blocked %s", presubmit.reason)
+            try:
+                send_critical(
+                    self._cfg.telegram_critical_chat_id,
+                    f"🛑 <b>PRE-SUBMIT GUARD blocked order</b>\n"
+                    f"dir={side} size={size_contracts} contracts "
+                    f"notional=${notional:,.2f} equity=${equity:,.2f}\n"
+                    f"{presubmit.reason}\n"
+                    f"No order sent — sizing produced an out-of-bounds order. "
+                    f"Investigate sizing logic.",
+                )
+            except Exception:
+                logger.exception("presubmit_guard_alert_failed")
+            if approval_id is not None and self._approval is not None:
+                # Don't leave the approval dangling as pending — it never
+                # became a trade, so mark it stale (guard-rejected).
+                try:
+                    self._approval.mark_stale(approval_id,
+                                              reason="presubmit_guard_blocked")
+                except Exception:
+                    logger.exception("presubmit_mark_approval_failed")
+            return CycleResult(action="none",
+                               detail={"reason": "presubmit_guard_blocked",
+                                       "trigger_id": presubmit.trigger_id,
+                                       "detail": presubmit.reason})
+
         # 1. Submit market entry
         entry_cl_ord_id = make_cl_ord_id(prefix="v7")
         order_side = Side.BUY if side == "LONG" else Side.SELL
@@ -1055,6 +1094,25 @@ class V7OkxExecutor:
                 )
             except Exception:
                 logger.exception("log_kill_trigger_failed")
+
+        # Manual interference takes precedence over everything else: OKX
+        # carries a position the executor never opened.  DEMOTE (sticky —
+        # needs a deliberate restart to re-enter) but DO NOT force-close it:
+        # we must never touch a position we didn't create (wrong size/side
+        # assumptions could make it worse).  The operator manages it by hand.
+        # This is the code backstop for the 2026-06-05 manual-blowup vector;
+        # the real fix is account isolation (docs/okx_account_isolation.md).
+        manual = next((t for t in triggered
+                       if t.trigger_id == "MANUAL-INTERFERENCE"), None)
+        if manual is not None:
+            self._alert_manual_interference(manual)
+            self._set_status(
+                ExecutorStatus.DEMOTED,
+                reason=f"manual_interference: {manual.reason}",
+                trigger_id="MANUAL-INTERFERENCE",
+                context=manual.context,
+            )
+            return
 
         # Telegram critical alert — severity carries from `worst`
         self._alert_critical(
@@ -1370,6 +1428,33 @@ class V7OkxExecutor:
                 logger.exception("dicts_to_positions_row_failed row_id=%s",
                                  r.get("id"))
         return out
+
+    def _alert_manual_interference(self, check: KillCheckResult) -> None:
+        """Unmistakable alert for a foreign position on the bot account.
+
+        Distinct from the generic kill alert so the operator immediately
+        understands: someone (probably you) traded the executor's account
+        by hand, the bot has STOPPED, and it will NOT touch that position.
+        Never raises.
+        """
+        try:
+            okx_detail = check.context or {}
+            send_critical(
+                self._cfg.telegram_critical_chat_id,
+                f"🚨 <b>MANUAL INTERFERENCE DETECTED</b> 🚨\n"
+                f"stage={self._cfg.stage_label}\n"
+                f"OKX shows a position the executor never opened:\n"
+                f"<code>{okx_detail}</code>\n\n"
+                f"<b>Executor DEMOTED — it has stopped trading and will NOT "
+                f"close this position.</b>\n"
+                f"If you opened this by hand, this account is NOT isolated. "
+                f"Close it yourself, move trading capital to a dedicated "
+                f"sub-account the executor alone uses, then restart the "
+                f"service to re-enter.\n"
+                f"See docs/okx_account_isolation.md.",
+            )
+        except Exception:
+            logger.exception("manual_interference_alert_send_failed")
 
     def _alert_critical(self, check: KillCheckResult, *,
                          severity_label: str) -> None:

@@ -60,6 +60,12 @@ class OkxConfig:
     # = 20% account move, so the old -50% cap was meaningless.
     daily_loss_cap_pct: float = -20.0   # Safety belt #3
     total_loss_cap_pct: float = -30.0   # Safety belt #4 (career-end)
+    # Pre-submit STRATEGY risk-leverage ceiling (notional / equity), NOT the
+    # OKX account leverage (10x, margin lockup only).  Sizing targets ~2x
+    # (NOTIONAL_LEV_MULT); 3.0 leaves headroom for lot-rounding / small-account
+    # min-lot inflation while still catching the int()-floor class bug that
+    # forced ~7x on 2026-06-05.  See kill_checks.check_presubmit_order.
+    max_effective_leverage: float = 3.0
 
     # ── Monitoring intervals
     reconciliation_interval_sec: int = 60
@@ -133,6 +139,14 @@ def validate_okx_config(cfg: OkxConfig) -> None:
     if not (1 <= cfg.leverage <= 10):
         raise RuntimeError(
             f"E1: Stage 3 leverage must be in [1, 10], got {cfg.leverage}"
+        )
+    # Pre-submit strategy leverage cap must be sane: >= 1x (else nothing
+    # trades) and <= 10x (CLAUDE.md Stage-3 account leverage ceiling).
+    # Decoupled from cfg.leverage so low-leverage configs stay valid.
+    if not (1.0 <= cfg.max_effective_leverage <= 10.0):
+        raise RuntimeError(
+            f"max_effective_leverage must be in [1, 10], "
+            f"got {cfg.max_effective_leverage}"
         )
     # E2 — both modes supported; executor branches on cfg.pos_mode
     if cfg.pos_mode not in ("net_mode", "long_short_mode"):

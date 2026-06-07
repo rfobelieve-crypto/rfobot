@@ -185,10 +185,24 @@ class TestReconciliation:
         result = check_reconciliation(result=recon)
         assert not result.triggered
 
-    def test_mismatch_triggers_halt(self):
+    def test_foreign_mismatch_triggers_manual_interference_demote(self):
+        # OKX has a position the executor didn't open -> DEMOTE (sticky)
+        for mtype in ("size_diff", "direction_diff", "orphan_exchange",
+                      "multiple_exchange_positions"):
+            recon = ReconciliationResult(
+                verdict=ReconciliationVerdict.MISMATCH,
+                detail={"type": mtype, "local": 1, "okx": 2},
+            )
+            result = check_reconciliation(result=recon)
+            assert result.triggered
+            assert result.trigger_id == "MANUAL-INTERFERENCE"
+            assert result.severity == KillSeverity.DEMOTE
+
+    def test_orphan_local_still_halts_a4(self):
+        # DB has a position OKX doesn't (WS missed fill) -> transient HALT
         recon = ReconciliationResult(
             verdict=ReconciliationVerdict.MISMATCH,
-            detail={"type": "size_diff", "local": 1, "okx": 2},
+            detail={"type": "orphan_local", "local_id": 1},
         )
         result = check_reconciliation(result=recon)
         assert result.triggered
@@ -423,7 +437,7 @@ class TestRunAllChecks:
         trigger_ids = {r.trigger_id for r in triggered}
         assert "CAP-3" in trigger_ids   # daily
         assert "CAP-4" in trigger_ids   # total
-        assert "A4" in trigger_ids      # reconciliation
+        assert "MANUAL-INTERFERENCE" in trigger_ids   # foreign position
 
     def test_skips_ntp_when_no_drift_provided(self):
         cfg = _MockCfg()
