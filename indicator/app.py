@@ -926,6 +926,113 @@ def prediction_json():
     return jsonify(pred)
 
 
+@app.route("/research/exit-variants", methods=["GET"])
+def research_exit_variants_api():
+    """Run V7 exit-variants backtest.  Mobile-friendly admin endpoint.
+
+    Same as `python -m research.exit_variants_backtest` but callable from
+    a phone browser.  Runs synchronously; expect 30-120s wall time on
+    Railway depending on parquet size.
+
+    Query params:
+      variants:    comma-separated subset (e.g. "baseline,opp_strong").
+                   Default = all 7.
+      entry_mode:  "signal_close" (default) | "next_open"
+      token:       required if ADMIN_HEAL_TOKEN env var is set
+
+    Returns JSON: {ok, oos_window, span_days, entry_mode, results: [...]}
+    each result has n / wr_pct / avg_net_bps / roi_pct / mdd_pct /
+    sharpe_ann / profit_factor / avg_hold_h / by_reason{}.
+    """
+    from flask import request, jsonify
+    import math
+
+    expected_token = os.environ.get("ADMIN_HEAL_TOKEN", "")
+    if expected_token and request.args.get("token", "") != expected_token:
+        return jsonify({"error": "missing/invalid ?token"}), 403
+
+    variants_param = request.args.get("variants", "").strip()
+    variant_names = [v.strip() for v in variants_param.split(",") if v.strip()] or None
+    entry_mode = request.args.get("entry_mode", "signal_close")
+    if entry_mode not in ("signal_close", "next_open"):
+        return jsonify({"error": "entry_mode must be signal_close or next_open"}), 400
+
+    try:
+        from research.exit_variants_backtest import (
+            variants_catalog, simulate_with_policy, summarise,
+        )
+        from research.v71_v7_sizing_1x import (
+            ATR_PERIOD, load_data, decode_signals, _atr_wilder,
+        )
+    except Exception as e:
+        logger.exception("exit_variants_import_failed")
+        return jsonify({"error": f"import failed: {e}"}), 500
+
+    catalog = variants_catalog()
+    run_set = variant_names if variant_names else list(catalog)
+    unknown = [v for v in run_set if v not in catalog]
+    if unknown:
+        return jsonify({"error": f"unknown variants: {unknown}",
+                        "available": list(catalog)}), 400
+
+    try:
+        df = load_data()
+        df["atr"] = _atr_wilder(df, ATR_PERIOD)
+        direction, tier, warmup_n = decode_signals(df)
+        df = df.iloc[warmup_n:].copy()
+        direction = direction[warmup_n:]
+        tier = tier[warmup_n:]
+        span_days = (df.index[-1] - df.index[0]).total_seconds() / 86400.0
+
+        results = []
+        for name in run_set:
+            policy = catalog[name]
+            trades = simulate_with_policy(df, direction, tier, policy,
+                                          entry_mode=entry_mode)
+            results.append(summarise(trades, span_days, name))
+    except Exception as e:
+        logger.exception("exit_variants_run_failed")
+        return jsonify({"error": str(e)}), 500
+
+    # JSON sanitise: inf/nan aren't valid JSON. Convert to strings.
+    def _sanitise(o):
+        if isinstance(o, float):
+            if math.isinf(o):
+                return "inf"
+            if math.isnan(o):
+                return None
+            return o
+        if isinstance(o, dict):
+            return {k: _sanitise(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [_sanitise(x) for x in o]
+        return o
+
+    # Sort variants so baseline shows first for readability
+    results.sort(key=lambda r: (0 if r.get("name") == "baseline" else 1,
+                                r.get("name", "")))
+
+    # Add comparative Δ vs baseline for quick scan
+    baseline = next((r for r in results if r.get("name") == "baseline"), None)
+    if baseline:
+        for r in results:
+            if r["name"] == "baseline" or r.get("n", 0) == 0:
+                continue
+            r["delta_sharpe_vs_base"] = (r.get("sharpe_ann", 0)
+                                          - baseline.get("sharpe_ann", 0))
+            r["delta_net_bps_vs_base"] = (r.get("avg_net_bps", 0)
+                                           - baseline.get("avg_net_bps", 0))
+
+    return jsonify({
+        "ok": True,
+        "oos_window": [df.index[0].isoformat(), df.index[-1].isoformat()],
+        "span_days": round(span_days, 1),
+        "entry_mode": entry_mode,
+        "n_variants_run": len(results),
+        "results": _sanitise(results),
+    })
+
+
 @app.route("/okx-admin/heal", methods=["GET", "POST"])
 def okx_admin_heal_api():
     """Emergency heal endpoint for the V7 OKX executor.
