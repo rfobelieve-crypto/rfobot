@@ -480,7 +480,7 @@ class TestExecuteApprovedIntent:
             entry_price=75000.0, stop_price=74550.0,
             atr=150.0, stop_dist=450.0,
             size_contracts=5, size_frac=0.5,
-            notional_usd=375.0, equity_before=100.0,
+            notional_usd=180.0, equity_before=100.0,
             bar_ts_iso="2026-05-28T12:00:00",
             model_version="v1",
         )
@@ -503,7 +503,7 @@ class TestExecuteApprovedIntent:
             entry_price=75000.0, stop_price=74550.0,
             atr=150.0, stop_dist=450.0,
             size_contracts=5, size_frac=0.5,
-            notional_usd=375.0, equity_before=100.0,
+            notional_usd=180.0, equity_before=100.0,
             bar_ts_iso="2026-05-28T12:00:00",
         )
         with patch("indicator.okx.executor.send_critical", return_value=True):

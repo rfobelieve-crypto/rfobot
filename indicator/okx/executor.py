@@ -36,7 +36,7 @@ from indicator.okx.client import OkxClient
 from indicator.okx.config import OkxConfig
 from indicator.okx.kill_checks import (
     check_algo_stop_latency, check_api_permissions, check_ntp_drift,
-    run_all_checks,
+    check_presubmit_order, run_all_checks,
 )
 from indicator.okx.reconciler import PositionReconciler
 from indicator.okx.rest import make_cl_ord_id
@@ -852,6 +852,45 @@ class V7OkxExecutor:
                 bar_ts = bar_ts.astimezone(timezone.utc).replace(tzinfo=None)
         except Exception:
             bar_ts = datetime.utcnow()
+
+        # 0. Pre-submit order guard (defense-in-depth).  Last line before a
+        # real order hits OKX: refuse to send if the ACTUAL size/notional
+        # implies leverage above the strategy cap — even if _build_intent's
+        # sizing logic is buggy (this is the int()-floor 7x bug class from
+        # 2026-06-05).  Skip the trade + alert; do NOT halt (single bad
+        # intent is a sizing bug, not a system failure).
+        presubmit = check_presubmit_order(
+            size_contracts=size_contracts, notional_usd=notional,
+            equity_usd=equity,
+            max_effective_leverage=self._cfg.max_effective_leverage,
+            min_size_contracts=MIN_SZ,
+        )
+        if presubmit.triggered:
+            logger.error("presubmit_guard_blocked %s", presubmit.reason)
+            try:
+                send_critical(
+                    self._cfg.telegram_critical_chat_id,
+                    f"🛑 <b>PRE-SUBMIT GUARD blocked order</b>\n"
+                    f"dir={side} size={size_contracts} contracts "
+                    f"notional=${notional:,.2f} equity=${equity:,.2f}\n"
+                    f"{presubmit.reason}\n"
+                    f"No order sent — sizing produced an out-of-bounds order. "
+                    f"Investigate sizing logic.",
+                )
+            except Exception:
+                logger.exception("presubmit_guard_alert_failed")
+            if approval_id is not None and self._approval is not None:
+                # Don't leave the approval dangling as pending — it never
+                # became a trade, so mark it stale (guard-rejected).
+                try:
+                    self._approval.mark_stale(approval_id,
+                                              reason="presubmit_guard_blocked")
+                except Exception:
+                    logger.exception("presubmit_mark_approval_failed")
+            return CycleResult(action="none",
+                               detail={"reason": "presubmit_guard_blocked",
+                                       "trigger_id": presubmit.trigger_id,
+                                       "detail": presubmit.reason})
 
         # 1. Submit market entry
         entry_cl_ord_id = make_cl_ord_id(prefix="v7")

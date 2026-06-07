@@ -242,6 +242,61 @@ def check_ntp_drift(*, local_ts_sec: float, server_ts_sec: float,
     return KillCheckResult(triggered=False)
 
 
+# ── Pre-submit order guard (defense-in-depth before every entry) ────────
+
+def check_presubmit_order(*, size_contracts: float, notional_usd: float,
+                          equity_usd: float,
+                          max_effective_leverage: float,
+                          min_size_contracts: float) -> KillCheckResult:
+    """Final sanity on the ACTUAL order params, run right before submit.
+
+    This is defense-in-depth, NOT a duplicate of sizing: even if
+    _build_intent's sizing logic has a bug, this guard refuses to send an
+    order whose effective leverage (notional / equity) blows past the
+    strategy's intended ~2x (NOTIONAL_LEV_MULT).  It directly closes the
+    bug class behind the 2026-06-05 over-leverage event, where an
+    int()-floor to whole contracts forced ~7x on a small account
+    (see CLAUDE.md §"分數合約 sizing B").
+
+    NOTE: max_effective_leverage is the STRATEGY risk leverage cap, NOT the
+    OKX account leverage (10x) — the latter only governs margin lockup.
+
+    Returns triggered=True (caller skips the order + alerts) on:
+      - non-finite / non-positive / sub-min size
+      - effective leverage above max_effective_leverage
+    Does NOT halt the executor: a single bad intent is a sizing bug to
+    skip + surface, not a system-wide failure.
+    """
+    import math
+
+    if (not math.isfinite(size_contracts) or size_contracts < min_size_contracts
+            or not math.isfinite(notional_usd) or notional_usd <= 0):
+        return KillCheckResult(
+            triggered=True, trigger_id="PRESUBMIT-SIZE",
+            severity=KillSeverity.HALT,   # severity unused (we skip, not halt)
+            reason=f"order size {size_contracts} / notional {notional_usd} "
+                   f"invalid (min lot {min_size_contracts})",
+            context={"size_contracts": size_contracts,
+                     "notional_usd": notional_usd,
+                     "min_size_contracts": min_size_contracts},
+        )
+    if equity_usd > 0:
+        eff_lev = notional_usd / equity_usd
+        if eff_lev > max_effective_leverage:
+            return KillCheckResult(
+                triggered=True, trigger_id="PRESUBMIT-LEV",
+                severity=KillSeverity.HALT,
+                reason=f"effective leverage {eff_lev:.2f}x > cap "
+                       f"{max_effective_leverage:.2f}x "
+                       f"(notional ${notional_usd:.2f} / equity ${equity_usd:.2f})",
+                context={"eff_leverage": eff_lev,
+                         "max_effective_leverage": max_effective_leverage,
+                         "notional_usd": notional_usd,
+                         "equity_usd": equity_usd},
+            )
+    return KillCheckResult(triggered=False)
+
+
 # ── #10 Max position count ──────────────────────────────────────────────
 
 def check_max_position(*, local_open_positions: list[Position],
