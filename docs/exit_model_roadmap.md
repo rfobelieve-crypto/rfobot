@@ -16,6 +16,46 @@
 
 ---
 
+## ⚠️ 2026-06-07 本機接續結論:前提被推翻,exit ML/oracle 路線 PAUSE
+
+> 回家後跑完 §第一步 + 寫了 signal-layer 診斷,**整條 exit 路線的前提站不住**。
+> 下面 TL;DR 以下的內容全部保留作歷史,但**先別動手做 oracle/ML exit**。
+
+**做了兩件事:**
+1. 跑 `research.exit_variants_backtest`(7 個 variant)
+2. 寫 `research/live_vs_baseline_diag.py` 拆 signal-layer vs WF-OOS baseline
+
+**結論鏈(三層歸因定案):**
+
+1. **exit 不是問題,反而是 alpha 主來源。** 7 個 variant 全輸 baseline(Δ Sharpe 全負)。
+   baseline 出場拆解:`opp_signal` n=39 / WR 82.1% / **+145.4 bps**(最賺),`trail_stop`
+   n=34 / -1.0 bps(純保護)。移除 opp(`no_opp`)→ Sharpe 5.53→1.12、MDD 4.3%→11.1%。
+   → roadmap 原推論「opp 是 chop tax / trail 給回太多」**被數據打臉**,方向相反。
+
+2. **「live 負 P/L」是測量假象,不是真實交易也不是 alpha decay。**
+   roadmap §訊號層 的「Strong DOWN 57% WR / -0.10%」來源 = `tracked_signals` 的
+   **固定 4h TWAP forward return**(`actual_return_4h`)。診斷撈出 live Strong DOWN
+   = **-10.0 bps**,跟 -0.10% 完全吻合 → 證實來源。**但這個數字不含任何 exit 邏輯**
+   (死抱 4h,無 trail / 無 opp / 無 time_cap)。帶 exit 的 backtest 同期是 **+90 bps**。
+   兩者差 ~100 bps,因為一個是 raw entry edge、一個含 exit alpha。
+   而且 raw entry edge **pre-cutover 就弱**(pre -2.4 / live -10.9 bps),不是 cutover 後才壞
+   → **不是 alpha decay,是 fixed-hold 測量本來就量到弱的 raw entry**。
+
+3. **空單 alpha 幾乎全來自 exit timing,不是 entry。**
+   Strong DOWN fixed-4h = **-19.6 bps**(高 WR 60.8% 但贏小輸大,空單無 stop 被反彈尾部洗)。
+   trail stop 砍掉尾部大虧 → memory [[project_short_is_the_edge]] 的「空單帶 exit +115bps/70%」。
+   Strong UP fixed-4h 正(+18.8/+29.7)但帶 exit 後弱(多單 chop 被 trail 掃出)。
+
+**為什麼 PAUSE exit ML/oracle:** 它假設「live 負 P/L 暗示 exit 有問題」。但 live 負是
+fixed-hold artifact,帶 exit 的系統是正的。做 ML exit = 解一個不存在的問題。
+
+**真正的 bottleneck:** 真實 OKX closed trade 樣本 = **1 筆**(+ 6/5 手動爆倉,與系統 edge 無關)。
+帶 exit 的真實系統能否複製 backtest +90bps,**目前無法判斷**。缺的是真實 trade 樣本,不是 exit model。
+
+**診斷工具:** `research/live_vs_baseline_diag.py`(`python -m research.live_vs_baseline_diag`)。
+
+---
+
 ## 今天為何走到這個方向
 
 ### 訊號層數據(從 `/perf` Dashboard)
@@ -103,7 +143,25 @@ python -m research.exit_variants_backtest --variants baseline opp_strong opp_2ba
 
 ## 第二步:Oracle Analysis(Phase 0 證明 ROI)
 
-**這個 script 還沒寫**,但要寫不難。先跑 step 1,跑完再決定要不要寫 oracle。
+> ✅ **2026-06-07 已跑完 → NO-GO 定案**(`research/exit_oracle_analysis.py`)。
+> 設計上同時算兩個 ceiling:**PERFECT**(exit 在 MFE,look-ahead 上限)+ **CAUSAL**
+> (偵測動能停止才出,不偷看峰值,realistic ceiling)。結果:
+>
+> | | mean | median |
+> |---|---|---|
+> | PERFECT gap | **+147.8 bps** | +112 | ← 不可達,別用這個下決策 |
+> | CAUSAL gap | **-66.3 bps** | 0.0 | ← lag 1/2/3/4 = -95.6/-66.3/-67.7/-64.1,全負且穩健 |
+>
+> 連 idealized causal stall-detector 平均都**輸現有 exit 66 bps**,只有 28-39% trade 贏得了現狀。
+> by exit_reason:`opp_signal` 取代後 -109 bps(它本來就是最賺出場 +145bps);`trail_stop` 唯一有
+> 一點 causal 空間 (+15bps) 但 step1 已證全局收緊 trail 更差(oracle 看不到全局 trade-off)。
+> MFE median 落在 hold window 79% 位置 → 現有出場時機不差。
+>
+> **達成 roadmap 決策門檻「causal gap < 10 bps → exit 已近最佳、瓶頸在 entry、不要做 ML exit」。**
+> 不只 < 10,是負的。**ML exit / oracle 路線正式關閉**,除非未來真實 OKX trade 樣本累積到
+> 足量、且真實 trade P/L 顯著低於 backtest +90bps,才有理由重啟。
+
+**Script 已寫好並跑完**:`python -m research.exit_oracle_analysis`(可加 `--causal-lag N` 測敏感度)。
 
 如果 step 1 已經顯示某個 variant 大贏(例:no_opp Δ Sharpe +2.0)→ 直接 forward validate 那個 variant,不用做 oracle。
 如果 step 1 所有 variants 都 marginal(Δ Sharpe < 0.3)→ 簡單調整沒救,寫 oracle 證明「ML model 值不值得做」。
@@ -134,7 +192,7 @@ python -m research.exit_variants_backtest --variants baseline opp_strong opp_2ba
 
 ---
 
-## 完整 ML Exit Model 路線(僅供參考,等 Phase 0 證明 ROI 再說)
+## 完整 ML Exit Model 路線(⚠️ 2026-06-07 PAUSE — 前提已推翻,見頂部接續結論)
 
 ### Phase 1:Simple ML exit predictor(2-4 週)
 ```
