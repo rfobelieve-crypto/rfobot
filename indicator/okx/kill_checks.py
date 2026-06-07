@@ -163,9 +163,32 @@ def check_api_permissions(*, perms: list[str]) -> KillCheckResult:
 
 # ── #6 Reconciliation ──────────────────────────────────────────────────
 
+# Mismatch types that mean OKX shows a position the executor did NOT create.
+# On a properly isolated sub-account (see docs/okx_account_isolation.md) this
+# == manual interference (operator traded the bot account — the 2026-06-05
+# blowup vector) or a serious bug.  Either way: DEMOTE (sticky, manual
+# re-entry) and DON'T auto-close the foreign position.  orphan_local (our DB
+# has a position OKX doesn't) is a transient WS-missed-fill instead → A4 HALT,
+# which the executor's auto-heal converts to CONSISTENT after a streak.
+_FOREIGN_MISMATCH_TYPES = (
+    "orphan_exchange", "size_diff", "direction_diff",
+    "multiple_exchange_positions",
+)
+
+
 def check_reconciliation(*, result: ReconciliationResult) -> KillCheckResult:
-    """A4: any mismatch between local DB and OKX positions → halt."""
+    """A4 (HALT) for transient mismatch; MANUAL-INTERFERENCE (DEMOTE) when
+    OKX carries a position the executor never opened."""
     if result.verdict == ReconciliationVerdict.MISMATCH:
+        mtype = (result.detail or {}).get("type")
+        if mtype in _FOREIGN_MISMATCH_TYPES:
+            return KillCheckResult(
+                triggered=True, trigger_id="MANUAL-INTERFERENCE",
+                severity=KillSeverity.DEMOTE,
+                reason=f"OKX shows a position the executor did not open "
+                       f"({mtype}) — manual interference or bug",
+                context=result.detail,
+            )
         return KillCheckResult(
             triggered=True, trigger_id="A4",
             severity=KillSeverity.HALT,

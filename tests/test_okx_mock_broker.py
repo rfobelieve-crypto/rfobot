@@ -300,22 +300,27 @@ class TestKillSwitchesFire:
             return exe.cycle(klines=_mk_klines(), signal_direction="NEUTRAL",
                              signal_strength="Weak")
 
-    def test_manual_interference_orphan_exchange_halts(self):
+    def test_manual_interference_orphan_exchange_demotes_without_closing(self):
         """Operator opens a trade on the same account -> OKX shows a
-        position the executor never opened -> reconciler orphan_exchange
-        -> A4 HALT.  This is the manual-blowup detection vector.
+        position the executor never opened -> MANUAL-INTERFERENCE DEMOTE
+        (sticky), and the executor must NOT touch that foreign position.
+        This is the 2026-06-05 manual-blowup detection vector.
         """
         exe, client, store, cfg = _mk_harness(latest_equity=155.0,
                                               day_start_equity=155.0)
         _active(exe)
         client.set_okx_position("LONG", 1.0)   # foreign position
         result = self._cycle_neutral(exe)
-        assert exe.get_status() == ExecutorStatus.HALTED
-        assert result.action == "halted"
-        assert any(k["trigger_id"] == "A4" for k in store.kill_logs)
+        assert exe.get_status() == ExecutorStatus.DEMOTED
+        assert result.action == "demoted"
+        assert any(k["trigger_id"] == "MANUAL-INTERFERENCE"
+                   for k in store.kill_logs)
+        # executor did NOT try to close the foreign position
+        assert client.market_orders == []
+        assert client.get_positions(inst_id=cfg.inst_id)[0].direction == "LONG"
 
-    def test_direction_diff_halts(self):
-        # Local says LONG, OKX says SHORT -> size matches but direction_diff
+    def test_direction_diff_demotes(self):
+        # Local says LONG, OKX says SHORT -> direction_diff -> manual interfere
         exe, client, store, cfg = _mk_harness(latest_equity=155.0,
                                               day_start_equity=155.0)
         _active(exe)
@@ -328,8 +333,9 @@ class TestKillSwitchesFire:
             model_version="v1")
         client.set_okx_position("SHORT", 1.0)
         self._cycle_neutral(exe)
-        assert exe.get_status() == ExecutorStatus.HALTED
-        assert any(k["trigger_id"] == "A4" for k in store.kill_logs)
+        assert exe.get_status() == ExecutorStatus.DEMOTED
+        assert any(k["trigger_id"] == "MANUAL-INTERFERENCE"
+                   for k in store.kill_logs)
 
     def test_ntp_drift_demote_c6(self):
         exe, client, store, cfg = _mk_harness(latest_equity=155.0,

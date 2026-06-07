@@ -1095,6 +1095,25 @@ class V7OkxExecutor:
             except Exception:
                 logger.exception("log_kill_trigger_failed")
 
+        # Manual interference takes precedence over everything else: OKX
+        # carries a position the executor never opened.  DEMOTE (sticky —
+        # needs a deliberate restart to re-enter) but DO NOT force-close it:
+        # we must never touch a position we didn't create (wrong size/side
+        # assumptions could make it worse).  The operator manages it by hand.
+        # This is the code backstop for the 2026-06-05 manual-blowup vector;
+        # the real fix is account isolation (docs/okx_account_isolation.md).
+        manual = next((t for t in triggered
+                       if t.trigger_id == "MANUAL-INTERFERENCE"), None)
+        if manual is not None:
+            self._alert_manual_interference(manual)
+            self._set_status(
+                ExecutorStatus.DEMOTED,
+                reason=f"manual_interference: {manual.reason}",
+                trigger_id="MANUAL-INTERFERENCE",
+                context=manual.context,
+            )
+            return
+
         # Telegram critical alert — severity carries from `worst`
         self._alert_critical(
             worst,
@@ -1409,6 +1428,33 @@ class V7OkxExecutor:
                 logger.exception("dicts_to_positions_row_failed row_id=%s",
                                  r.get("id"))
         return out
+
+    def _alert_manual_interference(self, check: KillCheckResult) -> None:
+        """Unmistakable alert for a foreign position on the bot account.
+
+        Distinct from the generic kill alert so the operator immediately
+        understands: someone (probably you) traded the executor's account
+        by hand, the bot has STOPPED, and it will NOT touch that position.
+        Never raises.
+        """
+        try:
+            okx_detail = check.context or {}
+            send_critical(
+                self._cfg.telegram_critical_chat_id,
+                f"🚨 <b>MANUAL INTERFERENCE DETECTED</b> 🚨\n"
+                f"stage={self._cfg.stage_label}\n"
+                f"OKX shows a position the executor never opened:\n"
+                f"<code>{okx_detail}</code>\n\n"
+                f"<b>Executor DEMOTED — it has stopped trading and will NOT "
+                f"close this position.</b>\n"
+                f"If you opened this by hand, this account is NOT isolated. "
+                f"Close it yourself, move trading capital to a dedicated "
+                f"sub-account the executor alone uses, then restart the "
+                f"service to re-enter.\n"
+                f"See docs/okx_account_isolation.md.",
+            )
+        except Exception:
+            logger.exception("manual_interference_alert_send_failed")
 
     def _alert_critical(self, check: KillCheckResult, *,
                          severity_label: str) -> None:

@@ -197,14 +197,16 @@ class TestCycle:
     def test_kill_trigger_returns_halted(self):
         exe, client, store, recon = _mk_executor()
         exe.start()
-        # Inject mismatch via reconciliation
+        # Inject a transient mismatch (orphan_local: WS missed a fill) ->
+        # A4 HALT.  Foreign-position mismatch types (size_diff etc.) instead
+        # escalate to MANUAL-INTERFERENCE DEMOTE — covered separately.
         recon.reconcile_cycle.return_value = ReconciliationResult(
             verdict=ReconciliationVerdict.MISMATCH,
-            detail={"type": "size_diff"},
+            detail={"type": "orphan_local"},
         )
         result = exe.cycle(klines=pd.DataFrame(), signal_direction="NEUTRAL",
                            signal_strength="Weak")
-        assert result.action in ("halted", "demoted")
+        assert result.action == "halted"
         # A4 trigger should appear
         assert "A4" in result.detail["triggers"]
 
