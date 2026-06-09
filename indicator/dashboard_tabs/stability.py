@@ -54,26 +54,26 @@ def _milestone_card(title: str, current: float, target: float,
     pct = (current / target * 100) if target > 0 else 0
     pct = min(100, pct)
     if pct >= 100:
-        color = "#00CC80"
+        color = "#34e0a0"
         status = "PASS"
     elif pct >= 50:
-        color = "#FFB400"
+        color = "#f5b544"
         status = f"{pct:.0f}%"
     else:
-        color = "#FF3366"
+        color = "#ff5f6d"
         status = f"{pct:.0f}%"
     val_str = f"{current:.0f}{unit}" if current == int(current) \
                                        else f"{current:.1f}{unit}"
     return f"""
-    <div style="background:rgba(0,240,255,0.03);border-left:3px solid {color};
+    <div style="background:rgba(154,160,166,0.03);border-left:3px solid {color};
                  padding:14px 16px;border-radius:6px;font-family:inherit">
-      <div style="color:rgba(0,240,255,0.55);font-size:11px;
+      <div style="color:rgba(154,160,166,0.8);font-size:11px;
                   letter-spacing:0.05em;margin-bottom:4px">{title}</div>
       <div style="color:#FFFFFF;font-size:22px;font-weight:700;
                   margin-bottom:2px">{val_str}
         <span style="font-size:14px;color:{color};margin-left:8px">{status}</span>
       </div>
-      <div style="color:rgba(0,240,255,0.5);font-size:11px">
+      <div style="color:rgba(154,160,166,0.8);font-size:11px">
         target {target}{unit}  ·  {subtitle}
       </div>
       <div style="background:rgba(255,255,255,0.05);height:4px;
@@ -94,7 +94,7 @@ def _build_milestones() -> str:
             "M1: Live Trades", n_live, 30, " trades",
             "OKX live closed positions"))
     except Exception as e:
-        cards.append(f'<div style="color:#FF3366">M1 err: {e}</div>')
+        cards.append(f'<div style="color:#ff5f6d">M1 err: {e}</div>')
 
     # M2: 90 days 0 unresolved kill triggers
     try:
@@ -103,7 +103,7 @@ def _build_milestones() -> str:
             "M2: Clean Days", days_clean, 90, "d",
             "days since last unresolved kill trigger"))
     except Exception as e:
-        cards.append(f'<div style="color:#FF3366">M2 err: {e}</div>')
+        cards.append(f'<div style="color:#ff5f6d">M2 err: {e}</div>')
 
     # M3: Monthly IC >= 0.10 for 3 consecutive months
     try:
@@ -112,7 +112,7 @@ def _build_milestones() -> str:
             "M3: Strong-IC Months", n_consec, 3, " months",
             "consecutive months IC >= +0.10"))
     except Exception as e:
-        cards.append(f'<div style="color:#FF3366">M3 err: {e}</div>')
+        cards.append(f'<div style="color:#ff5f6d">M3 err: {e}</div>')
 
     # M4: Railway 95%+ uptime (last 30 days of expected hourly bars)
     try:
@@ -121,7 +121,7 @@ def _build_milestones() -> str:
             "M4: Uptime (30d)", uptime_pct, 95, "%",
             "expected hourly bars actually written"))
     except Exception as e:
-        cards.append(f'<div style="color:#FF3366">M4 err: {e}</div>')
+        cards.append(f'<div style="color:#ff5f6d">M4 err: {e}</div>')
 
     # M5: regime change observed
     try:
@@ -130,7 +130,7 @@ def _build_milestones() -> str:
             "M5: Regime Diversity", n_regimes_seen, 2, "",
             "distinct regimes during live operation"))
     except Exception as e:
-        cards.append(f'<div style="color:#FF3366">M5 err: {e}</div>')
+        cards.append(f'<div style="color:#ff5f6d">M5 err: {e}</div>')
 
     # M6: kill trigger fired + recovered
     try:
@@ -139,7 +139,7 @@ def _build_milestones() -> str:
             "M6: Recovery Validated", recovery_count, 1, "",
             "kill trigger fired AND auto-resumed (real, not stress)"))
     except Exception as e:
-        cards.append(f'<div style="color:#FF3366">M6 err: {e}</div>')
+        cards.append(f'<div style="color:#ff5f6d">M6 err: {e}</div>')
 
     return ('<div style="display:grid;grid-template-columns:repeat('
             'auto-fit,minmax(280px,1fr));gap:12px">'
@@ -361,7 +361,7 @@ def _build_kill_recovery() -> str:
                 """)
                 rows = cur.fetchall() or []
             except Exception as e:
-                return (f'<div style="color:rgba(0,240,255,0.4)">'
+                return (f'<div style="color:rgba(154,160,166,0.6)">'
                         f'kill_log 載入失敗: {e}</div>')
     finally:
         conn.close()
@@ -374,7 +374,7 @@ def _build_kill_recovery() -> str:
     for r in rows:
         resolved = r.get("resolved_at")
         ic = "✓" if resolved else "⚠"
-        col = "#00CC80" if resolved else "#FFB400"
+        col = "#34e0a0" if resolved else "#f5b544"
         recovery_str = (f"resolved at {fmt_tpe(resolved)}"
                         if resolved else "<i>unresolved</i>")
         items.append(
@@ -408,22 +408,22 @@ def _build_uptime() -> str:
                 """)
                 rows = cur.fetchall() or []
             except Exception:
-                return ('<div style="color:rgba(0,240,255,0.4)">'
+                return ('<div style="color:rgba(154,160,166,0.6)">'
                         'uptime 數據載入失敗</div>')
     finally:
         conn.close()
     if not rows:
-        return '<div style="color:rgba(0,240,255,0.4)">無 update_cycle 紀錄</div>'
+        return '<div style="color:rgba(154,160,166,0.6)">無 update_cycle 紀錄</div>'
 
     items = []
     for r in rows:
         d, n = r["d"], int(r["n"])
         if n >= 23:
-            col, ic = "#00CC80", "✓"
+            col, ic = "#34e0a0", "✓"
         elif n >= 18:
-            col, ic = "#FFB400", "⚠"
+            col, ic = "#f5b544", "⚠"
         else:
-            col, ic = "#FF3366", "✗"
+            col, ic = "#ff5f6d", "✗"
         items.append(
             f'<tr><td style="color:{col}">{ic}</td>'
             f'<td>{d}</td><td>{n}/24 hourly bars</td>'
@@ -433,9 +433,9 @@ def _build_uptime() -> str:
     total_n = sum(int(r["n"]) for r in rows)
     expected = len(rows) * 24
     pct = total_n / expected * 100 if expected else 0
-    color = "#00CC80" if pct >= 95 else ("#FFB400" if pct >= 80 else "#FF3366")
+    color = "#34e0a0" if pct >= 95 else ("#f5b544" if pct >= 80 else "#ff5f6d")
     return f"""
-    <div style="color:rgba(0,240,255,0.55);font-size:12px;margin-bottom:6px">
+    <div style="color:rgba(154,160,166,0.8);font-size:12px;margin-bottom:6px">
       {len(rows)} 天平均 update_cycle 覆蓋率:
       <span style="color:{color};font-weight:600">{pct:.1f}%</span>
       ({total_n}/{expected} 預期 hourly bars)
