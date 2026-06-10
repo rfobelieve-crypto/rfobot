@@ -56,17 +56,17 @@ def _build_okx_live() -> str:
     reason = s.get("executor_reason") or ""
 
     status_color = {
-        "ACTIVE": "#34e0a0",
+        "ACTIVE": "#36ffae",
         "HALTED": "#f5b544",
         "DEMOTED": "#ff5f6d",
         "INIT": "rgba(154,160,166,0.6)",
         "CONNECTING": "rgba(154,160,166,0.85)",
-        "READY": "#34e0a0",
+        "READY": "#36ffae",
     }.get(status, "rgba(154,160,166,0.6)")
 
     # ── Row 1: account state
     if eq is not None:
-        eq_color = "#34e0a0" if (delta_pct or 0) >= 0 else "#ff5f6d"
+        eq_color = "#36ffae" if (delta_pct or 0) >= 0 else "#ff5f6d"
         delta_str = f"{delta_pct:+.2f}% vs ${initial:.0f}"
         age_str = f"{age:.0f}s 前更新" if age is not None else "--"
         row1 = f"""
@@ -98,8 +98,8 @@ def _build_okx_live() -> str:
         cum_eq_pct = s.get("cum_equity_pct", 0)
         pt_sharpe = s.get("sharpe_per_trade")
         ann_sharpe = s.get("sharpe_annualised")
-        wr_color = "#34e0a0" if wr >= 55 else "#d9606a"
-        cum_color = "#34e0a0" if cum_pct >= 0 else "#ff5f6d"
+        wr_color = "#36ffae" if wr >= 55 else "#d9606a"
+        cum_color = "#36ffae" if cum_pct >= 0 else "#ff5f6d"
         sharpe_str = (f"per-trade {pt_sharpe:.2f}"
                        if pt_sharpe is not None else "n<2")
         sharpe_sub = (f"年化 {ann_sharpe:.2f}"
@@ -119,7 +119,7 @@ def _build_okx_live() -> str:
         et = op.get("entry_time")
         held_h = ((_dt.utcnow() - et).total_seconds() / 3600
                   if et else 0)
-        dir_color = "#34e0a0" if op.get("direction") == "LONG" else "#ff5f6d"
+        dir_color = "#36ffae" if op.get("direction") == "LONG" else "#ff5f6d"
         open_block = f"""
         <div style="color:rgba(154,160,166,0.8);font-size:11px;margin-bottom:6px">
           🔓 當前持倉 #{op.get('id')}
@@ -161,7 +161,7 @@ def _build_okx_live() -> str:
         </table>"""
     else:
         kill_block = (
-            '<div style="color:rgba(52,224,160,0.6);font-size:12px;margin-top:8px">'
+            '<div style="color:rgba(54,255,174,0.6);font-size:12px;margin-top:8px">'
             '✓ 近 7 天無 kill trigger 觸發</div>'
         )
 
@@ -279,10 +279,10 @@ def _build_ic_trend() -> str:
           labels: {_json.dumps(labels)},
           datasets: [
             {{ label: '滾動 IC (24h)', data: {_json.dumps(ics)},
-               borderColor: '#34e0a0', backgroundColor: 'rgba(255,255,255,0.06)',
+               borderColor: '#36ffae', backgroundColor: 'rgba(255,255,255,0.06)',
                yAxisID: 'y', tension: 0.3, borderWidth: 2, pointRadius: 1 }},
             {{ label: '勝率 % (24h)', data: {_json.dumps(wrs)},
-               borderColor: '#34e0a0', backgroundColor: 'rgba(0,204,128,0.08)',
+               borderColor: '#36ffae', backgroundColor: 'rgba(0,204,128,0.08)',
                yAxisID: 'y1', tension: 0.3, borderWidth: 2, pointRadius: 1 }}
           ]
         }},
@@ -298,12 +298,12 @@ def _build_ic_trend() -> str:
           scales: {{
             x: {{ ticks: {{ color: 'rgba(154,160,166,0.85)', font: {{ size: 9 }}, maxRotation: 45 }},
                   grid: {{ color: 'rgba(255,255,255,0.06)' }} }},
-            y: {{ position: 'left', ticks: {{ color: '#34e0a0', font: {{ size: 9 }} }},
+            y: {{ position: 'left', ticks: {{ color: '#36ffae', font: {{ size: 9 }} }},
                   grid: {{ color: 'rgba(255,255,255,0.06)' }},
-                  title: {{ display: true, text: 'IC', color: '#34e0a0' }} }},
-            y1: {{ position: 'right', ticks: {{ color: '#34e0a0', font: {{ size: 9 }} }},
+                  title: {{ display: true, text: 'IC', color: '#36ffae' }} }},
+            y1: {{ position: 'right', ticks: {{ color: '#36ffae', font: {{ size: 9 }} }},
                    grid: {{ drawOnChartArea: false }},
-                   title: {{ display: true, text: '勝率 %', color: '#34e0a0' }} }}
+                   title: {{ display: true, text: '勝率 %', color: '#36ffae' }} }}
           }}
         }}
       }});
@@ -353,12 +353,12 @@ def _build_equity_curve() -> str:
 
     n = len(rows)
     wr = wins / n * 100 if n > 0 else 0
-    final_color = "#34e0a0" if total >= 0 else "#ff5f6d"
+    final_color = "#36ffae" if total >= 0 else "#ff5f6d"
 
     return f"""
     <div class="grid grid-3" style="margin-bottom:10px">
       {card("總信號", str(n), f"勝: {wins} / 敗: {losses}")}
-      {card("勝率", f"{wr:.1f}%", "", "#34e0a0" if wr >= 60 else "#d9606a")}
+      {card("勝率", f"{wr:.1f}%", "", "#36ffae" if wr >= 60 else "#d9606a")}
       {card("累計回報", f"{total:+.1f}%", "方向性 live 訊號回報", final_color)}
     </div>
     <div style="position:relative;height:160px">
@@ -423,7 +423,7 @@ def _build_confidence_dist() -> str:
         idx = min(int(s / 20), 4)
         buckets[idx] += 1
 
-    colors = ["rgba(154,160,166,0.5)", "rgba(154,160,166,0.8)", "#d9606a", "#34e0a0", "#34e0a0"]
+    colors = ["rgba(154,160,166,0.5)", "rgba(154,160,166,0.8)", "#d9606a", "#36ffae", "#36ffae"]
     avg = sum(scores) / len(scores)
     median = sorted(scores)[len(scores) // 2]
 
@@ -487,7 +487,7 @@ def _build_pred_vs_actual() -> str:
         prices.append(round(float(r["close"]), 0))
         d = int(r["pred_direction_code"] or 0)
         s = int(r["strength_code"] or 1)
-        colors_list.append("#34e0a0" if d == 1 else "#ff5f6d" if d == -1 else "rgba(154,160,166,0.5)")
+        colors_list.append("#36ffae" if d == 1 else "#ff5f6d" if d == -1 else "rgba(154,160,166,0.5)")
         sizes.append(6 if s == 3 else 4 if s == 2 else 2)
 
     return f"""
@@ -504,7 +504,7 @@ def _build_pred_vs_actual() -> str:
         data: {{
           labels: {_json.dumps(labels)},
           datasets: [{{ label: 'BTC', data: {_json.dumps(prices)},
-            borderColor: '#34e0a0', backgroundColor: 'rgba(255,255,255,0.04)',
+            borderColor: '#36ffae', backgroundColor: 'rgba(255,255,255,0.04)',
             pointBackgroundColor: {_json.dumps(colors_list)},
             pointRadius: {_json.dumps(sizes)}, tension: 0.3, borderWidth: 2 }}]
         }},
@@ -578,7 +578,7 @@ def _build_drawdown() -> str:
         else:
             break
 
-    streak_color = "#34e0a0" if recent_type == "win" else "#ff5f6d"
+    streak_color = "#36ffae" if recent_type == "win" else "#ff5f6d"
     alert = ""
     if recent_type == "loss" and recent_streak >= max_loss_streak and recent_streak >= 3:
         alert = '<div style="color:#ff5f6d;font-weight:600;margin-top:6px">&#9888; 目前連敗次數已達歷史最高！</div>'
@@ -587,7 +587,7 @@ def _build_drawdown() -> str:
     <div class="grid grid-4">
       {card("當前連續", f'{recent_streak} {("連勝" if recent_type == "win" else "連敗")}',
             "", streak_color)}
-      {card("歷史最長連勝", str(max_win_streak), "", "#34e0a0")}
+      {card("歷史最長連勝", str(max_win_streak), "", "#36ffae")}
       {card("歷史最長連敗", str(max_loss_streak), "", "#ff5f6d")}
       {card("總信號數", str(len(rows)), "")}
     </div>
@@ -637,7 +637,7 @@ def _build_hourly_heatmap() -> str:
             wr = d["wins"] / d["total"] * 100
             # Color: green if good, red if bad
             if wr >= 65:
-                bg = "#34e0a0"
+                bg = "#36ffae"
             elif wr >= 50:
                 bg = "#d9606a"
             else:

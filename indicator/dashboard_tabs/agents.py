@@ -98,7 +98,7 @@ def _build_agent_status() -> str:
             last_local = last_run.replace(tzinfo=timezone.utc).astimezone(TZ8)
             last_str = last_local.strftime("%m/%d %H:%M")
 
-        rate_color = "#34e0a0" if rate >= 90 else "#d9606a" if rate >= 70 else "#ff5f6d"
+        rate_color = "#36ffae" if rate >= 90 else "#d9606a" if rate >= 70 else "#ff5f6d"
 
         # Error detail
         err_html = ""
@@ -121,9 +121,9 @@ def _build_agent_status() -> str:
     <div class="grid grid-4" style="margin-bottom:10px">
       {card("總執行", str(total), "過去 7 天")}
       {card("成功率", f'{overall_rate:.0f}%', f'{total_ok} ok / {total_fail} fail',
-            "#34e0a0" if overall_rate >= 90 else "#d9606a")}
+            "#36ffae" if overall_rate >= 90 else "#d9606a")}
       {card("失敗數", str(total_fail), "",
-            "#34e0a0" if total_fail == 0 else "#ff5f6d")}
+            "#36ffae" if total_fail == 0 else "#ff5f6d")}
       {card("Agent 數", str(len(agents)), "")}
     </div>
     {running_html}
@@ -183,8 +183,8 @@ def _build_signal_perf() -> str:
         wr = wins / filled * 100 if filled > 0 else 0
         avg_ret = float(r["avg_ret"] or 0) * 100
 
-        dc = "#34e0a0" if direction == "UP" else "#ff5f6d"
-        wc = "#34e0a0" if wr >= 60 else "#d9606a" if wr >= 50 else "#ff5f6d"
+        dc = "#36ffae" if direction == "UP" else "#ff5f6d"
+        wc = "#36ffae" if wr >= 60 else "#d9606a" if wr >= 50 else "#ff5f6d"
 
         dir_table_rows.append(
             f"<tr><td>{strength}</td>"
@@ -201,12 +201,12 @@ def _build_signal_perf() -> str:
         if hasattr(t, "replace"):
             t = t.replace(tzinfo=timezone.utc).astimezone(TZ8).strftime("%m/%d %H:%M")
         d = r["direction"]
-        dc = "#34e0a0" if d == "UP" else "#ff5f6d"
+        dc = "#36ffae" if d == "UP" else "#ff5f6d"
         icon = "&#9650;" if d == "UP" else "&#9660;"
 
         if r["filled"]:
             ret = float(r["actual_return_4h"]) * 100
-            oc = "#34e0a0" if r["correct"] else "#ff5f6d"
+            oc = "#36ffae" if r["correct"] else "#ff5f6d"
             ok = "&#10003;" if r["correct"] else "&#10007;"
             result = f'<span style="color:{oc}">{ret:+.2f}% {ok}</span>'
         else:
@@ -222,7 +222,7 @@ def _build_signal_perf() -> str:
         )
 
     return f"""
-    <div style="color:#34e0a0;font-size:12px;font-weight:600;margin-bottom:6px">
+    <div style="color:#36ffae;font-size:12px;font-weight:600;margin-bottom:6px">
       方向拆分績效
     </div>
     <table>
@@ -230,7 +230,7 @@ def _build_signal_perf() -> str:
       {''.join(dir_table_rows)}
     </table>
 
-    <div style="color:#34e0a0;font-size:12px;font-weight:600;margin:14px 0 6px">
+    <div style="color:#36ffae;font-size:12px;font-weight:600;margin:14px 0 6px">
       最近信號 (100 筆)
     </div>
     <table>

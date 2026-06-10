@@ -88,7 +88,7 @@ def _build_top_features(state: dict, engine) -> str:
                 if r and r["m"] is not None and r["s"] and float(r["s"]) > 1e-10:
                     z = (val - float(r["m"])) / float(r["s"])
                     z_str = f"{z:+.2f}"
-                    z_color = "#ff5f6d" if abs(z) > 2 else "#d9606a" if abs(z) > 1 else "#34e0a0"
+                    z_color = "#ff5f6d" if abs(z) > 2 else "#d9606a" if abs(z) > 1 else "#36ffae"
             except Exception:
                 pass
 
@@ -101,7 +101,7 @@ def _build_top_features(state: dict, engine) -> str:
             f"<code>{feat}</code></td>"
             f"<td style='text-align:right;font-family:monospace'>{val_str}</td>"
             f"<td style='text-align:right;color:{z_color};font-family:monospace'>{z_str}</td>"
-            f"<td><div style='background:#34e0a0;height:8px;width:{bar_w}px;"
+            f"<td><div style='background:#36ffae;height:8px;width:{bar_w}px;"
             f"border-radius:3px;opacity:0.7'></div></td>"
             f"<td style='text-align:right;color:rgba(154,160,166,0.8);font-size:10px'>{imp_str}</td>"
             f"</tr>"
@@ -163,7 +163,7 @@ def _build_mag_vs_realized() -> str:
       {card("實際均值", f'{real_mean:.3f}%', "")}
       {card("預測/實際", f'{ratio:.2f}x',
             "高估" if ratio > 1.3 else "低估" if ratio < 0.7 else "校準良好",
-            "#d9606a" if abs(ratio - 1) > 0.3 else "#34e0a0")}
+            "#d9606a" if abs(ratio - 1) > 0.3 else "#36ffae")}
     </div>
     <div style="position:relative;height:180px">
       <canvas id="magVolChart"></canvas>
@@ -176,7 +176,7 @@ def _build_mag_vs_realized() -> str:
           labels: {_json.dumps(labels)},
           datasets: [
             {{ label: 'Mag 預測 %', data: {_json.dumps(mag_preds)},
-               borderColor: '#34e0a0', borderWidth: 2, pointRadius: 1, tension: 0.3 }},
+               borderColor: '#36ffae', borderWidth: 2, pointRadius: 1, tension: 0.3 }},
             {{ label: '實際 |ret| %', data: {_json.dumps(realized)},
                borderColor: '#d9606a', borderWidth: 2, pointRadius: 1, tension: 0.3 }}
           ]
@@ -234,10 +234,10 @@ def _build_funding_env() -> str:
         sent_color = "#d9606a"
     elif current < -0.02:
         sentiment = "極度做空"
-        sent_color = "#34e0a0"
+        sent_color = "#36ffae"
     elif current < -0.005:
         sentiment = "偏空"
-        sent_color = "#34e0a0"
+        sent_color = "#36ffae"
     else:
         sentiment = "中性"
         sent_color = "rgba(154,160,166,0.8)"
@@ -326,9 +326,9 @@ def _build_oi_section() -> str:
     <div class="grid grid-3">
       {card("當前 OI", f'{current_oi/1e9:.2f}B', "")}
       {card("4h 變化", f'{chg_4h:+.2f}%', "",
-            "#34e0a0" if chg_4h > 0 else "#ff5f6d")}
+            "#36ffae" if chg_4h > 0 else "#ff5f6d")}
       {card("24h 變化", f'{chg_24h:+.2f}%', "",
-            "#34e0a0" if chg_24h > 0 else "#ff5f6d")}
+            "#36ffae" if chg_24h > 0 else "#ff5f6d")}
     </div>
     <div style="position:relative;height:160px">
       <canvas id="oiChart"></canvas>
@@ -394,7 +394,7 @@ def _build_ls_ratio() -> str:
     ls_vals = df["ls"].round(3).tolist()
 
     datasets = f"""{{ label: 'L/S Ratio', data: {_json.dumps(ls_vals)},
-        borderColor: '#34e0a0', borderWidth: 2, pointRadius: 0, tension: 0.3 }}"""
+        borderColor: '#36ffae', borderWidth: 2, pointRadius: 0, tension: 0.3 }}"""
 
     if has_top:
         df["top_ls"] = df["cg_top_trader_ls"].astype(float)
@@ -403,7 +403,7 @@ def _build_ls_ratio() -> str:
             borderColor: '#d9606a', borderWidth: 2, pointRadius: 0, tension: 0.3 }}"""
 
     ls_sentiment = "偏多" if current_ls > 1.05 else "偏空" if current_ls < 0.95 else "均衡"
-    ls_color = "#34e0a0" if current_ls > 1.05 else "#ff5f6d" if current_ls < 0.95 else "rgba(154,160,166,0.8)"
+    ls_color = "#36ffae" if current_ls > 1.05 else "#ff5f6d" if current_ls < 0.95 else "rgba(154,160,166,0.8)"
 
     return f"""
     <div class="grid grid-3">
@@ -431,7 +431,7 @@ def _build_ls_ratio() -> str:
           scales: {{
             x: {{ ticks: {{ color: 'rgba(154,160,166,0.85)', font: {{ size: 9 }}, maxRotation: 45 }},
                   grid: {{ color: 'rgba(255,255,255,0.06)' }} }},
-            y: {{ ticks: {{ color: '#34e0a0', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(255,255,255,0.06)' }} }}
+            y: {{ ticks: {{ color: '#36ffae', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(255,255,255,0.06)' }} }}
           }}
         }}
       }});
@@ -481,13 +481,13 @@ def _build_cross_timeframe() -> str:
 
     def _arrow(val):
         if val > 0.3:
-            return '<span style="color:#34e0a0;font-size:16px">&#9650;</span> UP'
+            return '<span style="color:#36ffae;font-size:16px">&#9650;</span> UP'
         elif val < -0.3:
             return '<span style="color:#ff5f6d;font-size:16px">&#9660;</span> DOWN'
         return '<span style="color:rgba(154,160,166,0.8)">&#9644;</span> NEUTRAL'
 
     def _ret_color(val):
-        return "#34e0a0" if val > 0 else "#ff5f6d"
+        return "#36ffae" if val > 0 else "#ff5f6d"
 
     # Consistency check
     signs = [np.sign(ret_1h), np.sign(ret_4h), np.sign(ret_24h)]
@@ -499,7 +499,7 @@ def _build_cross_timeframe() -> str:
 
     consistency_score = sum([price_consistent, model_consistent, price_model_agree])
     cons_label = {3: "高度一致", 2: "部分一致", 1: "分歧", 0: "強烈分歧"}
-    cons_color = {3: "#34e0a0", 2: "#d9606a", 1: "#ff5f6d", 0: "#ff5f6d"}
+    cons_color = {3: "#36ffae", 2: "#d9606a", 1: "#ff5f6d", 0: "#ff5f6d"}
 
     return f"""
     <div style="margin-bottom:8px">

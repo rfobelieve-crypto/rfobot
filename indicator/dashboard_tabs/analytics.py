@@ -113,15 +113,15 @@ def _build_signal_price_chart() -> str:
           labels: {_json.dumps(labels)},
           datasets: [
             {{ label: 'BTC 價格', data: {_json.dumps(prices)},
-               borderColor: '#34e0a0', backgroundColor: 'rgba(255,255,255,0.04)',
+               borderColor: '#36ffae', backgroundColor: 'rgba(255,255,255,0.04)',
                fill: true, tension: 0.3, borderWidth: 2, pointRadius: 0, order: 2 }},
             {{ label: 'UP 強', type: 'scatter',
                data: {_json.dumps(up_strong)},
-               backgroundColor: '#34e0a0', pointRadius: 8,
+               backgroundColor: '#36ffae', pointRadius: 8,
                pointStyle: 'triangle', order: 1 }},
             {{ label: 'UP 中', type: 'scatter',
                data: {_json.dumps(up_mod)},
-               backgroundColor: 'rgba(52,224,160,0.6)', pointRadius: 5,
+               backgroundColor: 'rgba(54,255,174,0.6)', pointRadius: 5,
                pointStyle: 'triangle', order: 1 }},
             {{ label: 'DN 強', type: 'scatter',
                data: {_json.dumps(dn_strong)},
@@ -188,17 +188,17 @@ def _build_gauges() -> str:
           </div>
         </div>"""
 
-    conf_color = "#34e0a0" if confidence >= 75 else "#d9606a" if confidence >= 60 else "rgba(154,160,166,0.8)"
+    conf_color = "#36ffae" if confidence >= 75 else "#d9606a" if confidence >= 60 else "rgba(154,160,166,0.8)"
 
     dir_pct = dir_prob * 100
-    dir_color = "#34e0a0" if dir_prob > 0.55 else "#ff5f6d" if dir_prob < 0.45 else "rgba(154,160,166,0.8)"
+    dir_color = "#36ffae" if dir_prob > 0.55 else "#ff5f6d" if dir_prob < 0.45 else "rgba(154,160,166,0.8)"
 
     mag_pct = min(mag / 0.01 * 100, 100) if mag else 0  # 1% = full
-    mag_color = "#d9606a" if mag > 0.005 else "#34e0a0"
+    mag_color = "#d9606a" if mag > 0.005 else "#36ffae"
 
     ret_display = f"{pred_ret*100:+.3f}%"
     ret_pct = min(abs(pred_ret) / 0.005 * 50 + 50, 100)  # center at 50
-    ret_color = "#34e0a0" if pred_ret > 0 else "#ff5f6d" if pred_ret < 0 else "rgba(154,160,166,0.8)"
+    ret_color = "#36ffae" if pred_ret > 0 else "#ff5f6d" if pred_ret < 0 else "rgba(154,160,166,0.8)"
 
     bars = [
         _bar("Confidence", confidence, f"{confidence:.0f}", confidence, conf_color),
@@ -264,9 +264,9 @@ def _build_equity_by_tier() -> str:
     return f"""
     <div class="grid grid-3" style="margin-bottom:8px">
       {card("Strong", f'{cum_s:+.2f}%', f'{n_s} 筆',
-            "#34e0a0" if cum_s >= 0 else "#ff5f6d")}
+            "#36ffae" if cum_s >= 0 else "#ff5f6d")}
       {card("Moderate", f'{cum_m:+.2f}%', f'{n_m} 筆',
-            "#34e0a0" if cum_m >= 0 else "#ff5f6d")}
+            "#36ffae" if cum_m >= 0 else "#ff5f6d")}
       {card("總計", str(len(rows)), "")}
     </div>
     <div style="position:relative;height:180px;overflow:hidden">
@@ -375,7 +375,7 @@ def _build_rolling_ic() -> str:
           labels: {_json.dumps(labels)},
           datasets: [
             {{ label: '7d IC', data: {_json.dumps(ic_7d)},
-               borderColor: '#34e0a0', tension: 0.3, borderWidth: 2,
+               borderColor: '#36ffae', tension: 0.3, borderWidth: 2,
                pointRadius: 1, spanGaps: true }},
             {{ label: '30d IC', data: {_json.dumps(ic_30d)},
                borderColor: '#d9606a', tension: 0.3, borderWidth: 2,
@@ -563,10 +563,10 @@ def _build_feature_radar(state: dict, engine) -> str:
           datasets: [{{
             label: 'Z-Score',
             data: {_json.dumps(radar_values)},
-            borderColor: '#34e0a0',
+            borderColor: '#36ffae',
             backgroundColor: 'rgba(154,160,166,0.15)',
             borderWidth: 2,
-            pointBackgroundColor: '#34e0a0',
+            pointBackgroundColor: '#36ffae',
             pointRadius: 4
           }}]
         }},
@@ -618,7 +618,7 @@ def _build_regime_signals() -> str:
         return '<div style="color:rgba(154,160,166,0.5)">數據不足</div>'
 
     regime_colors_map = {
-        2: "#34e0a0", -2: "#ff5f6d", 0: "#d9606a", -99: "rgba(154,160,166,0.5)"
+        2: "#36ffae", -2: "#ff5f6d", 0: "#d9606a", -99: "rgba(154,160,166,0.5)"
     }
     regime_names = {2: "BULL", -2: "BEAR", 0: "CHOPPY", -99: "WARMUP"}
 
@@ -654,7 +654,7 @@ def _build_regime_signals() -> str:
 
         is_up = s["direction"] == "UP"
         is_strong = s["strength"] == "Strong"
-        color = "#34e0a0" if is_up else "#ff5f6d"
+        color = "#36ffae" if is_up else "#ff5f6d"
         size = 10 if is_strong else 6
         symbol = "&#9650;" if is_up else "&#9660;"
 
@@ -674,7 +674,7 @@ def _build_regime_signals() -> str:
       {''.join(sig_markers)}
     </div>
     <div style="display:flex;gap:12px;margin-top:8px">
-      <span style="font-size:10px"><span style="color:#34e0a0">&#9632;</span> BULL</span>
+      <span style="font-size:10px"><span style="color:#36ffae">&#9632;</span> BULL</span>
       <span style="font-size:10px"><span style="color:#ff5f6d">&#9632;</span> BEAR</span>
       <span style="font-size:10px"><span style="color:#d9606a">&#9632;</span> CHOPPY</span>
     </div>"""
@@ -716,14 +716,14 @@ def _build_signal_heatmap() -> str:
         correct = bool(r["correct"]) if filled else None
 
         if correct is True:
-            bg = "#34e0a0"
+            bg = "#36ffae"
         elif correct is False:
             bg = "#ff5f6d"
         else:
             bg = "#333"
 
         arrow = "&#9650;" if r["direction"] == "UP" else "&#9660;"
-        d_color = "#34e0a0" if r["direction"] == "UP" else "#ff5f6d"
+        d_color = "#36ffae" if r["direction"] == "UP" else "#ff5f6d"
 
         if date_str not in date_map:
             date_map[date_str] = []

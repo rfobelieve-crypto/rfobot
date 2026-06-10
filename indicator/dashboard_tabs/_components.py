@@ -34,7 +34,7 @@ def section(title: str, sec_id: str, open_default: bool, body: str) -> str:
 def status_dot(status: str) -> str:
     """Return colored dot for status strings like healthy/warning/critical."""
     colors = {
-        "healthy": "#34e0a0", "warning": "#d9606a", "critical": "#ff5f6d",
+        "healthy": "#36ffae", "warning": "#d9606a", "critical": "#ff5f6d",
         "error": "#ff5f6d", "insufficient_data": "rgba(154,160,166,0.5)", "no_history": "rgba(154,160,166,0.5)",
     }
     c = colors.get(status, "rgba(154,160,166,0.5)")
@@ -43,7 +43,7 @@ def status_dot(status: str) -> str:
 
 def status_badge(status: str) -> str:
     colors = {
-        "healthy": "#34e0a0", "warning": "#d9606a", "critical": "#ff5f6d",
+        "healthy": "#36ffae", "warning": "#d9606a", "critical": "#ff5f6d",
         "error": "#ff5f6d", "insufficient_data": "rgba(154,160,166,0.5)",
     }
     c = colors.get(status, "rgba(154,160,166,0.5)")
@@ -62,7 +62,7 @@ def mini_table(headers: list[str], rows: list[list[str]]) -> str:
     return f"<table><tr>{h}</tr>{body}</table>"
 
 
-def gauge_bar(value: float, max_val: float = 100, color: str = "#34e0a0",
+def gauge_bar(value: float, max_val: float = 100, color: str = "#36ffae",
               label: str = "") -> str:
     """Horizontal gauge bar."""
     pct = min(max(value / max_val * 100, 0), 100)

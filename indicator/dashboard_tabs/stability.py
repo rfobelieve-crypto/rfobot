@@ -54,7 +54,7 @@ def _milestone_card(title: str, current: float, target: float,
     pct = (current / target * 100) if target > 0 else 0
     pct = min(100, pct)
     if pct >= 100:
-        color = "#34e0a0"
+        color = "#36ffae"
         status = "PASS"
     elif pct >= 50:
         color = "#f5b544"
@@ -374,7 +374,7 @@ def _build_kill_recovery() -> str:
     for r in rows:
         resolved = r.get("resolved_at")
         ic = "✓" if resolved else "⚠"
-        col = "#34e0a0" if resolved else "#f5b544"
+        col = "#36ffae" if resolved else "#f5b544"
         recovery_str = (f"resolved at {fmt_tpe(resolved)}"
                         if resolved else "<i>unresolved</i>")
         items.append(
@@ -419,7 +419,7 @@ def _build_uptime() -> str:
     for r in rows:
         d, n = r["d"], int(r["n"])
         if n >= 23:
-            col, ic = "#34e0a0", "✓"
+            col, ic = "#36ffae", "✓"
         elif n >= 18:
             col, ic = "#f5b544", "⚠"
         else:
@@ -433,7 +433,7 @@ def _build_uptime() -> str:
     total_n = sum(int(r["n"]) for r in rows)
     expected = len(rows) * 24
     pct = total_n / expected * 100 if expected else 0
-    color = "#34e0a0" if pct >= 95 else ("#f5b544" if pct >= 80 else "#ff5f6d")
+    color = "#36ffae" if pct >= 95 else ("#f5b544" if pct >= 80 else "#ff5f6d")
     return f"""
     <div style="color:rgba(154,160,166,0.8);font-size:12px;margin-bottom:6px">
       {len(rows)} 天平均 update_cycle 覆蓋率:

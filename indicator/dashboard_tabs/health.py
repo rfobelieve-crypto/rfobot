@@ -53,8 +53,8 @@ def _build_pipeline_latency(state: dict) -> str:
         </div>"""
 
     stages = [
-        ("data_fetch", "數據抓取", "#34e0a0"),
-        ("feature_build", "特徵計算", "#34e0a0"),
+        ("data_fetch", "數據抓取", "#36ffae"),
+        ("feature_build", "特徵計算", "#36ffae"),
         ("model_predict", "模型預測", "#d9606a"),
         ("chart_render", "圖表生成", "#ff5f6d"),
         ("db_write", "DB 寫入", "#ff5f6d"),
@@ -140,7 +140,7 @@ def _build_api_response_times() -> str:
             bar_w = 0
         else:
             if lat < 200:
-                color = "#34e0a0"
+                color = "#36ffae"
             elif lat < 500:
                 color = "#d9606a"
             else:
@@ -209,7 +209,7 @@ def _build_feature_health() -> str:
     nan_n = len(nan_features)
     ok_n = len(ok_features)
 
-    health_color = "#34e0a0" if nan_n == 0 else "#d9606a" if nan_n < 5 else "#ff5f6d"
+    health_color = "#36ffae" if nan_n == 0 else "#d9606a" if nan_n < 5 else "#ff5f6d"
 
     # Group NaN features by prefix
     nan_groups = {}
@@ -243,7 +243,7 @@ def _build_feature_health() -> str:
     return f"""
     <div class="grid grid-3">
       {card("特徵總數", str(total), "")}
-      {card("正常", str(ok_n), "", "#34e0a0")}
+      {card("正常", str(ok_n), "", "#36ffae")}
       {card("NaN", str(nan_n), "", health_color)}
     </div>
     {nan_detail}"""
@@ -304,7 +304,7 @@ def _fresh_row(source: str, age_min: float, last_dt) -> dict:
     if age_min > 9000:
         return {"source": source, "age_text": "ERROR", "last_time": "",
                 "color": "#ff5f6d"}
-    color = "#34e0a0" if age_min < 120 else "#d9606a" if age_min < 360 else "#ff5f6d"
+    color = "#36ffae" if age_min < 120 else "#d9606a" if age_min < 360 else "#ff5f6d"
     age_text = f"{age_min:.0f}min" if age_min < 120 else f"{age_min/60:.1f}h"
     last_time = ""
     if last_dt:
@@ -316,7 +316,7 @@ def _fresh_row(source: str, age_min: float, last_dt) -> dict:
 # ── System Health ────────────────────────────────────────────────────
 
 def _build_system_health(overall, checks, cg_status, engine, error) -> str:
-    color_map = {"healthy": "#34e0a0", "degraded": "#d9606a", "critical": "#ff5f6d"}
+    color_map = {"healthy": "#36ffae", "degraded": "#d9606a", "critical": "#ff5f6d"}
     overall_color = color_map.get(overall, "#999")
 
     dir_n, mag_n = "?", "?"
@@ -396,7 +396,7 @@ def _build_alert_history() -> str:
 
     alert_file = Path("research/monitor_alerts.csv")
     if not alert_file.exists():
-        return '<div style="color:#34e0a0">過去 7 天無警報</div>'
+        return '<div style="color:#36ffae">過去 7 天無警報</div>'
 
     try:
         df = pd.read_csv(alert_file)
@@ -406,7 +406,7 @@ def _build_alert_history() -> str:
         df = df.sort_values("timestamp", ascending=False)
 
         if df.empty:
-            return '<div style="color:#34e0a0">過去 7 天無警報</div>'
+            return '<div style="color:#36ffae">過去 7 天無警報</div>'
 
         total = len(df)
         alerts = []

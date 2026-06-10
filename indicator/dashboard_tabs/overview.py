@@ -31,8 +31,8 @@ def render_overview(state: dict, engine) -> str:
     # ── Key metrics ──
     risk_color = "#999"
     direction = pred.get("direction", "?")
-    dir_color = "#34e0a0" if direction == "UP" else "#ff5f6d" if direction == "DOWN" else "rgba(154,160,166,0.5)"
-    health_color = {"healthy": "#34e0a0", "degraded": "#d9606a",
+    dir_color = "#36ffae" if direction == "UP" else "#ff5f6d" if direction == "DOWN" else "rgba(154,160,166,0.5)"
+    health_color = {"healthy": "#36ffae", "degraded": "#d9606a",
                     "critical": "#ff5f6d"}.get(overall_health, "rgba(154,160,166,0.5)")
 
     metrics_html = f"""<div class="grid">
@@ -78,7 +78,7 @@ def render_overview(state: dict, engine) -> str:
     dist_html = f"""
       <div style="color:rgba(154,160,166,0.8);font-size:11px;margin-bottom:4px;">最近 24 根 bar 方向分佈</div>
       <div class="dist-bar">
-        <div style="background:#34e0a0;flex:{up_pct:.0f}">UP {up_n}</div>
+        <div style="background:#36ffae;flex:{up_pct:.0f}">UP {up_n}</div>
         <div style="background:rgba(154,160,166,0.5);flex:{nt_pct:.0f}">N {nt_n}</div>
         <div style="background:#ff5f6d;flex:{dn_pct:.0f}">DN {dn_n}</div>
       </div>{sig_summary}"""
@@ -131,7 +131,7 @@ def _build_prediction_detail(pred: dict, engine) -> str:
             name = d.get("feature", d.get("name", "?"))
             impact = d.get("impact", d.get("shap_value", 0))
             value = d.get("value", "")
-            bar_color = "#34e0a0" if impact > 0 else "#ff5f6d"
+            bar_color = "#36ffae" if impact > 0 else "#ff5f6d"
             bar_w = min(abs(impact) * 500, 80)
             shap_rows.append(
                 f"<tr><td style='font-size:11px'>{name}</td>"
@@ -142,7 +142,7 @@ def _build_prediction_detail(pred: dict, engine) -> str:
             )
         shap_html = (
             "<div style='margin-top:12px'>"
-            "<div style='color:#34e0a0;font-size:12px;font-weight:600;margin-bottom:6px'>"
+            "<div style='color:#36ffae;font-size:12px;font-weight:600;margin-bottom:6px'>"
             "SHAP Top-5 驅動因子</div>"
             f"<table>{''.join(shap_rows)}</table></div>"
         )
@@ -244,7 +244,7 @@ def _build_regime_timeline() -> str:
         total_h = sum(s["hours"] for s in segments)
         regime_blocks = ""
         for s in segments:
-            rc = {"BULL": "#34e0a0", "BEAR": "#ff5f6d", "CHOPPY": "#d9606a",
+            rc = {"BULL": "#36ffae", "BEAR": "#ff5f6d", "CHOPPY": "#d9606a",
                   "WARMUP": "rgba(154,160,166,0.5)"}.get(s["regime"], "rgba(154,160,166,0.5)")
             pct = s["hours"] / total_h * 100
             regime_blocks += (
@@ -311,15 +311,15 @@ def _build_market_overview() -> str:
         items = f"""
         <div class="grid grid-4">
           {card("Funding Rate", f'{funding*100:.4f}%' if funding else "N/A",
-                "8h 資金費率", "#d9606a" if abs(funding or 0) > 0.0001 else "#34e0a0")}
+                "8h 資金費率", "#d9606a" if abs(funding or 0) > 0.0001 else "#36ffae")}
           {card("OI 變化 (24h)", f'{oi_change_pct:+.1f}%',
                 f'OI: {oi_close/1e9:.2f}B' if oi_close > 1e6 else f'OI: {oi_close:,.0f}',
-                "#34e0a0" if oi_change_pct > 0 else "#ff5f6d")}
+                "#36ffae" if oi_change_pct > 0 else "#ff5f6d")}
           {card("多空比", f'{ls_ratio:.3f}' if ls_ratio else "N/A",
                 "Long/Short Ratio",
-                "#34e0a0" if (ls_ratio or 1) > 1 else "#ff5f6d")}
+                "#36ffae" if (ls_ratio or 1) > 1 else "#ff5f6d")}
           {card("DVOL", f'{dvol:.1f}' if dvol else "N/A",
-                "Deribit 波動率指數", "#d9606a" if (dvol or 0) > 60 else "#34e0a0")}
+                "Deribit 波動率指數", "#d9606a" if (dvol or 0) > 60 else "#36ffae")}
         </div>"""
         return items
     except Exception as e:

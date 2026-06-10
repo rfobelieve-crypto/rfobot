@@ -31,7 +31,7 @@ def render_dashboard_shell() -> str:
     --bg:#0a0b0d; --surface:#141619; --surface2:#1a1d21;
     --border:#272a30; --border-soft:#1f232a;
     --txt:#e8eaed; --mut:#9aa0a6; --dim:#5f656d;
-    --green:#34e0a0; --green-dim:rgba(52,224,160,0.14);
+    --green:#36ffae; --green-dim:rgba(54,255,174,0.14);
     --red:#ff5f6d; --warn:#f5b544; --blue:#7aa2ff;
   }}
   * {{ margin:0; padding:0; box-sizing:border-box; }}
@@ -47,10 +47,10 @@ def render_dashboard_shell() -> str:
   body::before {{
     content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
-      radial-gradient(1300px 920px at 8% -14%, rgba(52,224,160,0.24), transparent 70%),
+      radial-gradient(1300px 920px at 8% -14%, rgba(54,255,174,0.24), transparent 70%),
       radial-gradient(1200px 1050px at 112% 4%, rgba(48,222,196,0.14), transparent 68%),
       radial-gradient(1250px 1100px at 50% 124%, rgba(66,206,178,0.13), transparent 70%),
-      radial-gradient(1050px 950px at 50% 48%, rgba(52,224,160,0.08), transparent 74%);
+      radial-gradient(1050px 950px at 50% 48%, rgba(54,255,174,0.08), transparent 74%);
     animation:breathe 6s ease-in-out infinite;
   }}
   @keyframes breathe {{ 0%,100% {{ opacity:0.35 }} 50% {{ opacity:0.9 }} }}
@@ -64,9 +64,9 @@ def render_dashboard_shell() -> str:
     position:sticky; top:0; z-index:100;
   }}
   .logo {{ display:flex; align-items:center; gap:10px; }}
-  .logo-mark {{ width:27px; height:27px; flex-shrink:0; filter:drop-shadow(0 0 7px rgba(52,224,160,0.4)); }}
+  .logo-mark {{ width:27px; height:27px; flex-shrink:0; filter:drop-shadow(0 0 7px rgba(54,255,174,0.4)); }}
   .logo-word {{ font-size:16.5px; font-weight:760; letter-spacing:0.6px; color:var(--txt); }}
-  .logo-word em {{ font-style:normal; background:linear-gradient(92deg,#34e0a0,#39d6d6);
+  .logo-word em {{ font-style:normal; background:linear-gradient(92deg,#36ffae,#39d6d6);
                    -webkit-background-clip:text; background-clip:text; color:transparent; }}
   .logo-node {{ animation:breathe 6s ease-in-out infinite; transform-origin:center; }}
   .logo-tag {{ font-size:9px; font-weight:700; letter-spacing:0.8px; color:var(--green);
@@ -188,17 +188,17 @@ def render_dashboard_shell() -> str:
   <div class="logo">
     <svg class="logo-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <defs><linearGradient id="lgm" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
-        <stop stop-color="#34e0a0"/><stop offset="1" stop-color="#39d6d6"/></linearGradient></defs>
-      <rect x="2.5" y="2.5" width="27" height="27" rx="8" fill="rgba(52,224,160,0.07)" stroke="url(#lgm)" stroke-width="1.4"/>
+        <stop stop-color="#36ffae"/><stop offset="1" stop-color="#39d6d6"/></linearGradient></defs>
+      <rect x="2.5" y="2.5" width="27" height="27" rx="8" fill="rgba(54,255,174,0.07)" stroke="url(#lgm)" stroke-width="1.4"/>
       <path d="M6 20 L10 20 L13 12.5 L16 22 L19 9.5 L24 9.5" stroke="url(#lgm)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle class="logo-node" cx="24" cy="9.5" r="2.4" fill="#34e0a0"/>
+      <circle class="logo-node" cx="24" cy="9.5" r="2.4" fill="#36ffae"/>
     </svg>
     <span class="logo-word">FLOW<em>BOT</em></span>
     <span class="logo-tag">DUAL v7</span>
   </div>
   <div class="meta">
     <span id="update-time">{now}</span>
-    <span id="refresh-indicator" style="margin-left:8px;color:#34e0a0;font-size:9px">&#9679;</span>
+    <span id="refresh-indicator" style="margin-left:8px;color:#36ffae;font-size:9px">&#9679;</span>
   </div>
 </div>
 
