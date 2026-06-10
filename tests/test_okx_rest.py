@@ -407,6 +407,37 @@ class TestSetLeverage:
         assert ok is False
 
 
+class TestAmendAlgoBody:
+    """Regression: amend-algos body MUST include instId (2026-06-10 bug —
+    missing instId → 50014, trailing stop never moved on OKX)."""
+
+    def test_amend_body_includes_instid(self):
+        session = MagicMock()
+        session.request.return_value = _mk_resp(200,
+            {"code": "0", "data": [{"algoId": "a1", "sCode": "0"}]})
+        client = _mk_client(session=session)
+        res = client.amend_algo_stop(inst_id="BTC-USDT-SWAP", algo_id="a1",
+                                     new_trigger_px=62560.5)
+        assert res.status == "ok"
+        import json
+        body = json.loads(session.request.call_args.kwargs["data"])
+        assert body["instId"] == "BTC-USDT-SWAP"
+        assert body["algoId"] == "a1"
+        assert body["newSlTriggerPx"] == "62560.5"
+        assert body["newSlOrdPx"] == "-1"
+
+    def test_amend_missing_instid_would_fail(self):
+        # OKX returns sCode 50014 when instId is absent; parser → failed.
+        session = MagicMock()
+        session.request.return_value = _mk_resp(200,
+            {"code": "1", "data": [{"algoId": "a1", "sCode": "50014",
+                                    "sMsg": "Parameter instId can not be empty."}]})
+        client = _mk_client(session=session)
+        res = client.amend_algo_stop(inst_id="BTC-USDT-SWAP", algo_id="a1",
+                                     new_trigger_px=1.0)
+        assert res.status == "failed"
+
+
 # ── Latency tracking ──────────────────────────────────────────────────
 
 

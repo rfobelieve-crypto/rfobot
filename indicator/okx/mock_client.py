@@ -178,8 +178,8 @@ class MockOkxClient:
         return AlgoOrderResult(algo_cl_ord_id=algo_cl_ord_id or "",
                                algo_id=algo_id, status="live")
 
-    def amend_algo_stop(self, *, algo_id: str,
-                        new_trigger_px: float) -> AmendResult:
+    def amend_algo_stop(self, *, algo_id: str, new_trigger_px: float,
+                        inst_id: str | None = None) -> AmendResult:
         algo = self._algos.get(algo_id)
         if algo is None:
             return AmendResult(algo_id=algo_id, status="not_found")

@@ -187,17 +187,22 @@ class OkxRestClient:
             )
         return self._parse_algo_order_response(result, algo_cl_ord_id)
 
-    def amend_algo_stop(self, *, algo_id: str,
+    def amend_algo_stop(self, *, inst_id: str, algo_id: str,
                         new_trigger_px: float) -> AmendResult:
         """Atomic amend.  P6: NEVER cancel-then-new.
 
-        OKX amend-algos for stop-loss requires newSlTriggerPx (not the
-        generic newTriggerPx).  Same fix as submit_algo_stop above.
+        OKX amend-algos requires instId + algoId + newSlTriggerPx.  instId was
+        MISSING (2026-06-10 bug) → OKX rejected every amend with 50014
+        "Parameter instId can not be empty", so the trailing stop never moved on
+        the exchange (DB trail advanced, OKX order stayed at the entry stop).
+        newSlOrdPx="-1" keeps market-on-trigger execution (matches submit).
         """
         path = "/api/v5/trade/amend-algos"
         body = {
+            "instId": inst_id,
             "algoId": algo_id,
             "newSlTriggerPx": str(new_trigger_px),
+            "newSlOrdPx": "-1",
         }
         result = self._retry_post(
             path=path, body=body, retries=2, backoff_base=1.0,

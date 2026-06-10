@@ -548,26 +548,34 @@ class V7OkxExecutor:
 
         # No exit — ratchet trail if extreme advanced
         if new_extreme != prev_extreme:
+            amended_ok = False
             try:
-                self._client.amend_algo_stop(
+                res = self._client.amend_algo_stop(
+                    inst_id=self._cfg.inst_id,
                     algo_id=str(pos.get("stop_algo_id") or ""),
                     new_trigger_px=new_stop,
                 )
+                amended_ok = getattr(res, "status", None) == "ok"
+                if not amended_ok:
+                    logger.warning("amend_algo_stop_not_ok pos=%s err=%s",
+                                   pos.get("id"), getattr(res, "error", res))
             except Exception:
                 logger.exception("amend_algo_stop_failed pos=%s",
                                  pos.get("id"))
-                # Don't halt on amend fail; reconciler / WS event will
-                # surface if the stop is gone.  Caller's next cycle
-                # retries.
-            try:
-                self._store.update_trail(
-                    position_id=int(pos["id"]),
-                    trail_extreme=new_extreme,
-                    current_stop=new_stop,
-                )
-            except Exception:
-                logger.exception("update_trail_db_failed pos=%s",
-                                 pos.get("id"))
+            # Only advance the DB trail if OKX actually moved the stop — else the
+            # DB would claim a protection level the exchange does not have (the
+            # 2026-06-10 missing-instId bug: DB trailed to 62560 while OKX stayed
+            # at the 60181 entry stop). Retry on the next cycle if it failed.
+            if amended_ok:
+                try:
+                    self._store.update_trail(
+                        position_id=int(pos["id"]),
+                        trail_extreme=new_extreme,
+                        current_stop=new_stop,
+                    )
+                except Exception:
+                    logger.exception("update_trail_db_failed pos=%s",
+                                     pos.get("id"))
 
         return CycleResult(action="hold",
                            detail={"position_id": pos.get("id"),
