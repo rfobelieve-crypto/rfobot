@@ -152,6 +152,37 @@ edge 確信度」的漸進過程。
 
 **注意 Stage 3 → 4a 的 leverage 反而從 10x 降回 1x**：Stage 4a 起金額放大到 $1k，1 contract 不再是門檻，回到 Kelly-respecting 1x 是正解。Stage 3 的 10x 是「為了開門」的權宜，不是策略的一部分。
 
+## 壓縮版 Stage 3→4 edge 驗證（2026-06-10，第 3 次 informed override）
+
+**背景**：原 Stage 4 ladder（4a→4d，需 12+ 個月 live + 真實 Sharpe ≥1.5）被使用者判定**太嚴、太慢**。問題的根源是它想用「12 個月 live PnL」**同時**證明兩件不同的事，而 live PnL 是證明薄 edge **最沒效率**的資料來源（薄 edge + 高方差 → 30-50 筆 live 的勝率 CI 寬到含硬幣線）。
+
+**核心洞見：把「證 edge」和「證執行」拆開，各用最有統計力的資料證。**
+
+- **Gate A — edge 是真的嗎？（統計，用累積訊號）**
+  - 用 `tracked_signals` 表的**累積 live Strong 訊號回填結果**（幾百筆，不是幾十筆 live PnL）。
+  - 門檻：Strong 勝率 bootstrap 95% CI **下緣 > 52%**（顯著高於硬幣）。
+  - **STATUS：2026-06-10 已通過 ✅** — Strong n=739、勝率 59.5%、CI [56.0%, 63.2%]（下緣 56%）；最近 90 天 n=101、76.2%、CI [67.3%, 84.2%]。Moderate n=1241、54.4%、CI 下緣 51.7% 不顯著（再次佐證只開 Strong）。
+  - **edge 這題已答 YES，不需要再用 live PnL 重證。**
+
+- **Gate B — 執行有沒有把 edge 吃掉？（操作，用 30-50 筆 live）**
+  - 用**今天修好 trailing 的系統**（見 mistake.md 2026-06-10 amend instId bug）跑 30-50 筆乾淨 live trade，要求全部成立：
+    - 扣 8bps 成本後 **net ≥ 0**
+    - **0 kill trigger**
+    - **trailing 確認在 OKX 上真的有 amend 上移**（今天修的重點，必驗）
+    - live 每筆報酬**落在 backtest 分布內**（無大幅負滑點驚喜）
+  - 樣本從**今天（修好後）重新數**；之前 live 紀錄被 broken trailing + 手動爆倉污染，不算。
+
+**新的擴大規則（取代 12mo/Sharpe 1.5 作為「第一次放大」的條件）**：
+- Gate A + Gate B 都過 → 擴大**一級、適度增量**（$300-500 / 2-5x 名目，**不是**一次跳 $5k/$10k）。
+- 之後每多 30-50 筆乾淨樣本 + 重檢兩 Gate → 再放一級。證據累積，規模才累積。
+- 可選嚴謹升級：SPRT 序貫檢定，Gate B 證據夠強就提早收（不用死等固定 50 筆）。
+
+**為什麼這樣「鬆」但不犧牲 edge 證明**：A 用大樣本（訊號）給統計力、B 用小樣本（live）只驗執行——不是降低標準，是把證明搬到對的資料層。原 Stage 4a-4d 的 leverage 階梯與時間/Sharpe 條件**作廢為「第一次放大」的硬門檻**，改由上述兩 Gate 取代；之後的逐級放大仍走「增量 + 重檢」。
+
+**這次 override 不鬆的（ruin 保護，與「擴多快」無關）**：kill switch（daily −20% / total −30%）、leverage cap（有效 2x）、hit kill→降階重驗、max_position_count=1。這三樣是防再歸零一次（2026-06-05 的教訓），跟驗證速度無關，一個都不動。
+
+**注意**：訊號方向準確率（59.5%）≠ 交易獲利（扣成本/停損後）。Gate A 證「edge 存在」，Gate B 才證「執行能把它變成 +EV」——兩個都要，缺一不可。
+
 ## 仍然禁止的（避免在錯的階段做錯事）
 - **Stage 2-3**：禁鬆 hard kill switches 以外的 trigger；leverage hard cap = 10x（不可再放寬）
 - **Stage 3**：禁未經 manual approval 5 筆就切自動（paper cohort 已於 2026-06-05 移除，不再有「paper 停寫」這條）
