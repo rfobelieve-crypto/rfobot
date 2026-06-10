@@ -1238,6 +1238,23 @@ def okx_status_api():
             except Exception as e:
                 out["executor_status_err"] = repr(e)
             try:
+                # Resolved running config (non-secret) — confirms env flags
+                # like OKX_TD_MODE / OKX_STRONG_ONLY_ENTRY / OKX_TIME_CAP_HOURS
+                # actually took effect in the live process.
+                _c = okx_runner._INSTANCE._cfg
+                out["cfg"] = {
+                    "td_mode": _c.td_mode,
+                    "strong_only_entry": _c.strong_only_entry,
+                    "time_cap_hours": _c.time_cap_hours,
+                    "leverage": _c.leverage,
+                    "is_simulated": _c.is_simulated,
+                    "max_position_count": _c.max_position_count,
+                    "daily_loss_cap_pct": _c.daily_loss_cap_pct,
+                    "total_loss_cap_pct": _c.total_loss_cap_pct,
+                }
+            except Exception as e:
+                out["cfg_err"] = repr(e)
+            try:
                 out["ws_diag"] = okx_runner._INSTANCE._client.diag_state()
             except Exception as e:
                 out["ws_diag_err"] = repr(e)
