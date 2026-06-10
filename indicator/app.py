@@ -2456,6 +2456,65 @@ def _run_meeting_scheduled():
         logger.error("Scheduled Meeting agent failed: %s", e)
 
 
+def _heartbeat_watchdog():
+    """External dead-man's switch (2026-06-10).
+
+    update_cycle runs hourly via the scheduler and ALREADY alerts when it keeps
+    ERRORING (consecutive_errors → Telegram, lesson 2026-04-22). The remaining
+    gap this fills: when update_cycle STOPS running entirely (scheduler dead /
+    process hung / thread died) there is no exception, no counter, no in-cycle
+    health check — so nobody is told. This INDEPENDENT thread watches
+    last_update staleness + the last health verdict and pushes ONE Telegram
+    alert when the system goes silent/critical (and one when it recovers).
+
+    Pure monitoring — never touches trading state. Daemon; swallows all errors
+    so it can never crash the app.
+    """
+    import time as _t
+    STALE_MIN = 140          # hourly updates → >2h20 = missed ~2 cycles
+    CHECK_SEC = 600          # check every 10 min
+    _t.sleep(900)            # boot grace (warmup + first cycle)
+    alerted = False
+    while True:
+        try:
+            with _lock:
+                last_update = _state.get("last_update")
+                status = _state.get("status")
+                health = (_state.get("health") or {}).get("overall_status")
+            problems = []
+            if last_update:
+                try:
+                    lu = datetime.fromisoformat(
+                        str(last_update).replace("Z", "+00:00"))
+                    if lu.tzinfo is None:
+                        lu = lu.replace(tzinfo=timezone.utc)
+                    age = (datetime.now(timezone.utc) - lu).total_seconds() / 60
+                    if age > STALE_MIN:
+                        problems.append(
+                            f"update_cycle 已 {age:.0f} 分鐘沒成功更新（可能卡死/停跑）")
+                except Exception:
+                    pass
+            if health == "critical":
+                problems.append("健康檢查 CRITICAL（資料過期 / 端點異常）")
+            chat = os.environ.get("TG_CRITICAL_CHAT_ID", "") or ""
+            if problems and not alerted:
+                _send_telegram_text(
+                    "⚠️ <b>FLOWBOT 健康警示</b>\n"
+                    + "\n".join("• " + p for p in problems)
+                    + "\n\n查 /health 或 /okx-status。擔心可在 Railway 設 "
+                    "<code>OKX_EXECUTOR_ENABLED=0</code> 停交易。",
+                    chat_id=chat)
+                alerted = True
+                logger.error("heartbeat_alert_sent: %s", problems)
+            elif not problems and alerted:
+                _send_telegram_text("✅ <b>FLOWBOT 已恢復正常更新</b>",
+                                    chat_id=chat)
+                alerted = False
+        except Exception:
+            logger.exception("heartbeat_watchdog_error")
+        _t.sleep(CHECK_SEC)
+
+
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -2509,6 +2568,11 @@ def start_scheduler():
 
     # Run first update immediately
     threading.Thread(target=update_cycle, daemon=True).start()
+
+    # External dead-man's switch: alerts if update_cycle goes silent (the loop
+    # being dead can't alert from inside itself). Pure monitoring; see fn docstring.
+    threading.Thread(target=_heartbeat_watchdog, daemon=True,
+                     name="heartbeat").start()
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
