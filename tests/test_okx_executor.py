@@ -236,6 +236,43 @@ class TestCycle:
         assert exe.get_status() == ExecutorStatus.ACTIVE
 
 
+# ── strong_only_entry gate ───────────────────────────────────────────
+
+
+class TestStrongOnlyEntry:
+    """OKX_STRONG_ONLY_ENTRY gate: Moderate signals must not open a position
+    when the flag is on (they crowd out Strong under 1-position occupancy)."""
+
+    def test_moderate_skipped_when_flag_on(self):
+        exe, client, store, recon = _mk_executor(
+            cfg=_mk_cfg(strong_only_entry=True))
+        exe.start()
+        result = exe.cycle(klines=pd.DataFrame(), signal_direction="UP",
+                           signal_strength="Moderate")
+        assert result.action == "none"
+        assert result.detail["reason"] == "moderate_skipped_strong_only"
+        assert result.detail["tier"] == "Moderate"
+        client.submit_market_order.assert_not_called()
+
+    def test_strong_passes_gate_when_flag_on(self):
+        exe, client, store, recon = _mk_executor(
+            cfg=_mk_cfg(strong_only_entry=True))
+        exe.start()
+        result = exe.cycle(klines=pd.DataFrame(), signal_direction="UP",
+                           signal_strength="Strong")
+        # Gate passed → reached _open_position (which bails on empty klines).
+        assert result.detail.get("reason") != "moderate_skipped_strong_only"
+
+    def test_moderate_opens_when_flag_off(self):
+        exe, client, store, recon = _mk_executor(
+            cfg=_mk_cfg(strong_only_entry=False))
+        exe.start()
+        result = exe.cycle(klines=pd.DataFrame(), signal_direction="UP",
+                           signal_strength="Moderate")
+        # Flag off (default) → Moderate is NOT gated; reaches _open_position.
+        assert result.detail.get("reason") != "moderate_skipped_strong_only"
+
+
 # ── _force_close_all ─────────────────────────────────────────────────
 
 

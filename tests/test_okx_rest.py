@@ -371,6 +371,42 @@ class TestOrderBodyFields:
         assert body["reduceOnly"] is True
 
 
+# ── set_leverage (isolated margin prerequisite) ───────────────────────
+
+
+class TestSetLeverage:
+    def _client_with(self, resp):
+        session = MagicMock()
+        session.request.return_value = resp
+        return _mk_client(session=session), session
+
+    def test_set_leverage_isolated_body_and_success(self):
+        client, session = self._client_with(_mk_resp(200,
+            {"code": "0", "data": [{"lever": "10", "mgnMode": "isolated"}]}))
+        ok = client.set_leverage(inst_id="BTC-USDT-SWAP", lever=10,
+                                 mgn_mode="isolated", pos_side="long")
+        assert ok is True
+        import json
+        body = json.loads(session.request.call_args.kwargs["data"])
+        assert body == {"instId": "BTC-USDT-SWAP", "lever": "10",
+                        "mgnMode": "isolated", "posSide": "long"}
+
+    def test_set_leverage_cross_omits_pos_side(self):
+        client, session = self._client_with(_mk_resp(200,
+            {"code": "0", "data": [{}]}))
+        client.set_leverage(inst_id="BTC-USDT-SWAP", lever=5, mgn_mode="cross")
+        import json
+        body = json.loads(session.request.call_args.kwargs["data"])
+        assert "posSide" not in body
+
+    def test_set_leverage_nonzero_code_is_failure(self):
+        client, _ = self._client_with(_mk_resp(200,
+            {"code": "59000", "msg": "position exists", "data": []}))
+        ok = client.set_leverage(inst_id="BTC-USDT-SWAP", lever=10,
+                                 mgn_mode="isolated", pos_side="long")
+        assert ok is False
+
+
 # ── Latency tracking ──────────────────────────────────────────────────
 
 

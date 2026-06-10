@@ -243,6 +243,60 @@ class TestOpenPosition:
         assert result.detail["reason"] == "duplicate_cl_ord_id"
 
 
+class TestIsolatedLeverage:
+    """td_mode='isolated' (staged, env-activated): leverage must be set per
+    (instId, isolated, posSide) before each open; failure aborts the open."""
+
+    def test_isolated_sets_leverage_before_long_open(self):
+        exe, client, store, _ = _mk_executor(cfg=_mk_cfg(td_mode="isolated"))
+        client.set_leverage.return_value = True
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            result = exe._open_position(klines=_mk_klines(),
+                                         signal_direction="UP",
+                                         signal_strength="Strong",
+                                         model_version="v1")
+        assert result.action == "open"
+        lev_kwargs = client.set_leverage.call_args.kwargs
+        assert lev_kwargs["mgn_mode"] == "isolated"
+        assert lev_kwargs["pos_side"] == "long"
+        assert lev_kwargs["lever"] == 10
+        assert lev_kwargs["inst_id"] == "BTC-USDT-SWAP"
+
+    def test_isolated_short_open_sets_short_posside(self):
+        exe, client, store, _ = _mk_executor(cfg=_mk_cfg(td_mode="isolated"))
+        client.set_leverage.return_value = True
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            exe._open_position(klines=_mk_klines(), signal_direction="DOWN",
+                               signal_strength="Moderate", model_version="v1")
+        assert client.set_leverage.call_args.kwargs["pos_side"] == "short"
+
+    def test_set_leverage_failure_aborts_open(self):
+        exe, client, store, _ = _mk_executor(cfg=_mk_cfg(td_mode="isolated"))
+        client.set_leverage.return_value = False
+        with patch("indicator.okx.executor.send_critical",
+                   return_value=True) as tg:
+            result = exe._open_position(klines=_mk_klines(),
+                                         signal_direction="UP",
+                                         signal_strength="Strong",
+                                         model_version="v1")
+        assert result.action == "none"
+        assert result.detail["reason"] == "set_leverage_failed"
+        # No order should reach OKX if leverage couldn't be configured
+        client.submit_market_order.assert_not_called()
+        store.insert_open_position.assert_not_called()
+        tg.assert_called_once()  # operator alerted
+
+    def test_cross_mode_skips_set_leverage(self):
+        exe, client, store, _ = _mk_executor(cfg=_mk_cfg(td_mode="cross"))
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            result = exe._open_position(klines=_mk_klines(),
+                                         signal_direction="UP",
+                                         signal_strength="Strong",
+                                         model_version="v1")
+        assert result.action == "open"
+        client.set_leverage.assert_not_called()
+
+
 # ── _manage_position ─────────────────────────────────────────────────
 
 
@@ -322,7 +376,8 @@ class TestManagePosition:
         assert amend_kwargs["new_trigger_px"] == pytest.approx(74150.0)
 
     def test_time_cap_triggers_close(self):
-        exe, client, store, _ = _mk_executor()
+        # time_cap is opt-in now (default off); enable it to test the mechanism.
+        exe, client, store, _ = _mk_executor(cfg=_mk_cfg(time_cap_hours=72))
         klines = _mk_klines()
         # bar_ts in fixture = klines.index[-1] (UTC).  Entry 80h before.
         bar_ts_naive = klines.index[-1].tz_convert("UTC").tz_localize(None)
@@ -339,6 +394,20 @@ class TestManagePosition:
         assert (client.submit_market_order.call_args.kwargs["side"]
                 == Side.SELL)
         store.close_position.assert_called_once()
+
+    def test_time_cap_disabled_by_default(self):
+        # Default cfg (time_cap_hours=0): a very old position must NOT time-cap;
+        # with NEUTRAL signal + no stop hit it should just hold (ratchet trail).
+        exe, client, store, _ = _mk_executor()
+        klines = _mk_klines()
+        bar_ts_naive = klines.index[-1].tz_convert("UTC").tz_localize(None)
+        pos = _open_pos(side="LONG",
+                        entry_time=bar_ts_naive - timedelta(hours=240))
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            result = exe._manage_position(pos, klines=klines,
+                                           signal_direction="NEUTRAL")
+        assert result.detail.get("exit_reason") != "time_cap"
+        client.submit_market_order.assert_not_called()
 
     def test_opp_signal_DOWN_closes_LONG(self):
         exe, client, store, _ = _mk_executor()
@@ -556,7 +625,7 @@ class TestLongShortModePosSide:
         assert client.submit_algo_stop.call_args.kwargs["pos_side"] is None
 
     def test_manual_close_carries_pos_side_and_reduce_only(self):
-        cfg = _mk_cfg(pos_mode="long_short_mode")
+        cfg = _mk_cfg(pos_mode="long_short_mode", time_cap_hours=72)
         exe, client, store, _ = _mk_executor(cfg=cfg)
         klines = _mk_klines()
         bar_ts_naive = klines.index[-1].tz_convert("UTC").tz_localize(None)

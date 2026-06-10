@@ -32,6 +32,13 @@ class OkxConfig:
 
     # ── Instrument
     inst_id: str = "BTC-USDT-SWAP"
+    # Default cross. ISOLATED is staged (ring-fence each position's margin —
+    # 2026-06-05 blowup mitigation) but DORMANT until activated via
+    # OKX_TD_MODE=isolated, so it never disturbs an open cross position. Flip
+    # the env only when the account is FLAT (OKX won't mix cross+isolated on one
+    # instId; a cross position closed with tdMode=isolated would mismatch).
+    # When isolated: the executor sets leverage per (instId, isolated, posSide)
+    # before each open (executor._open_position). See docs/okx_account_isolation.md.
     td_mode: Literal["cash", "cross", "isolated"] = "cross"
     # OKX default for new accounts is long_short_mode (sides separate).
     # net_mode (single signed net position) is also supported; the
@@ -47,6 +54,23 @@ class OkxConfig:
     contract_size_base: float = 0.01
     # Round-trip taker cost as a fraction (mirrors v7_paper_executor)
     taker_cost: float = 0.0008
+
+    # Strong-only entry gate (2026-06-09, reversible; default OFF = no change).
+    # When True, only Strong-tier signals open a position; Moderate signals are
+    # skipped so they don't occupy the single slot and crowd out higher-WR
+    # Strong entries.  Evidence (research/dual_model/entry_policy_real_exit_bt,
+    # real 3xATR-trail exit + 1-position occupancy, 5mo OOS): Strong-only WR
+    # 62% vs both 53%, MaxDD halved (7.6% vs 20% at 2x effective leverage),
+    # cum higher.  Toggle live via OKX_STRONG_ONLY_ENTRY=1 (no redeploy needed).
+    # Does NOT touch management of an already-open position.
+    strong_only_entry: bool = False
+
+    # Time-cap exit (hours). 0 = DISABLED (removed 2026-06-10 per user) — let
+    # winners run; exits then come only from the 3xATR TRAILING stop or an
+    # opposite signal. The rare trades that previously hit the 72h cap were the
+    # biggest winners (backtest: time_cap exits +5xx bps), so the cap was
+    # cutting them short. Re-enable via OKX_TIME_CAP_HOURS=72 (no redeploy).
+    time_cap_hours: int = 0
 
     # ── Risk caps (Stage 3 defaults; tightened for 10x leverage)
     # Default bumped 100→155 on 2026-06-01: user deposited $154.86 to
@@ -122,6 +146,18 @@ def load_okx_config_from_env(stage: Literal["testnet", "live"] = "testnet") -> O
     if cap_override:
         try:
             kwargs["initial_capital_usd"] = float(cap_override)
+        except ValueError:
+            pass
+    tdm = os.environ.get("OKX_TD_MODE", "").strip().lower()
+    if tdm in ("cash", "cross", "isolated"):
+        kwargs["td_mode"] = tdm
+    soe = os.environ.get("OKX_STRONG_ONLY_ENTRY", "").strip().lower()
+    if soe in ("1", "true", "yes", "on"):
+        kwargs["strong_only_entry"] = True
+    tch = os.environ.get("OKX_TIME_CAP_HOURS", "").strip()
+    if tch:
+        try:
+            kwargs["time_cap_hours"] = int(tch)
         except ValueError:
             pass
     return OkxConfig(**kwargs)

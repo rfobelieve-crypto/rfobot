@@ -88,6 +88,7 @@ class MockOkxClient:
         self._reject_market_once: bool = False
         self._reject_algo_error: Optional[str] = None
         self._algo_raises: bool = False
+        self._reject_set_leverage: bool = False
 
         # ── WS callbacks ───────────────────────────────────────────────
         self._on_order: Optional[Callable[[OrderEvent], None]] = None
@@ -100,6 +101,7 @@ class MockOkxClient:
         self._ws_started = False
         self.market_orders: list[dict] = []   # every submit_market_order call
         self.algo_orders: list[dict] = []      # every submit_algo_stop call
+        self.leverage_calls: list[dict] = []   # every set_leverage call
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
@@ -189,6 +191,16 @@ class MockOkxClient:
             del self._algos[algo_id]
             return CancelResult(algo_id=algo_id, status="ok")
         return CancelResult(algo_id=algo_id, status="not_found")
+
+    def set_leverage(self, *, inst_id: str, lever: int, mgn_mode: str,
+                     pos_side: Optional[str] = None) -> bool:
+        """Mirror OkxRestClient.set_leverage.  Records the call; returns True
+        unless reject_set_leverage() armed a failure (to test the abort path)."""
+        self.leverage_calls.append({
+            "inst_id": inst_id, "lever": lever, "mgn_mode": mgn_mode,
+            "pos_side": pos_side,
+        })
+        return not self._reject_set_leverage
 
     # ── REST: account ──────────────────────────────────────────────────
 
@@ -293,6 +305,10 @@ class MockOkxClient:
     def raise_on_algo(self) -> None:
         """Make submit_algo_stop raise -> tests the B4 emergency-close path."""
         self._algo_raises = True
+
+    def reject_set_leverage(self) -> None:
+        """Make set_leverage return False -> tests the isolated open-abort path."""
+        self._reject_set_leverage = True
 
     def set_okx_position(self, direction: str, size_contracts: float,
                          avg_price: Optional[float] = None) -> None:

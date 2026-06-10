@@ -221,6 +221,27 @@ class OkxRestClient:
         return CancelResult(algo_id=algo_id, status="ok",
                             error="not_implemented")
 
+    def set_leverage(self, *, inst_id: str, lever: int, mgn_mode: str,
+                     pos_side: Optional[str] = None) -> bool:
+        """Set leverage for (instId, mgnMode[, posSide]).  Returns True on code==0.
+
+        Isolated margin REQUIRES leverage configured per (instId, isolated,
+        posSide) or OKX rejects the order (long_short_mode needs one call per
+        side).  Idempotent — safe to call before every open.  cross mode omits
+        posSide.  3x retry (do not retry 4xx — a bad request won't fix itself).
+        """
+        path = "/api/v5/account/set-leverage"
+        body = {"instId": inst_id, "lever": str(lever), "mgnMode": mgn_mode}
+        if pos_side is not None:
+            body["posSide"] = pos_side
+        result = self._retry_post(
+            path=path, body=body, retries=3, backoff_base=1.0,
+            retry_on_4xx=False,
+        )
+        if result is None:
+            return False
+        return str(result.get("code")) == "0"
+
     def get_positions(self, *, inst_id: str) -> list[Position]:
         path = "/api/v5/account/positions"
         params = {"instId": inst_id}

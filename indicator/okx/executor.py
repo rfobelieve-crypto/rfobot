@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 ATR_PERIOD = 14
 TRAIL_MULT = 3.0
-TIME_CAP_HOURS = 72
+TIME_CAP_HOURS = 72        # canonical re-enable value; live cap = cfg.time_cap_hours (0=off)
 RISK_FRAC = 0.02            # 2% of equity per trade (legacy; unused by B sizing)
 MAX_LEVERAGE = 1.0
 
@@ -346,6 +346,19 @@ class V7OkxExecutor:
         # 2026-06-05 — LIVE OKX is now the sole cohort, so there is no
         # paper-sync gate; OKX opens directly on a Strong/Moderate signal.)
         if signal_direction in ("UP", "DOWN"):
+            # Strong-only entry gate (reversible: OKX_STRONG_ONLY_ENTRY).
+            # Moderate signals do NOT take the single slot — they crowd out
+            # higher-WR Strong entries and roughly double MaxDD at 2x (see
+            # research/dual_model/entry_policy_real_exit_bt).  Managing an
+            # already-open Moderate position is unaffected (handled above).
+            if self._cfg.strong_only_entry and signal_strength != "Strong":
+                logger.info("strong_only_entry: skip %s %s signal",
+                            signal_strength, signal_direction)
+                return CycleResult(
+                    action="none",
+                    detail={"reason": "moderate_skipped_strong_only",
+                            "tier": signal_strength,
+                            "direction": signal_direction})
             return self._open_position(klines=klines,
                                        signal_direction=signal_direction,
                                        signal_strength=signal_strength,
@@ -466,7 +479,7 @@ class V7OkxExecutor:
         entry).  We only need to:
           - ratchet the trailing extreme bar-by-bar + amend the algo
             stop trigger to the new level
-          - manually close on time_cap (72h) or opposite signal
+          - manually close on opposite signal (or time_cap if cfg enables it)
             (those are conditions OKX doesn't know about)
 
         Algo-stop fills arrive via WS `orders` event and reconciliation;
@@ -517,8 +530,11 @@ class V7OkxExecutor:
             new_stop = new_extreme + stop_dist
 
         # Manual exits — OKX doesn't know about time_cap / opp_signal
+        # time_cap_hours=0 disables the cap (removed 2026-06-10) → exits come
+        # only from the trailing stop or an opposite signal.
         exit_reason: Optional[str] = None
-        if bars_held >= TIME_CAP_HOURS:
+        if (self._cfg.time_cap_hours > 0
+                and bars_held >= self._cfg.time_cap_hours):
             exit_reason = "time_cap"
         elif side == "LONG" and signal_direction == "DOWN":
             exit_reason = "opp_signal"
@@ -897,6 +913,42 @@ class V7OkxExecutor:
         order_side = Side.BUY if side == "LONG" else Side.SELL
         # posSide for long_short_mode; None in net_mode (omitted)
         pos_side = self._cfg.pos_side_for(side)
+
+        # 0b. Isolated margin needs leverage configured per (instId, isolated,
+        # posSide) BEFORE the order, or OKX rejects it.  Set it idempotently for
+        # the side we're about to open; if it fails, ABORT the open (don't fire
+        # an order destined for rejection) and alert.  Skipped for cross/cash.
+        if self._cfg.td_mode == "isolated":
+            try:
+                lev_ok = self._client.set_leverage(
+                    inst_id=self._cfg.inst_id, lever=self._cfg.leverage,
+                    mgn_mode="isolated", pos_side=pos_side,
+                )
+            except Exception:
+                logger.exception("set_leverage_exception")
+                lev_ok = False
+            if not lev_ok:
+                logger.error("set_leverage_failed_abort_open posSide=%s", pos_side)
+                try:
+                    send_critical(
+                        self._cfg.telegram_critical_chat_id,
+                        f"🔴 <b>OKX OPEN ABORTED</b>\n"
+                        f"set-leverage(isolated {self._cfg.leverage}x "
+                        f"posSide={pos_side}) failed — no order sent.\n"
+                        f"Isolated margin requires leverage configured first. "
+                        f"Check OKX account/API; next signal will retry.",
+                    )
+                except Exception:
+                    logger.exception("set_leverage_abort_alert_failed")
+                if approval_id is not None and self._approval is not None:
+                    try:
+                        self._approval.mark_stale(
+                            approval_id, reason="set_leverage_failed")
+                    except Exception:
+                        logger.exception("set_leverage_mark_approval_failed")
+                return CycleResult(action="none",
+                                   detail={"reason": "set_leverage_failed"})
+
         entry_t0 = datetime.now(tz=timezone.utc)
         try:
             entry_result = self._client.submit_market_order(
