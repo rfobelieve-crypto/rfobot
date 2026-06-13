@@ -1,0 +1,150 @@
+{
+  "pre_settlement_momentum": {
+    "full_sample_ic": 0.004967937529594593,
+    "bootstrap": {
+      "mean": 0.004534482284880213,
+      "std": 0.01591076971275221,
+      "ci_lo": -0.0277187204478648,
+      "ci_hi": 0.03652947022226807,
+      "n": 4495
+    },
+    "monthly_ic": {
+      "2025-10": -0.0342,
+      "2025-11": 0.0567,
+      "2025-12": -0.0575,
+      "2026-01": 0.0522,
+      "2026-02": 0.0768,
+      "2026-03": -0.0121,
+      "2026-04": -0.1253
+    },
+    "train_test_stability": "FLIP",
+    "rolling_ic": {
+      "mean": 0.0032853379670430994,
+      "std": 0.09757487732624506,
+      "min": -0.2561942574280982,
+      "max": 0.22198021317517272,
+      "frac_abs_gt_005": 0.7435304990757856
+    },
+    "correlation_with_existing": {
+      "cg_oi_close_zscore": 0.207,
+      "cg_oi_agg_close": 0.027,
+      "cg_bfx_margin_ratio": 0.008,
+      "vol_acceleration": -0.003,
+      "cg_funding_close_zscore": -0.005,
+      "realized_vol_20b": 0.007,
+      "cg_funding_close": 0.02,
+      "cg_ls_ratio": 0.01
+    }
+  },
+  "pre_settlement_volume_spike": {
+    "full_sample_ic": 0.0028572706510693,
+    "bootstrap": {
+      "mean": 0.004705183476773903,
+      "std": 0.015806850114066403,
+      "ci_lo": -0.02626236713678653,
+      "ci_hi": 0.035268404207583114,
+      "n": 4495
+    },
+    "monthly_ic": {
+      "2025-10": -0.0489,
+      "2025-11": -0.0299,
+      "2025-12": -0.018,
+      "2026-01": 0.0253,
+      "2026-02": 0.0614,
+      "2026-03": 0.0184,
+      "2026-04": -0.0145
+    },
+    "train_test_stability": "FLIP",
+    "rolling_ic": {
+      "mean": 0.005311770947977631,
+      "std": 0.07941300411738542,
+      "min": -0.23760603579851727,
+      "max": 0.2004412424230878,
+      "frac_abs_gt_005": 0.5577634011090573
+    },
+    "correlation_with_existing": {
+      "cg_oi_close_zscore": 0.015,
+      "cg_oi_agg_close": 0.0,
+      "cg_bfx_margin_ratio": 0.009,
+      "vol_acceleration": 0.137,
+      "cg_funding_close_zscore": -0.005,
+      "realized_vol_20b": -0.013,
+      "cg_funding_close": 0.007,
+      "cg_ls_ratio": -0.012
+    }
+  },
+  "post_settlement_reversal": {
+    "full_sample_ic": -0.020174677987508723,
+    "bootstrap": {
+      "mean": -0.02033421925673042,
+      "std": 0.015163786166582403,
+      "ci_lo": -0.05007821116610363,
+      "ci_hi": 0.007506084477976721,
+      "n": 4495
+    },
+    "monthly_ic": {
+      "2025-10": 0.072,
+      "2025-11": -0.0579,
+      "2025-12": 0.0761,
+      "2026-01": -0.0534,
+      "2026-02": -0.0053,
+      "2026-03": -0.0896,
+      "2026-04": -0.0519
+    },
+    "train_test_stability": "FLIP",
+    "rolling_ic": {
+      "mean": -0.025491692166144775,
+      "std": 0.08548988721109246,
+      "min": -0.21982664895378515,
+      "max": 0.21519998084292158,
+      "frac_abs_gt_005": 0.5919593345656192
+    },
+    "correlation_with_existing": {
+      "cg_oi_close_zscore": 0.192,
+      "cg_oi_agg_close": 0.012,
+      "cg_bfx_margin_ratio": 0.024,
+      "vol_acceleration": -0.074,
+      "cg_funding_close_zscore": 0.012,
+      "realized_vol_20b": -0.019,
+      "cg_funding_close": -0.009,
+      "cg_ls_ratio": -0.032
+    }
+  },
+  "settlement_proximity": {
+    "full_sample_ic": -0.0049821958545639665,
+    "bootstrap": {
+      "mean": -0.005870543226407383,
+      "std": 0.014110409019593574,
+      "ci_lo": -0.03431206686054912,
+      "ci_hi": 0.021162204670590917,
+      "n": 4495
+    },
+    "monthly_ic": {
+      "2025-10": -0.0259,
+      "2025-11": 0.0093,
+      "2025-12": -0.0191,
+      "2026-01": -0.0004,
+      "2026-02": -0.067,
+      "2026-03": 0.0181,
+      "2026-04": 0.063
+    },
+    "train_test_stability": "FLIP",
+    "rolling_ic": {
+      "mean": -0.00786069809505716,
+      "std": 0.08716661098309283,
+      "min": -0.2448027554234198,
+      "max": 0.2676760106894593,
+      "frac_abs_gt_005": 0.5506007393715342
+    },
+    "correlation_with_existing": {
+      "cg_oi_close_zscore": 0.006,
+      "cg_oi_agg_close": -0.0,
+      "cg_bfx_margin_ratio": 0.003,
+      "vol_acceleration": 0.025,
+      "cg_funding_close_zscore": 0.019,
+      "realized_vol_20b": 0.007,
+      "cg_funding_close": 0.009,
+      "cg_ls_ratio": 0.002
+    }
+  }
+}

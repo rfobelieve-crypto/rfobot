@@ -1,0 +1,162 @@
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:636: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:636: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:636: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:636: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:636: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:668: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:668: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:668: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:668: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:668: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:668: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:668: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:668: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:675: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df["dvol_rv_spread"] = df["dvol_close"] - rv_ann
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:85: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_break_up_atr"] = (close - prior_high) / atr.replace(0, np.nan)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:86: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_break_dn_atr"] = (prior_low - close) / atr.replace(0, np.nan)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:92: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_bo_up"] = ((close > prior_high) & (open_ <= prior_high)).astype(float)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:93: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_bo_dn"] = ((close < prior_low) & (open_ >= prior_low)).astype(float)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:101: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_bo_up_streak"] = (
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:104: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_bo_dn_streak"] = (
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:113: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_funding_d1"] = fund_d1.shift(1)     # trailing only
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:114: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_funding_d2"] = fund_d2.shift(1)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:119: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_funding_sign_persist_8h"] = roll_sign
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:131: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_oi_close_corr_12h"] = _roll_corr(d_oi, d_close, OI_DIVERGENCE_WINDOW)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:138: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_oi_bullish_build"] = ((sign_close > 0) & (sign_oi > 0)).astype(float)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:139: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_oi_bearish_build"] = ((sign_close < 0) & (sign_oi > 0)).astype(float)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:156: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_liq_long_cluster"] = ll_cum_8h / (ll_base * 8 + 1e-9)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:157: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_liq_short_cluster"] = ls_cum_8h / (ls_base * 8 + 1e-9)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:161: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_liq_cluster_imb"] = np.where(
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:172: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_break_funding_align_up"] = up_align
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:173: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_break_funding_align_dn"] = dn_align
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:218: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_fcvd_sign_streak"] = _signed_streak(out["cg_fcvd_delta"], cap=24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:220: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_scvd_sign_streak"] = _signed_streak(out["cg_scvd_delta"], cap=24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:222: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_taker_sign_streak"] = _signed_streak(out["cg_taker_delta"], cap=24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:224: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_oi_sign_streak"] = _signed_streak(out["cg_oi_delta"], cap=24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:227: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_pos_ls_sign_streak"] = _signed_streak(pos_d, cap=24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:236: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_flow_consensus_signed"] = consensus_signed
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:237: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_flow_consensus_persist_8h"] = consensus_signed.rolling(
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:250: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_flow_consensus_zweighted"] = weighted
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:257: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_spot_lead_ratio"] = (sd - fd) / denom
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:263: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_retail_whale_div"] = retail_d - whale_d
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:275: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_long_build_persist_8h"] = long_build_flag.rolling(
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:278: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_net_build_8h"] = out["dfp_long_build_persist_8h"] - short_build_8h
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:279: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_long_cover_persist_8h"] = long_cover_flag.rolling(
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:281: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_short_cover_persist_8h"] = short_cover_flag.rolling(
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:286: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_fcvd_cum_24h_rank"] = _pct_rank_trailing(out["cg_fcvd_cum"], 24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:288: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_scvd_cum_24h_rank"] = _pct_rank_trailing(out["cg_scvd_cum"], 24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:291: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_taker_4h_24h_rank"] = _pct_rank_trailing(taker_4h, 24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_liq_long_dom_streak"] = _flag_streak(long_dom, cap=12)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:300: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_liq_short_dom_streak"] = _flag_streak(short_dom, cap=12)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:306: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_post_long_liq_rev"] = ll_extreme.astype(float) * (
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:525: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df["exchange_flow_8h"] = _flow.rolling(8, min_periods=4).sum()
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:529: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df["oi_to_volume_zscore"] = _zscore(_oi_vol_ratio, 168)
+[backup] binary direction artifacts -> C:\Users\rfo\Desktop\flowbot\flow_system\indicator\model_artifacts\dual_model_backup_direction_binary_20260501_073448
+Parquet data is 431.6h old (threshold: 6.0h). Running backfill...
+============================================================
+[1/3] Binance klines 1h backfill
+============================================================
+  Existing: 4695 bars, ends at 2026-04-30 14:00:00+00:00
+  Fetched 8 bars up to 2026-04-30 22:00:00+00:00
+  Updated: 4703 bars, 2025-10-17 00:00:00+00:00 -> 2026-04-30 22:00:00+00:00
+
+============================================================
+[2/4 existing] Coinglass endpoints
+============================================================
+  oi: 4697 bars, 2025-10-17 -> 2026-04-30
+  oi_agg: 4697 bars, 2025-10-17 -> 2026-04-30
+  liquidation: 4697 bars, 2025-10-17 -> 2026-04-30
+  long_short: 4697 bars, 2025-10-17 -> 2026-04-30
+  global_ls: 4697 bars, 2025-10-17 -> 2026-04-30
+  funding: 4697 bars, 2025-10-17 -> 2026-04-30
+  taker: 4697 bars, 2025-10-17 -> 2026-04-30
+
+============================================================
+[3/4 new] Coinglass endpoints
+============================================================
+  coinbase_premium: 4572 bars, 2025-10-22 -> 2026-04-30
+  bitfinex_margin: 4572 bars, 2025-10-22 -> 2026-04-30
+  top_ls_position: 4572 bars, 2025-10-22 -> 2026-04-30
+  futures_cvd_agg: 4572 bars, 2025-10-22 -> 2026-04-30
+  spot_cvd_agg: 4572 bars, 2025-10-22 -> 2026-04-30
+  liq_agg: 4572 bars, 2025-10-22 -> 2026-04-30
+  oi_coin_margin: 1572 bars, 2026-02-24 -> 2026-04-30
+
+============================================================
+[4/4] Deribit DVOL 1h backfill
+============================================================
+  Existing: 6412 bars, ends at 2026-04-30 15:00:00+00:00
+  iter 0: +9 rows, earliest=2026-04-30 15:00:00+00:00
+  Updated: 6420 bars, 2025-08-06 12:00:00+00:00 -> 2026-04-30 23:00:00+00:00
+
+============================================================
+DONE - all parquet files updated
+============================================================
+[data] features: 136/136 available
+[data] training rows: 3995   target mu/sigma = -0.00011 / 0.00712
+[train] fit complete: mse  n_estimators=250
+[train] in-sample MAE=0.00339  corr=+0.8385  std=0.00293  (diagnostic only, NOT OOS)
+[calib] fallback strong ±  up=+0.00215  dn=-0.00160
+[calib] fallback mod    ±  up=+0.00112  dn=-0.00101
+[calib] warmup buffer: 500 signed preds  std=0.00201
+[calib] buffer/WF-OOS std ratio = 2.27x  (prod model typically 2-4x wider than WF folds; this is expected)
+[export] wrote direction_xgb.json
+[export] wrote direction_feature_cols.json  (136 features)
+[export] wrote direction_reg_config.json
+[export] seeded training_stats.json::dir_pred_history (500 bars)
+[export] magnitude model UNTOUCHED
+
+Rollback: delete direction_reg_config.json + restore from dual_model_backup_direction_binary_20260501_073448/

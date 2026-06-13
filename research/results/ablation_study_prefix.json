@@ -1,0 +1,155 @@
+{
+  "baseline": {
+    "n_features": 29,
+    "features": [
+      "cg_oi_close_zscore",
+      "cg_oi_agg_close",
+      "vol_acceleration",
+      "cg_bfx_margin_ratio",
+      "quote_vol_zscore",
+      "cg_oi_close",
+      "cg_oi_close_pctchg_8h",
+      "vol_kurtosis",
+      "cg_oi_close_pctchg_24h",
+      "cg_oi_range_zscore",
+      "cg_oi_close_pctchg_12h",
+      "cg_ls_ratio",
+      "cg_ls_divergence_zscore",
+      "cg_pos_account_divergence",
+      "cg_taker_sell",
+      "cg_bfx_margin_ratio_zscore",
+      "cg_gls_ratio",
+      "cg_oi_close_pctchg_4h",
+      "cg_bfx_margin_delta_zscore",
+      "cg_liq_total_zscore",
+      "cg_oi_range_pct",
+      "return_lag_4",
+      "cg_oi_binance_share_zscore",
+      "cg_liq_long",
+      "cg_liq_x_oi",
+      "hour_sin",
+      "hour_cos",
+      "vol_regime",
+      "squeeze_proxy"
+    ],
+    "auc": 0.5953167456402896,
+    "ic": 0.13649400307668214,
+    "acc": 0.5772477064220184,
+    "fold_auc_mean": 0.676723018843411,
+    "fold_auc_std": 0.12962708858395772,
+    "n_folds": 77,
+    "n_samples": 2725
+  },
+  "candidates": {
+    "is_trending_bull": {
+      "metrics": {
+        "auc": 0.6145772056050802,
+        "ic": 0.18018608655180743,
+        "acc": 0.584954128440367,
+        "fold_auc_mean": 0.6990509546668929,
+        "fold_auc_std": 0.13261236432022763,
+        "n_folds": 77,
+        "n_samples": 2725
+      },
+      "delta_auc": 0.019260459964790644,
+      "delta_ic": 0.04369208347512529,
+      "delta_acc": 0.007706422018348591,
+      "verdict": "KEEP"
+    },
+    "is_trending_bear": {
+      "metrics": {
+        "auc": 0.600996274341222,
+        "ic": 0.1592094962673416,
+        "acc": 0.5688073394495413,
+        "fold_auc_mean": 0.6866914109761713,
+        "fold_auc_std": 0.1365702765546276,
+        "n_folds": 77,
+        "n_samples": 2725
+      },
+      "delta_auc": 0.005679528700932468,
+      "delta_ic": 0.022715493190659464,
+      "delta_acc": -0.008440366972477076,
+      "verdict": "KEEP"
+    },
+    "vol_kurt_non_bear": {
+      "metrics": {
+        "auc": 0.5884079003790302,
+        "ic": 0.12822642144330615,
+        "acc": 0.5603669724770642,
+        "fold_auc_mean": 0.6823670134066311,
+        "fold_auc_std": 0.13112160953098187,
+        "n_folds": 77,
+        "n_samples": 2725
+      },
+      "delta_auc": -0.006908845261259344,
+      "delta_ic": -0.008267581633375987,
+      "delta_acc": -0.01688073394495415,
+      "verdict": "DROP"
+    },
+    "oi_8h_non_bull": {
+      "metrics": {
+        "auc": 0.6047203170149911,
+        "ic": 0.1523698470275125,
+        "acc": 0.5820183486238533,
+        "fold_auc_mean": 0.6927491611113282,
+        "fold_auc_std": 0.13477076901891016,
+        "n_folds": 77,
+        "n_samples": 2725
+      },
+      "delta_auc": 0.009403571374701492,
+      "delta_ic": 0.01587584395083036,
+      "delta_acc": 0.004770642201834874,
+      "verdict": "KEEP"
+    },
+    "long_liq_exhaustion_4h": {
+      "metrics": {
+        "auc": 0.6044501582704669,
+        "ic": 0.1575174143981112,
+        "acc": 0.5820183486238533,
+        "fold_auc_mean": 0.7008983276142388,
+        "fold_auc_std": 0.1305505187336113,
+        "n_folds": 77,
+        "n_samples": 2725
+      },
+      "delta_auc": 0.009133412630177307,
+      "delta_ic": 0.02102341132142907,
+      "delta_acc": 0.004770642201834874,
+      "verdict": "KEEP"
+    },
+    "cvd_persistence_12h": {
+      "metrics": {
+        "auc": 0.6030947855860749,
+        "ic": 0.16108548595166697,
+        "acc": 0.5735779816513762,
+        "fold_auc_mean": 0.6923104903887868,
+        "fold_auc_std": 0.13529233620450323,
+        "n_folds": 77,
+        "n_samples": 2725
+      },
+      "delta_auc": 0.007778039945785298,
+      "delta_ic": 0.024591482874984832,
+      "delta_acc": -0.003669724770642202,
+      "verdict": "KEEP"
+    }
+  },
+  "combined": {
+    "keep_features": [
+      "is_trending_bull",
+      "is_trending_bear",
+      "oi_8h_non_bull",
+      "long_liq_exhaustion_4h",
+      "cvd_persistence_12h"
+    ],
+    "metrics": {
+      "auc": 0.6019831752783471,
+      "ic": 0.15405896233084956,
+      "acc": 0.575045871559633,
+      "fold_auc_mean": 0.6827485670427003,
+      "fold_auc_std": 0.13313762242184177,
+      "n_folds": 77,
+      "n_samples": 2725
+    },
+    "delta_auc": 0.006666429638057525,
+    "delta_ic": 0.017564959254167428
+  }
+}

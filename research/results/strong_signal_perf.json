@@ -1,0 +1,32 @@
+{
+  "cutoff": null,
+  "guard_source": "none",
+  "strong": {
+    "label": "Strong",
+    "total": 700,
+    "filled": 700,
+    "pending": 0,
+    "correct": 419,
+    "win_rate": 0.5985714285714285,
+    "ci_lo": 0.5618150714832579,
+    "ci_hi": 0.6342517708289894,
+    "avg_confidence": 86.4140292253191,
+    "avg_return_raw": -0.0002447879432888604,
+    "avg_return_directional": 0.0019248740545450545
+  },
+  "moderate": {
+    "label": "Moderate",
+    "total": 1104,
+    "filled": 1104,
+    "pending": 0,
+    "correct": 596,
+    "win_rate": 0.5398550724637681,
+    "ci_lo": 0.5103668788227712,
+    "ci_hi": 0.569066859718912,
+    "avg_confidence": 58.15439312440942,
+    "avg_return_raw": -0.0002346495605726561,
+    "avg_return_directional": 0.0007648758511954596
+  },
+  "n_signals_checked": 1804,
+  "run_at": "2026-04-13T15:51:30.348373+00:00"
+}

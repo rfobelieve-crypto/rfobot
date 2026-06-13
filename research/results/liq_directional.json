@@ -1,0 +1,100 @@
+{
+  "H1_rule_liq_imbalance_sign": {
+    "description": "Use sign(cg_liq_imbalance) directly as direction signal",
+    "ic_spearman": 0.014842035732847534,
+    "ic_boot_ci": [
+      -0.014787500328045192,
+      0.04238731203859054
+    ],
+    "top5_precision": 0.5353535353535354,
+    "top5_k": 198,
+    "n": 3995
+  },
+  "H2_imb_ic_on_cascade_bars": {
+    "description": "Spearman IC of liq_imbalance vs return, restricted to bars where cascade actually occurred",
+    "ic_spearman": -0.2520298509328147,
+    "ic_boot_ci": [
+      -0.3392463176962488,
+      -0.16751366552367386
+    ],
+    "top5_precision_in_cascade": 0.3,
+    "n_cascade_bars": 429
+  },
+  "baseline_direction_reg": {
+    "description": "Current production-style direction regressor, 136 features, same hyperparams",
+    "ic_spearman": 0.021554243106388482,
+    "ic_boot_ci": [
+      -0.010891527198316245,
+      0.05499539314995132
+    ],
+    "top5_precision": 0.5434782608695652,
+    "top5_k": 184,
+    "top10_precision": 0.5380434782608695,
+    "n_oos": 3696
+  },
+  "cascade_classifier": {
+    "auc": 0.7083719205864911,
+    "auc_boot_ci": [
+      0.6840660520040198,
+      0.7347641007218646
+    ],
+    "base_rate": 0.10903679653679654,
+    "n_oos": 3696
+  },
+  "H3_2stage_pipeline": {
+    "description": "Direction precision conditional on predicted surge in top-N%",
+    "gates": {
+      "gate_top10pct": {
+        "n_gated_bars": 370,
+        "ic_on_gated": -0.053569933091332074,
+        "all_gated_precision": 0.4837837837837838,
+        "top5_within_gated_precision": 0.4444444444444444,
+        "top5_within_gated_k": 18
+      },
+      "gate_top15pct": {
+        "n_gated_bars": 555,
+        "ic_on_gated": -0.08213729923466827,
+        "all_gated_precision": 0.4720720720720721,
+        "top5_within_gated_precision": 0.4230769230769231,
+        "top5_within_gated_k": 26
+      },
+      "gate_top20pct": {
+        "n_gated_bars": 740,
+        "ic_on_gated": -0.04632628442898367,
+        "all_gated_precision": 0.4837837837837838,
+        "top5_within_gated_precision": 0.3888888888888889,
+        "top5_within_gated_k": 36
+      },
+      "gate_top30pct": {
+        "n_gated_bars": 1109,
+        "ic_on_gated": -0.04415183658200263,
+        "all_gated_precision": 0.48512173128944996,
+        "top5_within_gated_precision": 0.3888888888888889,
+        "top5_within_gated_k": 54
+      },
+      "gate_top50pct": {
+        "n_gated_bars": 1848,
+        "ic_on_gated": 0.004968943702563158,
+        "all_gated_precision": 0.520021645021645,
+        "top5_within_gated_precision": 0.4673913043478261,
+        "top5_within_gated_k": 92
+      }
+    }
+  },
+  "H4_augmented_direction": {
+    "description": "Direction regressor with p(surge) added as 137th feature",
+    "ic_spearman": 0.03399320463306074,
+    "ic_boot_ci": [
+      0.0017249705921001542,
+      0.06663907045233529
+    ],
+    "top5_precision": 0.5217391304347826,
+    "top10_precision": 0.5380434782608695,
+    "n_oos": 3696,
+    "delta_vs_baseline": {
+      "ic": 0.01243896152667226,
+      "top5_precision": -0.021739130434782594
+    }
+  },
+  "elapsed_sec": 297.6
+}

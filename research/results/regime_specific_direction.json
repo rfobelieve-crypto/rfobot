@@ -1,0 +1,36 @@
+{
+  "n_oos": 1970,
+  "auc_global_all": 0.5345851393188855,
+  "auc_regime_all": 0.5138960009063103,
+  "per_regime": {
+    "CHOP": {
+      "n_oos": 1375,
+      "auc_global": 0.5483651486055119,
+      "auc_regime": 0.5499845268829512,
+      "delta": 0.0016193782774392984,
+      "n_regime_oos": 1375
+    },
+    "BULL": {
+      "n_oos": 245,
+      "auc_global": 0.4997996794871795,
+      "auc_regime": 0.44043085627244044,
+      "delta": -0.059368823214739075,
+      "n_regime_oos": 192
+    },
+    "BEAR": {
+      "n_oos": 350,
+      "auc_global": 0.4965551020408163,
+      "auc_regime": 0.37810559006211186,
+      "delta": -0.11844951197870446,
+      "n_regime_oos": 313
+    }
+  },
+  "skipped_splits_per_regime": {
+    "0": 0,
+    "1": 16,
+    "2": 3
+  },
+  "horizon": 4,
+  "k_deadzone": 0.5,
+  "n_features": 35
+}

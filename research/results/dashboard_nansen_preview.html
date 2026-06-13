@@ -1,0 +1,122 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nansen Style 預覽 · 呼吸綠光</title>
+<style>
+:root{
+  --bg:#0a0b0d; --surface:#141619; --surface2:#1a1d21;
+  --border:#272a30; --border-soft:#1f232a;
+  --txt:#e8eaed; --mut:#9aa0a6; --dim:#5f656d;
+  --green:#34e0a0; --green-dim:rgba(52,224,160,0.14);
+  --red:#ff5f6d; --red-dim:rgba(255,95,109,0.14);
+  --warn:#f5b544; --blue:#7aa2ff;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;min-height:100vh;}
+
+/* ── breathing green ambient glow (~6s = calm breath) ── */
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(1300px 920px at 8% -14%, rgba(52,224,160,0.24), transparent 70%),
+    radial-gradient(1200px 1050px at 112% 4%, rgba(48,222,196,0.14), transparent 68%),
+    radial-gradient(1250px 1100px at 50% 124%, rgba(66,206,178,0.13), transparent 70%),
+    radial-gradient(1050px 950px at 50% 48%, rgba(52,224,160,0.08), transparent 74%);
+  animation:breathe 6s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{opacity:0.35;}50%{opacity:0.9;}}
+@media (prefers-reduced-motion:reduce){body::before{animation:none;opacity:0.5;}}
+
+.topbar{background:rgba(10,11,13,0.7);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-mark{width:27px;height:27px;flex-shrink:0;filter:drop-shadow(0 0 7px rgba(52,224,160,0.4));}
+.logo-word{font-size:16.5px;font-weight:760;letter-spacing:0.6px;color:var(--txt);}
+.logo-word em{font-style:normal;background:linear-gradient(92deg,#34e0a0,#39d6d6);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.logo-node{animation:breathe 6s ease-in-out infinite;transform-origin:center;}
+.logo-tag{font-size:9px;font-weight:700;letter-spacing:0.8px;color:var(--green);background:var(--green-dim);padding:2px 6px;border-radius:5px;margin-left:2px;}
+.topbar .meta{color:var(--mut);font-size:11px;}
+.tab-bar{background:rgba(10,11,13,0.7);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);display:flex;gap:2px;padding:0 14px;position:sticky;top:46px;}
+.tab{background:transparent;border:none;color:var(--mut);padding:11px 14px;cursor:pointer;font-size:12.5px;font-weight:500;border-bottom:2px solid transparent;transition:all .15s;}
+.tab:hover{color:var(--txt);}
+.tab.active{color:var(--txt);border-bottom-color:var(--green);font-weight:600;}
+.content{max-width:1200px;margin:0 auto;padding:18px 20px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:13px 14px;transition:border-color .15s,background .15s;}
+.card:hover{border-color:#33373e;background:var(--surface2);}
+.card-title{color:var(--mut);font-size:10.5px;font-weight:500;letter-spacing:0.2px;}
+.card-value{font-size:21px;font-weight:680;margin:4px 0 2px;color:var(--txt);letter-spacing:-0.3px;}
+.card-sub{color:var(--dim);font-size:10.5px;}
+.up{color:var(--green);} .down{color:var(--red);}
+.section{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+.section-header{padding:12px 15px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-soft);}
+.section-header:hover{background:var(--surface2);}
+.section-title{color:var(--txt);font-size:13px;font-weight:600;}
+.section-toggle{color:var(--dim);font-size:13px;}
+.section-body{padding:13px 15px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;color:var(--mut);padding:7px 8px;border-bottom:1px solid var(--border);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;}
+td{padding:8px;border-bottom:1px solid var(--border-soft);}
+tbody tr{transition:background .12s;} tbody tr:hover{background:var(--surface2);}
+tr:last-child td{border-bottom:none;}
+.badge{display:inline-block;padding:3px 9px;border-radius:6px;font-size:10.5px;font-weight:600;}
+.badge.b-green{background:var(--green-dim);color:var(--green);}
+.badge.b-red{background:var(--red-dim);color:var(--red);}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+.dot-ok{background:var(--green);} .dot-err{background:var(--red);}
+.regime-row{display:flex;gap:3px;height:8px;border-radius:4px;overflow:hidden;margin:10px 0 6px;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.gauge-wrap{display:flex;align-items:center;margin:7px 0;}
+.gauge-label{width:90px;font-size:11px;color:var(--mut);}
+.gauge-track{flex:1;height:6px;background:#23262c;border-radius:4px;overflow:hidden;margin:0 10px;}
+.gauge-fill{height:100%;border-radius:4px;}
+.gauge-val{width:46px;text-align:right;font-size:11.5px;color:var(--txt);}
+code{background:#23262c;padding:1px 6px;border-radius:5px;font-size:11px;color:var(--green);}
+.footer{text-align:center;color:var(--dim);font-size:10px;padding:22px 0;}
+</style></head><body>
+<div class="topbar">
+<div class="logo">
+  <svg class="logo-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+    <defs><linearGradient id="lgm" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34e0a0"/><stop offset="1" stop-color="#39d6d6"/></linearGradient></defs>
+    <rect x="2.5" y="2.5" width="27" height="27" rx="8" fill="rgba(52,224,160,0.07)" stroke="url(#lgm)" stroke-width="1.4"/>
+    <path d="M6 20 L10 20 L13 12.5 L16 22 L19 9.5 L24 9.5" stroke="url(#lgm)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle class="logo-node" cx="24" cy="9.5" r="2.4" fill="#34e0a0"/>
+  </svg>
+  <span class="logo-word">FLOW<em>BOT</em></span>
+  <span class="logo-tag">DUAL v7</span>
+</div>
+<div class="meta">2026-06-09 17:45 UTC+8 &nbsp;<span style="color:#34e0a0">&#9679;</span></div></div>
+<div class="tab-bar">
+<button class="tab active">總覽</button><button class="tab">模型績效</button>
+<button class="tab">市場情報</button><button class="tab">系統健康</button>
+<button class="tab">分析圖表</button><button class="tab">Agent</button></div>
+<div class="content">
+<div class="grid">
+ <div class="card"><div class="card-title">Model AUC</div><div class="card-value up">0.587</div><div class="card-sub">baseline 0.59 · OK</div></div>
+ <div class="card"><div class="card-title">Spearman IC</div><div class="card-value">+0.164</div><div class="card-sub">recent60d +0.171</div></div>
+ <div class="card"><div class="card-title">Strong 勝率</div><div class="card-value">71.1%</div><div class="card-sub">Moderate 61.3%</div></div>
+ <div class="card"><div class="card-title">當前部位</div><div class="card-value up">LONG 0.33</div><div class="card-sub">+$4.84 · 有效 1.95x</div></div>
+</div>
+<div class="section"><div class="section-header"><span class="section-title">Regime 拆解</span><span class="section-toggle">&#9662;</span></div>
+<div class="section-body">
+ <div class="regime-row"><div style="background:#34e0a0;flex:2.04"></div><div style="background:#7aa2ff;flex:1.61"></div><div style="background:#9aa0a6;flex:1.20"></div></div>
+ <table><thead><tr><th>Regime</th><th>IC</th><th>勝率</th><th>n</th></tr></thead><tbody>
+ <tr><td>BEAR</td><td class="up">+0.204</td><td>57.1%</td><td>737</td></tr>
+ <tr><td>CHOPPY</td><td>+0.161</td><td>55.8%</td><td>2,291</td></tr>
+ <tr><td>BULL</td><td>+0.120</td><td>56.7%</td><td>668</td></tr></tbody></table>
+</div></div>
+<div class="two-col">
+ <div class="section"><div class="section-header"><span class="section-title">最近訊號</span><span class="section-toggle">&#9662;</span></div>
+ <div class="section-body"><table><tbody>
+  <tr><td><span class="badge b-green">LONG</span></td><td>Strong</td><td class="up">+0.40%</td><td style="color:#5f656d">14:00</td></tr>
+  <tr><td><span class="badge b-red">SHORT</span></td><td>Moderate</td><td class="up">+0.21%</td><td style="color:#5f656d">09:00</td></tr>
+ </tbody></table></div></div>
+ <div class="section"><div class="section-header"><span class="section-title">系統狀態</span><span class="section-toggle">&#9662;</span></div>
+ <div class="section-body">
+  <div class="gauge-wrap"><span class="gauge-label">OKX REST</span><div class="gauge-track"><div class="gauge-fill" style="width:18%;background:#34e0a0"></div></div><span class="gauge-val">42ms</span></div>
+  <div class="gauge-wrap"><span class="gauge-label">Binance</span><div class="gauge-track"><div class="gauge-fill" style="width:30%;background:#34e0a0"></div></div><span class="gauge-val">71ms</span></div>
+  <p style="margin-top:10px"><span class="dot dot-ok"></span>Reconciliation CONSISTENT</p>
+  <p style="margin-top:7px"><span class="badge b-green">PASS</span> 月度重驗 · <code>AUC 0.587</code></p>
+ </div></div>
+</div></div>
+<div class="footer">BTC Market Intelligence Indicator · Dual v7 · Nansen Style</div>
+</body></html>

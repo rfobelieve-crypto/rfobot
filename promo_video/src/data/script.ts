@@ -32,7 +32,7 @@ export const SCENES: Scene[] = [
   {
     id: 1,
     title: 'Cold Open',
-    start: s(0), end: s(20),
+    start: s(0.0), end: s(14.0),
     vo_zh:
       '凌晨三點，BTC 突然跳水百分之五。' +
       '你還在睡。' +
@@ -46,7 +46,7 @@ export const SCENES: Scene[] = [
   {
     id: 2,
     title: 'Hook',
-    start: s(20), end: s(50),
+    start: s(14.0), end: s(33.2),
     vo_zh:
       '我花了四個月，把一個訊號指標系統，' +
       '一步一步演化成可以自動下單的量化交易機器人。' +
@@ -61,7 +61,7 @@ export const SCENES: Scene[] = [
   {
     id: 3,
     title: 'Problem',
-    start: s(50), end: s(90),
+    start: s(33.2), end: s(62.3),
     vo_zh:
       '為什麼自己做？' +
       '市面上的量化產品有三個共通問題：' +
@@ -79,7 +79,7 @@ export const SCENES: Scene[] = [
   {
     id: 4,
     title: 'Architecture Overview',
-    start: s(90), end: s(150),
+    start: s(62.3), end: s(88.0),
     vo_zh:
       '系統分兩個獨立服務：' +
       '左邊是市場數據收集，' +
@@ -98,7 +98,7 @@ export const SCENES: Scene[] = [
   {
     id: 5,
     title: 'V7 Model',
-    start: s(150), end: s(210),
+    start: s(88.0), end: s(113.6),
     vo_zh:
       'V7 模型是核心。' +
       '兩百個工程特徵分十二個群組，' +
@@ -116,7 +116,7 @@ export const SCENES: Scene[] = [
   {
     id: 6,
     title: 'Stage Framework',
-    start: s(210), end: s(270),
+    start: s(113.6), end: s(141.4),
     vo_zh:
       '上線分五個階段，不是一次到位。' +
       'Stage 1 paper trading 0 風險虛擬下單。' +
@@ -133,7 +133,7 @@ export const SCENES: Scene[] = [
   {
     id: 7,
     title: 'Kill Switches',
-    start: s(270), end: s(330),
+    start: s(141.4), end: s(172.2),
     vo_zh:
       'Kill switch 是這套系統的最後防線。' +
       '單日虧損百分之二十、累計虧損百分之三十、' +
@@ -152,7 +152,7 @@ export const SCENES: Scene[] = [
   {
     id: 8,
     title: 'Telegram Demo',
-    start: s(330), end: s(390),
+    start: s(172.2), end: s(201.1),
     vo_zh:
       'Telegram 是主要互動介面。' +
       '我用按鈕設計把所有功能擺在 thumb-reach。' +
@@ -172,7 +172,7 @@ export const SCENES: Scene[] = [
   {
     id: 9,
     title: 'Paper Track Record',
-    start: s(390), end: s(450),
+    start: s(201.1), end: s(228.6),
     vo_zh:
       '五月十八號開始 paper trading。' +
       '十三天，九筆 trade，累計報酬八點五個百分點。' +
@@ -190,7 +190,7 @@ export const SCENES: Scene[] = [
   {
     id: 10,
     title: 'OKX Live Launch',
-    start: s(450), end: s(510),
+    start: s(228.6), end: s(259.5),
     vo_zh:
       '上週把 OKX 接上來，' +
       '初始保證金一百美金，十倍槓桿。' +
@@ -209,7 +209,7 @@ export const SCENES: Scene[] = [
   {
     id: 11,
     title: 'Engineering Hardening',
-    start: s(510), end: s(570),
+    start: s(259.5), end: s(291.2),
     vo_zh:
       '從本地測試過到 Railway 真實上線，' +
       '抓了七個如果沒實際連線根本不會發現的 bug。' +
@@ -228,7 +228,7 @@ export const SCENES: Scene[] = [
   {
     id: 12,
     title: 'Dashboard Tour',
-    start: s(570), end: s(630),
+    start: s(291.2), end: s(315.7),
     vo_zh:
       'Dashboard 分三個 endpoint。' +
       '/perf 看 indicator 的訊號績效跟 IC 衰退。' +
@@ -245,7 +245,7 @@ export const SCENES: Scene[] = [
   {
     id: 13,
     title: 'Why Different',
-    start: s(630), end: s(690),
+    start: s(315.7), end: s(346.0),
     vo_zh:
       '這套跟市售量化的差別：' +
       '第一，訊號全開源，' +
@@ -265,7 +265,7 @@ export const SCENES: Scene[] = [
   {
     id: 14,
     title: 'Current Status + Roadmap',
-    start: s(690), end: s(750),
+    start: s(346.0), end: s(378.7),
     vo_zh:
       '坦白現況：' +
       'OKX live 上週才啟動，目前零筆 live trade，' +

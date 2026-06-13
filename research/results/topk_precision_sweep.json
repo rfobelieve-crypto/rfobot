@@ -1,0 +1,117 @@
+{
+  "oos_file": "direction_oos_full_expanded",
+  "exclude_contaminated": true,
+  "n_samples": 2649,
+  "date_range": [
+    "2025-11-08 19:00:00+00:00",
+    "2026-04-06 22:00:00+00:00"
+  ],
+  "baseline_accuracy": 0.5575688939222349,
+  "base_rate_up": 0.49754624386560964,
+  "sweep": [
+    {
+      "k_frac": 0.01,
+      "k_count": 26,
+      "n_total": 2649,
+      "precision": 0.5769230769230769,
+      "ci_lo": 0.3894829692111983,
+      "ci_hi": 0.744558100972706,
+      "signals_per_month": 5.230511316010058,
+      "avg_dir_return": -0.00029751807698247685,
+      "min_confidence": 0.23332417011260986,
+      "prob_threshold_up": 0.7333241701126099,
+      "prob_threshold_down": 0.26667582988739014
+    },
+    {
+      "k_frac": 0.02,
+      "k_count": 53,
+      "n_total": 2649,
+      "precision": 0.6415094339622641,
+      "ci_lo": 0.5069089329999881,
+      "ci_hi": 0.7569823015887636,
+      "signals_per_month": 10.66219614417435,
+      "avg_dir_return": 0.0007256159821293717,
+      "min_confidence": 0.2073938250541687,
+      "prob_threshold_up": 0.7073938250541687,
+      "prob_threshold_down": 0.2926061749458313
+    },
+    {
+      "k_frac": 0.05,
+      "k_count": 132,
+      "n_total": 2649,
+      "precision": 0.6742424242424242,
+      "ci_lo": 0.5903484794634238,
+      "ci_hi": 0.7482812186555617,
+      "signals_per_month": 26.55490360435876,
+      "avg_dir_return": 0.002069223125750186,
+      "min_confidence": 0.1648266315460205,
+      "prob_threshold_up": 0.6648266315460205,
+      "prob_threshold_down": 0.3351733684539795
+    },
+    {
+      "k_frac": 0.1,
+      "k_count": 265,
+      "n_total": 2649,
+      "precision": 0.6528301886792452,
+      "ci_lo": 0.5936957070423378,
+      "ci_hi": 0.707596950046446,
+      "signals_per_month": 53.31098072087175,
+      "avg_dir_return": 0.0017069976395981653,
+      "min_confidence": 0.13144361972808838,
+      "prob_threshold_up": 0.6314436197280884,
+      "prob_threshold_down": 0.3685563802719116
+    },
+    {
+      "k_frac": 0.15,
+      "k_count": 397,
+      "n_total": 2649,
+      "precision": 0.6246851385390428,
+      "ci_lo": 0.576072955641135,
+      "ci_hi": 0.6709073976954447,
+      "signals_per_month": 79.86588432523051,
+      "avg_dir_return": 0.001845027774524968,
+      "min_confidence": 0.11037677526473999,
+      "prob_threshold_up": 0.61037677526474,
+      "prob_threshold_down": 0.38962322473526
+    },
+    {
+      "k_frac": 0.2,
+      "k_count": 530,
+      "n_total": 2649,
+      "precision": 0.6018867924528302,
+      "ci_lo": 0.5596220400269982,
+      "ci_hi": 0.6426851612102227,
+      "signals_per_month": 106.6219614417435,
+      "avg_dir_return": 0.0015756375530861682,
+      "min_confidence": 0.09414026141166687,
+      "prob_threshold_up": 0.5941402614116669,
+      "prob_threshold_down": 0.40585973858833313
+    },
+    {
+      "k_frac": 0.3,
+      "k_count": 795,
+      "n_total": 2649,
+      "precision": 0.5924528301886792,
+      "ci_lo": 0.5579298802820524,
+      "ci_hi": 0.6260865755459867,
+      "signals_per_month": 159.93294216261526,
+      "avg_dir_return": 0.00108646776025618,
+      "min_confidence": 0.06948980689048767,
+      "prob_threshold_up": 0.5694898068904877,
+      "prob_threshold_down": 0.43051019310951233
+    },
+    {
+      "k_frac": 0.5,
+      "k_count": 1324,
+      "n_total": 2649,
+      "precision": 0.5876132930513596,
+      "ci_lo": 0.5608808547597777,
+      "ci_hi": 0.6138387804738226,
+      "signals_per_month": 266.3537300922045,
+      "avg_dir_return": 0.00145378400987911,
+      "min_confidence": 0.03316783905029297,
+      "prob_threshold_up": 0.533167839050293,
+      "prob_threshold_down": 0.46683216094970703
+    }
+  ]
+}

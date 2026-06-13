@@ -1,0 +1,54 @@
+{
+  "freshness": {
+    "status": "fresh",
+    "cache_mtime": 1776046511.5422907,
+    "cache_mtime_iso": "2026-04-13T02:15:11.542290688",
+    "stale_sources": [],
+    "raw_count": 15
+  },
+  "ohlc": {
+    "status": "ok",
+    "overlap_bars": 3983,
+    "overlap_start": "2025-10-28 11:00:00",
+    "overlap_end": "2026-04-12 09:00:00",
+    "columns": {
+      "close": {
+        "n": 3983,
+        "max_abs_diff": 0.0,
+        "max_rel_diff": 0.0,
+        "mean_rel_diff": 0.0,
+        "drift": false
+      },
+      "open": {
+        "n": 3983,
+        "max_abs_diff": 0.0,
+        "max_rel_diff": 0.0,
+        "mean_rel_diff": 0.0,
+        "drift": false
+      },
+      "high": {
+        "n": 3983,
+        "max_abs_diff": 0.0,
+        "max_rel_diff": 0.0,
+        "mean_rel_diff": 0.0,
+        "drift": false
+      },
+      "low": {
+        "n": 3983,
+        "max_abs_diff": 0.0,
+        "max_rel_diff": 0.0,
+        "mean_rel_diff": 0.0,
+        "drift": false
+      }
+    }
+  },
+  "rebuild": {
+    "status": "ok",
+    "overlap_bars": 3999,
+    "drifted": [],
+    "stable": 82,
+    "only_in_old_cache": [],
+    "only_in_new_rebuild": [],
+    "n_critical_checked": 82
+  }
+}

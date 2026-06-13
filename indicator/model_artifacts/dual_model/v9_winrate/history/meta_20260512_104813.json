@@ -1,0 +1,42 @@
+{
+  "version": "v9_20260512_103707",
+  "trained_at_utc": "2026-05-12T10:38:22.347945+00:00",
+  "duration_seconds": 74.648099,
+  "n_bars": 3991,
+  "feature_cols_n": 136,
+  "horizon_bars": 8,
+  "tp_dist": 0.005,
+  "sl_dist": 0.003,
+  "val_auc_long": 0.5464320625610948,
+  "val_auc_short": 0.4968096419709323,
+  "median_auc_long": 0.6107033639143731,
+  "median_auc_short": 0.5466867469879518,
+  "cv_aucs_long": [
+    0.6060844185002245,
+    0.6107033639143731,
+    0.6960084033613446
+  ],
+  "cv_aucs_short": [
+    0.5466867469879518,
+    0.5394998579141802,
+    0.6144278606965174
+  ],
+  "model_params": {
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "n_estimators": 400,
+    "subsample": 0.8,
+    "colsample_bytree": 0.7,
+    "min_child_weight": 10,
+    "reg_alpha": 0.1,
+    "reg_lambda": 1.0,
+    "verbosity": 0,
+    "early_stopping_rounds": 30,
+    "objective": "binary:logistic",
+    "eval_metric": "auc"
+  },
+  "data_range": {
+    "start": "2025-11-26 19:00:00",
+    "end": "2026-05-12 01:00:00"
+  }
+}
