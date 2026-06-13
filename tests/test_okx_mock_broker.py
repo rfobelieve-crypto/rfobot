@@ -190,7 +190,8 @@ class TestMockBrokerFidelity:
             inst_id=cfg.inst_id, side=Side.SELL, sz=0.5,
             trigger_px=70000.0, td_mode="cross", algo_cl_ord_id="a1")
         assert algo.status == "live" and algo.algo_id
-        amend = client.amend_algo_stop(algo_id=algo.algo_id,
+        amend = client.amend_algo_stop(inst_id=cfg.inst_id,
+                                       algo_id=algo.algo_id,
                                        new_trigger_px=71000.0)
         assert amend.status == "ok"
         cancel = client.cancel_algo_stop(algo_id=algo.algo_id)

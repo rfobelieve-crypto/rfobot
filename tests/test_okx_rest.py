@@ -450,3 +450,44 @@ class TestLatencyTracking:
         client._retry_get(path="/p", params={}, retries=0, backoff_base=0.01)
         assert client.last_latency_ms() is not None
         assert client.last_latency_ms() >= 0
+
+
+class TestFacadeRestSignatureParity:
+    """Regression guard for audit P0-2 / 2026-06-10 trailing bug.
+
+    The OkxClient facade silently dropped inst_id when forwarding to the REST
+    layer (its signature lacked the param), so every amend_algo_stop raised
+    TypeError and the trailing stop never moved on the exchange.  Unit tests
+    using a permissive mock could not catch it.  These tests assert the facade
+    and REST layer (and the mock) keep identical required keyword args.
+    """
+
+    def _required_kw(self, fn):
+        import inspect
+        return {
+            name for name, p in inspect.signature(fn).parameters.items()
+            if p.kind == inspect.Parameter.KEYWORD_ONLY
+            and p.default is inspect.Parameter.empty
+        }
+
+    def test_amend_algo_stop_facade_forwards_inst_id(self):
+        from indicator.okx.client import OkxClient
+        from indicator.okx.rest import OkxRestClient
+        from indicator.okx.mock_client import MockOkxClient
+        req = self._required_kw(OkxRestClient.amend_algo_stop)
+        assert "inst_id" in req, "REST amend must require inst_id (OKX 50014)"
+        # Facade must NOT drop any required REST kwarg — that was the bug.
+        assert self._required_kw(OkxClient.amend_algo_stop) >= req, (
+            "OkxClient facade dropped a required kwarg vs REST layer")
+        # Test double must mirror the real facade so mocks can't mask drift.
+        assert "inst_id" in self._required_kw(MockOkxClient.amend_algo_stop)
+
+    def test_facade_actually_passes_inst_id_to_rest(self):
+        from indicator.okx.client import OkxClient
+        fake_rest = MagicMock()
+        client = OkxClient.__new__(OkxClient)
+        client._rest = fake_rest
+        client.amend_algo_stop(inst_id="BTC-USDT-SWAP", algo_id="a1",
+                               new_trigger_px=70000.0)
+        _, kwargs = fake_rest.amend_algo_stop.call_args
+        assert kwargs.get("inst_id") == "BTC-USDT-SWAP"

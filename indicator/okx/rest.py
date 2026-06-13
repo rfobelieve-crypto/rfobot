@@ -36,6 +36,17 @@ from indicator.okx.types import (
 logger = logging.getLogger(__name__)
 
 
+class OkxQueryUnavailable(RuntimeError):
+    """A read query (positions/balance) could not complete after retries.
+
+    Callers MUST treat this as 'unknown', NEVER as 'flat'/'zero'.  Conflating
+    the two is how get_positions() returning [] on REST failure let the
+    reconciler emit orphan_local and auto-heal delete a live position's only
+    DB record during a REST outage (2026-06 audit P0-3).  Both the reconciler
+    (→ UNAVAILABLE → HALT) and admin_heal (→ 502 refuse) already catch this.
+    """
+
+
 # ── Circuit breaker ────────────────────────────────────────────────────
 
 @dataclass
@@ -254,7 +265,11 @@ class OkxRestClient:
             path=path, params=params, retries=5, backoff_base=0.5,
         )
         if result is None:
-            return []
+            # NEVER return [] here — an empty list is indistinguishable from
+            # "OKX is flat" and would let the reconciler call orphan_local +
+            # auto-heal delete a live position's only DB record (audit P0-3).
+            raise OkxQueryUnavailable(
+                "get_positions failed after retries (circuit-open / network)")
         return self._parse_positions_response(result)
 
     def get_balance(self) -> Optional[Balance]:

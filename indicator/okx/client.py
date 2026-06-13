@@ -66,10 +66,15 @@ class OkxClient:
             pos_side=pos_side, reduce_only=reduce_only,
         )
 
-    def amend_algo_stop(self, *, algo_id: str,
+    def amend_algo_stop(self, *, inst_id: str, algo_id: str,
                         new_trigger_px: float) -> AmendResult:
+        # inst_id is REQUIRED: OKX amend-algos rejects missing instId with 50014
+        # (2026-06-10 bug).  The caller (executor.py) and the REST layer
+        # (rest.py) both pass/accept inst_id; this facade previously dropped it,
+        # so every amend raised TypeError here and the trailing stop never moved
+        # on the exchange.  Keep this signature in lockstep with rest.amend_algo_stop.
         return self._rest.amend_algo_stop(
-            algo_id=algo_id, new_trigger_px=new_trigger_px,
+            inst_id=inst_id, algo_id=algo_id, new_trigger_px=new_trigger_px,
         )
 
     def cancel_algo_stop(self, *, algo_id: str) -> CancelResult:

@@ -19,6 +19,7 @@ Skeleton status (2026-05-25):
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -106,6 +107,12 @@ class V7OkxExecutor:
         self._approval = approval_gate
         # In-memory status cache; persisted via store on every change.
         self._status: ExecutorStatus = ExecutorStatus.INIT
+        # Serializes the real-entry path.  The scheduled cycle thread and the
+        # /yes webhook thread can both reach execute_approved_intent(); without
+        # this lock they could each pass the "flat?" precondition and fire two
+        # OKX entries before either writes the DB → double position / 2x intended
+        # leverage, bypassing max_position_count=1 (2026-06 audit P0-1).
+        self._open_lock = threading.Lock()
         # NTP probe rate-limit: monotonic seconds of last probe.  0 = never.
         self._last_ntp_probe: float = 0.0
         # Orphan-local auto-heal: track consecutive reconcile cycles where
@@ -859,7 +866,55 @@ class V7OkxExecutor:
           - _open_position when in auto mode (approval_id=None)
           - app.py /yes webhook handler after gate.approve returns
             (approval_id=<id> so we can mark_executed)
+
+        Serialized + guarded under self._open_lock so concurrent callers
+        (scheduled cycle vs /yes webhook) cannot double-open (audit P0-1).
         """
+        with self._open_lock:
+            return self._execute_approved_intent_locked(
+                intent, approval_id=approval_id)
+
+    def _mark_approval_stale(self, approval_id: Optional[int],
+                             reason: str) -> None:
+        if approval_id is not None and self._approval is not None:
+            try:
+                self._approval.mark_stale(approval_id, reason=reason)
+            except Exception:
+                logger.exception("mark_approval_stale_failed reason=%s", reason)
+
+    def _execute_approved_intent_locked(self, intent: TradeIntent, *,
+                                        approval_id: Optional[int]) -> CycleResult:
+        # ── Entry guards (run under self._open_lock) ────────────────────────
+        # G1: never trade while halted/demoted.  A /yes on a stale PENDING
+        # approval must not resurrect trading after a kill switch fired.
+        if self._status in (ExecutorStatus.HALTED, ExecutorStatus.DEMOTED):
+            logger.warning("execute_intent_blocked_status status=%s",
+                           self._status.value)
+            self._mark_approval_stale(approval_id,
+                                      reason=f"status_{self._status.value}")
+            return CycleResult(action="none",
+                               detail={"reason": "blocked_status",
+                                       "status": self._status.value})
+        # G2: re-query open position INSIDE the lock — closes the TOCTOU
+        # between the caller's earlier "flat?" check and this submit.  With
+        # max_position_count=1 any existing OPEN row means refuse.
+        try:
+            already_open = self._store.get_open_position()
+        except Exception:
+            logger.exception("execute_intent_position_recheck_failed")
+            # Fail closed: if we cannot confirm we're flat, do not open.
+            self._mark_approval_stale(approval_id,
+                                      reason="position_recheck_failed")
+            return CycleResult(action="none",
+                               detail={"reason": "position_recheck_failed"})
+        if already_open is not None:
+            logger.warning("execute_intent_blocked_existing_position id=%s",
+                           already_open.get("id"))
+            self._mark_approval_stale(approval_id, reason="already_in_position")
+            return CycleResult(action="none",
+                               detail={"reason": "already_in_position",
+                                       "existing_id": already_open.get("id")})
+
         side = intent.direction
         size_contracts = intent.size_contracts
         last_close = intent.entry_price
