@@ -287,23 +287,35 @@ class V7OkxExecutor:
         local_position_dicts = self._store.get_all_open_positions() or []
         local_positions = self._dicts_to_positions(local_position_dicts)
 
-        # Equity from latest balance snapshot (WS-pushed); day_start_equity
-        # from pre-today snapshot.  Both fall back to initial_capital_usd
-        # when no snapshot exists yet (boot day before first WS event).
-        equity_usd = self._cfg.initial_capital_usd
-        day_start_equity = self._cfg.initial_capital_usd
+        # Equity (WS-pushed snapshot) + day_start anchor (last snapshot BEFORE
+        # today) are REQUIRED to evaluate the daily/total loss caps.  If the DB
+        # read raises, FAIL CLOSED: skip this cycle's trading rather than let
+        # both fall back to initial_capital and make the caps silently compute
+        # 0% loss while the account is actually down (audit P1 — a silently
+        # disabled kill switch is the worst failure mode).
         try:
             latest = self._store.get_latest_balance()
-            if latest and latest.get("total_eq_usd") is not None:
-                equity_usd = float(latest["total_eq_usd"])
             day_start = self._store.get_day_start_equity()
-            if day_start is not None:
-                day_start_equity = day_start
-            else:
-                # No pre-today anchor yet — use current as the day's anchor
-                day_start_equity = equity_usd
         except Exception:
-            logger.exception("equity_lookup_failed_using_initial")
+            logger.exception("equity_lookup_failed_fail_closed")
+            return CycleResult(action="none",
+                               detail={"reason": "equity_unavailable_fail_closed"})
+
+        if latest and latest.get("total_eq_usd") is not None:
+            equity_usd = float(latest["total_eq_usd"])
+        else:
+            # True boot only (no balance snapshot ever persisted) — conservative
+            # stand-in.  On a running account get_latest_balance returns the
+            # last persisted balance, so this branch is the first-ever cycle.
+            equity_usd = self._cfg.initial_capital_usd
+
+        if day_start is not None:
+            day_start_equity = day_start
+        else:
+            # No pre-today anchor (Day-1).  Anchor to INITIAL CAPITAL, never to
+            # current equity — anchoring to current makes day_change == 0% and
+            # disables CAP-3 for the entire first UTC day (audit P1).
+            day_start_equity = self._cfg.initial_capital_usd
 
         # Periodic NTP probe (rate-limited inside _probe_ntp).
         # If the probe itself failed we skip the NTP check this cycle.
@@ -659,13 +671,25 @@ class V7OkxExecutor:
             # the position is now naked.
             try:
                 algo_side = Side.SELL if side == "LONG" else Side.BUY
-                self._client.submit_algo_stop(
+                replace_result = self._client.submit_algo_stop(
                     inst_id=self._cfg.inst_id, side=algo_side, sz=size,
                     trigger_px=float(pos.get("current_stop") or 0),
                     td_mode=self._cfg.td_mode,
                     pos_side=self._cfg.pos_side_for(side),
                     reduce_only=True,
                 )
+                # Persist the NEW algoId. The original was cancelled before the
+                # close attempt, so without writing the replacement back the
+                # next cycle would amend a dead algoId (OKX 51401) and the
+                # trailing stop would freeze at this trigger forever (audit P1-c).
+                new_algo_id = getattr(replace_result, "algo_id", None)
+                if new_algo_id and getattr(replace_result, "status", None) != "rejected":
+                    try:
+                        self._store.set_position_okx_ids(
+                            position_id=int(pos_id), stop_algo_id=str(new_algo_id))
+                    except Exception:
+                        logger.exception(
+                            "close_failed_algo_id_writeback_failed pos=%s", pos_id)
             except Exception:
                 logger.exception("close_failed_algo_replace_also_failed "
                                  "pos=%s — position now NAKED", pos_id)
@@ -1135,8 +1159,56 @@ class V7OkxExecutor:
             )
         except Exception:
             logger.exception("open_db_insert_failed")
+            # OKX has a live position + algo stop, but the DB insert failed →
+            # the position would be UNMANAGED (orphan_exchange → DEMOTE; no
+            # trail / time_cap / opp-exit). Flatten it so we never hold a
+            # position the system cannot track (audit P1). The algo stop placed
+            # above still protects it, so close FIRST and only cancel the algo
+            # once the close confirms — if the close fails the position keeps
+            # its stop rather than going naked.
+            emerg_close_ok = False
+            emerg_close_err: Optional[str] = None
+            try:
+                close_side = Side.SELL if side == "LONG" else Side.BUY
+                emerg_result = self._client.submit_market_order(
+                    inst_id=self._cfg.inst_id, side=close_side,
+                    sz=size_contracts, td_mode=self._cfg.td_mode,
+                    cl_ord_id=make_cl_ord_id(prefix="v7emerg"),
+                    pos_side=pos_side, reduce_only=True,
+                )
+                emerg_close_ok = emerg_result.status != "rejected"
+                if not emerg_close_ok:
+                    emerg_close_err = emerg_result.error or "okx_rejected"
+            except Exception as exc:
+                emerg_close_err = f"exception: {exc}"
+                logger.exception("db_fail_emergency_close_failed")
+            if emerg_close_ok:
+                algo_id = getattr(algo_result, "algo_id", None)
+                if algo_id:
+                    try:
+                        self._client.cancel_algo_stop(algo_id=str(algo_id))
+                    except Exception:
+                        logger.exception("db_fail_cancel_algo_failed")
+            else:
+                try:
+                    send_critical(
+                        self._cfg.telegram_critical_chat_id,
+                        f"🚨 <b>UNMANAGED POSITION ON OKX</b> 🚨\n"
+                        f"Entry + algo stop placed OK but DB insert failed AND "
+                        f"emergency close failed.\n\n"
+                        f"OKX has an open {side} {size_contracts} contract "
+                        f"position WITH a stop @ ${current_stop:,.2f} but NO DB "
+                        f"record — it will NOT be trailed/time-capped/opp-exited.\n"
+                        f"Entry clOrdId: {entry_cl_ord_id}  posSide: {pos_side}\n"
+                        f"Close err: {emerg_close_err}\n\n"
+                        f"⚠️ Reconcile manually (close on OKX, or re-insert the "
+                        f"DB row then heal).",
+                    )
+                except Exception:
+                    logger.exception("db_fail_unmanaged_alert_failed")
             return CycleResult(action="none",
-                               detail={"reason": "db_insert_exception"})
+                               detail={"reason": "db_insert_exception",
+                                       "flattened": emerg_close_ok})
         if new_id is None:
             logger.warning("open_duplicate_cl_ord_id=%s", entry_cl_ord_id)
             return CycleResult(action="none",
