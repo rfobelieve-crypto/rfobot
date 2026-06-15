@@ -1,0 +1,42 @@
+{
+  "direction_before": 99,
+  "direction_after": 14,
+  "direction_features": [
+    "vol_regime",
+    "cg_pos_account_divergence",
+    "vol_kurtosis",
+    "vol_acceleration",
+    "cg_oi_binance_share_zscore",
+    "cg_bfx_margin_ratio",
+    "cg_bfx_margin_delta_zscore",
+    "taker_delta_ma_24h",
+    "impact_asymmetry",
+    "cg_gls_ratio_zscore",
+    "cg_oi_binance_share",
+    "realized_vol_20b",
+    "abs_completion_z",
+    "cg_oi_close_pctchg_12h"
+  ],
+  "magnitude_before": 91,
+  "magnitude_after": 18,
+  "magnitude_features": [
+    "realized_vol_20b",
+    "hour_cos",
+    "taker_delta_std_24h",
+    "vol_regime",
+    "weekday_sin",
+    "taker_delta_ma_24h",
+    "cg_oi_close_zscore",
+    "tox_bv_vpin_zscore",
+    "weekday_cos",
+    "cg_oi_range_pct",
+    "cg_oi_close_pctchg_12h",
+    "cg_ls_ratio_zscore",
+    "cg_ls_ratio",
+    "cg_taker_buy",
+    "cg_conviction",
+    "vol_acceleration",
+    "cg_gls_ratio_zscore",
+    "cg_oi_close_pctchg_8h"
+  ]
+}

@@ -1,0 +1,81 @@
+2026-06-08 22:17:13,982 | Fetching 35000 1h klines from Binance (paginated)…
+2026-06-08 22:17:14,585 | Klines pagination: fetched 1500 bars, remaining 33500
+2026-06-08 22:17:15,423 | Klines pagination: fetched 1500 bars, remaining 32000
+2026-06-08 22:17:16,282 | Klines pagination: fetched 1500 bars, remaining 30500
+2026-06-08 22:17:17,236 | Klines pagination: fetched 1500 bars, remaining 29000
+2026-06-08 22:17:18,103 | Klines pagination: fetched 1500 bars, remaining 27500
+2026-06-08 22:17:19,966 | Klines pagination: fetched 1500 bars, remaining 26000
+2026-06-08 22:17:21,826 | Klines pagination: fetched 1500 bars, remaining 24500
+2026-06-08 22:17:22,766 | Klines pagination: fetched 1500 bars, remaining 23000
+2026-06-08 22:17:23,646 | Klines pagination: fetched 1500 bars, remaining 21500
+2026-06-08 22:17:24,868 | Klines pagination: fetched 1500 bars, remaining 20000
+2026-06-08 22:17:25,786 | Klines pagination: fetched 1500 bars, remaining 18500
+2026-06-08 22:17:26,657 | Klines pagination: fetched 1500 bars, remaining 17000
+2026-06-08 22:17:27,481 | Klines pagination: fetched 1500 bars, remaining 15500
+2026-06-08 22:17:29,372 | Klines pagination: fetched 1500 bars, remaining 14000
+2026-06-08 22:17:30,258 | Klines pagination: fetched 1500 bars, remaining 12500
+2026-06-08 22:17:31,124 | Klines pagination: fetched 1500 bars, remaining 11000
+2026-06-08 22:17:32,219 | Klines pagination: fetched 1500 bars, remaining 9500
+2026-06-08 22:17:33,116 | Klines pagination: fetched 1500 bars, remaining 8000
+2026-06-08 22:17:33,977 | Klines pagination: fetched 1500 bars, remaining 6500
+2026-06-08 22:17:34,818 | Klines pagination: fetched 1500 bars, remaining 5000
+2026-06-08 22:17:35,672 | Klines pagination: fetched 1500 bars, remaining 3500
+2026-06-08 22:17:36,558 | Klines pagination: fetched 1500 bars, remaining 2000
+2026-06-08 22:17:37,770 | Klines pagination: fetched 1500 bars, remaining 500
+2026-06-08 22:17:38,535 | Klines pagination: fetched 500 bars, remaining 0
+2026-06-08 22:17:39,062 | Klines total: 34999 bars, 2022-06-11 07:00:00+00:00 ~ 2026-06-08 13:00:00+00:00
+2026-06-08 22:17:39,194 | Fetched & cached: 34999 bars (2022-06-11 07:00:00+00:00 ~ 2026-06-08 13:00:00+00:00)
+
+================================================================================================
+T1  MOMENTUM IC GRID  (n=34999 bars, ~4.0 yr)  rows=lookback L, cols=horizon H
+================================================================================================
+  L\H           24h         48h         72h        120h        168h        336h
+   72      -0.015     -0.004     -0.006     -0.034     -0.046     +0.002 
+  120      -0.020     -0.029     -0.032     -0.051     -0.054     -0.010 
+  168      -0.029     -0.036     -0.037     -0.049     -0.036     -0.007 
+  336      +0.010     +0.025     +0.024     +0.019     +0.015     +0.003 
+
+  strongest cell: L=336 H=48 IC=+0.025
+
+================================================================================================
+T2  SIGNIFICANCE (moving-block bootstrap, block=H) for L=168 momentum
+================================================================================================
+  H=  24h  IC=-0.029 CI[-0.069,+0.012]    spread(up-dn)=-0.027% CI[-0.22,+0.17]% 
+  H=  48h  IC=-0.036 CI[-0.089,+0.022]    spread(up-dn)=-0.081% CI[-0.43,+0.30]% 
+  H=  72h  IC=-0.037 CI[-0.101,+0.031]    spread(up-dn)=-0.164% CI[-0.70,+0.41]% 
+  H= 120h  IC=-0.049 CI[-0.136,+0.029]    spread(up-dn)=-0.383% CI[-1.26,+0.41]% 
+  H= 168h  IC=-0.036 CI[-0.134,+0.058]    spread(up-dn)=-0.387% CI[-1.60,+0.64]% 
+  H= 336h  IC=-0.007 CI[-0.134,+0.090]    spread(up-dn)=-0.223% CI[-2.19,+1.46]% 
+  (spread = drift-neutral momentum edge; * = CI excludes 0)
+
+================================================================================================
+T3  PER-YEAR STABILITY  signal=trail168h momentum vs fwd168h  (real momentum = positive most years)
+================================================================================================
+    year       n       IC   spread%  long_WR%   drift%
+    2022    4721   -0.217    -3.61%     38.5%   -0.45%
+    2023    8760   -0.080    -0.53%     53.5%   +2.10%
+    2024    8784   -0.014    -1.07%     54.2%   +1.80%
+    2025    8760   -0.101    -0.40%     48.3%   +0.00%
+    2026    3638   +0.266    +4.04%     58.4%   -1.40%
+
+  spread>0 in 1/5 years
+
+================================================================================================
+T4  REGIME SPLIT  — does momentum-long survive in BEAR, or is it just beta?
+================================================================================================
+    BULL (30d ret>0)  n= 19351  spread=-0.518% CI[-1.83,+0.82]%   long_WR=51.5%
+    BEAR (30d ret<0)  n= 14760  spread=-0.293% CI[-2.01,+1.11]%   long_WR=51.9%
+
+================================================================================================
+VERDICT
+================================================================================================
+  drift-neutral momentum spread significant & positive at horizons: NONE
+  positive spread in 1/5 years
+  survives in BEAR regime: NO
+
+  >>> NO-GO: weekly momentum is not stable/drift-independent enough.
+      The Phase-0 hint was regime/outlier-driven. Trend door closed;
+      long-side answer remains tier-scaling sizing.
+================================================================================================
+
+Wrote → C:\Users\rfo\Desktop\flowbot\flow_system\research\results\dual_model\ts_momentum_powertest.csv

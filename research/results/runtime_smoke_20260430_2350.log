@@ -1,0 +1,47 @@
+2026-05-01 07:50:44,791 INFO indicator.inference: IndicatorEngine v7 (dual-model, dir_type=regression) loaded: direction=136 features, magnitude=76 features, 300 mag-warmup, 500 dir-warmup, decoding=rolling_percentile top=0.05
+
+=== Step 1: load IndicatorEngine ===
+  mode               : dual
+  dir_model_type     : regression
+  dir_decoding       : rolling_percentile
+  pct_window         : 500
+  strong_top_frac    : 0.05
+  moderate_top_frac  : 0.15
+  warmup_bars        : 100
+  dir features       : 136
+  mag features       : 76
+  dir_pred_history   : 500 entries  (buffer is WARM)
+  pred_history (mag) : 300 entries
+  → all asserts passed
+
+=== Step 2: load cached features ===
+  features parquet   : 3999 bars x 282 cols
+  range              : 2025-11-15 08:00:00+00:00 ~ 2026-04-30 22:00:00+00:00
+  → all required features present
+
+=== Step 3: run predict() on last 50 bars ===
+  output shape       : (50, 16)
+  output cols        : ['pred_return_4h', 'pred_direction', 'confidence_score', 'strength_score', 'regime', 'up_pred', 'down_pred', 'strength_raw', 'dynamic_deadzone', 'dir_prob_up', 'mag_pred', 'dir_pred_ret']...
+  pred-ret column    : pred_return_4h
+  pred stats         : n=50  n_nan=0  min=-0.00486  median=-0.00004  max=+0.00286  std=0.00180
+  buffer std         : 0.00201
+  live pred std      : 0.00180
+  buffer/live ratio  : 1.11x  (must be in [0.5, 2.0] per mistake.md 2026-04-19)
+
+=== Step 4: decoded direction & strength distribution ===
+
+=== Step 5: last 10 predictions ===
+                           pred_return_4h  mag_pred  regime
+dt                                                         
+2026-04-30 13:00:00+00:00       -0.001097  0.007535  WARMUP
+2026-04-30 14:00:00+00:00       -0.000257  0.006107  WARMUP
+2026-04-30 15:00:00+00:00       -0.001495  0.006464  WARMUP
+2026-04-30 16:00:00+00:00       -0.000130  0.005805  WARMUP
+2026-04-30 17:00:00+00:00       -0.001169  0.004594  WARMUP
+2026-04-30 18:00:00+00:00       -0.002296  0.004821  WARMUP
+2026-04-30 19:00:00+00:00       -0.002146  0.005059  WARMUP
+2026-04-30 20:00:00+00:00       -0.000754  0.004456  WARMUP
+2026-04-30 21:00:00+00:00       -0.001580  0.005563  WARMUP
+2026-04-30 22:00:00+00:00       -0.001359  0.004485  WARMUP
+
+=== ALL CHECKS PASSED ✅ ===

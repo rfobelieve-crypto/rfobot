@@ -1,0 +1,21 @@
+{
+  "strong": {
+    "prob_long_threshold": 0.15357705950737,
+    "prob_short_threshold": 0.1982230581343174,
+    "mag_percentile_min": 0.8,
+    "require_breakout": true
+  },
+  "moderate": {
+    "prob_long_threshold": 0.1312125325202942,
+    "prob_short_threshold": 0.15492229163646698,
+    "mag_percentile_min": 0.65,
+    "require_breakout": true
+  },
+  "metadata": {
+    "calibration_source": "walk_forward_OOS",
+    "k_pct": 0.008,
+    "horizon_bars": 4,
+    "strong_top_frac": 0.05,
+    "moderate_top_frac": 0.1
+  }
+}

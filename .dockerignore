@@ -1,0 +1,17 @@
+# Secrets — never bake into image layers
+.env
+.env.*
+!.env.example
+config.json
+*.pem
+*.key
+*.p12
+
+# VCS / caches / junk — not needed at runtime
+.git
+.gitignore
+**/__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ipynb_checkpoints

@@ -53,10 +53,14 @@ def get_model_deploy_time() -> datetime | None:
 
 def _connect_railway():
     """Connect to Railway MySQL (same pattern as review_signals.py)."""
+    import os
     import pymysql
     return pymysql.connect(
-        host='caboose.proxy.rlwy.net', port=18766, user='root',
-        password='lKukMzubRgBHgUaFAJnqwQKVDWQOJLkA', database='railway',
+        host=os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "")),
+        port=int(os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "3306"))),
+        user=os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "root")),
+        password=os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "")),
+        database=os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "railway")),
         cursorclass=pymysql.cursors.DictCursor,
     )
 

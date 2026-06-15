@@ -1,0 +1,73 @@
+{
+  "description": "Per-month Spearman IC of cg_liq_imbalance vs path_ret_4h, restricted to cascade bars (surge=1)",
+  "min_monthly_cascades_threshold": 15,
+  "total_cascade_bars": 422,
+  "global_ic": -0.25412887080620494,
+  "global_ic_ci95": [
+    -0.3308483718234939,
+    -0.15960540128177567
+  ],
+  "months": [
+    {
+      "month": "2025-11",
+      "cascade_count": 46,
+      "ic": -0.09589885908109774,
+      "ic_ci_lower": -0.39647049231660114,
+      "ic_ci_upper": 0.2217622995078608,
+      "contrarian_precision": 0.6304347826086957,
+      "contrarian_n_signals": 46
+    },
+    {
+      "month": "2025-12",
+      "cascade_count": 41,
+      "ic": -0.3547038327526133,
+      "ic_ci_lower": -0.5879412850412327,
+      "ic_ci_upper": -0.0727707263428749,
+      "contrarian_precision": 0.6585365853658537,
+      "contrarian_n_signals": 41
+    },
+    {
+      "month": "2026-01",
+      "cascade_count": 104,
+      "ic": -0.10679114445710981,
+      "ic_ci_lower": -0.28397326532756784,
+      "ic_ci_upper": 0.05910185218569107,
+      "contrarian_precision": 0.5576923076923077,
+      "contrarian_n_signals": 104
+    },
+    {
+      "month": "2026-02",
+      "cascade_count": 81,
+      "ic": -0.3198509485094851,
+      "ic_ci_lower": -0.49670988159354623,
+      "ic_ci_upper": -0.12010723743344617,
+      "contrarian_precision": 0.6419753086419753,
+      "contrarian_n_signals": 81
+    },
+    {
+      "month": "2026-03",
+      "cascade_count": 44,
+      "ic": -0.19732205778717404,
+      "ic_ci_lower": -0.46736860534979496,
+      "ic_ci_upper": 0.1102514494036952,
+      "contrarian_precision": 0.6590909090909091,
+      "contrarian_n_signals": 44
+    },
+    {
+      "month": "2026-04",
+      "cascade_count": 106,
+      "ic": -0.14575051768397618,
+      "ic_ci_lower": -0.3415811171450583,
+      "ic_ci_upper": 0.028514407276863378,
+      "contrarian_precision": 0.6415094339622641,
+      "contrarian_n_signals": 106
+    }
+  ],
+  "stability_counts": {
+    "n_months_with_data": 6,
+    "months_negative_ic": 6,
+    "months_negative_and_ci_ge_0": 2,
+    "months_near_zero_ic": 0
+  },
+  "stability_verdict": "MARGINAL"
+}

@@ -1,0 +1,39 @@
+{
+  "pre_fix": {
+    "n_folds": 77,
+    "n_oos": 2725,
+    "n_valid_labels": 2725,
+    "spearman_ic": 0.06325692951123758,
+    "accuracy": 0.5269724770642202,
+    "brier": 0.2792047027751218,
+    "brier_skill": -0.11687310837406684,
+    "ece": 0.150655488492152,
+    "strong_n": 1082,
+    "strong_winrate": 0.555452865064695
+  },
+  "post_fix": {
+    "n_folds": 77,
+    "n_oos": 2724,
+    "n_valid_labels": 2724,
+    "spearman_ic": 0.04787117822376294,
+    "accuracy": 0.5286343612334802,
+    "brier": 0.2833513755479089,
+    "brier_skill": -0.133479436293356,
+    "ece": 0.15399100725291498,
+    "strong_n": 1118,
+    "strong_winrate": 0.5438282647584973
+  },
+  "diff": {
+    "n_folds": 0,
+    "n_oos": -1,
+    "n_valid_labels": -1,
+    "spearman_ic": -0.015385751287474644,
+    "accuracy": 0.0016618841692599418,
+    "brier": 0.0041466727727870745,
+    "brier_skill": -0.016606327919289177,
+    "ece": 0.00333551876076299,
+    "strong_n": 36,
+    "strong_winrate": -0.011624600306197719
+  },
+  "note": "If |diff.spearman_ic| > 0.01 or |diff.strong_winrate| > 0.03, pre-fix research conclusions should be re-evaluated."
+}

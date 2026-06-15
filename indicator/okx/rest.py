@@ -1,8 +1,8 @@
 """OKX REST client with retry / backoff / circuit breaker.
 
-Connection-resilience focus per user request (2026-05-25). Actual OKX
-endpoint integration marked `# TODO(stage2-impl)` — fill those in when
-demo API key is available.
+Connection-resilience + response parsers complete (2026-05-28).
+Remaining TODO at L124 is the partial-fill → reconciler hook, which
+is a future feature, not a blocker for Stage 3 $100.
 
 Retry policy (per docs/okx_integration_design.md §10.2):
   - Order submit: 3x, 1s/2s/4s, idempotency via clOrdId
@@ -34,6 +34,17 @@ from indicator.okx.types import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class OkxQueryUnavailable(RuntimeError):
+    """A read query (positions/balance) could not complete after retries.
+
+    Callers MUST treat this as 'unknown', NEVER as 'flat'/'zero'.  Conflating
+    the two is how get_positions() returning [] on REST failure let the
+    reconciler emit orphan_local and auto-heal delete a live position's only
+    DB record during a REST outage (2026-06 audit P0-3).  Both the reconciler
+    (→ UNAVAILABLE → HALT) and admin_heal (→ 502 refuse) already catch this.
+    """
 
 
 # ── Circuit breaker ────────────────────────────────────────────────────
@@ -105,8 +116,15 @@ class OkxRestClient:
 
     def submit_market_order(self, *, inst_id: str, side: Side, sz: int,
                             td_mode: str,
-                            cl_ord_id: Optional[str] = None) -> OrderResult:
+                            cl_ord_id: Optional[str] = None,
+                            pos_side: Optional[str] = None,
+                            reduce_only: bool = False) -> OrderResult:
         """Submit a market order.  Idempotent via clOrdId.
+
+        pos_side: "long"/"short" required in long_short_mode, omitted in
+        net_mode.  reduce_only: True ensures the order only reduces an
+        existing position (defensive; redundant in long_short_mode where
+        side+posSide is unambiguous, but harmless).
 
         Retry policy: 3x exponential backoff on 5xx; do NOT retry on 4xx
         (4xx means our request is malformed/rejected — retrying won't help).
@@ -121,6 +139,10 @@ class OkxRestClient:
             "sz": str(sz),
             "clOrdId": cl_ord_id,
         }
+        if pos_side is not None:
+            body["posSide"] = pos_side
+        if reduce_only:
+            body["reduceOnly"] = True
         # TODO(stage2-impl): on partial fill we should pass into reconciler.
         result = self._retry_post(
             path=path, body=body, retries=3, backoff_base=1.0,
@@ -135,20 +157,36 @@ class OkxRestClient:
 
     def submit_algo_stop(self, *, inst_id: str, side: Side, sz: int,
                          trigger_px: float, td_mode: str,
-                         algo_cl_ord_id: Optional[str] = None) -> AlgoOrderResult:
-        """Submit conditional stop-market algo order (the trailing stop)."""
+                         algo_cl_ord_id: Optional[str] = None,
+                         pos_side: Optional[str] = None,
+                         reduce_only: bool = False) -> AlgoOrderResult:
+        """Submit conditional stop-market algo order (the trailing stop).
+
+        pos_side / reduce_only: same semantics as submit_market_order.
+        For long_short_mode the stop's posSide must match the position
+        it protects (LONG position → posSide='long').
+        """
         algo_cl_ord_id = algo_cl_ord_id or make_cl_ord_id(prefix="v7a")
         path = "/api/v5/trade/order-algo"
+        # OKX conditional orders require slTriggerPx + slOrdPx for stop loss
+        # (triggerPx alone returns 50015 "Either parameter tpTriggerPx or
+        # slTriggerPx is required").  Discovered 2026-06-02 when first live
+        # algo stop submission failed.
         body = {
             "instId": inst_id,
             "tdMode": td_mode,
             "side": side.value,
             "ordType": "conditional",
             "sz": str(sz),
-            "triggerPx": str(trigger_px),
-            "orderPx": "-1",        # market on trigger
+            "slTriggerPx": str(trigger_px),
+            "slOrdPx": "-1",              # market on trigger
+            "slTriggerPxType": "last",    # trigger on last price
             "algoClOrdId": algo_cl_ord_id,
         }
+        if pos_side is not None:
+            body["posSide"] = pos_side
+        if reduce_only:
+            body["reduceOnly"] = True
         result = self._retry_post(
             path=path, body=body, retries=3, backoff_base=1.0,
             retry_on_4xx=False,
@@ -158,18 +196,24 @@ class OkxRestClient:
                 algo_cl_ord_id=algo_cl_ord_id, status="rejected",
                 error="all_retries_exhausted",
             )
-        # TODO(stage2-impl): parse OKX response → AlgoOrderResult
-        return AlgoOrderResult(algo_cl_ord_id=algo_cl_ord_id,
-                               algo_id=None, status="submitted",
-                               error="not_implemented")
+        return self._parse_algo_order_response(result, algo_cl_ord_id)
 
-    def amend_algo_stop(self, *, algo_id: str,
+    def amend_algo_stop(self, *, inst_id: str, algo_id: str,
                         new_trigger_px: float) -> AmendResult:
-        """Atomic amend.  P6: NEVER cancel-then-new."""
+        """Atomic amend.  P6: NEVER cancel-then-new.
+
+        OKX amend-algos requires instId + algoId + newSlTriggerPx.  instId was
+        MISSING (2026-06-10 bug) → OKX rejected every amend with 50014
+        "Parameter instId can not be empty", so the trailing stop never moved on
+        the exchange (DB trail advanced, OKX order stayed at the entry stop).
+        newSlOrdPx="-1" keeps market-on-trigger execution (matches submit).
+        """
         path = "/api/v5/trade/amend-algos"
         body = {
+            "instId": inst_id,
             "algoId": algo_id,
-            "newTriggerPx": str(new_trigger_px),
+            "newSlTriggerPx": str(new_trigger_px),
+            "newSlOrdPx": "-1",
         }
         result = self._retry_post(
             path=path, body=body, retries=2, backoff_base=1.0,
@@ -178,9 +222,7 @@ class OkxRestClient:
         if result is None:
             return AmendResult(algo_id=algo_id, status="failed",
                                error="all_retries_exhausted")
-        # TODO(stage2-impl): parse response. Handle 51400 already_filled.
-        return AmendResult(algo_id=algo_id, status="ok",
-                           error="not_implemented")
+        return self._parse_amend_response(result, algo_id)
 
     def cancel_algo_stop(self, *, algo_id: str) -> CancelResult:
         path = "/api/v5/trade/cancel-algos"
@@ -195,6 +237,27 @@ class OkxRestClient:
         return CancelResult(algo_id=algo_id, status="ok",
                             error="not_implemented")
 
+    def set_leverage(self, *, inst_id: str, lever: int, mgn_mode: str,
+                     pos_side: Optional[str] = None) -> bool:
+        """Set leverage for (instId, mgnMode[, posSide]).  Returns True on code==0.
+
+        Isolated margin REQUIRES leverage configured per (instId, isolated,
+        posSide) or OKX rejects the order (long_short_mode needs one call per
+        side).  Idempotent — safe to call before every open.  cross mode omits
+        posSide.  3x retry (do not retry 4xx — a bad request won't fix itself).
+        """
+        path = "/api/v5/account/set-leverage"
+        body = {"instId": inst_id, "lever": str(lever), "mgnMode": mgn_mode}
+        if pos_side is not None:
+            body["posSide"] = pos_side
+        result = self._retry_post(
+            path=path, body=body, retries=3, backoff_base=1.0,
+            retry_on_4xx=False,
+        )
+        if result is None:
+            return False
+        return str(result.get("code")) == "0"
+
     def get_positions(self, *, inst_id: str) -> list[Position]:
         path = "/api/v5/account/positions"
         params = {"instId": inst_id}
@@ -202,9 +265,12 @@ class OkxRestClient:
             path=path, params=params, retries=5, backoff_base=0.5,
         )
         if result is None:
-            return []
-        # TODO(stage2-impl): parse result["data"] into Position[]
-        return []
+            # NEVER return [] here — an empty list is indistinguishable from
+            # "OKX is flat" and would let the reconciler call orphan_local +
+            # auto-heal delete a live position's only DB record (audit P0-3).
+            raise OkxQueryUnavailable(
+                "get_positions failed after retries (circuit-open / network)")
+        return self._parse_positions_response(result)
 
     def get_balance(self) -> Optional[Balance]:
         """Get total equity in USD-equivalent.  3x retry, demote on full fail."""
@@ -214,8 +280,7 @@ class OkxRestClient:
         )
         if result is None:
             return None
-        # TODO(stage2-impl): parse total_eq / available
-        return Balance(total_eq_usd=0.0, available_usd=0.0)
+        return self._parse_balance_response(result)
 
     def get_account_config(self) -> dict:
         """Get account-level settings + API key permissions.
@@ -239,8 +304,7 @@ class OkxRestClient:
         )
         if result is None:
             return None
-        # TODO(stage2-impl): parse result["data"][0]["ts"] (ms) / 1000
-        return None
+        return self._parse_server_time(result)
 
     # ── Health surface ─────────────────────────────────────────────────
 
@@ -300,6 +364,17 @@ class OkxRestClient:
             logger.warning("rest_call_skipped_circuit_tripped path=%s", path)
             return None
 
+        # OKX HMAC signs (ts + method + requestPath + body) where
+        # requestPath must include the query string for GETs.  If we
+        # signed just `/api/v5/account/positions` but actually fetched
+        # `/api/v5/account/positions?instId=...`, OKX returns 50113.
+        signed_path = path
+        if method == "GET" and params:
+            from urllib.parse import urlencode
+            qs = urlencode(params)
+            if qs:
+                signed_path = f"{path}?{qs}"
+
         last_err: Optional[Exception] = None
         for attempt in range(retries + 1):
             if attempt > 0:
@@ -314,7 +389,8 @@ class OkxRestClient:
                 resp = self._session.request(
                     method=method, url=url, params=params,
                     data=body_str if method != "GET" else None,
-                    headers=self._headers(method, path, body_str, auth=auth),
+                    headers=self._headers(method, signed_path, body_str,
+                                          auth=auth),
                     timeout=self._timeout,
                 )
                 self._last_latency_ms = (time.time() - t0) * 1000
@@ -362,21 +438,166 @@ class OkxRestClient:
     # ── Internal: response parsing ─────────────────────────────────────
 
     def _parse_order_response(self, raw: dict, cl_ord_id: str) -> OrderResult:
-        """Parse OKX submit_order response into OrderResult.
+        """Parse POST /api/v5/trade/order response into OrderResult.
 
-        OKX response shape (for reference):
-          { "code": "0", "msg": "",
-            "data": [{ "ordId": "...", "clOrdId": "...",
-                       "sCode": "0", "sMsg": "" }] }
+        Two failure layers:
+          - top-level `code != "0"`: request was rejected outright
+          - per-order `sCode != "0"`: order-level reject (e.g. 51008 balance)
         """
-        # TODO(stage2-impl): parse real response
         code = raw.get("code", "")
         if code != "0":
             return OrderResult(cl_ord_id=cl_ord_id, status="rejected",
                                error=f"okx_code_{code}_{raw.get('msg', '')}")
-        data = (raw.get("data") or [{}])[0]
+        data_list = raw.get("data") or []
+        if not data_list:
+            # Top code=0 but no data — treat as submitted with unknown ord_id
+            return OrderResult(cl_ord_id=cl_ord_id, status="submitted",
+                               ord_id=None)
+        data = data_list[0]
+        s_code = data.get("sCode", "0")
+        if s_code != "0":
+            return OrderResult(
+                cl_ord_id=cl_ord_id, status="rejected",
+                error=f"okx_sCode_{s_code}_{data.get('sMsg', '')}",
+            )
         return OrderResult(
             cl_ord_id=cl_ord_id,
-            ord_id=data.get("ordId"),
+            ord_id=data.get("ordId") or None,
             status="submitted",
         )
+
+    def _parse_algo_order_response(self, raw: dict,
+                                   algo_cl_ord_id: str) -> AlgoOrderResult:
+        """Parse POST /api/v5/trade/order-algo response into AlgoOrderResult."""
+        code = raw.get("code", "")
+        if code != "0":
+            return AlgoOrderResult(
+                algo_cl_ord_id=algo_cl_ord_id, status="rejected",
+                error=f"okx_code_{code}_{raw.get('msg', '')}",
+            )
+        data_list = raw.get("data") or []
+        if not data_list:
+            return AlgoOrderResult(
+                algo_cl_ord_id=algo_cl_ord_id, status="submitted",
+                algo_id=None,
+            )
+        data = data_list[0]
+        s_code = data.get("sCode", "0")
+        if s_code != "0":
+            return AlgoOrderResult(
+                algo_cl_ord_id=algo_cl_ord_id, status="rejected",
+                algo_id=data.get("algoId") or None,
+                error=f"okx_sCode_{s_code}_{data.get('sMsg', '')}",
+            )
+        return AlgoOrderResult(
+            algo_cl_ord_id=algo_cl_ord_id, status="submitted",
+            algo_id=data.get("algoId") or None,
+        )
+
+    # OKX algo-amend response code → AmendResult.status mapping
+    _AMEND_CODE_MAP = {
+        "0": "ok",
+        "51400": "already_filled",   # docs/stage2_kill_criteria B3 boundary
+        "51401": "not_found",
+    }
+
+    def _parse_amend_response(self, raw: dict, algo_id: str) -> AmendResult:
+        """Parse POST /api/v5/trade/amend-algos response.
+
+        Handles 51400 (already_filled — race with stop trigger) and
+        51401 (order does not exist) per kill_criteria B3.
+        """
+        code = raw.get("code", "")
+        if code != "0":
+            return AmendResult(algo_id=algo_id, status="failed",
+                               error=f"okx_code_{code}_{raw.get('msg', '')}")
+        data_list = raw.get("data") or []
+        if not data_list:
+            return AmendResult(algo_id=algo_id, status="ok")
+        data = data_list[0]
+        s_code = data.get("sCode", "0")
+        status = self._AMEND_CODE_MAP.get(s_code, "failed")
+        error = None
+        if status == "failed":
+            error = f"okx_sCode_{s_code}_{data.get('sMsg', '')}"
+        return AmendResult(algo_id=algo_id, status=status, error=error)
+
+    def _parse_positions_response(self, raw: dict) -> list[Position]:
+        """Parse GET /api/v5/account/positions data list into Position[].
+
+        Handles both net_mode (posSide="net", pos signed) and long_short
+        mode (posSide="long"/"short", pos positive).  size_contracts is
+        always the absolute magnitude; direction is the human label.
+        """
+        out: list[Position] = []
+        for item in raw.get("data") or []:
+            pos_str = item.get("pos") or "0"
+            try:
+                pos_signed = float(pos_str)
+            except ValueError:
+                pos_signed = 0.0
+            pos_side = (item.get("posSide") or "net").lower()
+            if pos_signed == 0:
+                direction = "FLAT"
+            elif pos_side == "long":
+                direction = "LONG"
+            elif pos_side == "short":
+                direction = "SHORT"
+            else:
+                # net_mode: sign of pos carries direction
+                direction = "LONG" if pos_signed > 0 else "SHORT"
+            try:
+                avg_price = float(item.get("avgPx") or 0)
+            except ValueError:
+                avg_price = 0.0
+            try:
+                upl = float(item.get("upl") or 0)
+            except ValueError:
+                upl = 0.0
+            out.append(Position(
+                inst_id=item.get("instId", ""),
+                direction=direction,
+                size_contracts=float(abs(pos_signed)),
+                avg_price=avg_price,
+                unrealized_pnl_usd=upl,
+                raw=item,
+            ))
+        return out
+
+    def _parse_balance_response(self, raw: dict) -> Optional[Balance]:
+        """Parse GET /api/v5/account/balance response.
+
+        Picks USDT row from details[] for available; falls back to 0 if
+        no USDT row found.  Returns None if data array is empty.
+        """
+        data_list = raw.get("data") or []
+        if not data_list:
+            return None
+        data = data_list[0]
+        try:
+            total_eq = float(data.get("totalEq") or 0)
+        except ValueError:
+            total_eq = 0.0
+        available = 0.0
+        for ccy_row in data.get("details") or []:
+            if (ccy_row.get("ccy") or "").upper() == "USDT":
+                try:
+                    available = float(ccy_row.get("availBal") or 0)
+                except ValueError:
+                    available = 0.0
+                break
+        return Balance(total_eq_usd=total_eq, available_usd=available,
+                       raw=data)
+
+    def _parse_server_time(self, raw: dict) -> Optional[float]:
+        """Parse GET /api/v5/public/time → Unix seconds (float)."""
+        data_list = raw.get("data") or []
+        if not data_list:
+            return None
+        ts_ms_str = data_list[0].get("ts")
+        if not ts_ms_str:
+            return None
+        try:
+            return float(ts_ms_str) / 1000.0
+        except (ValueError, TypeError):
+            return None

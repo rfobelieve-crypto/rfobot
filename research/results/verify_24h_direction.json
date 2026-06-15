@@ -1,0 +1,22 @@
+{
+  "horizon": 24,
+  "k": 0.5,
+  "n_features": 35,
+  "exp1_bootstrap": {
+    "n_oos": 2143,
+    "point_auc": 0.5720757312862577,
+    "boot_mean": 0.5717827983005817,
+    "ci_95_low": 0.5467168196845784,
+    "ci_95_high": 0.5960890445661511,
+    "gate_pass": false
+  },
+  "exp2_time_stability": {
+    "first_half_auc": 0.672553037608486,
+    "second_half_auc": 0.564447474058926,
+    "abs_diff": 0.10810556354955991,
+    "first_n": 930,
+    "second_n": 1029,
+    "gate_pass": false
+  },
+  "verdict": "REVERT_PATH_1"
+}

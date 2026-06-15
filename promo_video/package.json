@@ -1,0 +1,29 @@
+{
+  "name": "v7-promo-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Promotional video for V7 BTC quant trading system (Remotion 4)",
+  "scripts": {
+    "dev": "remotion studio",
+    "preview": "remotion studio",
+    "build": "remotion render PromoVideo out/promo.mp4",
+    "build-4k": "remotion render PromoVideo out/promo-4k.mp4 --width=3840 --height=2160",
+    "still": "remotion still PromoVideo out/preview.png"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.0",
+    "@remotion/cli": "^4.0.0",
+    "@remotion/google-fonts": "^4.0.0",
+    "@remotion/media-utils": "^4.0.0",
+    "@remotion/renderer": "^4.0.0",
+    "@remotion/shapes": "^4.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -73,13 +73,10 @@ def _make_reply_markup():
         ],
         [
             {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
-            {"text": "\U0001f4c8 LDC Chart", "callback_data": "ldc_chart"},
-            {"text": "\U0001f4c9 LDC Stats", "callback_data": "ldc_stats"},
+            {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
         ],
         [
-            {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
-            {"text": "\U0001f916 V7 Stats", "callback_data": "v7_stats"},
-            {"text": "\U0001f4cb Meeting", "callback_data": "meeting"},
+            {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
         ],
     ]})
 
@@ -110,114 +107,6 @@ def _send_telegram_photo(png: bytes, caption: str) -> str:
     except Exception as e:
         logger.error("Telegram photo send failed: %s", e)
         return f"error: {e}"
-
-
-def _fmt_v9(v9: dict | None) -> str:
-    if not v9 or v9.get("p_long") is None:
-        return ""
-    return f"\nv9: P_long={v9['p_long']:.3f} P_short={v9['p_short']:.3f}"
-
-
-def _send_ldc_swing_alerts(result: dict, paused: bool) -> None:
-    """Translate ldc_swing_executor.run_cycle result into Telegram messages."""
-    if not result:
-        return
-    action = result.get("action")
-    if action not in ("open", "close", "reverse", "v9_veto"):
-        return  # hold/none: silent
-
-    pause_tag = " <i>[PAUSED — shadow only]</i>" if paused else ""
-    msgs = []
-    if action == "open":
-        d = result["opened_direction"]
-        emoji = "🟢" if d == "LONG" else "🔴"
-        msgs.append(
-            f"{emoji} <b>LDC {d} OPEN</b>{pause_tag}\n"
-            f"Entry: ${result['entry_price']:,.2f}\n"
-            f"Strategy: jdehorty LDC swing + v9 filter + min hold 4h\n"
-            f"Notional $1000 × 3x leverage"
-            f"{_fmt_v9(result.get('v9'))}"
-        )
-    elif action == "close":
-        c = result["closed"]
-        emoji = "✅" if c["win"] else "❌"
-        net_lev = c["net_pct"] * 100 * 3.0  # 3x leverage applied to net %
-        skip_tag = ""
-        if "skipped_reverse" in result:
-            skip_tag = f"\n<i>(Reverse {result['skipped_reverse']} skipped: v9 veto)</i>"
-        msgs.append(
-            f"{emoji} <b>LDC {c['direction']} CLOSE</b>\n"
-            f"Exit: ${c['exit_price']:,.2f} ({c['reason']})\n"
-            f"Held: {c['bars_held']}h | "
-            f"Net: {c['net_pct']*100:+.2f}% (1x) / <b>{net_lev:+.2f}% (3x)</b>"
-            f"{skip_tag}"
-            f"{_fmt_v9(result.get('v9'))}"
-        )
-    elif action == "reverse":
-        c = result["closed"]
-        new_d = result["opened_direction"]
-        emoji_close = "✅" if c["win"] else "❌"
-        emoji_open = "🟢" if new_d == "LONG" else "🔴"
-        net_lev = c["net_pct"] * 100 * 3.0
-        msgs.append(
-            f"🔄 <b>LDC FLIP</b>{pause_tag}\n"
-            f"{emoji_close} CLOSE {c['direction']} @ ${c['exit_price']:,.2f}\n"
-            f"  Net: {c['net_pct']*100:+.2f}% (1x) / <b>{net_lev:+.2f}% (3x)</b>\n"
-            f"{emoji_open} OPEN {new_d} @ ${result['entry_price']:,.2f}"
-            f"{_fmt_v9(result.get('v9'))}"
-        )
-    elif action == "v9_veto":
-        v9 = result.get("v9", {})
-        d = result.get("skipped_direction", "?")
-        msgs.append(
-            f"⚠️ <b>LDC {d} VETOED</b> by v9\n"
-            f"Price: ${result.get('entry_price', 0):,.2f}\n"
-            f"{v9.get('reason', '')}"
-        )
-    for m in msgs:
-        try:
-            _send_telegram_text(m)
-        except Exception as exc:
-            logger.warning("LDC swing alert send failed: %s", exc)
-
-
-def _send_v7_paper_alerts(result: dict) -> None:
-    """Translate v7_paper_executor.run_cycle result into Telegram messages."""
-    if not result:
-        return
-    action = result.get("action")
-    if action not in ("open", "close"):
-        return  # hold/none: silent
-    msg = None
-    if action == "open":
-        d = result["opened_direction"]
-        emoji = "🟢" if d == "LONG" else "🔴"
-        shadow = (" <i>[SHADOW — 模型轉換窗口, 不計入 cohort]</i>"
-                  if result.get("paused") else "")
-        msg = (
-            f"{emoji} <b>V7 {d} OPEN</b>{shadow}\n"
-            f"Entry: ${result['entry_price']:,.2f} "
-            f"({result.get('entry_tier', '')})\n"
-            f"Strategy: v7.1 signal-exit + 3×ATR trailing stop\n"
-            f"Size: {result['size_frac']*100:.0f}% equity "
-            f"(${result['notional_usd']:,.0f}) | "
-            f"stop ${result['current_stop']:,.2f}"
-        )
-    elif action == "close":
-        c = result["closed"]
-        emoji = "✅" if c["win"] else "❌"
-        shadow = " <i>[SHADOW — 不計入 cohort]</i>" if c.get("paused") else ""
-        msg = (
-            f"{emoji} <b>V7 {c['direction']} CLOSE</b>{shadow}\n"
-            f"Exit: ${c['exit_price']:,.2f} ({c['reason']})\n"
-            f"Held: {c['bars_held']}h | Net: {c['net_pct']*100:+.2f}%\n"
-            f"Equity: {c['equity_ret_pct']:+.2f}% → ${c['equity_after']:,.0f}"
-        )
-    if msg:
-        try:
-            _send_telegram_text(msg)
-        except Exception as exc:
-            logger.warning("V7 paper alert send failed: %s", exc)
 
 
 def _send_telegram_text(message: str, chat_id: str = ""):
@@ -685,6 +574,10 @@ def update_cycle() -> dict:
         tg_result = _send_telegram_photo(png, caption)
         dc_result = _send_discord_photo(png, caption)
 
+        # Pre-init so they're always defined before the signal-alert block.
+        shap_result = None
+        shap_json_str = ""
+
         # Signal alert (Telegram + Discord push for Strong + Moderate)
         if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
             regime = str(last_row.get("regime", "?"))
@@ -708,18 +601,29 @@ def update_cycle() -> dict:
             else:
                 mag_tier_line = f"\n⚠️ Mag Weak (p{mag_pct:.0f})"
 
-            # SHAP explanation for Strong signals only
+            # SHAP explanation for Strong + Moderate (user 2026-06-02:
+            # 「全部每個訊號都寫詳細理由」 — both tiers get full SHAP block
+            # + humanized 1-line intro).
             shap_text = ""
-            shap_json_str = ""
-            if is_strong:
+            if strength in ("Strong", "Moderate") and direction in ("UP", "DOWN"):
                 try:
-                    from indicator.signal_explainer import explain_strong_signal, format_shap_for_telegram
+                    from indicator.signal_explainer import (
+                        explain_signal, format_shap_for_telegram,
+                        humanize_entry_reason,
+                    )
                     import json as _json
                     last_features = features.iloc[-1].to_dict() if len(features) > 0 else {}
-                    shap_result = explain_strong_signal(last_features, direction)
+                    shap_result = explain_signal(last_features, direction)
                     if shap_result:
-                        shap_text = format_shap_for_telegram(shap_result, direction)
                         shap_json_str = _json.dumps(shap_result, ensure_ascii=False)
+                        # Human-readable intro (top groups in plain language)
+                        human_line = humanize_entry_reason(
+                            shap_result, direction,
+                            regime=regime, conf=float(conf), tier=strength,
+                        )
+                        # Full driver factor analysis (technical detail)
+                        detail = format_shap_for_telegram(shap_result, direction)
+                        shap_text = f"\n<pre>{human_line}</pre>{detail}"
                 except Exception as e:
                     logger.warning("SHAP explanation failed (non-critical): %s", e)
 
@@ -747,7 +651,8 @@ def update_cycle() -> dict:
                 sig_time = indicator_df.index[-1]
                 if hasattr(sig_time, 'to_pydatetime'):
                     sig_time = sig_time.to_pydatetime()
-                shap_json_str = shap_json_str if strength == "Strong" else ""
+                # Strong + Moderate both store SHAP json now (Moderate's SHAP
+                # powers paper trade entry_reason; still useful as history).
                 record_signal(
                     signal_time=sig_time, direction=direction,
                     strength=strength,
@@ -767,39 +672,25 @@ def update_cycle() -> dict:
         except Exception as e:
             logger.warning("Signal tracker backfill failed: %s", e)
 
-        # ── Path 2: LDC Swing executor (jdehorty original, min hold 4h, 3x).
-        # Replaced v9+LDC must-agree hybrid on 2026-05-12.
-        # Independent path — failures MUST NOT break v7 outputs.
+        # ── V7 OKX executor (Stage 3 — env-gated, 2026-05-28).
+        # Sole cohort post paper-removal (2026-06-05); LIVE is now the
+        # baseline and the only thing recorded on the charts.
+        # Disabled unless OKX_EXECUTOR_ENABLED=1 — see indicator/okx/runner.py
         try:
-            from indicator.hybrid_monitor import (
-                check_and_update_pause_state, is_paused,
-            )
-            check_and_update_pause_state()
-            ldc_paused = is_paused()
+            from indicator.okx import runner as okx_runner
+            okx_executor = okx_runner.get_executor()
+            if okx_executor is not None:
+                from indicator.model_version import get_current_model_version
+                okx_result = okx_executor.cycle(
+                    klines=klines, signal_direction=direction,
+                    signal_strength=strength,
+                    model_version=get_current_model_version(),
+                )
+                logger.info("okx_cycle action=%s detail=%s",
+                            okx_result.action, okx_result.detail)
+                _record_executor_success("V7 OKX executor")
         except Exception as e:
-            logger.warning("LDC monitor failed (defaulting to NOT paused): %s", e)
-            ldc_paused = False
-
-        try:
-            from indicator.ldc_swing_executor import run_cycle as run_ldc_cycle
-            ldc_result = run_ldc_cycle(klines, features=features, paused=ldc_paused)
-            _send_ldc_swing_alerts(ldc_result, ldc_paused)
-            _record_executor_success("LDC swing executor")
-        except Exception as e:
-            _record_executor_failure("LDC swing executor", e)
-
-        # ── Path 3: V7 paper executor (v7.1 signal-exit + 3xATR trailing).
-        # Parallel Stage-1 paper cohort — runs alongside LDC, LDC untouched.
-        try:
-            from indicator.v7_paper_executor import run_cycle as run_v7_cycle
-            from indicator.model_version import get_current_model_version
-            v7_result = run_v7_cycle(
-                klines, signal_direction=direction, signal_strength=strength,
-                model_version=get_current_model_version())
-            _send_v7_paper_alerts(v7_result)
-            _record_executor_success("V7 paper executor")
-        except Exception as e:
-            _record_executor_failure("V7 paper executor", e)
+            _record_executor_failure("V7 OKX executor", e)
 
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
@@ -959,8 +850,9 @@ def health():
 def test_telegram():
     """Send a test message to verify Telegram integration."""
     # Debug: show all TELEGRAM* env vars (masked)
-    tg_vars = {k: v[:6] + "****" for k, v in os.environ.items()
-                if "TELEGRAM" in k.upper() or "TG" in k.upper() or "BOT" in k.upper()}
+    # names only — never expose any chars of the token/chat values
+    tg_vars = sorted(k for k in os.environ
+                     if "TELEGRAM" in k.upper() or "TG" in k.upper() or "BOT" in k.upper())
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat = os.environ.get("TELEGRAM_CHAT_ID", "")
     if not token or not chat:
@@ -1034,6 +926,355 @@ def prediction_json():
     return jsonify(pred)
 
 
+@app.route("/research/exit-variants", methods=["GET"])
+def research_exit_variants_api():
+    """Run V7 exit-variants backtest.  Mobile-friendly admin endpoint.
+
+    Same as `python -m research.exit_variants_backtest` but callable from
+    a phone browser.  Runs synchronously; expect 30-120s wall time on
+    Railway depending on parquet size.
+
+    Query params:
+      variants:    comma-separated subset (e.g. "baseline,opp_strong").
+                   Default = all 7.
+      entry_mode:  "signal_close" (default) | "next_open"
+      token:       required if ADMIN_HEAL_TOKEN env var is set
+
+    Returns JSON: {ok, oos_window, span_days, entry_mode, results: [...]}
+    each result has n / wr_pct / avg_net_bps / roi_pct / mdd_pct /
+    sharpe_ann / profit_factor / avg_hold_h / by_reason{}.
+    """
+    from flask import request, jsonify
+    import math
+
+    expected_token = os.environ.get("ADMIN_HEAL_TOKEN", "")
+    if expected_token and request.args.get("token", "") != expected_token:
+        return jsonify({"error": "missing/invalid ?token"}), 403
+
+    variants_param = request.args.get("variants", "").strip()
+    variant_names = [v.strip() for v in variants_param.split(",") if v.strip()] or None
+    entry_mode = request.args.get("entry_mode", "signal_close")
+    if entry_mode not in ("signal_close", "next_open"):
+        return jsonify({"error": "entry_mode must be signal_close or next_open"}), 400
+
+    try:
+        from research.exit_variants_backtest import (
+            variants_catalog, simulate_with_policy, summarise,
+        )
+        from research.v71_v7_sizing_1x import (
+            ATR_PERIOD, load_data, decode_signals, _atr_wilder,
+        )
+    except Exception as e:
+        logger.exception("exit_variants_import_failed")
+        return jsonify({"error": f"import failed: {e}"}), 500
+
+    catalog = variants_catalog()
+    run_set = variant_names if variant_names else list(catalog)
+    unknown = [v for v in run_set if v not in catalog]
+    if unknown:
+        return jsonify({"error": f"unknown variants: {unknown}",
+                        "available": list(catalog)}), 400
+
+    try:
+        df = load_data()
+        df["atr"] = _atr_wilder(df, ATR_PERIOD)
+        direction, tier, warmup_n = decode_signals(df)
+        df = df.iloc[warmup_n:].copy()
+        direction = direction[warmup_n:]
+        tier = tier[warmup_n:]
+        span_days = (df.index[-1] - df.index[0]).total_seconds() / 86400.0
+
+        results = []
+        for name in run_set:
+            policy = catalog[name]
+            trades = simulate_with_policy(df, direction, tier, policy,
+                                          entry_mode=entry_mode)
+            results.append(summarise(trades, span_days, name))
+    except Exception as e:
+        logger.exception("exit_variants_run_failed")
+        return jsonify({"error": str(e)}), 500
+
+    # JSON sanitise: inf/nan aren't valid JSON. Convert to strings.
+    def _sanitise(o):
+        if isinstance(o, float):
+            if math.isinf(o):
+                return "inf"
+            if math.isnan(o):
+                return None
+            return o
+        if isinstance(o, dict):
+            return {k: _sanitise(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [_sanitise(x) for x in o]
+        return o
+
+    # Sort variants so baseline shows first for readability
+    results.sort(key=lambda r: (0 if r.get("name") == "baseline" else 1,
+                                r.get("name", "")))
+
+    # Add comparative Δ vs baseline for quick scan
+    baseline = next((r for r in results if r.get("name") == "baseline"), None)
+    if baseline:
+        for r in results:
+            if r["name"] == "baseline" or r.get("n", 0) == 0:
+                continue
+            r["delta_sharpe_vs_base"] = (r.get("sharpe_ann", 0)
+                                          - baseline.get("sharpe_ann", 0))
+            r["delta_net_bps_vs_base"] = (r.get("avg_net_bps", 0)
+                                           - baseline.get("avg_net_bps", 0))
+
+    return jsonify({
+        "ok": True,
+        "oos_window": [df.index[0].isoformat(), df.index[-1].isoformat()],
+        "span_days": round(span_days, 1),
+        "entry_mode": entry_mode,
+        "n_variants_run": len(results),
+        "results": _sanitise(results),
+    })
+
+
+@app.route("/okx-admin/heal", methods=["GET", "POST"])
+def okx_admin_heal_api():
+    """Emergency heal endpoint for the V7 OKX executor.
+
+    Use case: executor stuck in DEMOTED/HALTED with orphan_local
+    rows from a missed WS algo fill or a long WS disconnect.  Mobile-
+    friendly: just hit the URL from a browser, no SQL needed.
+
+    Behaviour:
+      - GET /okx-admin/heal              → dry-run preview (safe)
+      - GET /okx-admin/heal?confirm=YES  → actually heal
+
+    Heal actions:
+      1. Close every v7_okx_positions row currently OPEN
+         (exit_reason='admin_heal', zero P&L)
+      2. Reset v7_okx_executor_status from DEMOTED/HALTED to INIT
+         (next cycle will reconnect WS + transition INIT→CONNECTING→
+         READY→ACTIVE, same as a fresh start)
+      3. Re-fetch positions from OKX via REST so reconciler starts
+         from accurate state next cycle
+
+    Requires ADMIN_HEAL_TOKEN env match if set; otherwise open (use
+    a Railway env var to lock down in production).
+    """
+    from flask import request, jsonify
+    # SAFETY (2026-06-07): the destructive heal is POST-only. A GET — even
+    # with ?confirm=YES — is dry-run ONLY. Link-preview bots, browser
+    # prefetch and uptime probes all issue GETs, and a stored
+    # ".../heal?confirm=YES" URL got auto-fetched and zeroed a live position
+    # twice (orphan_exchange). See mistake.md 2026-06-07.
+    execute = (
+        request.method == "POST"
+        and request.values.get("confirm", "").upper() == "YES"
+    )
+    expected_token = os.environ.get("ADMIN_HEAL_TOKEN", "")
+    if execute and expected_token:
+        provided = request.values.get("token", "")
+        if provided != expected_token:
+            return jsonify({"error": "missing/invalid token"}), 403
+
+    from shared.db import get_db_conn
+    open_rows: list[dict] = []
+    status_row: dict | None = None
+    try:
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, status, direction, size_contracts, "
+                    "entry_price, entry_time, entry_cl_ord_id, stop_algo_id "
+                    "FROM v7_okx_positions WHERE status='OPEN' ORDER BY id"
+                )
+                open_rows = list(cur.fetchall() or [])
+                cur.execute(
+                    "SELECT status, reason, trigger_id, last_changed_at "
+                    "FROM v7_okx_executor_status WHERE id=1"
+                )
+                status_row = cur.fetchone()
+
+                if execute:
+                    # SAFETY (2026-06-07): never zero a DB position OKX still
+                    # holds — that is exactly what created today's
+                    # orphan_exchange. Heal is only for orphan_local (DB has
+                    # rows, OKX is flat). If OKX is NOT flat, refuse.
+                    try:
+                        from indicator.okx.runner import _stage_label
+                        from indicator.okx.config import load_okx_config_from_env
+                        from indicator.okx.rest import OkxRestClient
+                        _cli = OkxRestClient(
+                            load_okx_config_from_env(stage=_stage_label()))
+                        live_pos = [
+                            p for p in _cli.get_positions(inst_id="BTC-USDT-SWAP")
+                            if p.direction != "FLAT" and abs(p.size_contracts) > 0
+                        ]
+                    except Exception as e:
+                        return jsonify({
+                            "error": f"OKX position check failed, refusing to heal: {e}"
+                        }), 502
+                    if live_pos:
+                        return jsonify({
+                            "error": "refused: OKX still holds live position(s); "
+                                     "zeroing DB would create orphan_exchange",
+                            "okx_positions": [
+                                {"direction": p.direction,
+                                 "size": p.size_contracts,
+                                 "avg_price": p.avg_price,
+                                 "upl_usd": p.unrealized_pnl_usd}
+                                for p in live_pos
+                            ],
+                            "fix": "close the OKX position first (manually or let "
+                                   "the executor manage it), then heal. Heal only "
+                                   "clears orphan_local (DB rows with OKX flat).",
+                        }), 409
+                    n_closed = 0
+                    if open_rows:
+                        cur.execute(
+                            "UPDATE v7_okx_positions "
+                            "SET status='CLOSED', "
+                            "    exit_time=NOW(), "
+                            "    exit_reason='admin_heal', "
+                            "    exit_price=COALESCE(exit_price, entry_price), "
+                            "    gross_pct=0.0, net_pct=0.0, "
+                            "    equity_ret_pct=0.0, "
+                            "    equity_after=equity_before "
+                            "WHERE status='OPEN'"
+                        )
+                        n_closed = cur.rowcount
+                    cur.execute(
+                        "UPDATE v7_okx_executor_status "
+                        "SET status='INIT', "
+                        "    last_changed_at=NOW(), "
+                        "    reason='admin_heal', "
+                        "    trigger_id=NULL "
+                        "WHERE id=1"
+                    )
+                    cur.execute(
+                        "UPDATE v7_okx_kill_log "
+                        "SET resolved_at=NOW(), "
+                        "    resolution='admin_heal' "
+                        "WHERE resolved_at IS NULL"
+                    )
+                    conn.commit()
+                    return jsonify({
+                        "healed": True,
+                        "positions_closed": n_closed,
+                        "executor_reset_to": "INIT (will reconnect on next cycle)",
+                        "kill_log_resolved": True,
+                        "note": "wait 1 cycle (≤60min) for executor "
+                                "to re-init through INIT→CONNECTING→READY→ACTIVE.",
+                    })
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.exception("okx_admin_heal failed")
+        return jsonify({"error": f"DB op failed: {e}"}), 500
+
+    return jsonify({
+        "dry_run": True,
+        "current_status": status_row,
+        "open_positions": open_rows,
+        "would_close_n_positions": len(open_rows),
+        "would_reset_executor_to": "INIT",
+        "how_to_apply": (
+            "POST to this URL with confirm=YES"
+            + (" and token=<your-token>" if expected_token else "")
+            + ". GET is always dry-run; heal also REFUSES if OKX still "
+              "holds a position (orphan_exchange guard)."
+        ),
+    })
+
+
+@app.route("/okx-status", methods=["GET"])
+def okx_status_api():
+    """Inspect OKX runner singleton state.  Returns diagnostic info
+    on whether the env flag is recognised, init has run, and what
+    the executor's current state machine value is.
+
+    Defensively wrapped — every section's exception is captured so we
+    can see exactly where it fails on Railway without grepping logs.
+    """
+    import os
+    import time as _time
+    import traceback
+
+    def _fingerprint(s: str) -> dict:
+        """Non-secret leak: length + first/last 2 chars.  Lets us spot
+        whitespace / truncation / quoting issues without exposing the
+        value."""
+        if not s:
+            return {"set": False}
+        return {
+            "set": True, "len": len(s),
+            "has_leading_ws": s != s.lstrip(),
+            "has_trailing_ws": s != s.rstrip(),
+            "has_quote": '"' in s or "'" in s,
+        }
+
+    out = {
+        "env_OKX_EXECUTOR_ENABLED": os.environ.get(
+            "OKX_EXECUTOR_ENABLED", "<unset>"),
+        "env_STAGE": os.environ.get("STAGE", "<unset>"),
+        "env_OKX_API_KEY_LIVE": _fingerprint(
+            os.environ.get("OKX_API_KEY_LIVE", "")),
+        "env_OKX_API_SECRET_LIVE": _fingerprint(
+            os.environ.get("OKX_API_SECRET_LIVE", "")),
+        "env_OKX_PASSPHRASE_LIVE": _fingerprint(
+            os.environ.get("OKX_PASSPHRASE_LIVE", "")),
+        "env_TG_CRITICAL_CHAT_ID_set": bool(os.environ.get(
+            "TG_CRITICAL_CHAT_ID")),
+        "local_time_unix": int(_time.time()),
+    }
+    # Attempt import + introspection independently
+    try:
+        from indicator.okx import runner as okx_runner
+        out["runner_import"] = "ok"
+        out["runner_is_enabled"] = okx_runner.is_enabled()
+        out["runner_init_failed"] = okx_runner._INIT_FAILED
+        out["runner_instance_alive"] = okx_runner._INSTANCE is not None
+        if okx_runner._INSTANCE is not None:
+            try:
+                out["executor_status"] = (
+                    okx_runner._INSTANCE.get_status().value)
+            except Exception as e:
+                out["executor_status_err"] = repr(e)
+            try:
+                # Resolved running config (non-secret) — confirms env flags
+                # like OKX_TD_MODE / OKX_STRONG_ONLY_ENTRY / OKX_TIME_CAP_HOURS
+                # actually took effect in the live process.
+                _c = okx_runner._INSTANCE._cfg
+                out["cfg"] = {
+                    "td_mode": _c.td_mode,
+                    "strong_only_entry": _c.strong_only_entry,
+                    "time_cap_hours": _c.time_cap_hours,
+                    "leverage": _c.leverage,
+                    "is_simulated": _c.is_simulated,
+                    "max_position_count": _c.max_position_count,
+                    "daily_loss_cap_pct": _c.daily_loss_cap_pct,
+                    "total_loss_cap_pct": _c.total_loss_cap_pct,
+                }
+            except Exception as e:
+                out["cfg_err"] = repr(e)
+            try:
+                out["ws_diag"] = okx_runner._INSTANCE._client.diag_state()
+            except Exception as e:
+                out["ws_diag_err"] = repr(e)
+    except Exception as e:
+        out["runner_import"] = "FAIL"
+        out["runner_import_err"] = repr(e)
+        out["runner_import_traceback"] = traceback.format_exc()
+
+    # Also test approval module load independently
+    try:
+        from indicator.okx.approval import ApprovalGate
+        out["approval_import"] = "ok"
+    except Exception as e:
+        out["approval_import"] = "FAIL"
+        out["approval_import_err"] = repr(e)
+        out["approval_import_traceback"] = traceback.format_exc()
+
+    return jsonify(out)
+
+
 @app.route("/indicator-status", methods=["GET"])
 def indicator_status_api():
     """API for main bot to fetch indicator status text."""
@@ -1058,10 +1299,8 @@ def indicator_status_api():
 @app.route("/db-diag")
 def db_diagnostics():
     """Show MySQL env var names (no values) for debugging."""
-    mysql_vars = {k: f"{v[:3]}***" if v else "EMPTY"
-                  for k, v in os.environ.items()
-                  if "MYSQL" in k.upper() or "DB" in k.upper()}
-    all_env = sorted(os.environ.keys())
+    mysql_vars = sorted(k for k in os.environ
+                        if "MYSQL" in k.upper() or "DB" in k.upper())
     try:
         from shared.db import get_db_info
         db_info = get_db_info()
@@ -1070,7 +1309,6 @@ def db_diagnostics():
     return jsonify({
         "mysql_vars_found": mysql_vars,
         "db_info": db_info,
-        "all_env_names": all_env,
     })
 
 
@@ -1079,13 +1317,10 @@ def diagnostics():
     """Live diagnostics — check Coinglass API + indicator history state."""
     import math
 
-    # List ALL env var names in this container (no values, just names)
-    all_env_names = sorted(os.environ.keys())
     cg_key_raw = os.environ.get("COINGLASS_API_KEY", "")
     diag = {
         "coinglass_api_key_set": bool(cg_key_raw),
         "coinglass_api_key_len": len(cg_key_raw),
-        "all_env_var_names": all_env_names,
         "cg_status": _state.get("cg_status", "no update yet"),
     }
 
@@ -1487,22 +1722,21 @@ def hybrid_chart_api():
         return f"<h3>Hybrid chart 失敗: {e}</h3>", 500
 
 
-@app.route("/paper-perf", methods=["GET"])
-def paper_perf_api():
-    """API: paper-trading virtual PnL report (Stage 1 of auto-trading roadmap).
+@app.route("/okx-perf", methods=["GET"])
+def okx_perf_api():
+    """OKX live Stage 3 cohort report — equity / WR / Sharpe / open pos.
 
-    Reads tracked_signals + assumes 4h-hold blind execution + 13 bps cost.
-    Used to monitor whether the indicator's signals are net-positive after
-    realistic trading frictions, as a precondition for moving toward live
-    auto-trading stages.
+    HTML body for direct browser viewing; the JSON shape ({"text": ...})
+    mirrors /paper-perf so a Telegram /okx-perf command can reuse the
+    same handler pattern.
     """
     try:
-        from indicator.paper_trading import get_paper_trading_report
-        report = get_paper_trading_report()
+        from indicator.okx.report import get_okx_report
+        report = get_okx_report()
         return jsonify({"text": report})
     except Exception as e:
-        logger.exception("Paper perf failed")
-        return jsonify({"text": f"❌ Paper trading 查詢失敗: {e}"}), 500
+        logger.exception("OKX perf failed")
+        return jsonify({"text": f"❌ OKX perf query failed: {e}"}), 500
 
 
 @app.route("/meeting", methods=["GET", "POST"])
@@ -1734,7 +1968,7 @@ def admin_flow_bars_export():
     from shared.db import get_db_conn
     symbol = request.args.get("symbol", "BTC-USD")
     since_ms = int(request.args.get("since_ms", "0"))
-    limit = int(request.args.get("limit", "100000"))
+    limit = min(int(request.args.get("limit", "100000")), 50000)
     try:
         conn = get_db_conn()
     except Exception as e:
@@ -2222,6 +2456,65 @@ def _run_meeting_scheduled():
         logger.error("Scheduled Meeting agent failed: %s", e)
 
 
+def _heartbeat_watchdog():
+    """External dead-man's switch (2026-06-10).
+
+    update_cycle runs hourly via the scheduler and ALREADY alerts when it keeps
+    ERRORING (consecutive_errors → Telegram, lesson 2026-04-22). The remaining
+    gap this fills: when update_cycle STOPS running entirely (scheduler dead /
+    process hung / thread died) there is no exception, no counter, no in-cycle
+    health check — so nobody is told. This INDEPENDENT thread watches
+    last_update staleness + the last health verdict and pushes ONE Telegram
+    alert when the system goes silent/critical (and one when it recovers).
+
+    Pure monitoring — never touches trading state. Daemon; swallows all errors
+    so it can never crash the app.
+    """
+    import time as _t
+    STALE_MIN = 140          # hourly updates → >2h20 = missed ~2 cycles
+    CHECK_SEC = 600          # check every 10 min
+    _t.sleep(900)            # boot grace (warmup + first cycle)
+    alerted = False
+    while True:
+        try:
+            with _lock:
+                last_update = _state.get("last_update")
+                status = _state.get("status")
+                health = (_state.get("health") or {}).get("overall_status")
+            problems = []
+            if last_update:
+                try:
+                    lu = datetime.fromisoformat(
+                        str(last_update).replace("Z", "+00:00"))
+                    if lu.tzinfo is None:
+                        lu = lu.replace(tzinfo=timezone.utc)
+                    age = (datetime.now(timezone.utc) - lu).total_seconds() / 60
+                    if age > STALE_MIN:
+                        problems.append(
+                            f"update_cycle 已 {age:.0f} 分鐘沒成功更新（可能卡死/停跑）")
+                except Exception:
+                    pass
+            if health == "critical":
+                problems.append("健康檢查 CRITICAL（資料過期 / 端點異常）")
+            chat = os.environ.get("TG_CRITICAL_CHAT_ID", "") or ""
+            if problems and not alerted:
+                _send_telegram_text(
+                    "⚠️ <b>FLOWBOT 健康警示</b>\n"
+                    + "\n".join("• " + p for p in problems)
+                    + "\n\n查 /health 或 /okx-status。擔心可在 Railway 設 "
+                    "<code>OKX_EXECUTOR_ENABLED=0</code> 停交易。",
+                    chat_id=chat)
+                alerted = True
+                logger.error("heartbeat_alert_sent: %s", problems)
+            elif not problems and alerted:
+                _send_telegram_text("✅ <b>FLOWBOT 已恢復正常更新</b>",
+                                    chat_id=chat)
+                alerted = False
+        except Exception:
+            logger.exception("heartbeat_watchdog_error")
+        _t.sleep(CHECK_SEC)
+
+
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -2275,6 +2568,11 @@ def start_scheduler():
 
     # Run first update immediately
     threading.Thread(target=update_cycle, daemon=True).start()
+
+    # External dead-man's switch: alerts if update_cycle goes silent (the loop
+    # being dead can't alert from inside itself). Pure monitoring; see fn docstring.
+    threading.Thread(target=_heartbeat_watchdog, daemon=True,
+                     name="heartbeat").start()
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────

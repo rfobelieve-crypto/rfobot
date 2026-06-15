@@ -4,6 +4,162 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-06-07: admin_heal 第二次造孤兒倉——破壞性操作掛在無認證 GET + 只改 DB 不平 OKX
+
+**What happened:**
+`/okx-admin/heal` 這個 endpoint 在 06-07 08:26 自動把一筆 live SHORT 0.29（id=6，executor 02:00 正常開的）在 DB 裡標成 `status=CLOSED`（exit_reason=admin_heal），但**完全沒去 OKX 平倉**。09:02 對帳發現「OKX 有、DB active 沒有」→ `orphan_exchange` → executor DEMOTE，推了一條「MANUAL INTERFERENCE DETECTED」假警報（其實不是手動，是 endpoint 被自動觸發）。
+
+時間線鐵證：08:02 對帳還 CONSISTENT（兩邊都有 SHORT）→ 08:26 admin_heal 抹 DB → 09:02 orphan_exchange。OKX 唯讀查證實 SHORT 還活著、強平價 $97K（離現價 +55%、碰不到）、stop algo 還 live @ 63148——所以**根本沒有風險事件，只有人造的狀態不一致**。
+
+這是 **6/4 admin_heal 事件的第二次重演**（6/4 是 orphan_local，CLAUDE.md 記過）。第一次只處理了當次孤兒倉，沒根治 endpoint 本身，於是換個方向（orphan_exchange）又炸一次。
+
+**Root cause:**
+兩個疊加的設計缺陷：
+1. **破壞性操作掛在無認證 GET**：`@app.route("/okx-admin/heal", methods=["GET"])`，要 `?confirm=YES` 才執行。問題是一個存過的 `.../heal?confirm=YES` 完整鏈接（Telegram 訊息/文檔/監控配置裡），會被 **link-preview bot / 瀏覽器預取 / uptime probe 連 query string 一起 GET**，自動帶 confirm=YES 觸發歸零。GET 依設計應幂等只讀，把「歸零 live 倉位」放 GET = 等著被預取誤觸。
+2. **heal 只 UPDATE DB、不碰 OKX**：函數體全是 SQL（close DB rows + reset executor + resolve kill_log），注釋 L947 聲稱「Re-fetch positions from OKX via REST」但**代碼根本沒這段**。所以一旦 OKX 實際有倉，歸零 DB 必然製造 orphan_exchange。
+
+**Correct approach（已修，commit 待 push）:**
+1. **破壞性路徑改 POST-only**：`methods=["GET","POST"]`，但 `execute = request.method=="POST" and confirm=="YES"`。GET 永遠 dry-run，link-preview/預取（都是 GET）再也觸發不了歸零。
+2. **歸零前先查 OKX，有倉則拒絕**：execute 前 `OkxRestClient.get_positions("BTC-USDT-SWAP")`，只要 OKX 還有非 FLAT 倉位就回 409 拒絕，附 OKX 倉位明細 + 「先平 OKX 再 heal」提示。heal 從此只能清真正的 orphan_local（DB 有 rows、OKX flat）。
+3. 驗證：py_compile + `app.url_map` 確認 `/okx-admin/heal → okx_admin_heal_api [GET,POST]` 綁定沒脫鉤。
+
+**Rule:** 任何會改變**真實交易所狀態 / 真錢**的 endpoint，**絕不可掛在 GET**——GET 必須幂等只讀，否則 link-preview / 預取 / 重載會在你不知情時觸發。破壞性 admin 操作 = POST + token + **執行前先核對真實外部狀態**（never zero local state that the exchange still holds）。修一個 ops bug 時，要修**機制本身**不是只清當次的髒數據——6/4 只清了孤兒倉沒修 endpoint，6/7 就用另一個方向重演。對帳出現 orphan 時，第一個問「是不是某個 heal/reset 工具只動了單邊（DB 或 exchange）」。
+
+---
+
+## 2026-06-02: aggregate AUC lift 被 2 個 outlier folds 撐起來，per-fold mean 是負的
+
+**What happened:**
+為了突破 V7 0.54 AUC ceiling，我跑 WorldQuant 101 alphas adapted for single-asset（rank → ts_rank），跑 conditional IC 找出 6 個強候選（alpha008/047/005/020/024/084，cond_IC > 0.03 + frac_pos > 65%）。然後用 production trainer (`train_direction_reg_walk_forward`) 跑 ensemble A/B：V7 baseline 136 features vs V7 + 6 alphas (142 features)。
+
+**Aggregate 結果看起來 GO**：
+- sign_AUC: 0.59755 → 0.60473 = **+0.00718**（剛過 +0.005 部署門檻）
+- Strong thr=0.008 WR: 83% → 100%（6 笔全勝）
+- Strong thr=0.010：新門檻達成 1 trade 100% WR
+
+我寫了 verdict 文字「DEPLOY: WQ101 candidates bring measurable lift」，準備推 user 走 2 週 paper validation。差一步就 commit。
+
+幸好部署前最後一個 sanity check：**per-fold AUC lift 分布**——只花 5 分鐘，但翻盤：
+- Mean lift: **-0.00442**（負的！）
+- Median lift: -0.00529（負的）
+- Positive lift folds: **37/77 = 48.1%**（不到一半）
+- Std: 0.091（極不穩）
+- Worst fold: -0.318，Best fold: +0.279
+- Capped mean (clip ±0.05): +0.00023（等同 0）
+- Bootstrap 95% CI: [-0.026, +0.016]（含 0）
+- Bootstrap p(lift ≤ 0): **0.666**（66% 機率根本沒 lift）
+
+aggregate +0.0072 是被 1-2 個極端 fold（max +0.28）撐起來的。**Median 是 -0.0053**。
+
+**Root cause:**
+**Aggregate AUC 跟 per-fold mean AUC 是不同 metric**。
+- **Aggregate**：把所有 fold 的 OOS predictions pool 起來再算一次 AUC
+- **Per-fold mean**：每個 fold 各算 AUC 後平均
+
+當有 1-2 個 fold 有極端 improvement（例如某段 quiet market 剛好 alpha008 抓到 momentum），會把 aggregate 拉高，但 per-fold 平均不變。Pooled metric 對 outlier 敏感，per-fold 才是真實 generalization 訊號。
+
+更深問題：**conditional IC 顯著 ≠ ensemble A/B 過**。
+- Conditional IC 量「**alpha 跟 V7 線性 residual** 的相關」
+- Ensemble A/B 量「XGB 加 alpha 後**非線性 ensemble** 預測是否改善」
+- 兩者可以背離：XGB 已透過 tree splits 非線性捕捉類似 pattern → 加 raw alpha 變成 noise
+
+也就是說 conditional IC 顯著只證明「**alpha 帶 V7 沒有的線性訊息**」，但 XGB ensemble 可能透過 conditional split 隱式抓到了 → 加進去**反而 hurt**（看到 best fold +0.28 但 worst fold -0.32 = high-variance signal）。
+
+放大因素：6/2 之前的 [[mistake 2026-06-01]] 已經建立了「conditional IC > raw IC 篩選」紀律，但**還缺一步 per-fold sanity**。我以為 aggregate 過了就 deploy，差點重蹈覆轍。
+
+**Correct approach:**
+任何 ensemble A/B 的 verdict 必須**同時看**：
+1. **Aggregate lift > +0.005**
+2. **Per-fold mean lift > +0.001**
+3. **Frac_positive folds > 55%**
+4. **Bootstrap 95% CI 不含 0**
+
+4 條都過才算「真實 lift」，缺一就**疑似 outlier 撐起來的假 lift**。
+
+具體實作：寫進 `wq101_ab.py` 之類的 A/B script 末段——
+
+```python
+fold_lifts = [auc(new_fold) - auc(base_fold) for fold in folds]
+n_pos = sum(1 for x in fold_lifts if x > 0)
+boot_p = bootstrap_p_value(fold_lifts, hypothesis="lift > 0", n=2000)
+
+if (aggregate_lift > 0.005
+    and np.mean(fold_lifts) > 0.001
+    and n_pos / len(fold_lifts) > 0.55
+    and boot_p < 0.05):
+    verdict = "DEPLOY"
+else:
+    verdict = "NO-GO (aggregate may be outlier-driven)"
+```
+
+**Rule:** Ensemble A/B 看到 aggregate AUC lift 過門檻時，**強制再算 per-fold mean + frac_positive + bootstrap CI 4 條 sanity**。光看 aggregate 等於 [[mistake 2026-06-01]] 在升級版重演——只是這次「univariate IC 過」變成「aggregate AUC 過」，本質都是「**outlier 撐起 averaged metric 但 generalization 不行**」。Conditional IC 過只是「值得試 A/B」的 trigger，不是「值得 deploy」的證據；ensemble A/B aggregate 過也只是「值得 per-fold sanity」的 trigger，不是 deploy 證據。**驗證鏈條每加深一層都要重新 sanity check**。
+
+更實務的紀律：**如果 5 分鐘的額外 check 能省下 2 週 paper validation，永遠先做這個 check**。今天這個 sanity 省下了：(a) 中斷現有 V7 paper cohort (b) 訓練 new model 等 1 小時 (c) 2 週 wait 然後發現沒差 (d) 浪費 14 天 paper baseline 比較性。**Validation discipline 的 ROI 是「上游 5 分鐘擋下下游 2 週的浪費」**。
+
+**Update**: 證實 V7 對「OHLCV + Coinglass + Deribit + Binance order flow」這幾個 data source 已飽和。突破方向必須是**異源 channel**：(1) options gamma exposure (paid Deribit/Glassnode), (2) whale on-chain wallet flow (Glassnode), (3) Bitcoin ETF AUM/flow (CoinGecko 開放), (4) Twitter/Reddit sentiment (DIY scraper)。優先順序按「取得成本 vs 預期 lift」評估。
+
+---
+
+## 2026-06-01: walk-forward univariate IC 漂亮但加進 ensemble 沒 lift（feature redundancy）
+
+**What happened:**
+為驗證使用者「market moves to least resistance」的訂單流原則，我跑了一輪 walk-forward IC sweep（`research/liquidity_proxy_features.py`）。8 大類 21 個 microstructure proxy 特徵，做了 30d-train / 7d-OOS / 4-fold rolling 走勢驗證。結果非常漂亮：
+
+- 12 個 feature 通過 |mean_IC| > 0.05 + 4/4 fold 同向
+- 最強 `A_swing_high_dist_168h` mean_IC **+0.207**（V7 既有最強 feature ~0.07，看起來是 3x lift）
+- 7 個獨立特徵（greedy de-dup |corr|<0.5）全部 4/4 同向
+
+看起來非常有信心。於是寫了 A/B retrain script（`research/dual_model/train_with_liq_features.py`），用相同 XGB 超參數 + 77-fold WF split 比較「V7 baseline (136 features) vs V7 + 7 liq features (143 features)」。**結果：sign_AUC 從 0.5208 掉到 0.5178（-0.0030），IC 兩者都 ≈0**。
+
+也就是說：univariate WF IC 看起來強的 feature，加進 ensemble **完全沒有 marginal information value**。
+
+**Root cause:**
+**Feature redundancy 在 XGBoost ensemble 裡是常見現象**。V7 的 136 個既有 feature（CVD divergence、OI delta、vol_kurtosis、impact_asymmetry、各種 z-score、return lag）已經透過 tree split 重組出類似 swing distance、sweep magnitude 的訊息。新加的 raw 特徵雖然 univariately 有訊號，但 **conditional on 既有 features 的訊號=零**。
+
+更深的問題是我**只看 univariate IC 就下結論「這是 V7 強 3 倍的新 alpha」**。正確比較應該是「marginal IC given V7 model」— 也就是 V7 預測 residual 跟新 feature 的 IC。如果 V7 residual 跟新 feature 不相關，新 feature 對 V7 才有 lift。我這次直接用 raw IC 比較 V7 整體 IC，是 apples-to-oranges：raw IC 量「跟 target 相關」，但 V7 IC 量「ensemble 預測誤差」。一個 feature 可以很 univariately 相關但對 ensemble 全無 lift。
+
+放大因素：walk-forward N=4 folds 太少。frac_positive=4/4 看起來很穩，但隨機 4/4 同向機率 = 1/16 = 6.25%。7 個獨立特徵全 4/4 同向是不太可能（聯合機率極低），但**每個獨立 feature 的 IC 估計值本身仍有大量 noise**。可能我看到的 +0.207 在更多 folds 之後會收斂到 +0.05 或更低 — 還是有 signal，但沒「3x V7」這麼誇張。
+
+**Correct approach:**
+1. **加新 feature 前永遠跑 ensemble A/B**，不是只看 univariate IC。Univariate IC 量的是「跟 target 的 raw 相關性」，ensemble 已經透過 tree split 吸了大半。要看 lift 必須是「加進去 ensemble 後 OOS AUC 是否提升 +0.005 以上」。
+2. **若一定要用 univariate metric 做篩選**，用 **conditional IC**：先用 V7 baseline 預測，算 residual = y - pred，然後算新 feature vs residual 的 IC。Conditional IC 顯著 > 0 才值得進 ensemble。原始 IC 顯著只證明「跟 target 有關」，沒證明「V7 沒抓到」。
+3. **WF fold 數 N < 10 時的「全 fold 同向」結論要打折**。N=4 同向看起來 4/4，實際統計強度約等於 binomial p=0.5 下 4 trials 全成功，p-value = 1/16 = 0.0625（剛過 5% 邊界）。要 N≥10 同向結論才篤定。
+4. **負面結果一樣要記下來**，未來別人不會（或自己不會）重複跑同樣的 univariate IC sweep 結果 hyped。`research/orderbook_liq_features.py` 跟 `research/liquidity_proxy_features.py` 一起留作「univariate IC 高但 ensemble 沒 lift」的案例。
+
+**Rule:** 任何「新 feature 加進 V7 / V8 ensemble」的決定必須基於 **ensemble A/B retrain 的 sign_AUC 或 IC lift**，不是 univariate WF IC。Univariate IC 高表示「跟 target 有 raw correlation」，但 conditional on ensemble 的剩餘 signal 才是真正的 marginal alpha。看到 univariate IC 比 V7 既有 feature 高 2-3 倍時 — **特別**要警覺，這往往是已經被 V7 吸收的訊息以另一種包裝出現。下次先跑「conditional IC vs V7 residual」 → 若顯著再 ensemble A/B → 都過才整合。
+
+**Update 2026-06-02:** 重跑 A/B 用 production training function（`research/dual_model/rerun_liq_ab_with_prod_trainer.py`，import `train_direction_reg_walk_forward` 直接）驗證上面結論：BASELINE V7 sign_AUC 0.6030 / IC 0.180（跟 canonical OOS 0.593/0.170 對齊），NEW V7 + 9 liq features sign_AUC 0.6036 / IC 0.186 — **+0.0006 AUC、+0.006 IC**，仍遠低於 +0.005 部署門檻。原始結論「不要部署」**仍然成立**，但要注意：上次第一版 A/B baseline 訓練設定有差（custom eval_set 早停太凶導致預測退化），所以兩個 broken model 之間「無 lift」的觀察方向對，但**比較的絕對值都是錯的**。下次 A/B 要**直接 import 生產訓練函式**避免 hyperparam drift。
+
+---
+
+## 2026-05-31: Edit 把新函式塞進 `@app.route` 跟 `def webhook()` 之間，decorator 被靜默搶走，Telegram bot 全死
+
+**What happened:**
+commit c758336 加 `_handle_okx_perf` 函式時，我用 Edit 工具改 BTC_perp_data.py 的 old_string = `def _handle_okx_approval_response(...):`，new_string = `def _handle_okx_perf(...): ...\n\n\ndef _handle_okx_approval_response(...):`。結果新函式被插入到 `_handle_okx_approval_response` 之前。
+
+`_handle_okx_approval_response` 本來就是我之前（commit e531b2c）用同樣手法插在 `def webhook():` 之前的——那一次也是把 webhook 上方的 `@app.route(f"/{TOKEN}", methods=["POST"])` decorator 跟 `def webhook()` 拆開了，但因為 `_handle_okx_approval_response` 的 signature 是 `(chat_id, raw_cmd)`，Flask 路由把 POST 進來時 Werkzeug 報 "TypeError: missing argument" → 變成 500 給 Telegram。**那次沒爆只是因為 Telegram 平常不會故意打 webhook 來驗證，Flask app 也沒在啟動時報錯**。直到我這次再插一個 `_handle_okx_perf` 在更前面，decorator 又被搶過去——這一次完全相同的問題終於在用戶按 V7 Stats 按鈕時暴露。
+
+症狀很迷惑：bot service 的 `/` 主頁回 200 「OKX BTC Liquidity Outcome Bot is running」(因為 `/` 的 decorator 跟 def 是黏在一起的，沒被動到)，但 Telegram getWebhookInfo 顯示 `last_error_message: "Wrong response from the webhook: 500 Internal Server Error"`，每個指令、每個按鈕都死，**包括完全沒碰過的 /help**。用戶看起來就是「bot 沒反應」，沒有任何錯誤訊息能讓他自己 diagnose。
+
+Python 語法檢查、import 檢查、unit test 全都過——因為這個 bug 是「decorator 綁錯函式」，不是任何 lint 工具會抓的。要等到 HTTP request 真的進來、Flask 帶錯誤參數 call 那個函式，才會炸。
+
+**Root cause:**
+我把 `def webhook():` 之前的某行（裡面有獨立函式 `_handle_okx_approval_response` 或 `_handle_okx_perf`）當成 anchor 點插入新函式，沒注意到該函式緊鄰 `@app.route(...)` decorator，而 Python decorator 是 syntactically 綁到「decorator 下面那一個 def」上的——我的 Edit 把新 def 塞在中間，等於把 decorator 從 `def webhook` 拔走、轉嫁到我新插的 def 上。
+
+更深層原因：Flask 的 `@app.route` 沒有「綁定檢查」——decorator 隨便綁到哪個函式它都不會 raise，只是綁的那個函式變成 endpoint。Runtime 在 Telegram 打過來、Flask 用沒給 chat_id 參數的方式 call 它時才出 TypeError。再加上 Flask app 對 unhandled exception 的預設行為是回 500 給 client，沒任何 startup-time 警報。
+
+放大因素：我寫 commit message 的時候 grep 路徑下的 `@app.route` 看其它路由還在，但沒去看每個 decorator 是不是綁到「原本應該的 def」上。 sanity check 是「routes 都存在」而不是「routes 都綁對函式」。
+
+**Correct approach:**
+1. 任何 Edit 動到「Flask / Django route 檔案中、靠近 `@app.route` 或 `@app.get` 之類 decorator 的位置」，必須**讀 Edit 後的整段** 至少 ±10 行，確認 decorator 跟原本的 def 仍然黏著。
+2. 加新 helper 函式時，**找一個遠離 route handler 的安全位置**插入。例如：放到檔尾、或一個獨立的 `# === Helpers ===` 區塊。不要見縫插針地塞在現有 route 旁邊。
+3. push 前如果改了 Flask app 檔案，用 `python -c "from BTC_perp_data import app; print([str(r) for r in app.url_map.iter_rules()])"` 檢查所有 route 跟 view function 的對應關係。`url_map` 印出來會看到 `<Rule '/<token>' (POST) -> webhook>`，如果看到 `-> _handle_okx_perf` 就是綁錯了。
+4. Bot service 應該有一個 startup smoke——例如「啟動後對自己 webhook POST 一個空 JSON，預期回 200 ok」，啟動失敗的話 Railway 部署應該直接 fail，而不是部署成功讓 silent failure 跑半天。
+
+**Rule:** 用 Edit 工具改 Flask / Django / FastAPI route 檔案時，**絕對不要把 anchor 點選在 `@app.route` decorator 下方那行**。如果一定要插入，要連同 decorator 一起包進 old_string，或選擇遠離任何 decorator 的位置（例如 helper section、檔尾）。Edit 後務必目視確認每個 decorator 還黏在原本的 view function 上。Python decorator 跟 def 沒有任何語法保護，綁錯了 lint/syntax/import 都不會炸，只在 runtime 有人打 endpoint 時才以「500 + missing positional argument」現身。**Symptom 是「Flask 主頁活著但某個 route 全死」、「Telegram 顯示 500 但 code 看起來沒問題」**——下次看到這種模式，第一個查 `app.url_map`。
+
+---
+
 ## 2026-04-22: 新特徵邏輯貼進錯誤的 helper 函數，signature 不符導致 NameError 整夜停機
 
 **What happened:**

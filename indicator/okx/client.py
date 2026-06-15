@@ -47,24 +47,34 @@ class OkxClient:
 
     def submit_market_order(self, *, inst_id: str, side: Side, sz: int,
                             td_mode: str,
-                            cl_ord_id: Optional[str] = None) -> OrderResult:
+                            cl_ord_id: Optional[str] = None,
+                            pos_side: Optional[str] = None,
+                            reduce_only: bool = False) -> OrderResult:
         return self._rest.submit_market_order(
             inst_id=inst_id, side=side, sz=sz, td_mode=td_mode,
-            cl_ord_id=cl_ord_id,
+            cl_ord_id=cl_ord_id, pos_side=pos_side, reduce_only=reduce_only,
         )
 
     def submit_algo_stop(self, *, inst_id: str, side: Side, sz: int,
                          trigger_px: float, td_mode: str,
-                         algo_cl_ord_id: Optional[str] = None) -> AlgoOrderResult:
+                         algo_cl_ord_id: Optional[str] = None,
+                         pos_side: Optional[str] = None,
+                         reduce_only: bool = False) -> AlgoOrderResult:
         return self._rest.submit_algo_stop(
             inst_id=inst_id, side=side, sz=sz, trigger_px=trigger_px,
             td_mode=td_mode, algo_cl_ord_id=algo_cl_ord_id,
+            pos_side=pos_side, reduce_only=reduce_only,
         )
 
-    def amend_algo_stop(self, *, algo_id: str,
+    def amend_algo_stop(self, *, inst_id: str, algo_id: str,
                         new_trigger_px: float) -> AmendResult:
+        # inst_id is REQUIRED: OKX amend-algos rejects missing instId with 50014
+        # (2026-06-10 bug).  The caller (executor.py) and the REST layer
+        # (rest.py) both pass/accept inst_id; this facade previously dropped it,
+        # so every amend raised TypeError here and the trailing stop never moved
+        # on the exchange.  Keep this signature in lockstep with rest.amend_algo_stop.
         return self._rest.amend_algo_stop(
-            algo_id=algo_id, new_trigger_px=new_trigger_px,
+            inst_id=inst_id, algo_id=algo_id, new_trigger_px=new_trigger_px,
         )
 
     def cancel_algo_stop(self, *, algo_id: str) -> CancelResult:
@@ -103,3 +113,11 @@ class OkxClient:
         status.rest_last_latency_ms = self._rest.last_latency_ms()
         status.rest_circuit_tripped = self._rest.is_circuit_tripped()
         return status
+
+    def diag_state(self) -> dict:
+        """Diagnostic snapshot — surface WS internals to /okx-status."""
+        return {
+            "ws_private": self._ws_private.diag_state(),
+            "rest_last_latency_ms": self._rest.last_latency_ms(),
+            "rest_circuit_tripped": self._rest.is_circuit_tripped(),
+        }

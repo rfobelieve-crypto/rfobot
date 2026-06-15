@@ -1,0 +1,121 @@
+{
+  "description": "Cascade-bar reversion dynamics (magnitude, per-hour, fee-sensitivity)",
+  "round_trip_fee": 0.0008,
+  "magnitude": {
+    "cascade_bars": {
+      "n": 422,
+      "abs_return_4h_mean": 0.017370299177445075,
+      "abs_return_4h_median": 0.013407713147246092,
+      "abs_return_4h_p25": 0.007859632796152843,
+      "abs_return_4h_p75": 0.0246370640124893,
+      "abs_return_4h_p90": 0.0385467284896482
+    },
+    "non_cascade_bars": {
+      "n": 3467,
+      "abs_return_4h_mean": 0.005888092393377266,
+      "abs_return_4h_median": 0.004017015564701465
+    },
+    "cascade_over_non_cascade_ratio_median": 3.3377299468448838
+  },
+  "per_hour": {
+    "long_dominant": {
+      "1h": {
+        "n": 217,
+        "mean_return": -0.0030098953514265886,
+        "median_return": -0.0017993326822703937,
+        "win_rate": 0.6221198156682027,
+        "short_pnl_mean": 0.0030098953514265886
+      },
+      "2h": {
+        "n": 217,
+        "mean_return": -0.004672733100335909,
+        "median_return": -0.004956867609053783,
+        "win_rate": 0.663594470046083,
+        "short_pnl_mean": 0.004672733100335909
+      },
+      "3h": {
+        "n": 217,
+        "mean_return": -0.006477954844159178,
+        "median_return": -0.00836605091677367,
+        "win_rate": 0.6682027649769585,
+        "short_pnl_mean": 0.006477954844159178
+      },
+      "4h": {
+        "n": 217,
+        "mean_return": -0.007137896425174882,
+        "median_return": -0.00877793881569977,
+        "win_rate": 0.6682027649769585,
+        "short_pnl_mean": 0.007137896425174882
+      }
+    },
+    "short_dominant": {
+      "1h": {
+        "n": 205,
+        "mean_return": 0.001296780721320451,
+        "median_return": 0.0005141518277693713,
+        "win_rate": 0.5317073170731708,
+        "long_pnl_mean": 0.001296780721320451
+      },
+      "2h": {
+        "n": 205,
+        "mean_return": 0.0013394378765645106,
+        "median_return": 0.0013431920090827276,
+        "win_rate": 0.5414634146341464,
+        "long_pnl_mean": 0.0013394378765645106
+      },
+      "3h": {
+        "n": 205,
+        "mean_return": 0.0014494002687508608,
+        "median_return": 0.0018139075460041898,
+        "win_rate": 0.5560975609756098,
+        "long_pnl_mean": 0.0014494002687508608
+      },
+      "4h": {
+        "n": 205,
+        "mean_return": 0.0013491781895019627,
+        "median_return": 0.002702633861481951,
+        "win_rate": 0.5560975609756098,
+        "long_pnl_mean": 0.0013491781895019627
+      }
+    },
+    "contrarian_combined": {
+      "1h": {
+        "n": 422,
+        "mean_signed_return": 0.0021776951164224224,
+        "median_signed_return": 0.0011260242674742682,
+        "win_rate": 0.5781990521327014,
+        "mean_after_fees": 0.0013776951164224224
+      },
+      "2h": {
+        "n": 422,
+        "mean_signed_return": 0.003053478311537005,
+        "median_signed_return": 0.0030810176349165275,
+        "win_rate": 0.6042654028436019,
+        "mean_after_fees": 0.002253478311537005
+      },
+      "3h": {
+        "n": 422,
+        "mean_signed_return": 0.004035173593072198,
+        "median_signed_return": 0.004925957545379056,
+        "win_rate": 0.6137440758293838,
+        "mean_after_fees": 0.0032351735930721977
+      },
+      "4h": {
+        "n": 422,
+        "mean_signed_return": 0.0043258413580825866,
+        "median_signed_return": 0.005912342669175452,
+        "win_rate": 0.6137440758293838,
+        "mean_after_fees": 0.0035258413580825866
+      }
+    }
+  },
+  "fee_profitable_by_horizon": {
+    "1h_profitable_after_fees": true,
+    "2h_profitable_after_fees": true,
+    "3h_profitable_after_fees": true,
+    "4h_profitable_after_fees": true
+  },
+  "best_horizon": 4,
+  "best_mean_after_fees": 0.0035258413580825866,
+  "reversion_verdict": "PROFITABLE"
+}

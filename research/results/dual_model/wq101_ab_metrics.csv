@@ -1,0 +1,9 @@
+metric,baseline,new
+mae,0.004296691221247488,0.004289215759431248
+rmse,0.006488584995977029,0.006489865755492213
+spearman_ic,0.16727698039110045,0.1680132006342324
+auc_sign,0.5975486445604913,0.6047297732712976
+strong_sweep,"{'thr_0.006': {'n': 10, 'n_long': 10, 'n_short': 0, 'wr': 0.9, 'fire_rate': 0.0027056277056277055, 'wr_long': 0.9, 'wr_short': nan}, 'thr_0.008': {'n': 6, 'n_long': 6, 'n_short': 0, 'wr': 0.8333333333333334, 'fire_rate': 0.0016233766233766235, 'wr_long': 0.8333333333333334, 'wr_short': nan}, 'thr_0.010': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}, 'thr_0.012': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}, 'thr_0.015': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}}","{'thr_0.006': {'n': 10, 'n_long': 10, 'n_short': 0, 'wr': 0.9, 'fire_rate': 0.0027056277056277055, 'wr_long': 0.9, 'wr_short': nan}, 'thr_0.008': {'n': 6, 'n_long': 6, 'n_short': 0, 'wr': 1.0, 'fire_rate': 0.0016233766233766235, 'wr_long': 1.0, 'wr_short': nan}, 'thr_0.010': {'n': 1, 'n_long': 1, 'n_short': 0, 'wr': 1.0, 'fire_rate': 0.00027056277056277056, 'wr_long': 1.0, 'wr_short': nan}, 'thr_0.012': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}, 'thr_0.015': {'n': 0, 'n_long': 0, 'n_short': 0, 'wr': nan, 'fire_rate': 0.0}}"
+n_folds,77,77
+n_features,136,142
+objective,mse,mse

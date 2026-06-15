@@ -1,0 +1,5 @@
+# Place TTS-generated voiceover here.
+# Filename convention: scene_01.mp3 ... scene_14.mp3 (zero-padded id).
+# Each file is auto-loaded by Composition.tsx via staticFile().
+# Missing files are tolerated in dev (Remotion logs a warning,
+# the scene plays silent so you can iterate visuals first).

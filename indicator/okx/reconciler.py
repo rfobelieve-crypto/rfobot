@@ -30,9 +30,10 @@ from indicator.okx.types import (
 logger = logging.getLogger(__name__)
 
 
-# Tolerance for "size equal" (contracts integer-typed so exact = 0 diff,
-# but OKX returns 'pos' as float-string).  Anything > this = mismatch.
-SIZE_TOLERANCE_CONTRACTS = 0.001
+# Tolerance for "size equal".  Sizes are now fractional (OKX lotSz 0.01),
+# so use half a lot step to absorb float dust without masking real mismatches
+# (e.g. the 0.29-vs-1.0 / 1-vs-12 kind still trips it).
+SIZE_TOLERANCE_CONTRACTS = 0.005
 
 
 class PositionReconciler:
@@ -116,7 +117,7 @@ class PositionReconciler:
 
         # Both have exactly one — compare
         okx = okx_active[0]
-        local_size = int(local_open["size_contracts"] or 0)
+        local_size = float(local_open["size_contracts"] or 0)
         if abs(okx.size_contracts - local_size) > SIZE_TOLERANCE_CONTRACTS:
             return ReconciliationResult(
                 verdict=ReconciliationVerdict.MISMATCH,

@@ -1,0 +1,22 @@
+[
+  "dfp_fcvd_cum_24h_rank",
+  "dfp_scvd_cum_24h_rank",
+  "dfp_flow_consensus_persist_8h",
+  "dfp_long_build_persist_8h",
+  "dfp_taker_4h_24h_rank",
+  "dfp_liq_short_dom_streak",
+  "dfp_liq_long_dom_streak",
+  "dfp_fcvd_sign_streak",
+  "dfp_flow_consensus_signed",
+  "dfp_taker_sign_streak",
+  "dfp_flow_consensus_zweighted",
+  "dfp_net_build_8h",
+  "dfp_long_cover_persist_8h",
+  "dfp_scvd_sign_streak",
+  "dfp_oi_sign_streak",
+  "dfp_spot_lead_ratio",
+  "dfp_short_cover_persist_8h",
+  "dfp_pos_ls_sign_streak",
+  "dfp_retail_whale_div",
+  "dfp_post_long_liq_rev"
+]

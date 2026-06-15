@@ -32,16 +32,64 @@ class OkxConfig:
 
     # ── Instrument
     inst_id: str = "BTC-USDT-SWAP"
+    # Default cross. ISOLATED is staged (ring-fence each position's margin —
+    # 2026-06-05 blowup mitigation) but DORMANT until activated via
+    # OKX_TD_MODE=isolated, so it never disturbs an open cross position. Flip
+    # the env only when the account is FLAT (OKX won't mix cross+isolated on one
+    # instId; a cross position closed with tdMode=isolated would mismatch).
+    # When isolated: the executor sets leverage per (instId, isolated, posSide)
+    # before each open (executor._open_position). See docs/okx_account_isolation.md.
     td_mode: Literal["cash", "cross", "isolated"] = "cross"
-    pos_mode: str = "net_mode"
-    leverage: int = 1                # HARD CAP 1 for Stage 2-3
+    # OKX default for new accounts is long_short_mode (sides separate).
+    # net_mode (single signed net position) is also supported; the
+    # executor branches on this field to decide whether to include
+    # posSide / reduceOnly on each order.
+    pos_mode: Literal["net_mode", "long_short_mode"] = "long_short_mode"
+    # Leverage hard cap = 10x (Stage 3 informed override 2026-05-28).
+    # Required for $100 capital to fit 1 BTC-USDT-SWAP contract
+    # (1 contract = 0.01 BTC ≈ $750 notional).  Trade-off documented
+    # in CLAUDE.md §"10x leverage informed override".
+    leverage: int = 10
+    # OKX SWAP contract size in base currency (BTC for BTC-USDT-SWAP = 0.01)
+    contract_size_base: float = 0.01
+    # Round-trip taker cost as a fraction (mirrors v7_paper_executor)
+    taker_cost: float = 0.0008
 
-    # ── Risk caps (Stage 3 defaults; user accepted $100 + all 10 safety belts)
-    initial_capital_usd: float = 100.0
+    # Strong-only entry gate (2026-06-09, reversible; default OFF = no change).
+    # When True, only Strong-tier signals open a position; Moderate signals are
+    # skipped so they don't occupy the single slot and crowd out higher-WR
+    # Strong entries.  Evidence (research/dual_model/entry_policy_real_exit_bt,
+    # real 3xATR-trail exit + 1-position occupancy, 5mo OOS): Strong-only WR
+    # 62% vs both 53%, MaxDD halved (7.6% vs 20% at 2x effective leverage),
+    # cum higher.  Toggle live via OKX_STRONG_ONLY_ENTRY=1 (no redeploy needed).
+    # Does NOT touch management of an already-open position.
+    strong_only_entry: bool = False
+
+    # Time-cap exit (hours). 0 = DISABLED (removed 2026-06-10 per user) — let
+    # winners run; exits then come only from the 3xATR TRAILING stop or an
+    # opposite signal. The rare trades that previously hit the 72h cap were the
+    # biggest winners (backtest: time_cap exits +5xx bps), so the cap was
+    # cutting them short. Re-enable via OKX_TIME_CAP_HOURS=72 (no redeploy).
+    time_cap_hours: int = 0
+
+    # ── Risk caps (Stage 3 defaults; tightened for 10x leverage)
+    # Default bumped 100→155 on 2026-06-01: user deposited $154.86 to
+    # OKX trading account; CAP-2 (equity > 1.5×initial → HALT) was
+    # tripping immediately because $154 > $150.  Configurable via
+    # OKX_INITIAL_CAPITAL_USD env var if you adjust the deposit later.
+    initial_capital_usd: float = 155.0
     risk_frac: float = 0.02
     max_position_count: int = 1
-    daily_loss_cap_pct: float = -50.0   # Safety belt #3: -50% of capital
-    total_loss_cap_pct: float = -50.0   # Safety belt #4: -50% of capital
+    # Tightened on 2026-05-28 for 10x leverage.  At 10x, a 2% BTC move
+    # = 20% account move, so the old -50% cap was meaningless.
+    daily_loss_cap_pct: float = -20.0   # Safety belt #3
+    total_loss_cap_pct: float = -30.0   # Safety belt #4 (career-end)
+    # Pre-submit STRATEGY risk-leverage ceiling (notional / equity), NOT the
+    # OKX account leverage (10x, margin lockup only).  Sizing targets ~2x
+    # (NOTIONAL_LEV_MULT); 3.0 leaves headroom for lot-rounding / small-account
+    # min-lot inflation while still catching the int()-floor class bug that
+    # forced ~7x on 2026-06-05.  See kill_checks.check_presubmit_order.
+    max_effective_leverage: float = 3.0
 
     # ── Monitoring intervals
     reconciliation_interval_sec: int = 60
@@ -64,12 +112,28 @@ class OkxConfig:
     # ── DB
     table_prefix: str = "v7_okx"
 
+    # ── Helpers ────────────────────────────────────────────────────────
+
+    def pos_side_for(self, direction: str) -> "Optional[str]":
+        """Map our LONG/SHORT direction → OKX posSide field.
+
+        In net_mode the field is omitted (OKX infers from signed pos).
+        In long_short_mode every order must carry an explicit posSide.
+        """
+        if self.pos_mode == "net_mode":
+            return None
+        return "long" if direction == "LONG" else "short"
+
 
 def load_okx_config_from_env(stage: Literal["testnet", "live"] = "testnet") -> OkxConfig:
     """Read env vars, return OkxConfig.  Does NOT validate (call validate
-    separately so test code can inject incomplete configs)."""
+    separately so test code can inject incomplete configs).
+
+    OKX_INITIAL_CAPITAL_USD overrides the default 155.0 — useful when
+    you change the OKX deposit without redeploying code.
+    """
     suffix = "_TESTNET" if stage == "testnet" else "_LIVE"
-    return OkxConfig(
+    kwargs: dict = dict(
         is_simulated=1 if stage == "testnet" else 0,
         stage_label=stage,
         api_key=os.environ.get(f"OKX_API_KEY{suffix}", ""),
@@ -78,25 +142,53 @@ def load_okx_config_from_env(stage: Literal["testnet", "live"] = "testnet") -> O
         telegram_alert_chat_id=os.environ.get("TG_ALERT_CHAT_ID", ""),
         telegram_critical_chat_id=os.environ.get("TG_CRITICAL_CHAT_ID", ""),
     )
+    cap_override = os.environ.get("OKX_INITIAL_CAPITAL_USD", "").strip()
+    if cap_override:
+        try:
+            kwargs["initial_capital_usd"] = float(cap_override)
+        except ValueError:
+            pass
+    tdm = os.environ.get("OKX_TD_MODE", "").strip().lower()
+    if tdm in ("cash", "cross", "isolated"):
+        kwargs["td_mode"] = tdm
+    soe = os.environ.get("OKX_STRONG_ONLY_ENTRY", "").strip().lower()
+    if soe in ("1", "true", "yes", "on"):
+        kwargs["strong_only_entry"] = True
+    tch = os.environ.get("OKX_TIME_CAP_HOURS", "").strip()
+    if tch:
+        try:
+            kwargs["time_cap_hours"] = int(tch)
+        except ValueError:
+            pass
+    return OkxConfig(**kwargs)
 
 
 def validate_okx_config(cfg: OkxConfig) -> None:
     """Fail-fast validation.  Raises RuntimeError on violation.
 
     These checks correspond to kill_criteria.md §2E (should-never-happen):
-      E1: leverage > 1
+      E1: leverage outside Stage 3 informed-override range [1, 10]
       E2: posMode != net_mode
       E4: withdraw permission (checked separately via REST query in startup)
     """
-    # E1
-    if cfg.leverage != 1:
+    # E1 — Stage 3 informed override (2026-05-28): leverage may be 1..10
+    if not (1 <= cfg.leverage <= 10):
         raise RuntimeError(
-            f"E1: Stage 2-3 leverage hard cap = 1, got {cfg.leverage}"
+            f"E1: Stage 3 leverage must be in [1, 10], got {cfg.leverage}"
         )
-    # E2
-    if cfg.pos_mode != "net_mode":
+    # Pre-submit strategy leverage cap must be sane: >= 1x (else nothing
+    # trades) and <= 10x (CLAUDE.md Stage-3 account leverage ceiling).
+    # Decoupled from cfg.leverage so low-leverage configs stay valid.
+    if not (1.0 <= cfg.max_effective_leverage <= 10.0):
         raise RuntimeError(
-            f"E2: Stage 2 posMode must be net_mode, got {cfg.pos_mode!r}"
+            f"max_effective_leverage must be in [1, 10], "
+            f"got {cfg.max_effective_leverage}"
+        )
+    # E2 — both modes supported; executor branches on cfg.pos_mode
+    if cfg.pos_mode not in ("net_mode", "long_short_mode"):
+        raise RuntimeError(
+            f"E2: posMode must be 'net_mode' or 'long_short_mode', "
+            f"got {cfg.pos_mode!r}"
         )
     # td_mode sanity
     if cfg.td_mode not in ("cash", "cross", "isolated"):

@@ -10,6 +10,8 @@ secrets.json
 credentials.json
 *.pem
 *.key
+railway-recovery-codes.txt
+*recovery-codes*.txt
 *.cert
 *.crt
 *.p12
@@ -46,6 +48,8 @@ indicator/state/
 market_data/raw_data/
 research/ml_data/
 research/eda_charts/
+research/cache/
+.cache/
 .claude/worktrees/
 
 # Local scripts with secrets
@@ -58,3 +62,13 @@ indicator/model_artifacts/*_backup.parquet
 
 # Local only
 .claude/settings.local.json
+
+# Remotion video output / deps / generated VO mp3s
+promo_video/node_modules/
+promo_video/out/
+promo_video/.remotion/
+promo_video/public/audio/*.mp3
+
+# Course / marketing material — kept local only (slides, scripts, large mp4 videos)
+量化課程/
+外部技術借鑑/

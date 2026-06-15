@@ -38,7 +38,7 @@ def load_config():
     allowed_users_raw = os.getenv("ALLOWED_USERS")
 
     if token:
-        debug_mode = str(debug_raw or "true").lower() == "true"
+        debug_mode = str(debug_raw or "false").lower() == "true"
         port = int(port_raw or 5000)
 
         allowed_users = []
@@ -1552,7 +1552,8 @@ def tradingview_webhook():
             logger.warning("Invalid TV webhook secret")
             return {"status": "forbidden"}, 403
 
-        logger.info("TV webhook received: %s", data)
+        logger.info("TV webhook received: %s",
+                    {k: v for k, v in data.items() if k != "secret"})
 
         event = str(data.get("event", "unknown")).strip()
         liquidity_side = str(data.get("liquidity_side", "unknown")).strip().lower()
@@ -1678,11 +1679,7 @@ _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
         {"text": "\U0001f4e6 DB", "callback_data": "db"},
     ],
     [
-        {"text": "\U0001f4c8 LDC Chart", "callback_data": "ldc_chart"},
-        {"text": "\U0001f4c9 LDC Stats", "callback_data": "ldc_stats"},
-    ],
-    [
-        {"text": "\U0001f916 V7 Stats", "callback_data": "v7_stats"},
+        {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
     ],
 ]})
 
@@ -1793,74 +1790,6 @@ def _handle_alpha_decay(chat_id: str):
         send_message(chat_id, f"❌ Alpha decay 檢查失敗: {e}")
 
 
-def _handle_ldc_chart(chat_id: str):
-    """Send link to interactive LDC swing signal chart."""
-    if not INDICATOR_SERVICE_URL:
-        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
-        return
-    url_link = f"{INDICATOR_SERVICE_URL}/hybrid-chart"
-    demo_link = f"{INDICATOR_SERVICE_URL}/hybrid-chart?demo=1"
-    send_message(chat_id,
-        f"\U0001f4c8 <b>LDC Swing 進出場圖表</b>\n\n"
-        f"<a href=\"{url_link}\">即時訊號（production）</a>\n"
-        f"<a href=\"{demo_link}\">5.5 月 walk-forward demo</a>\n\n"
-        f"標記:\n"
-        f"  ▲ 綠色 = LONG 進場\n"
-        f"  ▼ 紅色 = SHORT 進場\n"
-        f"  ● 綠色 = 獲利出場\n"
-        f"  ● 紅色 = 虧損出場\n"
-        f"  exit 標籤: Cross (dynamic) / Reverse / 數字 = net%")
-
-
-def _handle_ldc_stats(chat_id: str):
-    """Fetch LDC swing strategy stats from indicator service."""
-    if not INDICATOR_SERVICE_URL:
-        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
-        return
-    try:
-        # paper-perf includes LDC swing cohort section after 2026-05-12 refactor
-        paper = requests.get(f"{INDICATOR_SERVICE_URL}/paper-perf", timeout=30)
-        status = requests.get(f"{INDICATOR_SERVICE_URL}/hybrid-status", timeout=15)
-        msg_parts = []
-        if status.status_code == 200:
-            msg_parts.append(status.json().get("text", ""))
-        if paper.status_code == 200:
-            msg_parts.append(paper.json().get("text", ""))
-        if not msg_parts:
-            send_message(chat_id, f"❌ Indicator 服務未就緒 (paper={paper.status_code} status={status.status_code})")
-            return
-        combined = "\n\n────────\n\n".join(msg_parts)
-        send_long_message(chat_id, combined)
-    except Exception as e:
-        logger.exception("ldc stats fetch error: %s", e)
-        send_message(chat_id, f"❌ 取得 LDC 統計失敗: {e}")
-
-
-def _handle_v7_stats(chat_id: str):
-    """Fetch V7 paper-trading stats from indicator service.
-
-    /paper-perf returns the combined report; the V7 cohort section
-    (🤖 V7 Paper) is included alongside the indicator + LDC cohorts.
-    """
-    if not INDICATOR_SERVICE_URL:
-        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
-        return
-    try:
-        paper = requests.get(f"{INDICATOR_SERVICE_URL}/paper-perf", timeout=30)
-        if paper.status_code != 200:
-            send_message(chat_id,
-                         f"❌ Indicator 服務未就緒 (paper={paper.status_code})")
-            return
-        text = paper.json().get("text", "")
-        if not text:
-            send_message(chat_id, "❌ paper-perf 無內容")
-            return
-        send_long_message(chat_id, text)
-    except Exception as e:
-        logger.exception("v7 stats fetch error: %s", e)
-        send_message(chat_id, f"❌ 取得 V7 統計失敗: {e}")
-
-
 def _handle_signal_perf(chat_id: str):
     """Fetch Strong signal performance report from Indicator service."""
     if not INDICATOR_SERVICE_URL:
@@ -1936,7 +1865,6 @@ def _send_help(chat_id: str):
         "/chart - 4h 多空預測指標圖\n"
         "/ichart - 互動圖表 (可放大/十字線)\n"
         "/perf - 模型表現 + Strong 信號績效\n"
-        "/ldc - LDC swing 績效 (paper trading)\n"
         "/db - 資料庫累積狀態\n"
         "/ind_status - 指標系統狀態\n"
         "\n<b>--- 流動性監控 ---</b>\n"
@@ -1980,6 +1908,95 @@ def _send_help(chat_id: str):
         }, timeout=10)
     except Exception as e:
         logger.warning("Help send failed: %s", e)
+
+
+def _handle_okx_perf(chat_id: str) -> None:
+    """Fetch OKX live cohort report via the indicator service."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        resp = requests.get(
+            f"{INDICATOR_SERVICE_URL}/okx-perf", timeout=30,
+        )
+        data = resp.json() if resp.status_code == 200 else {}
+        text = data.get("text", "❌ OKX perf 查詢失敗")
+        send_message(chat_id, text)
+    except Exception as e:
+        logger.exception("okx_perf error: %s", e)
+        send_message(chat_id, f"❌ OKX perf 查詢失敗: {e}")
+
+
+def _handle_okx_approval_response(chat_id: str, raw_cmd: str) -> None:
+    """Worker thread: route /yes_<id> /no_<id> to the approval gate.
+
+    Each step's failure is reported back to the chat so the operator
+    knows whether to retry, re-issue manually, or escalate.
+    """
+    try:
+        raw = raw_cmd.strip()
+        verb_part, _, id_part = raw.partition("_")
+        verb = verb_part.lower().lstrip("/")
+        try:
+            approval_id = int(id_part)
+        except ValueError:
+            send_message(chat_id,
+                f"⚠️ 無效的 approval id: `{id_part}`\n格式: /yes_42 或 /no_42")
+            return
+
+        from indicator.okx import runner as okx_runner
+        gate = okx_runner.get_approval_gate()
+        if gate is None:
+            send_message(chat_id, "⚠️ OKX executor 未啟用 (OKX_EXECUTOR_ENABLED!=1)")
+            return
+
+        if verb == "no":
+            decision = gate.deny(approval_id, decided_by=chat_id)
+            if decision.ok:
+                send_message(chat_id, f"❌ Approval #{approval_id} DENIED")
+            else:
+                send_message(chat_id,
+                    f"⚠️ Approval #{approval_id} 拒絕失敗: {decision.status}")
+            return
+
+        # verb == "yes"
+        decision = gate.approve(approval_id, decided_by=chat_id)
+        if not decision.ok or decision.intent is None:
+            send_message(chat_id,
+                f"⚠️ Approval #{approval_id} 核准失敗: {decision.status} {decision.reason}")
+            return
+
+        executor = okx_runner.get_executor()
+        if executor is None:
+            send_message(chat_id,
+                "⚠️ Executor 已停用 — 核准記錄保留但無法執行")
+            return
+
+        # Optional drift check: pull a fresh price via REST balance ping
+        # is not the right signal; for now we trust the intent (operator
+        # is the human gate).  Drift detection is wired but not used
+        # until we have a cheap latest-price source.
+        result = executor.execute_approved_intent(
+            decision.intent, approval_id=approval_id,
+        )
+        if result.action == "open":
+            d = result.detail
+            send_message(chat_id,
+                f"✅ Approval #{approval_id} EXECUTED\n"
+                f"pos #{d.get('position_id')} {d.get('side')} "
+                f"@ {d.get('entry_price'):.2f}\n"
+                f"size: {d.get('size_contracts')} contracts  "
+                f"stop: {d.get('current_stop'):.2f}")
+        else:
+            send_message(chat_id,
+                f"⚠️ Approval #{approval_id} 核准但執行失敗: "
+                f"{result.action} {result.detail}")
+    except Exception:
+        logger.exception("okx_approval_response_failed")
+        try:
+            send_message(chat_id, f"⚠️ Approval 處理失敗 (見 log): `{raw_cmd}`")
+        except Exception:
+            pass
 
 
 @app.route(f"/{TOKEN}", methods=["POST"])
@@ -2026,17 +2043,10 @@ def webhook():
                         f"功能: 放大縮小 / 拖曳平移 / 十字線游標")
                 else:
                     send_message(cb_chat_id, "INDICATOR_SERVICE_URL 未設定")
-            elif cb_data == "ldc_chart":
-                threading.Thread(target=_handle_ldc_chart, args=(cb_chat_id,), daemon=True).start()
-            elif cb_data == "ldc_stats":
-                threading.Thread(target=_handle_ldc_stats, args=(cb_chat_id,), daemon=True).start()
-            elif cb_data == "v7_stats":
-                threading.Thread(target=_handle_v7_stats, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "decay":
                 threading.Thread(target=_handle_alpha_decay, args=(cb_chat_id,), daemon=True).start()
-            elif cb_data == "meeting":
-                send_message(cb_chat_id, "\U0001f4cb AI Meeting 啟動中... 5 個 agent 正在調查系統狀態，完成後會發送報告。")
-                threading.Thread(target=_handle_meeting, args=(cb_chat_id,), daemon=True).start()
+            elif cb_data == "okx_perf":
+                threading.Thread(target=_handle_okx_perf, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "help":
                 _send_help(cb_chat_id)
             return "ok"
@@ -2118,9 +2128,6 @@ def webhook():
         elif cmd == "/perf":
             threading.Thread(target=_handle_indicator_perf, args=(chat_id,), daemon=True).start()
 
-        elif cmd == "/ldc":
-            threading.Thread(target=_handle_ldc_stats, args=(chat_id,), daemon=True).start()
-
         elif cmd == "/decay":
             threading.Thread(target=_handle_alpha_decay, args=(chat_id,), daemon=True).start()
 
@@ -2154,6 +2161,20 @@ def webhook():
 
         elif cmd in ["/start", "/help"]:
             _send_help(chat_id)
+
+        elif cmd in ("/okx_perf", "/okxperf"):
+            threading.Thread(
+                target=_handle_okx_perf, args=(chat_id,), daemon=True,
+            ).start()
+
+        elif cmd.startswith("/yes_") or cmd.startswith("/no_"):
+            # OKX Stage 3 manual-approval response.  /yes_<id> approves
+            # the pending trade and submits it; /no_<id> denies.
+            threading.Thread(
+                target=_handle_okx_approval_response,
+                args=(chat_id, raw_text),
+                daemon=True,
+            ).start()
 
         else:
             send_message(chat_id, "❓未知指令，輸入 /help 查看支援功能")

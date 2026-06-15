@@ -1,8 +1,9 @@
 """
-Strong signal SHAP explainer — TreeSHAP for XGBoost direction model.
+Signal SHAP explainer — TreeSHAP for XGBoost direction model.
 
-Only runs when a Strong signal fires (rare, <10ms per call).
-Records top contributing features to understand WHY the signal triggered.
+Runs for Strong + Moderate direction signals (≤10ms per call). Records top
+contributing features to understand WHY the signal triggered, and produces
+a humanized entry/exit reason for Telegram + paper trade records.
 """
 from __future__ import annotations
 
@@ -105,8 +106,105 @@ def _get_group(feature_name: str) -> str:
     return "其他"
 
 
+GROUP_HUMAN = {
+    "清算": "爆倉/清算結構",
+    "OI": "未平倉量",
+    "情緒/反向": "持倉/資金費率情緒",
+    "Taker": "主動買賣力",
+    "吸收代理": "大單吸收/反向釋放",
+    "波動率": "波動率結構",
+    "溢價/保證金": "現貨溢價/槓桿融資",
+    "短期動量": "短期動量",
+    "大單流": "大單訂單流",
+    "失衡持續性": "訂單流失衡",
+    "交叉特徵": "綜合交叉特徵",
+    "時間": "時間週期",
+    "其他": "其他",
+}
+
+EXIT_REASON_HUMAN = {
+    "trail_stop": "3×ATR 追蹤停損觸發",
+    "opp_signal": "出現反向訊號（按 opp_signal 規則平倉）",
+    "time_cap": "達持倉時間上限",
+}
+
+
+def humanize_entry_reason(shap_result: dict | None, direction: str,
+                          regime: str = "", conf: float = 0.0,
+                          tier: str = "") -> str:
+    """Build a human-readable entry reason from SHAP output.
+
+    Format: 1 headline + top-3 group contributions (with raw feature/value
+    for debug). Returns empty string if shap_result is None.
+    """
+    if not shap_result:
+        # Fallback: at least state the basic facts.
+        bits = [f"開 {direction} — SHAP 不可用"]
+        if regime:
+            bits.append(f"regime={regime}")
+        if conf:
+            bits.append(f"conf={conf:.0f}")
+        if tier:
+            bits.append(f"tier={tier}")
+        return " | ".join(bits)
+
+    side = "LONG" if direction == "UP" else "SHORT"
+    lines = [f"開 {side}，主要驅動："]
+
+    top_groups = shap_result.get("top_groups", [])[:3]
+    top_pos_by_group: dict[str, dict] = {}
+    for item in shap_result.get("top_positive", []):
+        g = item.get("group", "其他")
+        if g not in top_pos_by_group:
+            top_pos_by_group[g] = item
+
+    for g_item in top_groups:
+        g_name = g_item["group"]
+        g_shap = g_item["shap"]
+        human = GROUP_HUMAN.get(g_name, g_name)
+        feat = top_pos_by_group.get(g_name)
+        if feat is not None:
+            lines.append(
+                f"  • {human}（SHAP {g_shap:+.4f}）— "
+                f"{feat['feature']}={feat['value']:+.4f}"
+            )
+        else:
+            lines.append(f"  • {human}（SHAP {g_shap:+.4f}）")
+
+    meta = []
+    if regime:
+        meta.append(f"Regime: {regime}")
+    if conf:
+        meta.append(f"Conf: {conf:.0f}")
+    if tier:
+        meta.append(f"Tier: {tier}")
+    if meta:
+        lines.append("  " + " | ".join(meta))
+
+    return "\n".join(lines)
+
+
+def humanize_exit_reason(exit_reason: str, direction: str,
+                         net_pct: float = 0.0, bars_held: int = 0,
+                         opp_info: dict | None = None) -> str:
+    """Build a human-readable exit reason. opp_info optionally supplies
+    {'direction': UP/DOWN, 'conf': 94.9, 'p_up': 0.688} for opp_signal."""
+    side = "LONG" if direction == "LONG" else ("SHORT" if direction == "SHORT" else direction)
+    base = EXIT_REASON_HUMAN.get(exit_reason, exit_reason or "未知")
+    bits = [f"平 {side}，理由：{base}"]
+
+    if exit_reason == "opp_signal" and opp_info:
+        bits.append(
+            f"  反向訊號={opp_info.get('direction','?')} "
+            f"conf={opp_info.get('conf',0):.1f} "
+            f"p_up={opp_info.get('p_up',0):.3f}"
+        )
+    bits.append(f"  Held: {bars_held}h | Net: {net_pct*100:+.2f}%")
+    return "\n".join(bits)
+
+
 class SignalExplainer:
-    """SHAP explainer for Strong direction signals. Lazy-initialized."""
+    """SHAP explainer for direction signals (Strong + Moderate). Lazy-initialized."""
 
     def __init__(self):
         self._explainer = None
@@ -347,5 +445,11 @@ _explainer = SignalExplainer()
 
 
 def explain_strong_signal(features_row: dict, direction: str) -> dict | None:
-    """Module-level convenience function."""
+    """Module-level convenience function (kept name for backward compat —
+    now used for Strong AND Moderate signals)."""
+    return _explainer.explain_signal(features_row, direction)
+
+
+def explain_signal(features_row: dict, direction: str) -> dict | None:
+    """Module-level convenience function (preferred new name)."""
     return _explainer.explain_signal(features_row, direction)

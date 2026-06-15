@@ -1,0 +1,58 @@
+{
+  "config": {
+    "horizon_bars": 8,
+    "k_barrier": 1.0,
+    "vol_adaptive": true,
+    "n_features": 35,
+    "n_rows": 3999
+  },
+  "label_distribution": {
+    "up_pct": 27.02838482793268,
+    "down_pct": 30.695805074101983,
+    "neutral_pct": 42.27581009796533,
+    "avg_bars_to_touch": 3.980852915578764
+  },
+  "A_old_binary": {
+    "tag": "A_old_binary",
+    "n_oos": 2349,
+    "auc": 0.5370630409882415,
+    "acc": 0.5312899106002554,
+    "ic_endpoint": 0.05459193091296541,
+    "strong_n": 1124,
+    "strong_winrate": 0.5338078291814946
+  },
+  "B_tb_single_binary": {
+    "tag": "B_tb_single_binary",
+    "n_oos": 2140,
+    "auc": 0.49338220553462797,
+    "acc": 0.4976635514018692,
+    "ic_endpoint": -0.0009171378027827286,
+    "strong_n": 1157,
+    "strong_winrate": 0.5030250648228176
+  },
+  "C_stage1_conviction": {
+    "tag": "C_stage1_conviction",
+    "n_oos": 3695,
+    "auc": 0.663653274033116,
+    "acc": 0.624086603518268,
+    "ic_endpoint": -0.03424811508515983,
+    "strong_n": 2008,
+    "strong_winrate": 0.49352589641434264
+  },
+  "C_stage2_direction": {
+    "tag": "C_stage2_direction",
+    "n_oos": 2140,
+    "auc": 0.49338220553462797,
+    "acc": 0.4976635514018692,
+    "ic_endpoint": -0.0009171378027827286,
+    "strong_n": 1157,
+    "strong_winrate": 0.5030250648228176
+  },
+  "C_combined_strong": {
+    "strong_n": 549,
+    "barrier_hit_rate": 0.5100182149362478,
+    "barrier_miss_rate": 0.4899817850637523,
+    "neutral_rate": 0.0,
+    "endpoint_8h_winrate": 0.5136612021857924
+  }
+}
