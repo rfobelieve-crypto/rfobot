@@ -18,6 +18,12 @@ api_keys.txt
 .netrc
 # Local-only setup scripts that may carry keys
 scripts/local_*.sh
+# Personal — resume / CV variants (template-only version is committed once;
+# rename your filled-in copy to docs/resume_*.local.md or move outside repo)
+docs/resume_*.local.md
+docs/resume_*.docx
+docs/resume_*.pdf
+docs/cover_letter_*.md
 scripts/setup_local_*.py
 
 # Python
