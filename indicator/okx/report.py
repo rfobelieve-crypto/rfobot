@@ -54,6 +54,90 @@ def annualised_sharpe(net_pcts: list[float],
     return base * math.sqrt(trades_per_year)
 
 
+# ── Gate B (Stage 3 → 4 promotion gate) ──────────────────────────────
+
+
+# Minimum / target sample sizes for the trade-layer edge gate.
+# Lower = sample-size pressure too soon, upper = practical promotion target.
+GATE_B_SAMPLE_MIN = 30
+GATE_B_SAMPLE_TARGET = 50
+
+
+def bootstrap_mean_ci_bps(
+    net_pcts: list[float],
+    n_iter: int = 2000,
+    seed: int = 42,
+) -> Optional[tuple[float, float]]:
+    """Percentile bootstrap 95% CI on mean net_pct, returned in bps.
+
+    None if n < 5 (CI meaningless with tiny samples). Pure-stdlib (random)
+    so no scipy import inflates dashboard latency.
+    """
+    n = len(net_pcts)
+    if n < 5:
+        return None
+    import random
+    rng = random.Random(seed)
+    means: list[float] = []
+    for _ in range(n_iter):
+        sample = [net_pcts[rng.randrange(n)] for _ in range(n)]
+        means.append(sum(sample) / n)
+    means.sort()
+    lo = means[int(n_iter * 0.025)]
+    hi = means[int(n_iter * 0.975)]
+    return (lo * 10000, hi * 10000)
+
+
+def compute_gate_b_status(
+    n_closed: int,
+    net_pcts: list[float],
+    avg_net_bps: float,
+) -> dict:
+    """Where are we on Stage 3 → 4a promotion?
+
+    Pass criteria (CLAUDE.md compressed Gate B):
+      - n_closed ≥ GATE_B_SAMPLE_MIN (30)
+      - avg_net_bps ≥ 0
+      - bootstrap 95% CI lower bound > 0  (statistically reject "no edge")
+
+    Returns dict with status (one of "accumulating", "passed", "failed",
+    "marginal"), progress %, CI bounds, and a human-readable summary.
+    """
+    progress_pct = min(100.0, n_closed / GATE_B_SAMPLE_TARGET * 100)
+    ci = bootstrap_mean_ci_bps(net_pcts) if n_closed >= 5 else None
+
+    if n_closed < GATE_B_SAMPLE_MIN:
+        status = "accumulating"
+        summary = (f"累積中 {n_closed}/{GATE_B_SAMPLE_MIN} "
+                   f"(目標 {GATE_B_SAMPLE_TARGET})")
+    else:
+        if avg_net_bps < 0:
+            status = "failed"
+            summary = f"avg net {avg_net_bps:+.1f} bps < 0 — edge 未驗到"
+        elif ci is None or ci[0] <= 0:
+            status = "marginal"
+            ci_str = (f"95% CI [{ci[0]:+.1f}, {ci[1]:+.1f}]"
+                      if ci else "CI 無法計算")
+            summary = (f"avg net {avg_net_bps:+.1f} bps > 0 但 {ci_str} "
+                       f"下緣未離 0")
+        else:
+            status = "passed"
+            summary = (f"avg net {avg_net_bps:+.1f} bps, "
+                       f"95% CI [{ci[0]:+.1f}, {ci[1]:+.1f}] — Gate B 通過")
+
+    return {
+        "status": status,
+        "n_closed": n_closed,
+        "sample_min": GATE_B_SAMPLE_MIN,
+        "sample_target": GATE_B_SAMPLE_TARGET,
+        "progress_pct": progress_pct,
+        "avg_net_bps": avg_net_bps,
+        "ci_lo_bps": ci[0] if ci else None,
+        "ci_hi_bps": ci[1] if ci else None,
+        "summary": summary,
+    }
+
+
 # ── DB pulls ──────────────────────────────────────────────────────────
 
 
@@ -174,9 +258,20 @@ def compute_okx_summary() -> dict:
     open_pos = _get_open_position()
     kills = _get_recent_kill_log(days=7)
 
-    # Trade stats
+    # Trade stats — three WR definitions reconciled side by side.
+    # gross  : gross_pct > 0                    (price moved right way)
+    # net    : net_pct   > 0                    (gross - 8 bps assumed cost)
+    # equity : equity_after > equity_before     (wallet truth — real fees,
+    #                                            funding, slippage all baked in)
     n = len(closed)
-    wins = sum(1 for t in closed if (t.get("gross_pct") or 0) > 0)
+    wins_gross = sum(1 for t in closed if (t.get("gross_pct") or 0) > 0)
+    wins_net = sum(1 for t in closed if (t.get("net_pct") or 0) > 0)
+    wins_equity = sum(
+        1 for t in closed
+        if (t.get("equity_after") is not None
+            and t.get("equity_before") is not None
+            and t["equity_after"] > t["equity_before"])
+    )
     avg_bps = (sum((t.get("net_pct") or 0) for t in closed) / n * 10000
                if n else 0.0)
     cum_pct = (sum((t.get("net_pct") or 0) for t in closed) * 100
@@ -187,6 +282,7 @@ def compute_okx_summary() -> dict:
     # Sharpe — per-trade + naive annualised by observed cadence
     net_pcts = [float(t.get("net_pct") or 0) for t in closed]
     pt_sharpe = per_trade_sharpe(net_pcts)
+    gate_b = compute_gate_b_status(n, net_pcts, avg_bps)
     ann_sharpe = None
     if n >= 2 and closed:
         first = closed[0].get("entry_time")
@@ -218,13 +314,20 @@ def compute_okx_summary() -> dict:
         "executor_reason": (state.get("reason") if state else None),
         "executor_changed_at": (state.get("last_changed_at") if state else None),
         "n_closed": n,
-        "wins": wins,
-        "win_rate_pct": (wins / n * 100 if n else 0.0),
+        # Gross WR kept under legacy keys to preserve external consumers
+        # (Telegram /okx-perf, dashboards). Net + equity WR added alongside.
+        "wins": wins_gross,
+        "win_rate_pct": (wins_gross / n * 100 if n else 0.0),
+        "wins_net": wins_net,
+        "win_rate_pct_net": (wins_net / n * 100 if n else 0.0),
+        "wins_equity": wins_equity,
+        "win_rate_pct_equity": (wins_equity / n * 100 if n else 0.0),
         "avg_net_bps": avg_bps,
         "cum_net_pct": cum_pct,
         "cum_equity_pct": cum_equity_pct,
         "sharpe_per_trade": pt_sharpe,
         "sharpe_annualised": ann_sharpe,
+        "gate_b": gate_b,
         "open_position": open_pos,
         "recent_trades": closed[-5:],
         "kill_log_7d": kills,
@@ -261,14 +364,25 @@ def format_okx_report(summary: dict) -> str:
         lines.append(f"   {summary['executor_reason']}")
     lines.append("")
 
-    # Trade stats
+    # Trade stats — show all three WR definitions so the gap between
+    # "price moved right way" and "wallet actually grew" is transparent.
     n = summary.get("n_closed", 0)
     if n == 0:
         lines.append("📊 <i>No closed trades yet</i>")
     else:
+        wr_gross = summary["win_rate_pct"]
+        wr_net = summary.get("win_rate_pct_net", wr_gross)
+        wr_eq = summary.get("win_rate_pct_equity", wr_gross)
+        lines.append(f"📊 Trades: {n}")
         lines.append(
-            f"📊 Trades: {n}  WR: {summary['wins']}/{n} = "
-            f"{summary['win_rate_pct']:.0f}%")
+            f"   WR gross:  {summary['wins']}/{n} = {wr_gross:.0f}%  "
+            f"<i>(price direction)</i>")
+        lines.append(
+            f"   WR net:    {summary.get('wins_net', summary['wins'])}/{n} = "
+            f"{wr_net:.0f}%  <i>(after 8bps cost)</i>")
+        lines.append(
+            f"   WR equity: {summary.get('wins_equity', summary['wins'])}/{n} = "
+            f"{wr_eq:.0f}%  <i>(wallet truth)</i>")
         lines.append(
             f"   Avg net: {summary['avg_net_bps']:+.1f} bps  "
             f"Cum net: {summary['cum_net_pct']:+.2f}%")
@@ -282,6 +396,18 @@ def format_okx_report(summary: dict) -> str:
                 sharpe_line += f"  (annualised: {ann:.2f})"
             lines.append(sharpe_line)
     lines.append("")
+
+    # Gate B (Stage 3 → 4a promotion progress)
+    gb = summary.get("gate_b")
+    if gb:
+        gate_icon = {
+            "accumulating": "🟡",
+            "marginal": "🟠",
+            "passed": "🟢",
+            "failed": "🔴",
+        }.get(gb["status"], "⚪")
+        lines.append(f"{gate_icon} Gate B (Stage 3→4a): {gb['summary']}")
+        lines.append("")
 
     # Open position
     op = summary.get("open_position")

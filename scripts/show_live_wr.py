@@ -141,7 +141,7 @@ def main() -> int:
     print(f"=== WR comparison (n={n}) ===")
     print(f"  gross WR  (gross_pct > 0)               : "
           f"{gross_wins}/{n} = {gross_wins / n * 100:5.1f}%   "
-          f"<- what /okx-perf currently shows")
+          f"<- price direction only")
     print(f"  net   WR  (net_pct > 0, assumes 8 bps)  : "
           f"{net_wins}/{n} = {net_wins / n * 100:5.1f}%   "
           f"<- closer to 'made money'")
