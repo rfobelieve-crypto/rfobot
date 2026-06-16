@@ -13,23 +13,34 @@ Why this exists (2026-06-14):
   ~7-month history via a clean walk-forward, to get statistical power.
 
 Faithfulness to production:
-  - Same model: XGBRegressor on y_path_ret_4h (TWAP path return), FULL_DIRECTION
-    features, same hyperparams as BASE_PARAMS.
+  - Same model: XGBRegressor on y_path_ret_{H}h (TWAP path return) with the
+    SAME 137 FULL_DIRECTION features regardless of horizon, same hyperparams.
   - Same decode: 500-bar trailing rolling percentile; top 2.5% each tail =
     Strong (matches inference.py).  Rolling-percentile is self-normalizing so
     it is robust to per-fold prediction-scale drift.
-  - Clean: per fold trains ONLY on prior data (purge=4 + embargo=4) and uses
-    NO early-stopping-on-test (the train_direction_reg_4h.py leakage).  A leaky
-    variant is run side-by-side to quantify the inflation.
+  - Clean: per fold trains ONLY on prior data (purge ≥ horizon + embargo 4)
+    and uses NO early-stopping-on-test (the train_direction_reg_4h.py
+    leakage).  A leaky variant is run side-by-side to quantify the inflation.
+
+Multi-horizon (Path 1, docs/path1_multi_horizon_plan.md):
+  --horizon 4  (default) — production 4h target, reproduces existing Gate A
+  --horizon 1            — 1h target, tests cross-time-scale orthogonality
+  --horizon 24           — 1d target, tests trend-horizon orthogonality
+  Purge scales with horizon (must be ≥ horizon to prevent label leakage).
+  Output parquet is suffixed with horizon to avoid overwriting.
 
 NOT a substitute for live Gate A — it estimates the architecture's edge, not
 the exact deployed weights.  But it is the highest-power clean evidence
 available now.
 
-Run:  python research/gate_a_revalidate_wf.py
+Run:
+  python research/gate_a_revalidate_wf.py                  # 4h (default)
+  python research/gate_a_revalidate_wf.py --horizon 1      # 1h orthogonality
+  python research/gate_a_revalidate_wf.py --horizon 24     # 1d orthogonality
 """
 from __future__ import annotations
 
+import argparse
 import sys
 import time
 from math import sqrt
@@ -58,12 +69,21 @@ BASE_PARAMS = dict(
 )
 
 
-def walk_forward(df, features, *, leaky: bool):
-    """Per-fold XGBRegressor on y_path_ret_4h. leaky=True reproduces the
-    train_direction_reg_4h.py early-stopping-on-test-fold leakage; leaky=False
-    is the clean version (fixed n_estimators, no eval_set)."""
-    splits = walk_forward_splits(len(df), initial_train=288, test_size=48,
-                                 step=48)
+def walk_forward(df, features, *, leaky: bool, horizon: int, target_col: str):
+    """Per-fold XGBRegressor on the horizon-specific target. leaky=True
+    reproduces the train_direction_reg_4h.py early-stopping-on-test-fold
+    leakage; leaky=False is the clean version (fixed n_estimators, no
+    eval_set).
+
+    purge scales with horizon (must be ≥ horizon to prevent forward-label
+    leakage of bars whose target overlaps the test fold).
+    """
+    purge = max(horizon, 4)   # ≥ horizon; never below 4 (legacy floor)
+    embargo = 4               # serial-correlation guard, horizon-independent
+    splits = walk_forward_splits(
+        len(df), initial_train=288, test_size=48, step=48,
+        purge=purge, embargo=embargo,
+    )
     rows = []
     params = dict(BASE_PARAMS)
     if leaky:
@@ -71,12 +91,12 @@ def walk_forward(df, features, *, leaky: bool):
     t0 = time.time()
     for fi, (tr, te) in enumerate(splits):
         tr_df, te_df = df.iloc[tr], df.iloc[te]
-        m_tr = tr_df["y_path_ret_4h"].notna()
-        m_te = te_df["y_path_ret_4h"].notna()
+        m_tr = tr_df[target_col].notna()
+        m_te = te_df[target_col].notna()
         Xtr = tr_df.loc[m_tr, features].fillna(0)
-        ytr = tr_df.loc[m_tr, "y_path_ret_4h"].values.astype(float)
+        ytr = tr_df.loc[m_tr, target_col].values.astype(float)
         Xte = te_df.loc[m_te, features].fillna(0)
-        yte = te_df.loc[m_te, "y_path_ret_4h"].values.astype(float)
+        yte = te_df.loc[m_te, target_col].values.astype(float)
         if len(ytr) < 50 or len(yte) < 5:
             continue
         model = xgb.XGBRegressor(**params)
@@ -89,7 +109,8 @@ def walk_forward(df, features, *, leaky: bool):
             index=te_df.loc[m_te].index))
     oos = pd.concat(rows).sort_index()
     print(f"    {'leaky' if leaky else 'clean'}: {len(oos)} OOS bars, "
-          f"{oos['fold'].nunique()} folds, {time.time()-t0:.0f}s")
+          f"{oos['fold'].nunique()} folds, purge={purge} embargo={embargo}, "
+          f"{time.time()-t0:.0f}s")
     return oos
 
 
@@ -156,29 +177,45 @@ def evaluate(oos, label):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--horizon", type=int, default=4,
+                    choices=[1, 4, 24],
+                    help="Forward horizon in 1h bars (1 / 4 / 24). "
+                         "Default 4 reproduces production behaviour.")
+    args = ap.parse_args()
+    horizon = args.horizon
+    target_col = f"y_path_ret_{horizon}h"
+
     print("=" * 70)
-    print("  GATE A RE-VALIDATION — clean direction-regressor walk-forward")
+    print(f"  GATE A RE-VALIDATION — clean direction-regressor walk-forward")
+    print(f"  HORIZON: {horizon}h  (target column: {target_col})")
     print("=" * 70)
     df = load_and_cache_data()
-    labels = build_direction_reg_labels(df)
+    labels = build_direction_reg_labels(df, horizon_bars=horizon)
     df = df.copy()
-    df["y_path_ret_4h"] = labels["y_path_ret_4h"]
+    df[target_col] = labels[target_col]
     feats = filter_available(FULL_DIRECTION, list(df.columns))
     print(f"  Loaded {len(df)} bars, {len(feats)} direction features")
     span = f"{df.index.min()} ~ {df.index.max()}" if hasattr(df.index, "min") else "?"
     print(f"  History span: {span}")
 
     print("\n  Walk-forward (this is the slow part)...")
-    clean = decode_strong(walk_forward(df, feats, leaky=False))
-    leaky = decode_strong(walk_forward(df, feats, leaky=True))
+    clean = decode_strong(walk_forward(df, feats, leaky=False,
+                                       horizon=horizon, target_col=target_col))
+    leaky = decode_strong(walk_forward(df, feats, leaky=True,
+                                       horizon=horizon, target_col=target_col))
 
     r_clean = evaluate(clean, "CLEAN WF (no early-stop-on-test) — the honest number")
     r_leaky = evaluate(leaky, "LEAKY WF (early-stop-on-test) — reproduces inflation")
 
     print("\n" + "=" * 70)
-    print("  CONTRAST vs live Gate A")
-    print("=" * 70)
-    print(f"  live v7-only (n=28)          : WR 53.6%  CI[35.8, 70.5]")
+    if horizon == 4:
+        print("  CONTRAST vs live Gate A")
+        print("=" * 70)
+        print(f"  live v7-only (n=28)          : WR 53.6%  CI[35.8, 70.5]")
+    else:
+        print(f"  {horizon}h horizon — no live tracked_signals to contrast (Path 1)")
+        print("=" * 70)
     print(f"  clean WF (n={r_clean['n']})            : WR {r_clean['wr']*100:.1f}%  "
           f"CI[{r_clean['boot_lo']*100:.1f}, {r_clean['boot_hi']*100:.1f}]")
     print(f"  leaky WF (n={r_leaky['n']})            : WR {r_leaky['wr']*100:.1f}%  "
@@ -186,8 +223,13 @@ def main():
     print(f"  early-stopping inflation     : "
           f"{(r_leaky['wr']-r_clean['wr'])*100:+.1f} pp")
 
-    clean.to_parquet(PROJECT_ROOT / "research" / "results" /
-                     "gate_a_revalidate_clean_oos.parquet")
+    # Horizon-suffixed output path so 1h / 4h / 24h don't overwrite each other.
+    out_name = (f"gate_a_revalidate_clean_oos_{horizon}h.parquet"
+                if horizon != 4
+                else "gate_a_revalidate_clean_oos.parquet")
+    out_path = PROJECT_ROOT / "research" / "results" / out_name
+    clean.to_parquet(out_path)
+    print(f"\n  Saved OOS → {out_path}")
 
 
 if __name__ == "__main__":
