@@ -92,6 +92,28 @@ class OkxClient:
     def get_server_time(self) -> Optional[float]:
         return self._rest.get_server_time()
 
+    def set_leverage(self, *, inst_id: str, lever: int, mgn_mode: str,
+                     pos_side: Optional[str] = None) -> bool:
+        """Proxy to OkxRestClient.set_leverage.
+
+        Required because isolated-margin opens call this through the facade
+        before each entry (executor._open_position).  Without this proxy a
+        plain AttributeError surfaces as a generic 'set-leverage failed' abort
+        and hides the real root cause.  Discovered 2026-06-16 when the live
+        executor aborted every isolated open with a phantom error before
+        even reaching OKX.
+        """
+        return self._rest.set_leverage(
+            inst_id=inst_id, lever=lever, mgn_mode=mgn_mode, pos_side=pos_side,
+        )
+
+    def set_leverage_detail(self, *, inst_id: str, lever: int, mgn_mode: str,
+                            pos_side: Optional[str] = None) -> dict:
+        """Proxy to OkxRestClient.set_leverage_detail (diagnostic surface)."""
+        return self._rest.set_leverage_detail(
+            inst_id=inst_id, lever=lever, mgn_mode=mgn_mode, pos_side=pos_side,
+        )
+
     # ── WS subscription passthrough ────────────────────────────────────
 
     def subscribe_orders(self,
