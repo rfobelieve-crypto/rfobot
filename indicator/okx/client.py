@@ -66,6 +66,20 @@ class OkxClient:
             pos_side=pos_side, reduce_only=reduce_only,
         )
 
+    def set_leverage(self, *, inst_id: str, lever: int, mgn_mode: str,
+                     pos_side: Optional[str] = None) -> bool:
+        # Isolated margin REQUIRES leverage set per (instId, isolated, posSide)
+        # BEFORE the open or OKX rejects the order; the executor calls this on
+        # self._client (this facade) at executor.py:1010.  This passthrough was
+        # MISSING until 2026-06-17, so in live isolated mode every open raised
+        # AttributeError here -> swallowed by the executor's bare except ->
+        # "OKX OPEN ABORTED" and the executor could never open a position.
+        # Same facade-skip class as amend_algo_stop below; keep the signature
+        # in lockstep with rest.set_leverage.  Covered by tests/test_okx_client.py.
+        return self._rest.set_leverage(
+            inst_id=inst_id, lever=lever, mgn_mode=mgn_mode, pos_side=pos_side,
+        )
+
     def amend_algo_stop(self, *, inst_id: str, algo_id: str,
                         new_trigger_px: float) -> AmendResult:
         # inst_id is REQUIRED: OKX amend-algos rejects missing instId with 50014
