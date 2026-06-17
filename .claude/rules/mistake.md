@@ -4,6 +4,23 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-06-17: facade-skip bug 第三次——isolated 切換漏了 OkxClient.set_leverage，live 永遠開不了倉
+
+**What happened:**
+啟用 `OKX_TD_MODE=isolated` 後第一個 Strong 信號，live 推 `🔴 OKX OPEN ABORTED: set-leverage(isolated 10x posSide=long) failed — no order sent`。executor 在 isolated 開倉路徑呼叫 `self._client.set_leverage(...)`（executor.py:1010），但 live 下 `self._client` 是 **OkxClient facade（client.py）**，而 facade **沒有 set_leverage passthrough**（只存在於 rest.py:240 與 mock_client.py:198）→ 拋 `AttributeError` → 被 executor 的 bare `except Exception`（executor.py:1014）吞掉 → `lev_ok=False` → 中止開倉。net effect：isolated 模式下 executor **永遠開不了任何倉**。告警裡的 `posSide=long` 是 config 拼進字串的值，**不是 OKX 真的拒了**——AttributeError 在到達 OKX 之前就拋了。
+
+**Root cause:**
+**這是 facade-skip bug 第三次復發**（第一次 amend_algo_stop 漏 inst_id 2026-06-10，第二次同 bug 修不完全 2026-06-14，見 [[project_trailing_stop_amend_bug]]）。完全相同的盲點：一個跨層 feature（這次是 isolated margin 的 set_leverage）**只加了 executor 呼叫端 + rest 底層 + mock 測試替身，唯獨漏了中間的 OkxClient facade**。測試全綠是因為 trading 測試注入 `MagicMock` 當 client，MagicMock **auto-vivify 任何屬性**（`client.set_leverage(...)` 自動回傳 truthy mock），所以測試以為方法存在；唯一用 faithful MockOkxClient 的測試又只跑 `td_mode="cross"`，根本不進 isolated 分支。**facade↔executor 這條縫零覆蓋——client.py 本來連一個測試檔都沒有**。2026-06-14 的 LESSON 明明已寫「修 call site + 底層卻跳過 facade = 沒修完，要驗整條 call chain」，但下一個跨層 feature 還是踩同一個坑——因為當時只手動修了那一個方法，**沒有建立結構性防護**。
+
+**Correct approach（已修，commit 5a41ad7 pushed）:**
+1. client.py 補 set_leverage passthrough，簽名與 rest.set_leverage 鎖死（keyword-only inst_id/lever/mgn_mode/pos_side）。
+2. **新增 tests/test_okx_client.py（facade 本來零覆蓋）= 結構性防護**：用 AST 自省抓出 executor 在 `self._client.<name>` 上呼叫的**每一個**方法，斷言 facade 都有定義（`test_facade_exposes_every_method_executor_calls`）+ 簽名 superset 檢查（facade 不可 drop rest 接受的參數，專抓 amend_algo_stop 那種「方法在但簽名漂移」`test_facade_signatures_match_rest_for_shared_methods`）。**反向證明過**：刪掉 set_leverage → 測試立刻變紅、精確指出缺失方法。這對測試能擋整類 facade-skip（amend + set_leverage 都會被抓），不用手維護方法清單。
+3. pos_mode 查證：帳戶 long_short_mode（commit 4c982c4 live smoke + 先前 SHORT 0.29 帶 posSide=short 對帳 CONSISTENT 實證），config 與帳戶一致 → 補完 facade 後真實 OKX 呼叫成功、無 51000 風險。318 okx 測試綠。
+
+**Rule:** 任何**跨層**的新方法/簽名變更（call site → facade → rest/ws → mock）**必須同時改 facade，而且要有結構性測試保證 facade 暴露 executor 呼叫的每個方法**——不能靠「記得改 facade」（已證明記不住，三次了）。test double（MockOkxClient）的簽名要**嚴格**，optional 參數正好遮這類 bug；MagicMock 當 client 永遠測不出 facade 缺方法。新增任何 facade↔executor 之間的方法，跑 `tests/test_okx_client.py`。看到「測試全綠但 live 報 AttributeError / TypeError / OPEN ABORTED」第一個查的就是 **facade 是不是漏了 / 簽名漂移了**。
+
+---
+
 ## 2026-06-07: admin_heal 第二次造孤兒倉——破壞性操作掛在無認證 GET + 只改 DB 不平 OKX
 
 **What happened:**
