@@ -4,6 +4,65 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-06-16: facade signature drift（第 2 次重演）—— OkxClient 缺 set_leverage proxy，每次 isolated 開倉 AttributeError 被吞成「set-leverage failed」
+
+**What happened:**
+2026-06-16 23:03 (TPE) 收到 `🔴 OKX OPEN ABORTED set-leverage(isolated 10x posSide=long) failed — no order sent`。我（跟 user）一開始全程往「OKX UI 設定不對」方向 debug：檢查持倉模式、margin mode、雙向 leverage、帳戶子模式。耗了多次來回 user 都回「OKX 都有設好」。
+
+最後 grep `set_leverage` 才發現真相：`indicator/okx/executor.py:1010` 呼叫 `self._client.set_leverage(...)`，`self._client` 是 `OkxClient` facade，**而 `OkxClient` 根本沒有 `set_leverage` 這個 method**。OkxClient 只 proxy 了 `submit_market_order / submit_algo_stop / amend_algo_stop / cancel_algo_stop / get_positions / get_balance / get_account_config / get_server_time` 8 個 method，2f04e4d 加 isolated path 時忘了補 set_leverage。
+
+執行流程實際上是：
+```
+1. cfg.td_mode == "isolated" → 進入 set_leverage 路徑
+2. self._client.set_leverage(...)  → Python AttributeError（method 不存在）
+3. executor.py:1014 的 except Exception 接住 → lev_ok = False
+4. 觸發 abort + Telegram alert「set-leverage failed」
+```
+
+**完全沒打到 OKX 一次 request**。user 怎麼調 OKX UI 都沒救——這個 abort 是 Python 物件層級錯誤，不是 API 拒絕。但 Telegram alert 的文字寫「set-leverage failed」，誤導 user（跟我）以為是 OKX 那邊的問題。
+
+時間軸：2f04e4d（2026-06-XX）加 isolated dormant capability，沒同步 OkxClient → 期間 cross 模式不會觸發、bug 潛伏。user 啟用 `OKX_TD_MODE=isolated` 那一刻起，每個 Strong signal 都會 abort。第一次 abort 才暴露。
+
+**Root cause:**
+
+**這是 [[mistake 2026-06-07 trail bug 三輪修]] 的 P0-2「facade 對齊」教訓的第 2 次重演**——只是換成「facade 整個缺 method」而不是「facade signature 缺參數」。同 root pattern：
+
+> **新功能加在 REST adapter 層，忘了在 facade 層加 proxy。**
+
+trail bug：`OkxRestClient.amend_algo_stop` 加了 `inst_id` 參數、`OkxClient.amend_algo_stop` 沒加 → TypeError 被吞。
+這次：`OkxRestClient.set_leverage` 存在、`OkxClient.set_leverage` 整個沒有 → AttributeError 被吞。
+
+兩個都被 executor 的 generic `except Exception` 吞掉，alert 文字只寫「failed」、不寫真實 exception type，**讓使用者（含未來的我）誤以為是 exchange 那邊的問題**——這是更深層的設計缺陷：fail-safe 設計把錯誤捕獲了但**沒把錯誤分類傳遞**給操作員。
+
+放大因素：
+1. **Telegram alert 文字過度泛化**（「set-leverage failed」對「AttributeError」跟「OKX 50014」一視同仁）→ 誤導診斷方向
+2. **executor.py:1015 用 `logger.exception("set_leverage_exception")`** 確實會 log 完整 traceback，但 Railway logs 不在 alert 流程裡，user 手機看不到、跟我之前對話也沒查
+3. **07eadff 修 trail 時加的 signature-parity 測試只覆蓋 amend_algo_stop**，沒擴展到「整個 OkxClient 對 executor 用的所有 method」
+
+**Correct approach（已修，commit 914870c）:**
+
+1. **OkxClient 補 set_leverage + set_leverage_detail proxy**（純 passthrough 給 `self._rest`）。
+2. **rest.set_leverage_detail 新方法**回傳 `{ok, code, msg, raw}` 完整 OKX response，給診斷介面（未來的 `/okx-admin/isolated-check` endpoint）surface 真實錯誤碼用。
+3. **rest.set_leverage 失敗時 `logger.error` 帶 code + msg**——bool wrapper 不再吃掉錯誤資訊，Railway logs 能看到真實 OKX 5xxxx。
+4. **加 AST-based signature-parity 測試** `test_executor_called_methods_exist_on_facade`：scan `executor.py` 找所有 `self._client.<X>` 呼叫，assert 全部存在於 OkxClient。這是 trail bug 修法（07eadff signature-parity test）的**自動化升級版**——不靠人列出哪些 method 要驗，AST 直接抓 callgraph。
+
+**Rule:**
+
+新功能加 OkxRestClient method 時，**必須同步加 OkxClient proxy**——這條沒人會記得，所以靠 test 強制。AST signature-parity test 已部署，未來任何 facade drift 都會在 pre-commit / CI fail。
+
+**更根本的 rule（給未來自己跟未來 AI 協作）**：
+
+**fail-safe except 必須分類錯誤後再決定 user-facing 文字**。寫 generic `except Exception: alert("X failed")` 是把所有問題壓成同一條訊息、誤導 downstream debug。正確做法：
+- `except AttributeError` → alert 「internal facade error, missing method X」+ raise to top
+- `except OkxAPIError` → alert 「OKX rejected: code=Y msg=Z」
+- `except (ConnectionError, TimeoutError)` → alert 「network unreachable, will retry」
+
+每一種 user 採取的下一步動作完全不同。把它們合併成「failed」= 強迫操作員猜根因 = 浪費時間 + 誤判風險。
+
+**Symptom-to-search 規則**：看到「某 exchange method failed」alert，第一個 grep 不是 OKX docs，是 `grep -n "<method>" indicator/okx/*.py` 看 facade chain 是不是斷的。**Trail bug 兩次、set_leverage 一次，這個方向應該排第 1。**
+
+---
+
 ## 2026-06-07: admin_heal 第二次造孤兒倉——破壞性操作掛在無認證 GET + 只改 DB 不平 OKX
 
 **What happened:**
