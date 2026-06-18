@@ -548,6 +548,8 @@ def fetch_okx_positions_for_chart(start_dt: datetime, end_dt: datetime) -> list:
                     "FROM `v7_okx_positions` "
                     "WHERE entry_time <= %s "
                     "  AND (exit_time IS NULL OR exit_time >= %s) "
+                    "  AND (model_version IS NULL "
+                    "       OR model_version NOT LIKE 'manual_test%%') "
                     "ORDER BY entry_time ASC",
                     (end_dt.strftime("%Y-%m-%d %H:%M:%S"),
                      start_dt.strftime("%Y-%m-%d %H:%M:%S")))

@@ -105,6 +105,8 @@ def _get_closed_trades() -> list[dict]:
                            notional_usd, size_contracts
                     FROM v7_okx_positions
                     WHERE status IN ('CLOSED', 'DEMOTED')
+                      AND (model_version IS NULL
+                           OR model_version NOT LIKE 'manual_test%')
                     ORDER BY entry_time
                 """)
                 return list(cur.fetchall())

@@ -159,6 +159,8 @@ def _count_live_trades() -> int:
                 cur.execute("""
                     SELECT COUNT(*) AS n FROM v7_okx_positions
                     WHERE status IN ('CLOSED', 'DEMOTED')
+                      AND (model_version IS NULL
+                           OR model_version NOT LIKE 'manual_test%')
                 """)
                 return int((cur.fetchone() or {"n": 0})["n"] or 0)
             except Exception:
