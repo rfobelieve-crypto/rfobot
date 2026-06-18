@@ -1223,6 +1223,14 @@ def okx_status_api():
         "env_TG_CRITICAL_CHAT_ID_set": bool(os.environ.get(
             "TG_CRITICAL_CHAT_ID")),
         "local_time_unix": int(_time.time()),
+        # Deployed-commit fingerprint — Railway injects these automatically.
+        # Lets us byte-verify which commit the live process is actually
+        # running (e.g. confirm a fix deployed) instead of inferring from
+        # push/deploy timing.  None of these are secrets.
+        "git_sha": (os.environ.get("RAILWAY_GIT_COMMIT_SHA")
+                    or os.environ.get("GIT_COMMIT_SHA") or "<unset>"),
+        "git_branch": os.environ.get("RAILWAY_GIT_BRANCH", "<unset>"),
+        "deployment_id": os.environ.get("RAILWAY_DEPLOYMENT_ID", "<unset>"),
     }
     # Attempt import + introspection independently
     try:
