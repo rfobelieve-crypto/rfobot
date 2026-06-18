@@ -4,6 +4,23 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-06-19: 出場 Telegram 告警「整個 live 史上」靜默失敗——exit reason 的 '_' 破壞 Markdown → Telegram 400 → 被吞
+
+**What happened:**
+一筆 live SHORT（id=8）由 opp_signal 正常獲利平倉（+2.15% net，DB 正確 CLOSED），但**沒有任何 Telegram 出場通知**。查 DB 確認 `_close_position` 跑完了（net_pct/equity_after 都算了），告警卻沒出去。root cause：`send_critical` 用 `parse_mode="Markdown"`，而 `format_exit_alert` 把 exit reason 直接塞進訊息 `*OKX LIVE EXIT* (opp_signal)`——**`opp_signal` 的單一 `_` 在 legacy Markdown 是未閉合的斜體標記 → Telegram 回 400「can't parse entities」→ send_critical 只 log（`telegram_critical_failed`）不重試 → 告警靜默消失**。所有 exit reason 都帶 `_`（`opp_signal`/`trail_stop`/`time_cap`/`manual_close_trail_bug`），所以**每一筆出場告警從上線以來從沒成功過**。entry 告警沒事（無 `_`）；OPEN ABORTED / kill 告警沒事（訊息剛好無 `_`），所以一直沒人發現出場那條壞了。
+
+**Root cause:**
+把**動態字串塞進 Markdown 訊息卻沒跳脫/包 code span**，加上**送失敗只 log 不 fallback**——兩個疊起來＝典型 silent failure。最隱蔽的是：同一個 `send_critical` 對「無特殊字元」的訊息（OPEN ABORTED）正常，對「帶 `_`」的訊息（出場）必失敗，所以「告警系統看起來能用」掩蓋了「某一類告警全死」。跟 [[mistake 2026-04-22 / silent failure]] 同調：Railway 綠、進程活、其他告警會動 = 看起來健康，但某條路徑靜默死亡。
+
+**Correct approach（已修，commit 待 push）:**
+1. `format_exit_alert`：reason 改用反引號包（`` (`{reason}`) ``）——code span 內 `_` 是字面量，Markdown 不再被破壞。
+2. `send_critical`：**400 時去掉 parse_mode 用 plain text 重發一次**——critical 告警絕不可因格式 bug 而丟失（429/5xx 不重發，去 parse_mode 也救不了）。
+3. 回歸測試 `tests/test_okx_alerter.py`：(a) 400 → plain-text fallback 且第二次不帶 parse_mode；(b) 429 不雙發；(c) 每個 exit reason 在訊息裡都被反引號包。324 okx 測試綠。
+
+**Rule:** 任何要送進 Telegram（Markdown/HTML parse_mode）的訊息，**動態插值的欄位（reason / id / 任何含 `_ * [ ] ( ) ` 的字串）必須跳脫或包 code span**，否則一個特殊字元就讓整條訊息被 400 拒收。更重要：**critical 告警的送出層必須有「parse 失敗 → 降級 plain text 重送」的 fallback**——告警是用來在出事時通知人的，絕不能因為一個格式字元而靜默消失。看到「DB/狀態正確但通知沒來」第一個查**送出層的 parse_mode + 該訊息有沒有未跳脫的特殊字元**。
+
+---
+
 ## 2026-06-17: facade-skip bug 第三次——isolated 切換漏了 OkxClient.set_leverage，live 永遠開不了倉
 
 **What happened:**

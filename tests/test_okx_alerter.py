@@ -10,7 +10,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from indicator.okx.alerter import format_kill_alert, send_critical
+from indicator.okx.alerter import (
+    format_exit_alert, format_kill_alert, send_critical,
+)
 
 
 # ── send_critical ────────────────────────────────────────────────────
@@ -50,6 +52,54 @@ class TestSendCritical:
                        side_effect=RuntimeError("network")):
                 # Must not raise
                 assert send_critical("chat", "msg") is False
+
+    def test_markdown_400_falls_back_to_plain_text(self):
+        # 2026-06-19 bug: an exit reason like "opp_signal" has an unbalanced
+        # '_' that makes Telegram reject the Markdown message (400), silently
+        # dropping EVERY exit notification.  send_critical must retry once as
+        # plain text so the alert still gets through.
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok"}):
+            with patch("indicator.okx.alerter.requests.post") as post:
+                post.side_effect = [
+                    MagicMock(status_code=400, text="can't parse entities"),
+                    MagicMock(status_code=200, text=""),
+                ]
+                assert send_critical("chat", "*EXIT* (opp_signal)") is True
+        assert post.call_count == 2
+        first, second = post.call_args_list
+        assert first.kwargs["json"]["parse_mode"] == "Markdown"
+        # retry must NOT carry parse_mode (that's what makes it succeed)
+        assert "parse_mode" not in second.kwargs["json"]
+
+    def test_429_does_not_double_send(self):
+        # Only a 400 (parse error) is retryable as plain text; rate-limit /
+        # server errors aren't fixed by dropping parse_mode.
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok"}):
+            with patch("indicator.okx.alerter.requests.post") as post:
+                post.return_value = MagicMock(status_code=429, text="rate")
+                assert send_critical("chat", "msg") is False
+        post.assert_called_once()
+
+
+# ── format_exit_alert (Markdown-safety regression) ───────────────────
+
+
+class TestFormatExitAlert:
+    @pytest.mark.parametrize("reason",
+                             ["opp_signal", "trail_stop", "time_cap",
+                              "manual_close_trail_bug"])
+    def test_reason_is_backtick_wrapped(self, reason):
+        # The reason MUST sit inside a code span so its '_' renders literally
+        # and doesn't break legacy Markdown (the bug that ate exit alerts).
+        msg = format_exit_alert(
+            stage_label="live", direction="SHORT", reason=reason,
+            entry_price=63761.99, exit_price=62337.8,
+            gross_pct=0.0223, net_pct=0.0215, equity_after=104.08,
+        )
+        assert f"`{reason}`" in msg
+        # underscores only ever appear inside the backtick code span → the
+        # message outside code spans has no stray italic markers
+        assert reason in msg
 
 
 # ── format_kill_alert ────────────────────────────────────────────────

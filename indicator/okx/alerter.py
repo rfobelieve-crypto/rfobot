@@ -42,6 +42,24 @@ def send_critical(chat_id: str, message: str, *,
         )
         if resp.status_code == 200:
             return True
+        # A Markdown parse error (400 "can't parse entities") would otherwise
+        # SILENTLY eat the alert — e.g. an exit reason like "opp_signal" /
+        # "trail_stop" / "time_cap" carries an unbalanced '_' (italic marker in
+        # legacy Markdown), which silently dropped EVERY exit notification live.
+        # A critical alert must never be lost to a formatting bug, so retry once
+        # as plain text (no parse_mode).  Other codes (429/5xx) aren't fixed by
+        # dropping parse_mode, so don't double-send.
+        if resp.status_code == 400:
+            logger.warning(
+                "telegram_critical_markdown_failed body=%s; retry plain",
+                resp.text[:200])
+            resp = requests.post(
+                url,
+                json={"chat_id": chat_id, "text": message},
+                timeout=timeout_sec,
+            )
+            if resp.status_code == 200:
+                return True
         logger.warning("telegram_critical_failed status=%d body=%s",
                        resp.status_code, resp.text[:200])
     except Exception:
@@ -81,9 +99,15 @@ def format_exit_alert(*, stage_label: str, direction: str, reason: str,
                        entry_price: float, exit_price: float,
                        gross_pct: float, net_pct: float,
                        equity_after: float) -> str:
-    """Exit (manual close — algo-stop fills routed via WS event)."""
+    """Exit (manual close — algo-stop fills routed via WS event).
+
+    `reason` is backtick-wrapped: exit reasons (opp_signal / trail_stop /
+    time_cap) contain '_', which is an italic marker in legacy Markdown — an
+    unbalanced '_' makes Telegram reject the whole message (400), silently
+    dropping the alert.  A code span renders the underscore literally.
+    """
     return (
-        f"*OKX {stage_label.upper()} EXIT* ({reason})\n"
+        f"*OKX {stage_label.upper()} EXIT* (`{reason}`)\n"
         f"{direction} {entry_price:.2f} → {exit_price:.2f}\n"
         f"gross {gross_pct * 100:+.2f}%  net {net_pct * 100:+.2f}%\n"
         f"equity: ${equity_after:.2f}"
