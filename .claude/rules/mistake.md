@@ -4,6 +4,60 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-06-20: 一個 case 的 FOMO 差點變成 threshold-sweep overfit（避免成功、紀律守住）
+
+**What happened:**
+2026-06-19 01:02 (TPE) 一根 **Moderate** BULLISH 訊號（BTC $62,664、Confidence 85、Mag p98、Driver = cg_bfx_margin_delta +90,359、Regime TRENDING_BEAR）我按紀律沒進場（current rule: Strong-only），但 46h 後 BTC 回到 $63,930（+2.02%）—— 訊號方向 + 時間都對。
+
+我自然想問：「**Strong threshold 2.5% 是不是太緊？**」「**改 5% 是不是更好？**」
+
+差點就跑 threshold sweep（top 2.5% / 3% / 4% / 5% / 6% / 7% 各算 WR、avg bps、cum），找「歷史最 CP 值的 threshold」並改 production。
+
+幸好 user 自己 spot 到：「**可是這會 overfit 不是嗎**」——當場叫停。
+
+**Root cause（為什麼這是經典陷阱）:**
+
+1. **單一 case bias**: 6/19 那筆是 1 個 sample。整個歷史證據 stack（5.5mo backtest, 1980 tracked_signals, live cohort）都顯示 Strong > Moderate。改 rule 需要等比例的證據，不是 1 case + 直覺。
+
+2. **Threshold sweep ≠ 中性研究**: 即使跑 walk-forward，掃連續 threshold = multiple comparisons + selection bias。1980 樣本切 5 個 threshold 桶 = 每桶 ~400 有效樣本，期望 25% false positive rate (5 tests × p=0.05)。「最好那個」80% 是運氣不是 edge。
+
+3. **Crypto regime non-stationary**: 即使歷史 optimal 在 5%，未來 regime 變了不一定還在。Past optimal threshold 是 in-sample fit、forward 沒保證。
+
+4. **Optimization 對象錯了**: 想擠 0.5% threshold-tuning alpha vs 加新的真實 alpha source（cross-asset / 異源資料 / compound trigger），時間 ROI 完全不成比例。Threshold tuning 是 low-yield high-overfit 的研究路線。
+
+5. **FOMO 偽裝成 research**: 「我漏掉 6/19」的情緒 → 「該改 rule」的合理化 → threshold sweep 看似嚴謹但本質是 chase。
+
+**Correct approach（守住的紀律）:**
+
+- **Strong-only rule 不動**。已有 5.5mo backtest + 1980 tracked_signals + live cohort 三層證據撐住，改變需要相同等級的證據。
+- **不 sweep threshold**——撤回原本要 commit 的 `scripts/threshold_sweep.py`。
+- 若未來確實想驗證「premium Moderate 有沒有 edge」，正確路徑 = **categorical compound trigger watcher**（不 sweep、不改 entry）：
+    ```
+    TIER_B candidate = Moderate tier
+                     + Mag p95+ (categorical flag, 不是 tuned threshold)
+                     + Driver class in [whale_margin, short_squeeze_setup]
+                     + Regime in [TRENDING_BEAR, CHOPPY]
+    ```
+    fire 時純 Telegram alert（不 auto take）→ 累積 6 個月 → 30+ case + WR 統計顯著才考慮 carve out 成新 tier。
+- **不是 data-driven search**（容易 overfit）→ 是 **hypothesis-driven testing**（基於 domain knowledge）。
+- 即使這個方案也只「先收集 evidence」，不直接改 entry rule。
+
+**Rule（給未來的 self 跟 Claude）:**
+
+1. **單一 case ≠ rule change**。改 entry rule 的舉證責任 = 對應原始 rule 的證據強度。Strong-only 用 5.5mo backtest + 1980 signal + live 驗過 → 推翻它需要等比例 evidence、不是 1 個亮眼 case。
+
+2. **Threshold sweep 永遠是 last resort、不是 first response**。每次想 sweep 之前先問：(a) 是不是因為最近某個 case 觸發？(b) 連續 search space 是不是會放大 selection bias？(c) sample 夠不夠每個桶 > 200？任一答「是」就停。
+
+3. **FOMO-driven research = bad research**。「我漏掉那筆」的情緒永遠不該是 research direction 的觸發點。情緒當下記筆記、24h 後冷靜再評估，多數時候會發現原本紀律是對的。
+
+4. **改 rule = categorical > continuous**。Compound trigger（多個 categorical flag 共振）比 threshold tuning（連續參數 search）overfit 風險低 5x。前者基於 hypothesis，後者基於 data mining。
+
+5. **「漏掉好訊號」是紀律的成本、不是 bug**。期望值 EV 高的 rule 必然會錯過部分好機會（type I error 換 type II error 的取捨）。機構紀律：寧願漏掉 10 個 6/19，不要為不漏改 rule 然後吃 30 個爛單。
+
+**這是「avoided mistake」的紀錄，不是「committed mistake」**——這類紀錄比真實踩雷更 valuable：它證明紀律在情緒衝擊下守住了，下次同類情境（必然會再來）能更快識別。
+
+---
+
 ## 2026-06-16: facade signature drift（第 2 次重演）—— OkxClient 缺 set_leverage proxy，每次 isolated 開倉 AttributeError 被吞成「set-leverage failed」
 
 **What happened:**
