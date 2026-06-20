@@ -304,6 +304,54 @@
 
 ---
 
+### 20b. Chart 三角形 decoder（視覺信號 encoding）
+
+📖 V7 圖表上每個三角形是 **3 個維度組合 encode** 的，看一眼就能解讀完整訊號內容：**大小 × 顏色 × 透明度** 對應 **強度×幅度 × 方向×強度 × 信心**。
+
+📍 你系統：`indicator/chart_renderer.py:158-194`
+
+🎤 「我設計三角形採 dual-gate 視覺規則：大小由 strength × magnitude 共決定（不是單獨看 tier），顏色由 direction × strength 決定（Strong 深、Moderate 亮），透明度由 confidence 決定。一眼就能分辨『方向強 + 幅度也強』vs『方向強但幅度弱』。」
+
+**1. 大小 (size) — Strength × Magnitude percentile**
+
+| Strength | Mag percentile | Size (px²) | 視覺 |
+|---|---|---|---|
+| Strong | **p ≥ 90** | 289 | 🔥 超大、最強 |
+| Strong | p 80-90 | 169 | 標準 Strong |
+| Strong | p < 80 | 81 | 縮小（方向強、幅度弱）|
+| Moderate | **p ≥ 90** | 169 | 🎯 放大（方向中、幅度強）|
+| Moderate | p 80-90 | 81 | 標準 Moderate |
+| Moderate | p < 80 | 36 | 最小（兩個都弱）|
+
+**2. 顏色 (color) — Direction × Strength**
+
+```
+Strong UP     → #004d40  深綠（dark teal）  ▲
+Moderate UP   → #66bb6a  亮綠（light green） ▲
+Strong DOWN   → #b71c1c  深紅（dark red）   ▼
+Moderate DOWN → #ef5350  亮紅（light red）   ▼
+```
+
+Strong = 深色、Moderate = 亮色（不是透明度差別、是 hue）。
+
+**3. 透明度 (alpha) — Confidence**
+
+```python
+Strong:    alpha = max(0.5, min(c/100, 1.0))    # 範圍 0.5 - 1.0（較實心）
+Moderate:  alpha = max(0.35, min(c/100, 0.7))   # 範圍 0.35 - 0.7（較透明）
+```
+
+Confidence 越高越實心；Strong 永遠比 Moderate 實心（Strong 下限 = Moderate 上限）。
+
+**4. 位置 (offset)**
+
+- **UP 三角 (▲)** 放在該 bar 的 **low 下方** 0.02 × price_range
+- **DOWN 三角 (▼)** 放在該 bar 的 **high 上方** 0.02 × price_range
+
+⚠️ 常見坑：用 strength 一個維度看圖會錯——一個 Moderate + Mag p98（圖上「放大版亮綠」）vs 一個 Strong + Mag p<80（圖上「縮小版深綠」）大小一樣、但語意完全不同。**Dual-gate 設計就是要強迫你同時看兩個維度**。
+
+---
+
 <a name="part-5"></a>
 ## Part 5：風險數學
 
