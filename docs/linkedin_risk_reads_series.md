@@ -167,6 +167,8 @@ Visual: the checklist as a clean infographic.
 
 ## Style guide (shared with EP series)
 
+### Visual / formatting
+
 - ▍ visual marker for section breaks (looks like Markdown blockquote but
   carries forward to LinkedIn plain-text correctly)
 - 6-8 subheadings per post (matches EP rhythm)
@@ -175,6 +177,52 @@ Visual: the checklist as a clean infographic.
   #AlgorithmicTrading #MarketMicrostructure #RiskManagement #Crypto #Web3}
 - One concept-diagram image per post (not data screenshot — clean
   illustration of the mechanism)
+
+### Narrative structure — 5-beat PAS framework
+
+Every Risk Reads post (and most technical EP posts) should follow
+the Problem-Agitation-Solution copywriting structure. Friend-given
+advice 2026-06-21, validated against EP2 which already executes this
+cleanly:
+
+```
+[1] Pain         — the hook. State the concrete problem in 1-2 lines.
+                   Must be specific enough that the target reader
+                   thinks "yes, that's me."
+[2] Resonance    — show you've lived this. "I also fell into this"
+                   beats "many people experience X."
+[3] Curiosity    — gap statement: name what's not obvious about why
+                   it happens. Force a "how" question in the reader.
+[4] Solution +   — the mechanism + the takeaway. Reader should leave
+    Benefit       with one usable mental model or threshold.
+[5] Next         — open question, series tease, or call-to-think.
+                   Drives the engagement loop the algorithm rewards.
+```
+
+Pre-write self-check (ask before drafting):
+
+1. [Pain]       Who am I solving what for?
+2. [Resonance]  Will 90% of target readers feel this?
+3. [Curiosity]  Have I made them want to know "how"?
+4. [Benefit]    What concrete thing do they walk away with?
+5. [Next]       Why would they follow me for more?
+
+If any of these 5 is "no" or "weak," the post is not ready.
+
+Worked example (Risk Reads #1 outline):
+
+| Beat | Content |
+|---|---|
+| Pain | "Backtest looked clean, live PnL is 30 bps short per trade." |
+| Resonance | "First 100 live trades I blamed luck. Trade 200 it clicked." |
+| Curiosity | "When does spread widen, and why?" |
+| Solution + Benefit | MM widens spread when adverse-selection risk rises. 5 triggers. Rule: spread > 3× 60min avg → don't enter. |
+| Next | "Part 1 of a series. Next: CVD divergence." |
+
+EP posts (autobiographical) may bend this structure when the genre
+is origin-narrative (EP1 is a chapter, not a case study). But any
+technical EP (e.g., trail-bug postmortem) should still hit all 5
+beats — pain is the engine.
 
 ---
 
