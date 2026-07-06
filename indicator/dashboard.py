@@ -237,6 +237,9 @@ def render_dashboard_shell() -> str:
   var currentTab = 'overview';
   var refreshTimer = null;
   var tabs = document.querySelectorAll('.tab');
+  // /dashboard/tab/* is admin-guarded; forward the page's ?token= to tab fetches
+  var adminToken = new URLSearchParams(location.search).get('token') || '';
+  var tokenQS = adminToken ? '?token=' + encodeURIComponent(adminToken) : '';
 
   tabs.forEach(function(btn) {{
     btn.addEventListener('click', function() {{
@@ -253,7 +256,7 @@ def render_dashboard_shell() -> str:
     var content = document.getElementById('tab-content');
     content.innerHTML = '<div class="loading"><div class="spinner"></div>載入中...</div>';
 
-    fetch('/dashboard/tab/' + name)
+    fetch('/dashboard/tab/' + name + tokenQS)
       .then(function(r) {{ return r.text(); }})
       .then(function(html) {{
         content.innerHTML = html;

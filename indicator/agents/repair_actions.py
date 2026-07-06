@@ -101,9 +101,11 @@ def trigger_force_update(agent: str = "unknown") -> dict:
         urls.append(f"{svc}/force-update?sync=0")
     urls.append("http://localhost:8080/force-update?sync=0")
 
+    tok = os.environ.get("ADMIN_HEAL_TOKEN", "")
+    headers = {"X-Admin-Token": tok} if tok else {}
     for url in urls:
         try:
-            resp = req.get(url, timeout=10)
+            resp = req.get(url, timeout=10, headers=headers)
             if resp.status_code == 200:
                 _audit_log(agent, "AUTO:trigger_force_update", url, "triggered")
                 return {"triggered": True, "url": url}

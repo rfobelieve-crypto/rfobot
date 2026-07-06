@@ -1669,6 +1669,17 @@ def tradingview_webhook():
 INDICATOR_SERVICE_URL = os.getenv("INDICATOR_SERVICE_URL", "")
 
 
+def _indicator_admin_headers() -> dict:
+    """Auth header for the indicator service's admin-guarded routes.
+
+    The indicator service fail-closes those routes when ADMIN_HEAL_TOKEN is
+    unset there, so an empty dict here just means "send nothing" — the guard
+    on the other side decides.
+    """
+    tok = os.getenv("ADMIN_HEAL_TOKEN", "")
+    return {"X-Admin-Token": tok} if tok else {}
+
+
 _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
     [
         {"text": "\U0001f4ca Chart", "callback_data": "chart"},
@@ -1728,7 +1739,8 @@ def _handle_indicator_status(chat_id: str):
         send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
         return
     try:
-        resp = requests.get(f"{INDICATOR_SERVICE_URL}/indicator-status", timeout=15)
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/indicator-status", timeout=15,
+                            headers=_indicator_admin_headers())
         if resp.status_code != 200:
             send_message(chat_id, f"❌ Indicator 服務未就緒 ({resp.status_code})")
             return
@@ -1745,7 +1757,8 @@ def _handle_indicator_db(chat_id: str):
         send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
         return
     try:
-        resp = requests.get(f"{INDICATOR_SERVICE_URL}/indicator-db-stats", timeout=15)
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/indicator-db-stats", timeout=15,
+                            headers=_indicator_admin_headers())
         if resp.status_code != 200:
             send_message(chat_id, f"❌ Indicator 服務未就緒 ({resp.status_code})")
             return
@@ -1762,7 +1775,8 @@ def _handle_indicator_perf(chat_id: str):
         send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
         return
     try:
-        resp = requests.get(f"{INDICATOR_SERVICE_URL}/indicator-perf", timeout=30)
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/indicator-perf", timeout=30,
+                            headers=_indicator_admin_headers())
         if resp.status_code != 200:
             send_message(chat_id, f"❌ Indicator 服務未就緒 ({resp.status_code})")
             return
@@ -1814,6 +1828,7 @@ def _handle_meeting(chat_id: str):
             f"{INDICATOR_SERVICE_URL}/meeting",
             params={"sync": "1", "chat_id": chat_id},
             timeout=300,  # meetings can take a few minutes
+            headers=_indicator_admin_headers(),
         )
         data = resp.json()
         if data.get("status") != "ok":
@@ -1832,7 +1847,8 @@ def _handle_force_update(chat_id: str):
         return
     try:
         send_message(chat_id, "⏳ Updating... (may take 30-60s)")
-        resp = requests.get(f"{INDICATOR_SERVICE_URL}/force-update?sync=1", timeout=120)
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/force-update?sync=1", timeout=120,
+                            headers=_indicator_admin_headers())
         data = resp.json()
         if resp.status_code == 200 and data.get("status") == "ok":
             detail = data.get("detail", {})
@@ -1918,6 +1934,7 @@ def _handle_okx_perf(chat_id: str) -> None:
     try:
         resp = requests.get(
             f"{INDICATOR_SERVICE_URL}/okx-perf", timeout=30,
+            headers=_indicator_admin_headers(),
         )
         data = resp.json() if resp.status_code == 200 else {}
         text = data.get("text", "❌ OKX perf 查詢失敗")

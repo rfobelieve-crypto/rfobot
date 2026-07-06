@@ -13,6 +13,7 @@ Architecture:
 """
 from __future__ import annotations
 
+import hmac
 import os
 import logging
 import threading
@@ -60,6 +61,12 @@ DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 def _make_reply_markup():
     """Inline keyboard with quick action buttons."""
     import json
+    # /dashboard is admin-guarded; embed the token so the button keeps working
+    # (the Telegram chat is operator-only, so the URL stays private).
+    dash_url = "https://enchanting-emotion-production-4b4d.up.railway.app/dashboard"
+    _tok = os.environ.get("ADMIN_HEAL_TOKEN", "")
+    if _tok:
+        dash_url += f"?token={_tok}"
     return json.dumps({"inline_keyboard": [
         [
             {"text": "\U0001f4ca Chart", "callback_data": "chart"},
@@ -67,7 +74,7 @@ def _make_reply_markup():
             {"text": "\U0001f4e6 DB", "callback_data": "db"},
         ],
         [
-            {"text": "\U0001f4cb Dashboard", "url": "https://enchanting-emotion-production-4b4d.up.railway.app/dashboard"},
+            {"text": "\U0001f4cb Dashboard", "url": dash_url},
             {"text": "\U0001f30d Flow All", "callback_data": "flow_all"},
             {"text": "\u2699\ufe0f Status", "callback_data": "status"},
         ],
@@ -818,6 +825,44 @@ def _is_nan(v):
         return v is None or math.isnan(v)
     except (TypeError, ValueError):
         return False
+
+
+# ── Admin guard ──────────────────────────────────────────────────────────────
+# Sensitive routes (state-changing / live-account info / internal diagnostics)
+# require ADMIN_HEAL_TOKEN via "X-Admin-Token" header or "?token=" query param.
+# Fail-closed: if the env var is not set these routes return 503 instead of
+# silently staying open. Public product surface (/, /health, /json, charts)
+# is NOT guarded.
+
+_ADMIN_EXACT_PATHS = frozenset({
+    "/test-telegram",
+    "/okx-status",
+    "/okx-perf",
+    "/indicator-status",
+    "/indicator-db-stats",
+    "/indicator-perf",
+    "/db-diag",
+    "/diag",
+    "/meeting",
+    "/force-update",
+})
+_ADMIN_PATH_PREFIXES = ("/okx-admin/", "/admin/", "/dashboard", "/research/")
+
+
+@app.before_request
+def _admin_guard():
+    path = request.path
+    if path not in _ADMIN_EXACT_PATHS and not path.startswith(_ADMIN_PATH_PREFIXES):
+        return None
+    expected = os.environ.get("ADMIN_HEAL_TOKEN", "")
+    if not expected:
+        return jsonify({"error": "admin routes locked: ADMIN_HEAL_TOKEN "
+                                 "not configured on this service"}), 503
+    provided = (request.headers.get("X-Admin-Token", "")
+                or request.values.get("token", ""))
+    if not hmac.compare_digest(provided, expected):
+        return jsonify({"error": "missing/invalid admin token"}), 403
+    return None
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────

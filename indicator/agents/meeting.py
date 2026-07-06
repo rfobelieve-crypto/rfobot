@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timezone, timedelta
 
 from indicator.agents.base import BaseAgent, AgentResult
@@ -211,7 +212,9 @@ Respond in Traditional Chinese."""
     def _tool_force_update(self, inp: dict) -> dict:
         try:
             import requests
-            resp = requests.get("http://localhost:8080/force-update", timeout=30)
+            tok = os.environ.get("ADMIN_HEAL_TOKEN", "")
+            resp = requests.get("http://localhost:8080/force-update", timeout=30,
+                                headers={"X-Admin-Token": tok} if tok else {})
             return {
                 "triggered": True,
                 "status_code": resp.status_code,
