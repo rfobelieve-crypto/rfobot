@@ -148,6 +148,22 @@ class OrderEvent:
 
 
 @dataclass
+class OrderDetails:
+    """REST read-back of one order's true fill (GET /api/v5/trade/order).
+
+    The submit ack carries no fill/fee and the WS fill event races the DB
+    close write, so the executor reads the order back to get the real
+    average fill price and the real accumulated fee.  fee_usd keeps OKX's
+    sign convention (negative = user paid).
+    """
+    ord_id: str
+    state: str                       # "live", "partially_filled", "filled", "canceled"
+    avg_px: Optional[float] = None
+    fee_usd: Optional[float] = None
+    acc_fill_sz: Optional[float] = None
+
+
+@dataclass
 class PositionEvent:
     inst_id: str
     pos: float                       # +ve = long, -ve = short, 0 = flat

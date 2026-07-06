@@ -1,7 +1,7 @@
 """
 Tests for indicator/inference.py — IndicatorEngine and its static helpers.
 
-Covers regime detection, magnitude scoring, BBP computation,
+Covers regime detection, magnitude scoring,
 dynamic deadzone, and rolling percentile direction decoding.
 Model-dependent tests are skipped when XGBoost artifacts are absent.
 """
@@ -185,60 +185,6 @@ class TestComputeMagScore:
 
 
 # ---------------------------------------------------------------------------
-# BBP (_compute_bbp)
-# ---------------------------------------------------------------------------
-
-class TestComputeBBP:
-    """Tests for Bull/Bear Power composite indicator."""
-
-    def test_bbp_with_all_zscore_columns(self):
-        """BBP should be mean of normalised z-scores, clipped to [-1, 1]."""
-        from indicator.inference import IndicatorEngine
-        n = 10
-        df = pd.DataFrame({
-            "cg_oi_delta_zscore": np.full(n, 3.0),       # +1 after /3
-            "cg_funding_close_zscore": np.full(n, -3.0),  # negated -> +1
-            "cg_taker_delta_zscore": np.full(n, 3.0),     # +1
-            "cg_ls_ratio_zscore": np.full(n, -3.0),       # negated -> +1
-            "cg_ls_divergence_zscore": np.full(n, 3.0),   # +1
-        })
-        bbp = IndicatorEngine._compute_bbp(df)
-        # All components = +1, mean = +1, clipped to 1
-        np.testing.assert_allclose(bbp, 1.0, atol=1e-6)
-
-    def test_bbp_no_columns_returns_zero(self):
-        """When no z-score columns exist, BBP should be all zeros."""
-        from indicator.inference import IndicatorEngine
-        df = pd.DataFrame({"close": [1, 2, 3]})
-        bbp = IndicatorEngine._compute_bbp(df)
-        np.testing.assert_array_equal(bbp, 0.0)
-
-    def test_bbp_clipped_to_minus_one(self):
-        """Extreme negative z-scores should clip BBP to -1."""
-        from indicator.inference import IndicatorEngine
-        n = 5
-        df = pd.DataFrame({
-            "cg_oi_delta_zscore": np.full(n, -3.0),
-            "cg_funding_close_zscore": np.full(n, 3.0),
-            "cg_taker_delta_zscore": np.full(n, -3.0),
-            "cg_ls_ratio_zscore": np.full(n, 3.0),
-            "cg_ls_divergence_zscore": np.full(n, -3.0),
-        })
-        bbp = IndicatorEngine._compute_bbp(df)
-        np.testing.assert_allclose(bbp, -1.0, atol=1e-6)
-
-    def test_bbp_partial_columns(self):
-        """BBP should work with only some z-score columns present."""
-        from indicator.inference import IndicatorEngine
-        n = 5
-        df = pd.DataFrame({
-            "cg_oi_delta_zscore": np.full(n, 1.5),  # 1.5/3 = 0.5
-        })
-        bbp = IndicatorEngine._compute_bbp(df)
-        np.testing.assert_allclose(bbp, 0.5, atol=1e-6)
-
-
-# ---------------------------------------------------------------------------
 # Dynamic deadzone (_compute_dynamic_deadzone)
 # ---------------------------------------------------------------------------
 
@@ -389,7 +335,7 @@ class TestIndicatorEngineIntegration:
 
         required = [
             "pred_return_4h", "pred_direction", "confidence_score",
-            "strength_score", "bull_bear_power", "regime",
+            "strength_score", "regime",
         ]
         for col in required:
             assert col in out.columns, f"Missing output column: {col}"

@@ -30,7 +30,7 @@ import requests
 from indicator.okx.config import OkxConfig
 from indicator.okx.types import (
     AlgoOrderResult, AmendResult, Balance, CancelResult,
-    OrderResult, Position, Side,
+    OrderDetails, OrderResult, Position, Side,
 )
 
 logger = logging.getLogger(__name__)
@@ -257,6 +257,43 @@ class OkxRestClient:
         if result is None:
             return False
         return str(result.get("code")) == "0"
+
+    def get_order(self, *, inst_id: str, ord_id: str) -> Optional[OrderDetails]:
+        """Read back one order's true fill (avgPx + accumulated fee).
+
+        The submit ack carries neither fill price nor fee, and the WS fill
+        event can race the DB close write — so after a market close the
+        executor reads the order back synchronously.  Without this, exit
+        price was the bar-close estimate and the fee a flat constant: the
+        exact "wrong ruler" Gate B would have been graded with
+        (mistake.md 2026-06-14 fee bug).  Returns None on network failure —
+        caller falls back to estimates.
+        """
+        path = "/api/v5/trade/order"
+        params = {"instId": inst_id, "ordId": ord_id}
+        result = self._retry_get(
+            path=path, params=params, retries=2, backoff_base=0.5,
+        )
+        if result is None:
+            return None
+        data = result.get("data") or []
+        if not data:
+            return None
+        item = data[0]
+
+        def _f(v):
+            try:
+                return float(v) if v not in (None, "") else None
+            except (TypeError, ValueError):
+                return None
+
+        return OrderDetails(
+            ord_id=item.get("ordId", "") or "",
+            state=item.get("state", "unknown") or "unknown",
+            avg_px=_f(item.get("avgPx")),
+            fee_usd=_f(item.get("fee")),
+            acc_fill_sz=_f(item.get("accFillSz")),
+        )
 
     def get_positions(self, *, inst_id: str) -> list[Position]:
         path = "/api/v5/account/positions"

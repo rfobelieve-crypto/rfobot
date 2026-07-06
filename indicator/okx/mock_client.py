@@ -43,11 +43,15 @@ from typing import Callable, Optional
 from indicator.okx.config import OkxConfig
 from indicator.okx.types import (
     AlgoOrderResult, AmendResult, Balance, BalanceEvent, CancelResult,
-    ConnectivityStatus, OrderEvent, OrderResult, Position, PositionEvent,
-    Side,
+    ConnectivityStatus, OrderDetails, OrderEvent, OrderResult, Position,
+    PositionEvent, Side,
 )
 
 logger = logging.getLogger(__name__)
+
+# Per-side taker fee the mock charges on every market fill (matches OKX
+# regular-tier 0.05%).  Lets tests assert real-fee math end to end.
+MOCK_TAKER_FEE_FRAC = 0.0005
 
 
 class MockOkxClient:
@@ -89,6 +93,10 @@ class MockOkxClient:
         self._reject_algo_error: Optional[str] = None
         self._algo_raises: bool = False
         self._reject_set_leverage: bool = False
+        self._get_order_unavailable: bool = False   # arm to test read-back fallback
+
+        # ── Filled-order registry for get_order read-back ──────────────
+        self._orders: dict[str, dict] = {}
 
         # ── WS callbacks ───────────────────────────────────────────────
         self._on_order: Optional[Callable[[OrderEvent], None]] = None
@@ -147,6 +155,15 @@ class MockOkxClient:
         # (partial reduce / flip keeps the simple model's prior avg)
         self._net = new_net
 
+        # Register for get_order read-back: real avgPx + accumulated fee,
+        # OKX sign convention (negative = user paid).
+        notional = fill_price * float(sz) * self._cfg.contract_size_base
+        self._orders[ord_id] = {
+            "state": "filled", "avg_px": fill_price,
+            "fee_usd": -notional * MOCK_TAKER_FEE_FRAC,
+            "acc_fill_sz": float(sz),
+        }
+
         return OrderResult(cl_ord_id=cl_ord_id or "", ord_id=ord_id,
                            status="filled", fill_price=fill_price,
                            fill_size=float(sz))
@@ -204,6 +221,20 @@ class MockOkxClient:
             "pos_side": pos_side,
         })
         return not self._reject_set_leverage
+
+    def get_order(self, *, inst_id: str, ord_id: str) -> Optional[OrderDetails]:
+        """Mirror OkxRestClient.get_order — read back a filled order's real
+        avgPx/fee.  Keyword-only signature in lockstep with rest/facade
+        (strict test-double rule from the amend/set_leverage facade bugs)."""
+        if self._get_order_unavailable:
+            return None
+        info = self._orders.get(ord_id)
+        if info is None:
+            return None
+        return OrderDetails(
+            ord_id=ord_id, state=info["state"], avg_px=info["avg_px"],
+            fee_usd=info["fee_usd"], acc_fill_sz=info["acc_fill_sz"],
+        )
 
     # ── REST: account ──────────────────────────────────────────────────
 

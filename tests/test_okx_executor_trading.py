@@ -73,6 +73,10 @@ def _mk_executor(cfg=None):
     client.amend_algo_stop.return_value = MagicMock(status="ok")
     client.get_balance.return_value = Balance(total_eq_usd=10000.0,
                                               available_usd=10000.0)
+    # Fill read-back unavailable by default → close paths fall back to
+    # per-side fee estimates (tests that exercise the real read-back set
+    # get_order.return_value to an OrderDetails explicitly).
+    client.get_order.return_value = None
 
     store = MagicMock()
     store.get_latest_balance.return_value = {"total_eq_usd": 10000.0,
@@ -665,12 +669,15 @@ class TestClosePnL:
             result = exe._close_position(pos, exit_price=76500.0,
                                           exit_reason="opp_signal",
                                           bar_ts=bar_ts_naive)
-        # gross = 76500/75000 - 1 = +2.0%, net = +2.0% - 0.08% = +1.92%
+        # gross = 76500/75000 - 1 = +2.0%.  No real fees available (read-back
+        # stubbed to None, no entry_fees_usd on the row) → both legs estimated
+        # at taker_fee_side_est (0.05%/side): net = +2.0% - 0.10% = +1.90%.
+        est_fees = 2 * 0.0005
         assert result.detail["gross_pct"] == pytest.approx(0.02)
-        assert result.detail["net_pct"] == pytest.approx(0.02 - 0.0008)
-        # size_frac=0.5, equity_before=100 → equity_after = 100*(1+0.5*0.0192)=100.96
+        assert result.detail["net_pct"] == pytest.approx(0.02 - est_fees)
+        # notional=50, equity_before=100 → equity_after = 100*(1+0.5*net)
         assert result.detail["equity_after"] == pytest.approx(
-            100.0 * (1 + 0.5 * (0.02 - 0.0008))
+            100.0 * (1 + 0.5 * (0.02 - est_fees))
         )
 
     def test_short_profit(self):

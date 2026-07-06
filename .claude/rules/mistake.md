@@ -4,6 +4,27 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-07-05: 月度復驗三重靜默失敗——舊資料上的 PASS、沒人收到的推送、假裝在跑的排程
+
+**What happened:**
+每月 5 號 09:00 的月度復驗排程準時執行、verdict PASS、報告落地——看起來一切正常。全面體檢才發現三層疊加的靜默失敗：
+1. **驗證跑在 16 天舊的資料上**：執行當下本機 DNS 剛好斷線，auto-backfill 失敗被 log 成 "non-critical" 後 fallback 到 06-18 的快取特徵。報告裡「6 月 IC +0.016 貼零（n=416）」被解讀成「概念漂移的第一聲」，實際上是**資料截尾 artifact**——網路恢復後補滿資料重跑，6 月 IC = **+0.178（n=720）**、7 月頭 100 根 +0.204，完全正常。差點基於斷檔資料做出「edge 開始漂移」的判斷（第三篇 LinkedIn 貼文就要拿這根柱子當主視覺發出去了）。
+2. **PASS 推送沒人收到**：同一波 DNS 斷線讓 Telegram 推送也失敗（`telegram_critical_exception`），且**無重試**——排程「向人回報」這一環死了，operator 根本不知道這期跑過。復驗儀式的存在意義是「偵測快」，但它自己的失敗沒人偵測。
+3. **DailyCollect 排程指向已刪除的舊路徑約 96 天**：repo 資料夾更名後，Windows 排程的 action 還指向舊 CJK 路徑 → 每天 04:00 exit code 1，Coinglass parquet 備援線 3 月底起停更。排程面板顯示「就緒、有在跑」= 看起來活著。
+
+**Root cause:**
+與 [[mistake 2026-04-22 / silent failure]] 同族但發生在**自動化排程層**：(a) 資料新鮮度失敗被降級為 non-critical 後，verdict 沒有攜帶「本次基於舊資料」的標記——fail-open 的結果看起來跟 fail-safe 一樣漂亮；(b) 告警送出層單次失敗即放棄（跟 2026-06-19 出場告警同款，只是這次死因是網路不是格式）；(c) 排程的 lastResult=1 沒有任何監控。三個都是「執行成功的外觀」掩蓋「核心功能已死」。更深一層：**單月 n 不足的統計量（IC 貼零）在下結論前沒先問「資料完整嗎」**——又一次「先看結果再查測試設計」（2026-04-13 calibration 教訓的排程版）。
+
+**Correct approach（已修，2026-07-06）:**
+1. `quarterly_revalidation.py` 加 **STALE-DATA guard**：特徵尾端 > 48h 舊 → verdict 強制標 `STALE-DATA — RE-RUN REQUIRED`（不給 PASS/DRIFT），Telegram 訊息帶資料截止日。
+2. Telegram 推送加 **6 次 × 60s 重試**；最終失敗把 `TELEGRAM PUSH FAILED` 戳進報告檔本身。
+3. DailyCollect 排程 action 修正指向 `flow_system\market_data\backfill\daily_collect.bat`，手動觸發驗證 lastResult=0。
+4. 網路恢復後重跑復驗：資料補滿到 07-05、PASS（AUC 0.5988 / IC +0.177）、推送成功收到。
+
+**Rule:** 任何**基於資料的自動化 verdict**，必須把「資料新鮮度」當成 verdict 的一部分——資料過期時寧可輸出「無法判定」也不能輸出一個漂亮的 PASS/FAIL。任何「向人回報」的排程（告警、報告推送），送出層必須有重試 + 最終失敗要在某個人會看到的地方留痕。看到單月統計量異常（IC 驟降、WR 崩），**第一個檢查是該月的 n 和資料截止日**，不是開始解讀市場含義——n=416 vs n=720 就是「漂移的第一聲」和「什麼事都沒有」的差別。排程改路徑/搬 repo 後，`schtasks` 的 action 是不會自己跟著搬的。
+
+---
+
 ## 2026-06-19: 出場 Telegram 告警「整個 live 史上」靜默失敗——exit reason 的 '_' 破壞 Markdown → Telegram 400 → 被吞
 
 **What happened:**

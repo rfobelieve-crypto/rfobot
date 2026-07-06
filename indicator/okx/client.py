@@ -11,8 +11,8 @@ from indicator.okx.config import OkxConfig
 from indicator.okx.rest import OkxRestClient
 from indicator.okx.types import (
     AlgoOrderResult, AmendResult, Balance, BalanceEvent, CancelResult,
-    ConnectivityStatus, OrderEvent, OrderResult, Position, PositionEvent,
-    Side,
+    ConnectivityStatus, OrderDetails, OrderEvent, OrderResult, Position,
+    PositionEvent, Side,
 )
 from indicator.okx.ws_private import OkxWsPrivateClient
 
@@ -93,6 +93,12 @@ class OkxClient:
 
     def cancel_algo_stop(self, *, algo_id: str) -> CancelResult:
         return self._rest.cancel_algo_stop(algo_id=algo_id)
+
+    def get_order(self, *, inst_id: str, ord_id: str) -> Optional[OrderDetails]:
+        # Signature in lockstep with rest.get_order (facade-skip is a repeat
+        # offender: amend_algo_stop 2026-06-10, set_leverage 2026-06-17).
+        # Covered by the AST conformance guard in tests/test_okx_client.py.
+        return self._rest.get_order(inst_id=inst_id, ord_id=ord_id)
 
     def get_positions(self, *, inst_id: str) -> list[Position]:
         return self._rest.get_positions(inst_id=inst_id)

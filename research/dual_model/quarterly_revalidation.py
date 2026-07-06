@@ -53,6 +53,7 @@ AUC_FLOOR = 0.55             # below → edge decaying, investigate
 AUC_CEIL = 0.62              # above → new signal OR leak, investigate
 STRONG_WR_FLOOR = 0.60       # Strong tier sign-acc should stay above this
 RECENT_DAYS = 60             # "recent" window for the decay check
+STALE_HOURS = 48             # feature data older than this → verdict untrustworthy
 
 # Orthogonal-data scan: the only breakthrough path once OHLCV+CG+Deribit+order
 # flow saturates (mistake.md 2026-06-02). Re-evaluate availability/cost each run.
@@ -84,6 +85,18 @@ def main() -> int:
     log(f"# Quarterly Re-Validation — {stamp}\n")
     df = load_and_cache_data(limit=4000)
     log(f"Data: {len(df)} bars  {df.index[0]:%Y-%m-%d} → {df.index[-1]:%Y-%m-%d}\n")
+
+    # Fail-loud staleness guard. 2026-07-05: DNS was down at the scheduled
+    # 09:00 run — the auto-backfill failure was logged "non-critical" and the
+    # ritual silently graded a 16-day-old cache as PASS. A verdict computed on
+    # stale data must never present itself as a fresh PASS/DRIFT.
+    data_end = df.index[-1]
+    data_age_h = (pd.Timestamp.now(tz=data_end.tz) - data_end).total_seconds() / 3600.0
+    stale = data_age_h > STALE_HOURS
+    if stale:
+        log(f"**DATA STALE** — last bar {data_end:%Y-%m-%d %H:%M} is {data_age_h:.0f}h old "
+            f"(threshold {STALE_HOURS}h). Backfill failed (network?); metrics below run on "
+            f"an old cache and the verdict is NOT trustworthy.\n")
 
     # ── 1. AUC/IC ceiling ────────────────────────────────────────────────
     logger.info("Running canonical walk-forward (FULL_DIRECTION)…")
@@ -168,7 +181,16 @@ def main() -> int:
 
     # ── Verdict ──────────────────────────────────────────────────────────
     log("## VERDICT")
-    if not flags:
+    if stale:
+        log(f"**STALE-DATA — RE-RUN REQUIRED.** Feature data ends {data_end:%Y-%m-%d %H:%M} "
+            f"({data_age_h/24:.1f} days old); the most recent window is missing entirely, "
+            f"so neither PASS nor DRIFT can be concluded. Fix backfill/network, then re-run "
+            f"this script before acting on anything above.")
+        if flags:
+            log("\n(flags raised on the stale window, for reference only:)")
+            for f in flags:
+                log(f"  - {f}")
+    elif not flags:
         log("**PASS** — edge is where it was; no structural drift detected. "
             "Keep running; re-check next quarter.")
     else:
@@ -186,25 +208,44 @@ def main() -> int:
     out.write_text("\n".join(lines), encoding="utf-8")
     log(f"\nReport → {out}")
 
-    # Best-effort Telegram push so a scheduled run actually surfaces.
-    # Plain text (no Markdown specials) to avoid parse errors.
+    # Telegram push so a scheduled run actually surfaces. Plain text (no
+    # Markdown specials) to avoid parse errors. Must survive a transient
+    # network outage: 2026-07-05 DNS was down exactly at the 09:00 run, the
+    # push died once and nothing retried — the operator never saw the verdict.
+    pushed = False
     try:
         import os
+        import time as _time
         from indicator.okx.alerter import send_critical
         chat = (os.environ.get("TG_ALERT_CHAT_ID")
                 or os.environ.get("TG_CRITICAL_CHAT_ID") or "")
-        verdict = "PASS" if not flags else "DRIFT/INVESTIGATE"
+        verdict = ("STALE-DATA (re-run required)" if stale
+                   else ("PASS" if not flags else "DRIFT/INVESTIGATE"))
         msg = (f"Monthly re-validation {stamp}\n"
                f"Verdict: {verdict}\n"
+               f"Data ends {data_end:%Y-%m-%d %H:%M} ({data_age_h:.0f}h old)\n"
                f"AUC {auc:.3f} (band 0.55-0.62) | IC {ic:+.3f}\n"
                f"recent60d IC {ic_recent:+.3f} vs older {ic_older:+.3f}\n"
                f"Strong sign-acc {sw[0]*100:.0f}pct")
         if flags:
             msg += "\nflags: " + " ; ".join(flags)
         if chat:
-            send_critical(chat, msg)
+            for attempt in range(1, 7):        # 6 tries / ~5 min of outage cover
+                pushed = send_critical(chat, msg)
+                if pushed:
+                    break
+                logger.warning("revalidation_telegram_push_retry attempt=%d/6", attempt)
+                if attempt < 6:
+                    _time.sleep(60)
     except Exception:
         logger.exception("revalidation_telegram_push_failed")
+    if not pushed:
+        # Stamp the failure into the report itself so a later reader knows the
+        # verdict never reached the operator.
+        logger.error("revalidation_telegram_push_gave_up")
+        with out.open("a", encoding="utf-8") as fh:
+            fh.write("\n> TELEGRAM PUSH FAILED — this verdict never reached the "
+                     "operator. Check network, then re-run or push manually.\n")
     return 0
 
 

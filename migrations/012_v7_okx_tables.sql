@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS `v7_okx_positions` (
   `entry_ord_id`        VARCHAR(64),
   `stop_algo_cl_ord_id` VARCHAR(64) NOT NULL,
   `stop_algo_id`        VARCHAR(64),
+  -- Fees (real fills; 2026-07-06 fee fix — see indicator/okx/executor.py)
+  `entry_fees_usd`  DOUBLE DEFAULT 0,
   -- Close
   `status`          VARCHAR(16) NOT NULL DEFAULT 'OPEN',  -- OPEN / CLOSED / DEMOTED
   `exit_time`       DATETIME,

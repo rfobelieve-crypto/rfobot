@@ -164,6 +164,28 @@ class OkxStateStore:
             finally:
                 conn.close()
 
+    def set_entry_fees(self, *, position_id: int,
+                       entry_fees_usd: float) -> None:
+        """Persist the entry order's real fee (from the WS fill event).
+
+        OKX's orders-channel `fee` field is CUMULATIVE for the order, so
+        this overwrites (never adds) — partial-fill events converge on the
+        final value.  No status filter: a late fee event landing after the
+        row closed is still correct data.
+        """
+        sql = (
+            f"UPDATE `{self._prefix}_positions` "
+            "SET entry_fees_usd=%s WHERE id=%s"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (float(entry_fees_usd), int(position_id)))
+                conn.commit()
+            finally:
+                conn.close()
+
     def close_position(self, *, position_id: int, exit_time: datetime,
                        exit_price: float, exit_reason: str,
                        gross_pct: float, net_pct: float,
@@ -322,6 +344,30 @@ class OkxStateStore:
                     cur.execute(sql, (float(total_eq_usd),
                                       float(available_usd), source))
                 conn.commit()
+            finally:
+                conn.close()
+
+    def get_peak_equity(self, *, since_utc: str) -> Optional[float]:
+        """Highest M2M equity since `since_utc` (ISO date/datetime string).
+
+        Feeds the trailing-peak drawdown alert.  Scoped to the current
+        capital era — an all-history MAX would include the pre-blowup
+        account's peak and fake the drawdown.
+        """
+        sql = (
+            f"SELECT MAX(total_eq_usd) AS peak "
+            f"FROM `{self._prefix}_balance_snapshots` WHERE ts >= %s"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (since_utc,))
+                    row = cur.fetchone()
+                if not row:
+                    return None
+                peak = row.get("peak") if isinstance(row, dict) else row[0]
+                return float(peak) if peak is not None else None
             finally:
                 conn.close()
 

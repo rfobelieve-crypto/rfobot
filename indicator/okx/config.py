@@ -52,8 +52,25 @@ class OkxConfig:
     leverage: int = 10
     # OKX SWAP contract size in base currency (BTC for BTC-USDT-SWAP = 0.01)
     contract_size_base: float = 0.01
-    # Round-trip taker cost as a fraction (mirrors v7_paper_executor)
+    # Round-trip taker cost as a fraction (mirrors v7_paper_executor).
+    # LEGACY: only used as the last-resort fallback when notional is unknown —
+    # net_pct now uses REAL fill fees read back from OKX (2026-07-06 fee fix;
+    # the flat 8 bps under-counted a market-in/market-out round trip and was
+    # about to grade Gate B with a lying ruler, mistake.md 2026-06-14).
     taker_cost: float = 0.0008
+    # Per-side taker estimate used for a leg whose real fee is unavailable
+    # (read-back failed / WS event dropped).  OKX regular-tier taker = 0.05%.
+    taker_fee_side_est: float = 0.0005
+
+    # ── Trailing-peak M2M drawdown alert (alert-only, NOT a kill switch).
+    # M2M drawdown hit -21% on 2026-07-02 and breached the Stage-3→4a gate
+    # (MDD < 20%) with zero notification — trade-close MDD (-15%) never sees
+    # intra-trade troughs.  Peak = MAX(total_eq_usd) of balance snapshots
+    # since dd_peak_since_utc (start of the current $100 era; earlier peaks
+    # belong to the pre-blowup account and would fake a -47% drawdown).
+    dd_warn_pct: float = -15.0      # first alert
+    dd_breach_pct: float = -20.0    # Stage-3→4a gate line
+    dd_peak_since_utc: str = "2026-06-07"
 
     # Strong-only entry gate (2026-06-09, reversible; default OFF = no change).
     # When True, only Strong-tier signals open a position; Moderate signals are
@@ -221,6 +238,19 @@ def validate_okx_config(cfg: OkxConfig) -> None:
         raise RuntimeError("daily_loss_cap_pct must be negative")
     if cfg.total_loss_cap_pct >= 0:
         raise RuntimeError("total_loss_cap_pct must be negative")
+    # drawdown alert thresholds: warn fires first, breach is deeper
+    if cfg.dd_warn_pct >= 0 or cfg.dd_breach_pct >= 0:
+        raise RuntimeError("dd_warn_pct / dd_breach_pct must be negative")
+    if cfg.dd_breach_pct > cfg.dd_warn_pct:
+        raise RuntimeError(
+            f"dd_breach_pct ({cfg.dd_breach_pct}) must be <= dd_warn_pct "
+            f"({cfg.dd_warn_pct})"
+        )
+    # fee estimate sanity: 0..20 bps per side
+    if not (0.0 <= cfg.taker_fee_side_est <= 0.002):
+        raise RuntimeError(
+            f"taker_fee_side_est must be in [0, 0.002], got {cfg.taker_fee_side_est}"
+        )
     # Credentials present
     if not cfg.api_key:
         raise RuntimeError("OKX_API_KEY not set in env")

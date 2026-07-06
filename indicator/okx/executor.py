@@ -121,6 +121,10 @@ class V7OkxExecutor:
         # known to miss; reconciler is the safety net).  Reset on any
         # consistent or non-orphan_local result.
         self._orphan_local_streak: int = 0
+        # Trailing-peak drawdown alert dedup: None / "WARN" / "BREACH".
+        # In-memory only — a redeploy while still in drawdown re-alerts once,
+        # which is acceptable for an info-level alert.
+        self._dd_alert_level: Optional[str] = None
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
@@ -316,6 +320,14 @@ class V7OkxExecutor:
             # current equity — anchoring to current makes day_change == 0% and
             # disables CAP-3 for the entire first UTC day (audit P1).
             day_start_equity = self._cfg.initial_capital_usd
+
+        # Trailing-peak M2M drawdown alert (alert-only; daily/total caps stay
+        # the kill switches).  M2M drawdown breached the Stage-3→4a gate line
+        # (-21% on 2026-07-02) with zero notification — this closes that gap.
+        try:
+            self._check_trailing_drawdown(equity_usd)
+        except Exception:
+            logger.exception("dd_alert_check_failed")
 
         # Periodic NTP probe (rate-limited inside _probe_ntp).
         # If the probe itself failed we skip the NTP check this cycle.
@@ -602,6 +614,72 @@ class V7OkxExecutor:
                                    "bars_held": bars_held,
                                    "current_stop": new_stop})
 
+    def _check_trailing_drawdown(self, equity_usd: float) -> None:
+        """Alert (once per level) when M2M equity draws down from its peak.
+
+        Alert-only — no state change, no kill.  Peak is scoped to the current
+        capital era (cfg.dd_peak_since_utc).  Re-arms after equity recovers
+        2 pp above the warn line so a later relapse alerts again.
+        """
+        peak = self._store.get_peak_equity(
+            since_utc=self._cfg.dd_peak_since_utc)
+        if not peak or peak <= 0 or equity_usd <= 0:
+            return
+        dd_pct = (equity_usd / peak - 1.0) * 100.0
+
+        level: Optional[str] = None
+        if dd_pct <= self._cfg.dd_breach_pct:
+            level = "BREACH"
+        elif dd_pct <= self._cfg.dd_warn_pct:
+            level = "WARN"
+
+        if level is None:
+            if (self._dd_alert_level is not None
+                    and dd_pct > self._cfg.dd_warn_pct + 2.0):
+                self._dd_alert_level = None
+            return
+        already_deep = (self._dd_alert_level == "BREACH")
+        if level == self._dd_alert_level or (level == "WARN" and already_deep):
+            return
+        self._dd_alert_level = level
+
+        if level == "BREACH":
+            head = "🔴 M2M drawdown BREACH"
+            tail = (f"Stage-3→4a gate (MDD < {abs(self._cfg.dd_breach_pct):.0f}%) "
+                    f"is breached — no scaling up until re-validated.")
+        else:
+            head = "🟠 M2M drawdown warning"
+            tail = "Alert-only: daily/total caps remain the kill switches."
+        try:
+            send_critical(
+                self._cfg.telegram_critical_chat_id,
+                f"{head}: {dd_pct:.1f}% from peak\n"
+                f"equity ${equity_usd:.2f} vs peak ${peak:.2f} "
+                f"(since {self._cfg.dd_peak_since_utc})\n{tail}",
+            )
+        except Exception:
+            logger.exception("dd_alert_send_failed")
+        logger.warning("okx_dd_alert level=%s dd=%.1f%% equity=%.2f peak=%.2f",
+                       level, dd_pct, equity_usd, peak)
+
+    def _net_pct_with_fees(self, *, gross_pct: float, notional: float,
+                           entry_fees_usd: float,
+                           exit_fees_usd: Optional[float]) -> float:
+        """net = gross − real fees when known; a missing leg is estimated at
+        the per-side taker rate.  Replaces the flat taker_cost constant that
+        under-counted a market-in/market-out round trip — Gate B's ruler
+        (mistake.md 2026-06-14).
+        """
+        if notional <= 0:
+            return gross_pct - self._cfg.taker_cost
+        entry_frac = (entry_fees_usd / notional
+                      if entry_fees_usd and entry_fees_usd > 0
+                      else self._cfg.taker_fee_side_est)
+        exit_frac = (exit_fees_usd / notional
+                     if exit_fees_usd and exit_fees_usd > 0
+                     else self._cfg.taker_fee_side_est)
+        return gross_pct - entry_frac - exit_frac
+
     def _close_position(self, pos: dict, *, exit_price: float,
                          exit_reason: str,
                          bar_ts) -> CycleResult:
@@ -633,6 +711,7 @@ class V7OkxExecutor:
         # "V7 says closed, OKX still has the position" bug.
         close_submit_failed = False
         close_error: Optional[str] = None
+        close_ord_id: Optional[str] = None
         if size > 0 and side in ("LONG", "SHORT"):
             close_side = Side.SELL if side == "LONG" else Side.BUY
             try:
@@ -643,6 +722,7 @@ class V7OkxExecutor:
                     pos_side=self._cfg.pos_side_for(side),
                     reduce_only=True,
                 )
+                close_ord_id = getattr(close_result, "ord_id", None)
                 if close_result.status == "rejected":
                     close_submit_failed = True
                     close_error = close_result.error or "okx_rejected"
@@ -716,19 +796,49 @@ class V7OkxExecutor:
                                detail={"position_id": pos_id,
                                        "error": close_error})
 
-        # 3. Compute P&L using last_close as the exit-price estimate.
-        # WS fill event for the close order can refine this later.
+        # 3. Read back the real fill (avg price + accumulated fee).  The
+        # submit ack carries neither, and the WS fill event races the DB
+        # close write below.  Without this, exit price is the bar-close
+        # estimate and the fee a flat constant — the "wrong ruler" Gate B
+        # would have been graded with.  Read-back failure falls back to
+        # the estimates (never blocks the close).
+        exit_fees_usd: Optional[float] = None
+        if close_ord_id:
+            for attempt in range(3):
+                try:
+                    details = self._client.get_order(
+                        inst_id=self._cfg.inst_id, ord_id=close_ord_id)
+                except Exception:
+                    logger.exception("close_fill_readback_failed pos=%s",
+                                     pos_id)
+                    break
+                if details is None:
+                    break   # REST layer already retried — fall back to estimates
+                if details.state == "filled":
+                    if details.avg_px and details.avg_px > 0:
+                        exit_price = float(details.avg_px)
+                    if details.fee_usd is not None:
+                        exit_fees_usd = abs(float(details.fee_usd))
+                    break
+                if attempt < 2:
+                    time.sleep(0.5)   # market order on BTC swap fills ~instantly
+
+        # 4. Compute P&L from the (possibly refined) exit price + real fees.
         if side == "LONG" and entry_price > 0:
             gross_pct = exit_price / entry_price - 1.0
         elif side == "SHORT" and entry_price > 0:
             gross_pct = -(exit_price / entry_price - 1.0)
         else:
             gross_pct = 0.0
-        net_pct = gross_pct - self._cfg.taker_cost
+        notional = float(pos.get("notional_usd") or 0)
+        entry_fees_usd = float(pos.get("entry_fees_usd") or 0)
+        net_pct = self._net_pct_with_fees(
+            gross_pct=gross_pct, notional=notional,
+            entry_fees_usd=entry_fees_usd, exit_fees_usd=exit_fees_usd,
+        )
         # implied leverage = notional / equity_before; with 10x cfg the
         # equity move is 10x the gross trade %.  Previously this missed
         # the leverage factor and under-recorded equity changes by 10x.
-        notional = float(pos.get("notional_usd") or 0)
         if equity_before > 0 and notional > 0:
             equity_ret = (notional / equity_before) * net_pct
         else:
@@ -744,12 +854,13 @@ class V7OkxExecutor:
                 gross_pct=gross_pct, net_pct=net_pct,
                 equity_ret_pct=equity_ret * 100.0,
                 equity_after=equity_after,
+                exit_fees_usd=exit_fees_usd or 0.0,
                 new_status="CLOSED",
             )
         except Exception:
             logger.exception("close_position_db_failed pos=%s", pos_id)
 
-        # 4. Telegram exit alert
+        # 5. Telegram exit alert
         try:
             msg = format_exit_alert(
                 stage_label=self._cfg.stage_label, direction=side,
@@ -1473,7 +1584,15 @@ class V7OkxExecutor:
             gross_pct = -(exit_price / entry_price - 1.0)
         else:
             gross_pct = 0.0
-        net_pct = gross_pct - self._cfg.taker_cost
+        # Real fees: the algo-fill WS event carries the closing order's
+        # accumulated fee; the entry fee was persisted from the entry fill.
+        exit_fees_usd = (abs(float(evt.fee_usd))
+                         if evt.fee_usd is not None else None)
+        entry_fees_usd = float(pos.get("entry_fees_usd") or 0)
+        net_pct = self._net_pct_with_fees(
+            gross_pct=gross_pct, notional=notional,
+            entry_fees_usd=entry_fees_usd, exit_fees_usd=exit_fees_usd,
+        )
         if equity_before > 0 and notional > 0:
             equity_ret = (notional / equity_before) * net_pct
         else:
@@ -1491,6 +1610,7 @@ class V7OkxExecutor:
                 gross_pct=gross_pct, net_pct=net_pct,
                 equity_ret_pct=equity_ret * 100.0,
                 equity_after=equity_after,
+                exit_fees_usd=exit_fees_usd or 0.0,
                 new_status="CLOSED",
             )
         except Exception:
@@ -1537,12 +1657,21 @@ class V7OkxExecutor:
                 pos_id = pos.get("id")
                 if pos_id is None:
                     return
-                # (1) Entry fill — match by entry cl_ord_id
-                if pos.get("entry_cl_ord_id") == evt.cl_ord_id and evt.ord_id:
-                    self._store.set_position_okx_ids(
-                        position_id=int(pos_id),
-                        entry_ord_id=evt.ord_id,
-                    )
+                # (1) Entry fill — match by entry cl_ord_id.  Record the OKX
+                # ord_id AND the real entry fee (orders-channel `fee` is
+                # cumulative for the order → overwrite, partial fills
+                # converge).  The fee feeds net_pct at close time.
+                if pos.get("entry_cl_ord_id") == evt.cl_ord_id:
+                    if evt.ord_id:
+                        self._store.set_position_okx_ids(
+                            position_id=int(pos_id),
+                            entry_ord_id=evt.ord_id,
+                        )
+                    if evt.fee_usd is not None:
+                        self._store.set_entry_fees(
+                            position_id=int(pos_id),
+                            entry_fees_usd=abs(float(evt.fee_usd)),
+                        )
                     return
                 # (2) Algo stop fill — when OKX's algo triggers and creates
                 # the closing market order, the fill event carries
