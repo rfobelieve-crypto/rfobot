@@ -296,3 +296,486 @@ source, not more same-source features.
 **PASS** ¡X edge is where it was; no structural drift detected. Keep running; re-check next quarter.
 
 Report ¡÷ C:\Users\rfo\Desktop\flowbot\flow_system\research\results\dual_model\quarterly_revalidation_20260609.md
+2026-07-05 09:00:05,988 | Auto-backfill check failed (non-critical): HTTPSConnectionPool(host='fapi.binance.com', port=443): Max retries exceeded with url: /fapi/v1/klines?symbol=BTCUSDT&interval=1h&startTime=1781809200000&limit=1500 (Caused by NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x0000019ACD2BB0A0>: Failed to establish a new connection: [Errno 11001] getaddrinfo failed'))
+2026-07-05 09:00:06,032 | Loaded cached features: 3999 bars x 282 cols
+2026-07-05 09:00:06,032 | Running canonical walk-forward (FULL_DIRECTION)¡K
+2026-07-05 09:00:06,050 | Direction reg labels (PATH/TWAP): n=3999 valid=3995 mean=-0.00020 std=0.00677 | P(|y|>=0.006)=25.0% P(|y|>=0.008)=16.2% P(|y|>=0.010)=11.1% P(|y|>=0.015)=4.4% | endpoint/path ratio=1.46
+2026-07-05 09:00:06,062 | Direction-reg training: 136 requested, 136 available (objective=mse)
+2026-07-05 09:00:06,064 | Walk-forward: 77 folds, init_train=288, test=48, step=48, purge=4, embargo=4
+2026-07-05 09:00:06,064 | Walk-forward: 77 folds (purge+embargo applied)
+2026-07-05 09:00:08,149 | Fold 0: train=284 test=48 MAE=0.00212
+2026-07-05 09:00:08,431 | Fold 1: train=332 test=48 MAE=0.00259
+2026-07-05 09:00:08,673 | Fold 2: train=380 test=48 MAE=0.00396
+2026-07-05 09:00:09,079 | Fold 3: train=428 test=48 MAE=0.00447
+2026-07-05 09:00:09,363 | Fold 4: train=476 test=48 MAE=0.00232
+2026-07-05 09:00:09,985 | Fold 5: train=524 test=48 MAE=0.00351
+2026-07-05 09:00:10,280 | Fold 6: train=572 test=48 MAE=0.00355
+2026-07-05 09:00:10,533 | Fold 7: train=620 test=48 MAE=0.00642
+2026-07-05 09:00:10,805 | Fold 8: train=668 test=48 MAE=0.00763
+2026-07-05 09:00:11,104 | Fold 9: train=716 test=48 MAE=0.00711
+2026-07-05 09:00:11,440 | Fold 10: train=764 test=48 MAE=0.01271
+2026-07-05 09:00:11,683 | Fold 11: train=812 test=48 MAE=0.00950
+2026-07-05 09:00:11,919 | Fold 12: train=860 test=48 MAE=0.00671
+2026-07-05 09:00:12,357 | Fold 13: train=908 test=48 MAE=0.00580
+2026-07-05 09:00:12,677 | Fold 14: train=956 test=48 MAE=0.00598
+2026-07-05 09:00:12,946 | Fold 15: train=1004 test=48 MAE=0.00419
+2026-07-05 09:00:13,191 | Fold 16: train=1052 test=48 MAE=0.00477
+2026-07-05 09:00:13,655 | Fold 17: train=1100 test=48 MAE=0.00393
+2026-07-05 09:00:14,102 | Fold 18: train=1148 test=48 MAE=0.00273
+2026-07-05 09:00:14,362 | Fold 19: train=1196 test=48 MAE=0.00723
+2026-07-05 09:00:14,608 | Fold 20: train=1244 test=48 MAE=0.00815
+2026-07-05 09:00:14,860 | Fold 21: train=1292 test=48 MAE=0.00628
+2026-07-05 09:00:15,723 | Fold 22: train=1340 test=48 MAE=0.00557
+2026-07-05 09:00:15,983 | Fold 23: train=1388 test=48 MAE=0.00902
+2026-07-05 09:00:16,389 | Fold 24: train=1436 test=48 MAE=0.00569
+2026-07-05 09:00:16,800 | Fold 25: train=1484 test=48 MAE=0.00385
+2026-07-05 09:00:17,060 | Fold 26: train=1532 test=48 MAE=0.00634
+2026-07-05 09:00:17,327 | Fold 27: train=1580 test=48 MAE=0.00514
+2026-07-05 09:00:18,209 | Fold 28: train=1628 test=48 MAE=0.00481
+2026-07-05 09:00:18,482 | Fold 29: train=1676 test=48 MAE=0.00365
+2026-07-05 09:00:18,994 | Fold 30: train=1724 test=48 MAE=0.00427
+2026-07-05 09:00:19,258 | Fold 31: train=1772 test=48 MAE=0.00498
+2026-07-05 09:00:19,532 | Fold 32: train=1820 test=48 MAE=0.00368
+2026-07-05 09:00:19,803 | Fold 33: train=1868 test=48 MAE=0.00585
+2026-07-05 09:00:20,213 | Fold 34: train=1916 test=48 MAE=0.00522
+2026-07-05 09:00:20,479 | Fold 35: train=1964 test=48 MAE=0.00447
+2026-07-05 09:00:20,878 | Fold 36: train=2012 test=48 MAE=0.00314
+2026-07-05 09:00:21,249 | Fold 37: train=2060 test=48 MAE=0.00577
+2026-07-05 09:00:21,532 | Fold 38: train=2108 test=48 MAE=0.00397
+2026-07-05 09:00:21,832 | Fold 39: train=2156 test=48 MAE=0.00144
+2026-07-05 09:00:22,171 | Fold 40: train=2204 test=48 MAE=0.00393
+2026-07-05 09:00:22,500 | Fold 41: train=2252 test=48 MAE=0.00521
+2026-07-05 09:00:22,768 | Fold 42: train=2300 test=48 MAE=0.00342
+2026-07-05 09:00:23,049 | Fold 43: train=2348 test=48 MAE=0.00357
+2026-07-05 09:00:23,336 | Fold 44: train=2396 test=48 MAE=0.00543
+2026-07-05 09:00:23,799 | Fold 45: train=2444 test=48 MAE=0.00352
+2026-07-05 09:00:24,250 | Fold 46: train=2492 test=48 MAE=0.00358
+2026-07-05 09:00:24,520 | Fold 47: train=2540 test=48 MAE=0.00439
+2026-07-05 09:00:25,291 | Fold 48: train=2588 test=48 MAE=0.00401
+2026-07-05 09:00:25,630 | Fold 49: train=2636 test=48 MAE=0.00283
+2026-07-05 09:00:25,934 | Fold 50: train=2684 test=48 MAE=0.00289
+2026-07-05 09:00:26,932 | Fold 51: train=2732 test=48 MAE=0.00271
+2026-07-05 09:00:27,212 | Fold 52: train=2780 test=48 MAE=0.00366
+2026-07-05 09:00:27,489 | Fold 53: train=2828 test=48 MAE=0.00248
+2026-07-05 09:00:28,038 | Fold 54: train=2876 test=48 MAE=0.00385
+2026-07-05 09:00:28,323 | Fold 55: train=2924 test=48 MAE=0.00314
+2026-07-05 09:00:28,632 | Fold 56: train=2972 test=48 MAE=0.00229
+2026-07-05 09:00:29,177 | Fold 57: train=3020 test=48 MAE=0.00252
+2026-07-05 09:00:29,465 | Fold 58: train=3068 test=48 MAE=0.00260
+2026-07-05 09:00:30,031 | Fold 59: train=3116 test=48 MAE=0.00453
+2026-07-05 09:00:30,355 | Fold 60: train=3164 test=48 MAE=0.00284
+2026-07-05 09:00:30,723 | Fold 61: train=3212 test=48 MAE=0.00328
+2026-07-05 09:00:31,202 | Fold 62: train=3260 test=48 MAE=0.00200
+2026-07-05 09:00:31,712 | Fold 63: train=3308 test=48 MAE=0.00330
+2026-07-05 09:00:32,470 | Fold 64: train=3356 test=48 MAE=0.00325
+2026-07-05 09:00:32,798 | Fold 65: train=3404 test=48 MAE=0.00282
+2026-07-05 09:00:33,106 | Fold 66: train=3452 test=48 MAE=0.00354
+2026-07-05 09:00:33,516 | Fold 67: train=3500 test=48 MAE=0.00205
+2026-07-05 09:00:33,863 | Fold 68: train=3548 test=48 MAE=0.00401
+2026-07-05 09:00:34,160 | Fold 69: train=3596 test=48 MAE=0.00861
+2026-07-05 09:00:34,457 | Fold 70: train=3644 test=48 MAE=0.00772
+2026-07-05 09:00:34,756 | Fold 71: train=3692 test=48 MAE=0.00566
+2026-07-05 09:00:35,758 | Fold 72: train=3740 test=48 MAE=0.00451
+2026-07-05 09:00:36,057 | Fold 73: train=3788 test=48 MAE=0.00489
+2026-07-05 09:00:36,376 | Fold 74: train=3836 test=48 MAE=0.00259
+2026-07-05 09:00:36,755 | Fold 75: train=3884 test=48 MAE=0.00512
+2026-07-05 09:00:37,058 | Fold 76: train=3932 test=48 MAE=0.00477
+C:\Users\rfo\anaconda3\lib\site-packages\pandas\core\arrays\datetimes.py:1162: UserWarning: Converting to PeriodArray/Index representation will drop timezone information.
+  warnings.warn(
+2026-07-05 09:00:37,218 | telegram_critical_exception
+Traceback (most recent call last):
+  File "C:\Users\rfo\anaconda3\lib\site-packages\urllib3\connection.py", line 174, in _new_conn
+    conn = connection.create_connection(
+  File "C:\Users\rfo\anaconda3\lib\site-packages\urllib3\util\connection.py", line 72, in create_connection
+    for res in socket.getaddrinfo(host, port, family, socket.SOCK_STREAM):
+  File "C:\Users\rfo\anaconda3\lib\socket.py", line 954, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\rfo\anaconda3\lib\site-packages\urllib3\connectionpool.py", line 703, in urlopen
+    httplib_response = self._make_request(
+  File "C:\Users\rfo\anaconda3\lib\site-packages\urllib3\connectionpool.py", line 386, in _make_request
+    self._validate_conn(conn)
+  File "C:\Users\rfo\anaconda3\lib\site-packages\urllib3\connectionpool.py", line 1040, in _validate_conn
+    conn.connect()
+  File "C:\Users\rfo\anaconda3\lib\site-packages\urllib3\connection.py", line 358, in connect
+    self.sock = conn = self._new_conn()
+  File "C:\Users\rfo\anaconda3\lib\site-packages\urllib3\connection.py", line 186, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPSConnection object at 0x0000019ACEADCD30>: Failed to establish a new connection: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\rfo\anaconda3\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "C:\Users\rfo\anaconda3\lib\site-packages\urllib3\connectionpool.py", line 785, in urlopen
+    retries = retries.increment(
+  File "C:\Users\rfo\anaconda3\lib\site-packages\urllib3\util\retry.py", line 592, in increment
+    raise MaxRetryError(_pool, url, error or ResponseError(cause))
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8742332974:AAGYkXJi9-aulkHeHbgv4fwPxt-J4-Va2IE/sendMessage (Caused by NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x0000019ACEADCD30>: Failed to establish a new connection: [Errno 11001] getaddrinfo failed'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\indicator\okx\alerter.py", line 37, in send_critical
+    resp = requests.post(
+  File "C:\Users\rfo\anaconda3\lib\site-packages\requests\api.py", line 115, in post
+    return request("post", url, data=data, json=json, **kwargs)
+  File "C:\Users\rfo\anaconda3\lib\site-packages\requests\api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "C:\Users\rfo\anaconda3\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\rfo\anaconda3\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\rfo\anaconda3\lib\site-packages\requests\adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8742332974:AAGYkXJi9-aulkHeHbgv4fwPxt-J4-Va2IE/sendMessage (Caused by NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x0000019ACEADCD30>: Failed to establish a new connection: [Errno 11001] getaddrinfo failed'))
+# Quarterly Re-Validation ¡X 2026-07-05 01:00 UTC
+
+Parquet data is 1993.0h old (threshold: 6.0h). Running backfill...
+============================================================
+[1/3] Binance klines 1h backfill
+============================================================
+  Existing: 5875 bars, ends at 2026-06-18 18:00:00+00:00
+Data: 3999 bars  2026-01-03 ¡÷ 2026-06-18
+
+## 1. AUC / IC ceiling
+- sign_AUC = 0.5922  (baseline 0.59, band [0.55,0.62]) ¡÷ OK
+- Spearman IC = +0.1498  (baseline +0.16)
+- n_oos = 3696
+
+## 2. Recent IC decay (concept-drift check)
+  2026-01: IC=+0.236  (n=400)
+  2026-02: IC=+0.158  (n=672)
+  2026-03: IC=+0.106  (n=744)
+  2026-04: IC=+0.200  (n=720)
+  2026-05: IC=+0.173  (n=744)
+  2026-06: IC=+0.016  (n=416)
+- recent 60d IC = +0.158  vs older = +0.140  ¡÷ OK
+
+## 3. Tier edge (sign-accuracy by decoded tier)
+- Strong   : sign-acc=73.3%  (n=404)
+- Moderate : sign-acc=59.7%  (n=729)
+
+## 4. Regime breakdown (where the edge lives)
+- BULL   : IC=+0.101  sign-acc=54.2%  (n=587)
+- BEAR   : IC=+0.113  sign-acc=54.5%  (n=605)
+- CHOPPY : IC=+0.180  sign-acc=57.4%  (n=2504)
+
+## 5. Orthogonal-data scan (manual ¡X the only path to a NEW edge)
+Re-evaluate each channel's availability / cost / expected lift. v7 is
+saturated on OHLCV+CG+Deribit+order-flow; a breakthrough needs a NEW
+source, not more same-source features.
+- [ ] Options gamma exposure (GEX) ¡X Deribit/Glassnode paid; most-cited untested
+- [ ] On-chain whale wallet flow ¡X Glassnode/BGeometrics
+- [ ] Bitcoin ETF AUM/flow ¡X already wired (cg_etf_flow); re-check IC at daily res
+- [ ] Cross-asset (SPX/DXY/Gold/US10Y) ¡X SPX_return_1d already strongest cross feat
+- [ ] Funding/basis term structure across venues
+- [ ] Social/sentiment (Twitter/Reddit) DIY scraper
+
+## VERDICT
+**PASS** ¡X edge is where it was; no structural drift detected. Keep running; re-check next quarter.
+
+Report ¡÷ C:\Users\rfo\Desktop\flowbot\flow_system\research\results\dual_model\quarterly_revalidation_20260705.md
+2026-07-05 23:47:51,477 | Raw data newer than cache ¡X rebuilding features
+2026-07-05 23:47:51,807 | Klines pagination: fetched 1500 bars, remaining 2500
+2026-07-05 23:47:52,607 | Klines pagination: fetched 1500 bars, remaining 1000
+2026-07-05 23:47:53,384 | Klines pagination: fetched 1000 bars, remaining 0
+2026-07-05 23:47:53,898 | Klines total: 3999 bars, 2026-01-20 00:00:00+00:00 ~ 2026-07-05 14:00:00+00:00
+2026-07-05 23:47:54,250 | CG oi: 4000 rows
+2026-07-05 23:47:55,769 | CG oi_agg: 4000 rows
+2026-07-05 23:47:57,046 | CG liquidation: 4000 rows
+2026-07-05 23:47:58,329 | CG long_short: 4000 rows
+2026-07-05 23:47:59,638 | CG global_ls: 4000 rows
+2026-07-05 23:48:00,983 | CG funding: 4000 rows
+2026-07-05 23:48:02,280 | CG taker: 4000 rows
+2026-07-05 23:48:03,695 | CG coinbase_premium: 4000 rows
+2026-07-05 23:48:05,004 | CG bitfinex_margin: 4000 rows
+2026-07-05 23:48:06,290 | CG top_ls_position: 4000 rows
+2026-07-05 23:48:07,669 | CG futures_cvd_agg: 4000 rows
+2026-07-05 23:48:08,988 | CG spot_cvd_agg: 4000 rows
+2026-07-05 23:48:10,514 | CG liq_agg: 4000 rows
+2026-07-05 23:48:11,788 | CG oi_coin_margin: 1000 rows
+2026-07-05 23:48:18,393 | Direction features added: 34 new columns
+2026-07-05 23:48:18,441 | Toxicity features added: 9 columns
+2026-07-05 23:48:18,468 | ETF flow merged: 10 cols
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:651: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:651: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:651: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:651: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:651: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+2026-07-05 23:48:18,788 | F&G merged: 5 cols
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:683: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:683: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:683: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:683: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:683: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:683: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:683: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:683: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df[col] = merged[col].values
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:690: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df["dvol_rv_spread"] = df["dvol_close"] - rv_ann
+2026-07-05 23:48:18,827 | DVOL merged: 8 cols + spread
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:85: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_break_up_atr"] = (close - prior_high) / atr.replace(0, np.nan)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:86: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_break_dn_atr"] = (prior_low - close) / atr.replace(0, np.nan)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:92: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_bo_up"] = ((close > prior_high) & (open_ <= prior_high)).astype(float)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:93: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_bo_dn"] = ((close < prior_low) & (open_ >= prior_low)).astype(float)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:101: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_bo_up_streak"] = (
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:104: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_bo_dn_streak"] = (
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:113: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_funding_d1"] = fund_d1.shift(1)     # trailing only
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:114: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_funding_d2"] = fund_d2.shift(1)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:119: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_funding_sign_persist_8h"] = roll_sign
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:131: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_oi_close_corr_12h"] = _roll_corr(d_oi, d_close, OI_DIVERGENCE_WINDOW)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:138: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_oi_bullish_build"] = ((sign_close > 0) & (sign_oi > 0)).astype(float)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:139: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_oi_bearish_build"] = ((sign_close < 0) & (sign_oi > 0)).astype(float)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:156: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_liq_long_cluster"] = ll_cum_8h / (ll_base * 8 + 1e-9)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:157: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_liq_short_cluster"] = ls_cum_8h / (ls_base * 8 + 1e-9)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:161: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_liq_cluster_imb"] = np.where(
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:172: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_break_funding_align_up"] = up_align
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:173: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["init_break_funding_align_dn"] = dn_align
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:218: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_fcvd_sign_streak"] = _signed_streak(out["cg_fcvd_delta"], cap=24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:220: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_scvd_sign_streak"] = _signed_streak(out["cg_scvd_delta"], cap=24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:222: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_taker_sign_streak"] = _signed_streak(out["cg_taker_delta"], cap=24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:224: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_oi_sign_streak"] = _signed_streak(out["cg_oi_delta"], cap=24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:227: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_pos_ls_sign_streak"] = _signed_streak(pos_d, cap=24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:236: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_flow_consensus_signed"] = consensus_signed
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:237: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_flow_consensus_persist_8h"] = consensus_signed.rolling(
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:250: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_flow_consensus_zweighted"] = weighted
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:257: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_spot_lead_ratio"] = (sd - fd) / denom
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:263: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_retail_whale_div"] = retail_d - whale_d
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:275: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_long_build_persist_8h"] = long_build_flag.rolling(
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:278: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_net_build_8h"] = out["dfp_long_build_persist_8h"] - short_build_8h
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:279: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_long_cover_persist_8h"] = long_cover_flag.rolling(
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:281: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_short_cover_persist_8h"] = short_cover_flag.rolling(
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:286: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_fcvd_cum_24h_rank"] = _pct_rank_trailing(out["cg_fcvd_cum"], 24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:288: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_scvd_cum_24h_rank"] = _pct_rank_trailing(out["cg_scvd_cum"], 24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:291: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_taker_4h_24h_rank"] = _pct_rank_trailing(taker_4h, 24)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_liq_long_dom_streak"] = _flag_streak(long_dom, cap=12)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:300: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_liq_short_dom_streak"] = _flag_streak(short_dom, cap=12)
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\initiation_features.py:306: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  out["dfp_post_long_liq_rev"] = ll_extreme.astype(float) * (
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:525: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df["exchange_flow_8h"] = _flow.rolling(8, min_periods=4).sum()
+C:\Users\rfo\Desktop\flowbot\flow_system\indicator\feature_builder_live.py:529: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df["oi_to_volume_zscore"] = _zscore(_oi_vol_ratio, 168)
+2026-07-05 23:48:19,047 | Live features: 3999 bars x 282 columns
+2026-07-05 23:48:19,168 | Cached features: 3999 bars x 282 cols ¡÷ C:\Users\rfo\Desktop\flowbot\flow_system\research\dual_model\.cache\features_all.parquet
+2026-07-05 23:48:19,170 | Running canonical walk-forward (FULL_DIRECTION)¡K
+2026-07-05 23:48:19,178 | Direction reg labels (PATH/TWAP): n=3999 valid=3995 mean=-0.00021 std=0.00690 | P(|y|>=0.006)=25.4% P(|y|>=0.008)=16.3% P(|y|>=0.010)=11.3% P(|y|>=0.015)=4.7% | endpoint/path ratio=1.46
+2026-07-05 23:48:19,186 | Direction-reg training: 136 requested, 136 available (objective=mse)
+2026-07-05 23:48:19,188 | Walk-forward: 77 folds, init_train=288, test=48, step=48, purge=4, embargo=4
+2026-07-05 23:48:19,188 | Walk-forward: 77 folds (purge+embargo applied)
+2026-07-05 23:48:20,988 | Fold 0: train=284 test=48 MAE=0.00591
+2026-07-05 23:48:21,739 | Fold 1: train=332 test=48 MAE=0.00821
+2026-07-05 23:48:22,054 | Fold 2: train=380 test=48 MAE=0.01447
+2026-07-05 23:48:22,430 | Fold 3: train=428 test=48 MAE=0.00600
+2026-07-05 23:48:22,671 | Fold 4: train=476 test=48 MAE=0.00703
+2026-07-05 23:48:23,142 | Fold 5: train=524 test=48 MAE=0.00581
+2026-07-05 23:48:23,386 | Fold 6: train=572 test=48 MAE=0.00526
+2026-07-05 23:48:23,931 | Fold 7: train=620 test=48 MAE=0.00481
+2026-07-05 23:48:24,183 | Fold 8: train=668 test=48 MAE=0.00461
+2026-07-05 23:48:24,586 | Fold 9: train=716 test=48 MAE=0.00390
+2026-07-05 23:48:25,383 | Fold 10: train=764 test=48 MAE=0.00392
+2026-07-05 23:48:25,683 | Fold 11: train=812 test=48 MAE=0.00722
+2026-07-05 23:48:26,420 | Fold 12: train=860 test=48 MAE=0.00651
+2026-07-05 23:48:27,079 | Fold 13: train=908 test=48 MAE=0.00721
+2026-07-05 23:48:27,591 | Fold 14: train=956 test=48 MAE=0.00715
+2026-07-05 23:48:27,896 | Fold 15: train=1004 test=48 MAE=0.00779
+2026-07-05 23:48:28,297 | Fold 16: train=1052 test=48 MAE=0.00541
+2026-07-05 23:48:28,576 | Fold 17: train=1100 test=48 MAE=0.00411
+2026-07-05 23:48:28,869 | Fold 18: train=1148 test=48 MAE=0.00619
+2026-07-05 23:48:29,149 | Fold 19: train=1196 test=48 MAE=0.00504
+2026-07-05 23:48:29,471 | Fold 20: train=1244 test=48 MAE=0.00410
+2026-07-05 23:48:29,859 | Fold 21: train=1292 test=48 MAE=0.00524
+2026-07-05 23:48:30,219 | Fold 22: train=1340 test=48 MAE=0.00417
+2026-07-05 23:48:31,063 | Fold 23: train=1388 test=48 MAE=0.00357
+2026-07-05 23:48:31,312 | Fold 24: train=1436 test=48 MAE=0.00376
+2026-07-05 23:48:31,942 | Fold 25: train=1484 test=48 MAE=0.00690
+2026-07-05 23:48:32,267 | Fold 26: train=1532 test=48 MAE=0.00416
+2026-07-05 23:48:32,801 | Fold 27: train=1580 test=48 MAE=0.00389
+2026-07-05 23:48:33,313 | Fold 28: train=1628 test=48 MAE=0.00400
+2026-07-05 23:48:34,544 | Fold 29: train=1676 test=48 MAE=0.00537
+2026-07-05 23:48:34,880 | Fold 30: train=1724 test=48 MAE=0.00231
+2026-07-05 23:48:35,394 | Fold 31: train=1772 test=48 MAE=0.00275
+2026-07-05 23:48:36,042 | Fold 32: train=1820 test=48 MAE=0.00567
+2026-07-05 23:48:36,423 | Fold 33: train=1868 test=48 MAE=0.00314
+2026-07-05 23:48:36,793 | Fold 34: train=1916 test=48 MAE=0.00400
+2026-07-05 23:48:37,200 | Fold 35: train=1964 test=48 MAE=0.00446
+2026-07-05 23:48:37,555 | Fold 36: train=2012 test=48 MAE=0.00355
+2026-07-05 23:48:38,543 | Fold 37: train=2060 test=48 MAE=0.00422
+2026-07-05 23:48:38,874 | Fold 38: train=2108 test=48 MAE=0.00357
+2026-07-05 23:48:39,341 | Fold 39: train=2156 test=48 MAE=0.00440
+2026-07-05 23:48:40,021 | Fold 40: train=2204 test=48 MAE=0.00320
+2026-07-05 23:48:40,346 | Fold 41: train=2252 test=48 MAE=0.00212
+2026-07-05 23:48:40,665 | Fold 42: train=2300 test=48 MAE=0.00355
+2026-07-05 23:48:42,185 | Fold 43: train=2348 test=48 MAE=0.00329
+2026-07-05 23:48:42,531 | Fold 44: train=2396 test=48 MAE=0.00302
+2026-07-05 23:48:42,899 | Fold 45: train=2444 test=48 MAE=0.00247
+2026-07-05 23:48:43,218 | Fold 46: train=2492 test=48 MAE=0.00375
+2026-07-05 23:48:43,515 | Fold 47: train=2540 test=48 MAE=0.00321
+2026-07-05 23:48:44,415 | Fold 48: train=2588 test=48 MAE=0.00137
+2026-07-05 23:48:44,784 | Fold 49: train=2636 test=48 MAE=0.00310
+2026-07-05 23:48:45,097 | Fold 50: train=2684 test=48 MAE=0.00350
+2026-07-05 23:48:45,452 | Fold 51: train=2732 test=48 MAE=0.00423
+2026-07-05 23:48:45,876 | Fold 52: train=2780 test=48 MAE=0.00272
+2026-07-05 23:48:46,297 | Fold 53: train=2828 test=48 MAE=0.00264
+2026-07-05 23:48:46,888 | Fold 54: train=2876 test=48 MAE=0.00226
+2026-07-05 23:48:47,438 | Fold 55: train=2924 test=48 MAE=0.00408
+2026-07-05 23:48:47,960 | Fold 56: train=2972 test=48 MAE=0.00254
+2026-07-05 23:48:48,612 | Fold 57: train=3020 test=48 MAE=0.00337
+2026-07-05 23:48:49,045 | Fold 58: train=3068 test=48 MAE=0.00296
+2026-07-05 23:48:49,530 | Fold 59: train=3116 test=48 MAE=0.00178
+2026-07-05 23:48:50,302 | Fold 60: train=3164 test=48 MAE=0.00581
+2026-07-05 23:48:50,879 | Fold 61: train=3212 test=48 MAE=0.00755
+2026-07-05 23:48:51,299 | Fold 62: train=3260 test=48 MAE=0.00695
+2026-07-05 23:48:51,944 | Fold 63: train=3308 test=48 MAE=0.00587
+2026-07-05 23:48:52,428 | Fold 64: train=3356 test=48 MAE=0.00549
+2026-07-05 23:48:53,106 | Fold 65: train=3404 test=48 MAE=0.00340
+2026-07-05 23:48:53,644 | Fold 66: train=3452 test=48 MAE=0.00365
+2026-07-05 23:48:54,059 | Fold 67: train=3500 test=48 MAE=0.00391
+2026-07-05 23:48:54,715 | Fold 68: train=3548 test=48 MAE=0.00565
+2026-07-05 23:48:55,304 | Fold 69: train=3596 test=48 MAE=0.00255
+2026-07-05 23:48:55,922 | Fold 70: train=3644 test=48 MAE=0.00373
+2026-07-05 23:48:56,314 | Fold 71: train=3692 test=48 MAE=0.00637
+2026-07-05 23:48:56,700 | Fold 72: train=3740 test=48 MAE=0.00730
+2026-07-05 23:48:57,101 | Fold 73: train=3788 test=48 MAE=0.00274
+2026-07-05 23:48:57,803 | Fold 74: train=3836 test=48 MAE=0.00381
+2026-07-05 23:48:58,211 | Fold 75: train=3884 test=48 MAE=0.00524
+2026-07-05 23:48:58,647 | Fold 76: train=3932 test=48 MAE=0.00251
+C:\Users\rfo\anaconda3\lib\site-packages\pandas\core\arrays\datetimes.py:1162: UserWarning: Converting to PeriodArray/Index representation will drop timezone information.
+  warnings.warn(
+# Quarterly Re-Validation ¡X 2026-07-05 15:47 UTC
+
+Parquet data is 2007.8h old (threshold: 6.0h). Running backfill...
+============================================================
+[1/3] Binance klines 1h backfill
+============================================================
+  Existing: 5875 bars, ends at 2026-06-18 18:00:00+00:00
+  Fetched 404 bars up to 2026-07-05 14:00:00+00:00
+  Updated: 6279 bars, 2025-10-17 00:00:00+00:00 -> 2026-07-05 14:00:00+00:00
+
+============================================================
+[2/4 existing] Coinglass endpoints
+============================================================
+  oi: 6273 bars, 2025-10-17 -> 2026-07-05
+  oi_agg: 6273 bars, 2025-10-17 -> 2026-07-05
+  liquidation: 6273 bars, 2025-10-17 -> 2026-07-05
+  long_short: 6273 bars, 2025-10-17 -> 2026-07-05
+  global_ls: 6273 bars, 2025-10-17 -> 2026-07-05
+  funding: 6273 bars, 2025-10-17 -> 2026-07-05
+  taker: 6273 bars, 2025-10-17 -> 2026-07-05
+
+============================================================
+[3/4 new] Coinglass endpoints
+============================================================
+  coinbase_premium: 6148 bars, 2025-10-22 -> 2026-07-05
+  bitfinex_margin: 6148 bars, 2025-10-22 -> 2026-07-05
+  top_ls_position: 6148 bars, 2025-10-22 -> 2026-07-05
+  futures_cvd_agg: 6148 bars, 2025-10-22 -> 2026-07-05
+  spot_cvd_agg: 6148 bars, 2025-10-22 -> 2026-07-05
+  liq_agg: 6148 bars, 2025-10-22 -> 2026-07-05
+  oi_coin_margin: 3148 bars, 2026-02-24 -> 2026-07-05
+
+============================================================
+[4/4] Deribit DVOL 1h backfill
+============================================================
+  Existing: 7592 bars, ends at 2026-06-18 19:00:00+00:00
+  iter 0: +405 rows, earliest=2026-06-18 19:00:00+00:00
+  Updated: 7996 bars, 2025-08-06 12:00:00+00:00 -> 2026-07-05 15:00:00+00:00
+
+============================================================
+DONE - all parquet files updated
+============================================================
+Data: 3999 bars  2026-01-20 ¡÷ 2026-07-05
+
+## 1. AUC / IC ceiling
+- sign_AUC = 0.5988  (baseline 0.59, band [0.55,0.62]) ¡÷ OK
+- Spearman IC = +0.1769  (baseline +0.16)
+- n_oos = 3696
+
+## 2. Recent IC decay (concept-drift check)
+  2026-02: IC=+0.185  (n=668)
+  2026-03: IC=+0.156  (n=744)
+  2026-04: IC=+0.243  (n=720)
+  2026-05: IC=+0.100  (n=744)
+  2026-06: IC=+0.178  (n=720)
+  2026-07: IC=+0.204  (n=100)
+- recent 60d IC = +0.150  vs older = +0.204  ¡÷ OK
+
+## 3. Tier edge (sign-accuracy by decoded tier)
+- Strong   : sign-acc=72.3%  (n=361)
+- Moderate : sign-acc=61.7%  (n=700)
+
+## 4. Regime breakdown (where the edge lives)
+- BULL   : IC=+0.119  sign-acc=53.6%  (n=472)
+- BEAR   : IC=+0.196  sign-acc=58.2%  (n=433)
+- CHOPPY : IC=+0.187  sign-acc=56.7%  (n=2791)
+
+## 5. Orthogonal-data scan (manual ¡X the only path to a NEW edge)
+Re-evaluate each channel's availability / cost / expected lift. v7 is
+saturated on OHLCV+CG+Deribit+order-flow; a breakthrough needs a NEW
+source, not more same-source features.
+- [ ] Options gamma exposure (GEX) ¡X Deribit/Glassnode paid; most-cited untested
+- [ ] On-chain whale wallet flow ¡X Glassnode/BGeometrics
+- [ ] Bitcoin ETF AUM/flow ¡X already wired (cg_etf_flow); re-check IC at daily res
+- [ ] Cross-asset (SPX/DXY/Gold/US10Y) ¡X SPX_return_1d already strongest cross feat
+- [ ] Funding/basis term structure across venues
+- [ ] Social/sentiment (Twitter/Reddit) DIY scraper
+
+## VERDICT
+**PASS** ¡X edge is where it was; no structural drift detected. Keep running; re-check next quarter.
+
+Report ¡÷ C:\Users\rfo\Desktop\flowbot\flow_system\research\results\dual_model\quarterly_revalidation_20260705.md
