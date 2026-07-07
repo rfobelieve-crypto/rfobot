@@ -1,85 +1,103 @@
 # TODO — 待處理計劃
 
-## 高優先（近期）
+> **跨 session 任務真相源**。Claude Code 的 session 任務清單不進 git、不跨機器——
+> 凡是要「本機 / 雲端 / 下一次對話」都看得到的任務，寫這裡並 push。
+> 每次開工：先讀「當前任務」區。
 
-### 數據累積（進行中，預計 4/20 完成）
-- [ ] 新特徵數據累積至少 2 週 (impact_asymmetry, post_absorb_breakout, bvol, direction features)
-- [ ] 14 個新 CG 端點數據累積
-- [ ] 監控 Magnitude IC 是否從假日效應恢復
+## 當前任務（2026-07-07 更新）
 
-### Direction 模型重訓（預計 4/20 後）
-- [ ] 特徵集: liq_frag + absorb (99 特徵, walk-forward AUC=0.608, Acc=58.9%)
-  - 包含: OLD + NEW_KEY_4 + LIQUIDITY_FRAGILITY + POST_ABSORPTION
-  - impact_asymmetry, post_absorb_breakout, flow_trend_score, abs_completion 等
-- [ ] **暫不加入 toxicity** — walk-forward 顯示加 tox 後 AUC 從 0.608 降到 0.588，被其他特徵吸收
-- [ ] 特徵篩選: permutation importance 砍掉 < 0.5% 噪音，99 → 目標 50~60 精銳
-- [ ] Walk-forward 評估，AUC > 0.60 + Top-decile > 0.61 才部署
-- [ ] 若篩選後特徵數降到 60 以下，再嘗試加入 tox_pressure_zscore 看是否有邊際提升
+### 1. 擠壓指標 × 訂單流系統結合（策略 #2 候選）★ 最優先
+流動性真空假說：壓縮後價格往阻力小的一側走，撤單領先成交洩露方向。
+工具鏈已全部完成（branch `claude/general-session-HEJed`）：
+- `research/squeeze_events.py` — Pine v2.4 移植的事件採樣器（結算語義已對齊，勿改內部邏輯）
+- `research/squeeze_events_cli.py` — 事件表 CLI（對接既有 klines parquet）
+- `research/squeeze_flow_join.py` — H1/H2/H3 假設檢驗（joins orderbook_snapshots_1m + flow_bars_1m）
+- `market_data/adapters/depth_delta_collector.py` — 真撤單收集器（standalone，未接 service）
 
-### Magnitude 模型重訓（預計 4/20 後）
-- [ ] 特徵集: expanded + liq_frag + absorb + toxicity (91 特徵, walk-forward IC=0.374, ICIR=2.42)
-  - 新增 toxicity: tox_pressure, tox_accum_zscore, tox_bv_vpin_zscore, tox_div_taker
-  - Toxicity 對 Magnitude 有正貢獻: IC +0.006, ICIR +0.06, Top decile 1.194%
-- [ ] 特徵篩選: permutation importance，91 → 砍掉底部噪音
-- [ ] Walk-forward 評估，ICIR > 2.35 才部署
+執行順序：
+- [ ] Step 0-a Pine 對帳：TV 端（filterMode=OFF, confirmOnClose=ON）事件 vs
+      `squeeze_events_cli.py` 輸出，時間戳+方向 100% 一致才放行
+      （注意：atr_bo 欄=band=ATR×0.9；丟棄前 3×max(period) 根暖機）
+- [ ] Step 0-b 無條件基線：`python research/squeeze_events_cli.py --start 2025-06-01`
+- [ ] Step 1 flag 統計：`python research/squeeze_flow_join.py`（H1/H2/H3 + 前後半穩定性）
+- [ ] Step 2 啟動撤單收集器累積 depth_deltas_1m（3-6 個月後跑精細版）
 
-### 特徵篩選（隨重訓一起做）
-- [ ] Direction: 99 → 目標 50~60（permutation importance）
-- [ ] Magnitude: 91 → 砍底部噪音
-- [ ] 砍掉後重訓，OOS 不降才確認
-- [ ] 減少 overfit 風險
+預先登記假設（2026-07-07，看資料前寫定）：
+H1 薄側一致 → sl_first 較低；H2 撤單側 → 突破同側 >55%（CI 下緣>50%）；
+H3 三旗共振子集 r_scaleout CI 下緣 >0。
+紀律鎖：cell n<100 不下結論；前後半同向才算過；看資料後禁改 flag 定義。
+樣本量預警：1h BTC 一年約 30-60 事件，第一輪多半「方向有趣樣本不足」→ 擴樣本
+（15m / ETH），不降標準。定位：走完整 staged framework，倉位與 V7 合併計算。
 
-## 中優先
+### 2. okx.ai 任務
+- [ ] （內容待補——本機記錄的版本沒有 push，把任務描述貼給 Claude 補進來）
+
+### 3. 朋友跟單系統部署（Phase 0+1 程式碼已完成）
+- [ ] Railway env：`OKX_CRED_MASTER_KEY`（Fernet key，存密碼管理器）+ `TG_ADMIN_CHAT_ID`
+- [ ] 跑 `migrations/014_okx_accounts.sql`
+- [ ] Merge branch → 部署兩個 service（requirements 已含 cryptography）
+- [ ] Selftest：自己的第二組 API key 走 /okx_addacct → resume → 跨一筆 trade → delete
+- [ ] 通過後才收朋友 key（只勾讀取+交易、不勾提幣；capital ≤ $200）
+- 注意：pause 時未平倉位停止管理（OKX stop algo 仍在）——pause 前確認無持倉
+
+### 4. 研究腳本待跑（皆需資料層）
+- [ ] `python research/poc_sweep_study.py` — POC × 流動性獵取（手動交易輔助），
+      跑完把 Section 1+2 給 Claude 判讀
+- [ ] `python research/exit_decomposition.py` — exit regret 歸因
+      （先確認 5d83da2 的 exit-variants 雙 NO-GO 是否已覆蓋此問題，是則關閉）
+
+### 5. 內容線
+- [ ] EP2 英文版發 LinkedIn；EP3 細修後發（Medium 英文版已備）
+- [ ] EP12 素材「AI 當槓桿不當許願池」已入 roadmap（docs/linkedin_ep_series_roadmap.md）
+
+---
+
+## 已歸檔（2026-04 舊計畫，多數已被後續工作取代）
+
+<details>
+<summary>2026-04 重訓計畫與特徵構想（點開）</summary>
+
+### 數據累積（已完成）
+- [x] 新特徵數據累積 (impact_asymmetry, post_absorb_breakout, bvol)
+- [x] 14 個新 CG 端點數據累積
+
+### Direction / Magnitude 重訓（已由後續多輪重訓取代）
+- 原計畫：liq_frag + absorb 99 特徵、AUC>0.60 部署門檻
+- 後續實際：見 mistake.md 2026-06-01/02 的 ensemble A/B 紀律與 4 條部署門檻
 
 ### 滾動重訓機制
-- [ ] 設計每 2~4 週自動重訓流程
-- [ ] 追蹤 IC 衰退速度，決定重訓頻率
-- [ ] 自動比較新舊模型 OOS 表現，只有更好才部署
-
-### 績效追蹤完善
-- [ ] 累積足夠 Strong 信號樣本（目標 20+ 筆）再做統計結論
-- [ ] 觀察 Moderate 信號 live 勝率是否維持 95%+
-- [ ] 週一~週五 vs 週末假日的 IC 差異分析
+- [ ] 每 2-4 週自動重訓 + 新舊 OOS 比較（仍有效，低優先）
 
 ### 新特徵構想（待回測驗證）
-- [ ] 持倉痛苦累積：funding × 持續時間 × OI（多久沒釋放壓力）
-- [ ] 參與者分歧度：CB 溢價 × BFX 保證金 × Binance taker 的一致性
-- [ ] 流動性遷移：分時段 volume profile 變化率
+- [ ] 持倉痛苦累積：funding × 持續時間 × OI
+- [ ] 參與者分歧度：CB 溢價 × BFX 保證金 × Binance taker 一致性
 - [ ] Funding 結算前 2h 行為異常
 - [ ] 多空比加速度（二階導數）
 
-## 低優先（長期）
+### 多時間框架 / Ensemble（長期）
+- [ ] 1h 短線確認 + 4h 同向；3-5 seed ensemble
 
-### 多時間框架
-- [ ] 1h 短線確認信號
-- [ ] 4h + 1h 同向 = 更高信心
+</details>
 
-### Ensemble
-- [ ] 3~5 個不同隨機種子模型取平均
-- [ ] 降低單一模型隨機波動
-
-### 機率校準
-- [ ] Platt scaling 或 isotonic regression
-- [ ] 累積 500+ bars 後做一次 calibration check
-
-## 已完成
-
+## 已完成（歷史）
 - [x] impact_asymmetry 特徵 (IC=-0.071, 方向模型)
 - [x] post_absorb_breakout 特徵 (mag IC=0.191, 兩個模型)
 - [x] flow_trend_score 特徵 (mag IC=0.156)
 - [x] Magnitude 模型重訓 v2 (ICIR 1.18→1.22, Top/Bot 3.03→3.16)
 - [x] 績效追蹤系統 (Rolling IC, Strong signal tracking, SHAP)
 - [x] 互動圖表 (/ichart, TradingView Lightweight Charts)
-- [x] Moderate + Strong 三角形顯示
-- [x] 歷史 bar 全量重跑 predict()
-- [x] 圖表同步規則寫入 CLAUDE.md
-- [x] Order Flow Toxicity 特徵 (tox_pressure_zscore IC=+0.071, 9 個新特徵)
-- [x] Parquet 自動 freshness 檢查 (shared_data.py, 訓練前 6h 閾值自動 backfill)
-- [x] indicator_history 合併完整歷史 (621→4118 rows, 10/17→4/7)
-- [x] 統一 backfill 腳本 (backfill_all_parquet.py, Binance + 14 CG endpoints)
+- [x] Order Flow Toxicity 特徵 (tox_pressure_zscore IC=+0.071)
+- [x] 統一 backfill 腳本 (backfill_all_parquet.py)
+- [x] Gate A 通過（2026-06-10：Strong n=739, WR 59.5%, CI [56.0, 63.2]）
+- [x] 3-WR 透明化 /okx-perf + Gate B 進度卡
+- [x] 多帳戶跟單 Phase 0+1 程式碼（accounts registry + executor fan-out）
 
-## 回測失敗（已排除）
-- [x] ~~流動性獵取反轉~~ — 4h 週期上 IC ≈ 0，方向無預測力
-- [x] ~~K 線 delta 背離~~ — IC = 0.01，太弱
-- [x] ~~consolidation_score~~ — IC ≈ 0，無效
-- [x] ~~ChessDomination 4D (CDP)~~ — cdp_score IC=0.012 無效，合成乘法結構稀釋信號；cdp_x (-0.039) 和 cdp_pressure_level (+0.039) 邊際有效但本質是 price percentile
+## 回測失敗（已排除，勿重跑）
+- [x] ~~流動性獵取反轉~~ — 4h 週期上 IC ≈ 0
+- [x] ~~K 線 delta 背離~~ — IC = 0.01
+- [x] ~~consolidation_score~~ — IC ≈ 0
+- [x] ~~ChessDomination 4D (CDP)~~ — 合成乘法結構稀釋信號
+- [x] ~~ML exit model~~ — oracle 天花板分析 NO-GO
+- [x] ~~WQ101 alphas (6)~~ — aggregate lift 被 outlier fold 撐起，per-fold 負
+- [x] ~~liquidity proxy features (21)~~ — univariate IC 高但 ensemble 零提升
+- [x] ~~exit-variants sweep + 不對稱 cutoff Option C~~ — 雙 NO-GO（5d83da2）
