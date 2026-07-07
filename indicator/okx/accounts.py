@@ -33,7 +33,7 @@ from shared.db import get_db_conn
 logger = logging.getLogger(__name__)
 
 # Stage-3 hard ceilings — per-account caps may be tighter, never looser.
-MAX_CAPITAL_USD = 1000.0
+MAX_CAPITAL_USD = 200.0   # == validate_okx_config Stage-3 live ceiling
 MAX_LEV_MULT = 2.0
 DAILY_CAP_FLOOR = -20.0   # e.g. -25 is looser → rejected
 TOTAL_CAP_FLOOR = -30.0
@@ -311,3 +311,96 @@ def handle_acct_status(chat_id: str, raw_text: str, status: str) -> None:
         _tg_send(chat_id, delete_account(label))
     else:
         _tg_send(chat_id, set_account_status(label, status))
+
+
+# ── Phase 1: per-account executor support ──────────────────────────────
+
+OKX_TABLE_SUFFIXES = ("positions", "kill_log", "reconciliation_log",
+                      "executor_status", "balance_snapshots", "approvals")
+
+
+def table_prefix_for(account_id: int) -> str:
+    """Per-account table prefix, e.g. v7_okx_a3 → v7_okx_a3_positions."""
+    return f"v7_okx_a{int(account_id)}"
+
+
+def create_account_tables(account_id: int) -> None:
+    """Clone the main v7_okx_* table structures for one account.
+
+    CREATE TABLE ... LIKE copies columns + indexes exactly, so the
+    per-account stack stays schema-identical to main forever (as long
+    as migrations alter the main tables first, re-cloning is never
+    needed for existing accounts — ALTERs must be applied per prefix,
+    documented in migrations/014).
+    """
+    prefix = table_prefix_for(account_id)
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            for suffix in OKX_TABLE_SUFFIXES:
+                cur.execute(
+                    f"CREATE TABLE IF NOT EXISTS `{prefix}_{suffix}` "
+                    f"LIKE `v7_okx_{suffix}`"
+                )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_active_accounts() -> list[dict]:
+    """ACTIVE rows with decrypted credentials (in-memory only).
+
+    Returns [] on any failure — the runner treats that as 'no friend
+    accounts this cycle' rather than crashing the main loop.
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, label, owner_chat_id, api_key_enc, "
+                "       api_secret_enc, passphrase_enc, initial_capital_usd, "
+                "       notional_lev_mult, daily_loss_cap_pct, "
+                "       total_loss_cap_pct "
+                "FROM okx_accounts WHERE status='ACTIVE' ORDER BY id"
+            )
+            rows = cur.fetchall()
+    except Exception:
+        logger.exception("load_active_accounts_failed")
+        return []
+    finally:
+        conn.close()
+
+    out = []
+    for r in rows:
+        try:
+            out.append({
+                "id": int(r["id"]),
+                "label": r["label"],
+                "owner_chat_id": r["owner_chat_id"] or "",
+                "api_key": decrypt(r["api_key_enc"]),
+                "api_secret": decrypt(r["api_secret_enc"]),
+                "passphrase": decrypt(r["passphrase_enc"]),
+                "initial_capital_usd": float(r["initial_capital_usd"]),
+                "notional_lev_mult": float(r["notional_lev_mult"]),
+                "daily_loss_cap_pct": float(r["daily_loss_cap_pct"]),
+                "total_loss_cap_pct": float(r["total_loss_cap_pct"]),
+            })
+        except Exception:
+            logger.exception("account_decrypt_failed label=%s", r.get("label"))
+    return out
+
+
+def mark_account_halted(account_id: int, reason: str) -> None:
+    """Executor init failure → park the account so we don't retry every
+    cycle. Admin resumes with /okx_resumeacct after fixing the cause."""
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE okx_accounts SET status='HALTED' WHERE id=%s",
+                (account_id,),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    logger.error("account_halted id=%s reason=%s", account_id, reason)

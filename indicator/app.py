@@ -692,6 +692,29 @@ def update_cycle() -> dict:
         except Exception as e:
             _record_executor_failure("V7 OKX executor", e)
 
+        # ── Follow-trading accounts (Phase 1, 2026-07-07).  Same signal,
+        # each friend account runs an isolated executor stack (own creds,
+        # own v7_okx_a<id>_* tables, own kill switches).  One account's
+        # failure must never break main or the other accounts.
+        try:
+            from indicator.okx import runner as okx_runner
+            from indicator.model_version import get_current_model_version
+            for acct_label, acct_ex in okx_runner.get_account_executors():
+                try:
+                    acct_result = acct_ex.cycle(
+                        klines=klines, signal_direction=direction,
+                        signal_strength=strength,
+                        model_version=get_current_model_version(),
+                    )
+                    logger.info("okx_cycle[%s] action=%s detail=%s",
+                                acct_label, acct_result.action,
+                                acct_result.detail)
+                except Exception:
+                    logger.exception("okx_acct_cycle_failed label=%s",
+                                     acct_label)
+        except Exception as e:
+            logger.warning("okx_account_fanout_failed: %s", e)
+
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
 
