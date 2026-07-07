@@ -29,8 +29,19 @@ H3 三旗共振子集 r_scaleout CI 下緣 >0。
 樣本量預警：1h BTC 一年約 30-60 事件，第一輪多半「方向有趣樣本不足」→ 擴樣本
 （15m / ETH），不降標準。定位：走完整 staged framework，倉位與 V7 合併計算。
 
-### 2. okx.ai 任務
-- [ ] （內容待補——本機記錄的版本沒有 push，把任務描述貼給 Claude 補進來）
+### 2. OKX AI Trading Challenge（okx.ai / Agent Trade Kit 競賽）
+用 OKX 開源的 Agent Trade Kit（MCP server，`github.com/okx/agent-trade-kit`，
+164 tools：行情/下單/algo/帳戶）讓 Claude 直連 OKX 參賽。
+格式：14 天實盤 USDT 本位永續，ROI + PNL 雙排行榜 + Skill 提交；賽季制輪辦
+（已至第 8 屆，1M USDT 級獎池）。官方頁：okx.com/en-us/agent-tradekit/competition
+- [ ] 查當期賽季報名期限與規則（官方頁 + OKX App 活動區）
+- [ ] 本機裝 Agent Trade Kit（Node 18+，`okx config init`，API key 不出本機）
+- [ ] 決定參賽策略：V7 訊號鏡像（簡化版）vs 獨立簡單策略
+- [ ] **隔離規則**：競賽用獨立子帳戶 + 獨立小額資金，與 Stage 3 主帳戶完全分離；
+      競賽虧損上限先定死（如 $100，輸完即止），不影響主系統任何紀律
+- [ ] **IP 保護**：Skill Square 提交用包裝版/簡化版，V7 真實 edge 不公開
+- 加分動機：參賽過程 = EP 系列 + LinkedIn 素材 + 履歷素材（OKX 官方賽事排名可驗證）
+- 風險認知：ROI 榜首多為高槓桿樂透倉，不以奪榜為目標，以「完賽 + 正收益 + 內容產出」為目標
 
 ### 3. 朋友跟單系統部署（Phase 0+1 程式碼已完成）
 - [ ] Railway env：`OKX_CRED_MASTER_KEY`（Fernet key，存密碼管理器）+ `TG_ADMIN_CHAT_ID`
