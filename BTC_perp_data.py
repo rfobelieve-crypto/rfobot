@@ -2176,6 +2176,45 @@ def webhook():
                 daemon=True,
             ).start()
 
+        elif cmd.startswith("/okx_addacct"):
+            # Follow-trading account registration (admin only). The raw
+            # message carries API credentials — handler deletes it first.
+            # NOTE: use the un-split original text — raw_text truncates at
+            # "@" (bot-mention stripping) but a passphrase may contain "@".
+            from indicator.okx.accounts import handle_addacct
+            threading.Thread(
+                target=handle_addacct,
+                args=(chat_id, text.strip(), message.get("message_id")),
+                daemon=True,
+            ).start()
+
+        elif cmd == "/okx_accounts":
+            from indicator.okx.accounts import handle_accounts_list
+            threading.Thread(
+                target=handle_accounts_list, args=(chat_id,), daemon=True,
+            ).start()
+
+        elif cmd.startswith("/okx_pauseacct"):
+            from indicator.okx.accounts import handle_acct_status
+            threading.Thread(
+                target=handle_acct_status,
+                args=(chat_id, raw_text, "PAUSED"), daemon=True,
+            ).start()
+
+        elif cmd.startswith("/okx_resumeacct"):
+            from indicator.okx.accounts import handle_acct_status
+            threading.Thread(
+                target=handle_acct_status,
+                args=(chat_id, raw_text, "ACTIVE"), daemon=True,
+            ).start()
+
+        elif cmd.startswith("/okx_delacct"):
+            from indicator.okx.accounts import handle_acct_status
+            threading.Thread(
+                target=handle_acct_status,
+                args=(chat_id, raw_text, "DELETE"), daemon=True,
+            ).start()
+
         else:
             send_message(chat_id, "❓未知指令，輸入 /help 查看支援功能")
 
