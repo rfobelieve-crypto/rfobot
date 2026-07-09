@@ -41,6 +41,13 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Report strings use ⚠️ / box-drawing; force UTF-8 so a cp950 Windows console
+# (the local dev machine) doesn't UnicodeEncodeError mid-report.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 from shared.db import get_db_conn
 
 RNG = np.random.default_rng(7)
@@ -73,11 +80,11 @@ def fetch_flow(t0_ms: int, t1_ms: int) -> pd.DataFrame:
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT minute_start_ms AS ts_ms, delta_usd "
+                "SELECT window_start AS ts_ms, delta_usd "
                 "FROM flow_bars_1m "
                 "WHERE canonical_symbol='BTC-USD' "
-                "  AND minute_start_ms BETWEEN %s AND %s "
-                "ORDER BY minute_start_ms",
+                "  AND window_start BETWEEN %s AND %s "
+                "ORDER BY window_start",
                 (t0_ms, t1_ms))
             return pd.DataFrame(cur.fetchall())
     finally:
