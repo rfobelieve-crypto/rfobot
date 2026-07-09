@@ -291,6 +291,10 @@ def _build_okx_equity_chart() -> str:
                 "ORDER BY dt",
                 (SINCE,))
             btc_rows = cur.fetchall()
+            cur.execute(
+                "SELECT MAX(total_eq_usd) AS peak "
+                "FROM v7_okx_balance_snapshots WHERE ts >= %s", (SINCE,))
+            _pk = cur.fetchone()
     except Exception as e:
         return f'<div style="color:rgba(154,160,166,0.5)">淨值曲線載入失敗: {e}</div>'
     finally:
@@ -303,7 +307,8 @@ def _build_okx_equity_chart() -> str:
     labels = [fmt_tpe(r["ts"], "%m/%d") if hasattr(r["ts"], "strftime")
               else str(r["ts"])[5:10] for r in rows]
     eq = [round(float(r["total_eq_usd"]), 2) for r in rows]
-    cur_eq, peak = eq[-1], max(eq)
+    cur_eq = eq[-1]
+    peak = (float(_pk["peak"]) if _pk and _pk.get("peak") is not None else max(eq))
     delta = (cur_eq - BASE) / BASE * 100 if BASE else 0
     line_color = "#36ffae" if cur_eq >= BASE else "#ff5f6d"
 
@@ -323,7 +328,7 @@ def _build_okx_equity_chart() -> str:
     return f"""
     <div class="grid grid-3" style="margin-bottom:10px">
       {card("現值", f"${cur_eq:.2f}", f"{delta:+.2f}% vs ${BASE:.2f}", line_color)}
-      {card("峰值", f"${peak:.2f}", "補資後高點", "#36ffae")}
+      {card("峰值", f"${peak:.2f}", "補資後 M2M 高點", "#36ffae")}
       {card("起算", f"${BASE:.2f}", f"{SINCE} 補資")}
     </div>
     <div style="position:relative;height:180px">
@@ -382,6 +387,7 @@ def _build_okx_pro_metrics() -> str:
 
     strat_ret = s.get("eq_pct_from_initial") or 0.0
     mdd = s.get("mdd_pct")
+    cur_dd = s.get("equity_cur_dd_pct")
     bm = s.get("benchmark") or {}
     btc_ret, btc_mdd = bm.get("btc_ret_pct"), bm.get("btc_mdd_pct")
     payoff, pf = s.get("payoff_ratio"), s.get("profit_factor")
@@ -408,7 +414,9 @@ def _build_okx_pro_metrics() -> str:
       vs Buy&amp;Hold BTC（同期 {SINCE} 起）</div>
     <div class="grid grid-4" style="margin-bottom:12px">
       {card("策略報酬", f"{strat_ret:+.2f}%", f"BTC {btc_ret_str}", bm_color)}
-      {card("策略 MDD", f"{mdd:.1f}%" if mdd is not None else "--", f"BTC {btc_mdd_str}", "#ff5f6d")}
+      {card("策略 MDD", f"{mdd:.1f}%" if mdd is not None else "--",
+            (f"當前距峰 {cur_dd:.1f}% · BTC {btc_mdd_str}" if cur_dd is not None
+             else f"BTC {btc_mdd_str}"), "#ff5f6d")}
       {card("Payoff", payoff_str, f"平均 {aw:+.2f}% / {al:+.2f}%")}
       {card("Profit Factor", pf_str, "總獲利 / 總虧損", pf_color)}
     </div>

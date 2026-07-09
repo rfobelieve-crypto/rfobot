@@ -256,8 +256,13 @@ EXECUTOR_RESTART_CAPITAL_USD = 105.15
 EXECUTOR_RESTART_SINCE = "2026-06-07"
 
 
-def _get_equity_mdd(since: str) -> Optional[float]:
-    """Max drawdown (%) of the live wallet equity since `since` (peak→trough)."""
+def _get_equity_curve_stats(since: str) -> dict:
+    """Peak / trough / max-DD / current-DD-from-peak of live M2M equity.
+
+    Uses ALL balance snapshots (not daily close) so peak == the trailing-peak
+    drawdown alert's peak (state.get_peak_equity = MAX since `since`). Keeps
+    dashboard consistent with the Telegram M2M drawdown alert.
+    """
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
@@ -267,17 +272,19 @@ def _get_equity_mdd(since: str) -> Optional[float]:
             eqs = [float(r["total_eq_usd"]) for r in cur.fetchall()
                    if r.get("total_eq_usd") is not None]
     except Exception:
-        logger.exception("equity_mdd_query_failed")
-        return None
+        logger.exception("equity_curve_stats_failed")
+        return {}
     finally:
         conn.close()
     if len(eqs) < 2:
-        return None
+        return {}
     peak, mdd = eqs[0], 0.0
     for v in eqs:
         peak = max(peak, v)
         mdd = min(mdd, (v - peak) / peak * 100)
-    return mdd
+    hi, cur_eq = max(eqs), eqs[-1]
+    return {"peak_usd": hi, "trough_usd": min(eqs), "mdd_pct": mdd,
+            "cur_dd_pct": (cur_eq / hi - 1.0) * 100.0 if hi else 0.0}
 
 
 def _get_btc_benchmark(since: str) -> dict:
@@ -356,7 +363,8 @@ def compute_okx_summary() -> dict:
                 "cum_pct": sum((t.get("net_pct") or 0) for t in sub) * 100,
                 "wr": (w / ns * 100 if ns else 0.0)}
     long_stats, short_stats = _side_stats("LONG"), _side_stats("SHORT")
-    mdd_pct = _get_equity_mdd(EXECUTOR_RESTART_SINCE)
+    eqc = _get_equity_curve_stats(EXECUTOR_RESTART_SINCE)
+    mdd_pct = eqc.get("mdd_pct")
     benchmark = _get_btc_benchmark(EXECUTOR_RESTART_SINCE)
 
     # Sharpe — per-trade + naive annualised by observed cadence
@@ -416,6 +424,8 @@ def compute_okx_summary() -> dict:
         "long_stats": long_stats,
         "short_stats": short_stats,
         "mdd_pct": mdd_pct,
+        "equity_peak_usd": eqc.get("peak_usd"),
+        "equity_cur_dd_pct": eqc.get("cur_dd_pct"),
         "benchmark": benchmark,
         "sharpe_per_trade": pt_sharpe,
         "sharpe_annualised": ann_sharpe,
