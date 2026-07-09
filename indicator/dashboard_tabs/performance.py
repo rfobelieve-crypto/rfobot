@@ -21,6 +21,8 @@ def render_performance() -> str:
     parts = [
         section("🔴 OKX LIVE Stage 3 · 2x 有效槓桿（補資後起算）", "okxlive", True,
                 _build_okx_live()),
+        section("📈 LIVE 淨值曲線（補資後 6/7 起）", "okxequity", True,
+                _build_okx_equity_chart()),
     ]
     return "\n".join(parts)
 
@@ -254,3 +256,79 @@ def _build_gate_b_card(gb: dict | None) -> str:
       </div>
     </div>
     """
+
+
+# ── LIVE Equity Curve (post-refund 6/7) ──────────────────────────────
+
+def _build_okx_equity_chart() -> str:
+    """Live wallet equity curve since the 2026-06-07 executor restart.
+
+    Daily-close equity from v7_okx_balance_snapshots — the real post-refund
+    account trajectory (NOT signal returns). Dashed baseline at the $105.15
+    refund so above/below is obvious.
+    """
+    from indicator.okx.report import (
+        EXECUTOR_RESTART_CAPITAL_USD as BASE,
+        EXECUTOR_RESTART_SINCE as SINCE,
+    )
+    try:
+        conn = get_db_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT ts, total_eq_usd FROM v7_okx_balance_snapshots "
+                "WHERE id IN (SELECT MAX(id) FROM v7_okx_balance_snapshots "
+                "             WHERE ts >= %s GROUP BY DATE(ts)) "
+                "ORDER BY ts",
+                (SINCE,))
+            rows = cur.fetchall()
+        conn.close()
+    except Exception as e:
+        return f'<div style="color:rgba(154,160,166,0.5)">淨值曲線載入失敗: {e}</div>'
+
+    if len(rows) < 2:
+        return '<div style="color:rgba(154,160,166,0.5)">補資後淨值資料不足</div>'
+
+    labels = [fmt_tpe(r["ts"], "%m/%d") if hasattr(r["ts"], "strftime")
+              else str(r["ts"])[5:10] for r in rows]
+    eq = [round(float(r["total_eq_usd"]), 2) for r in rows]
+    cur_eq, peak = eq[-1], max(eq)
+    delta = (cur_eq - BASE) / BASE * 100 if BASE else 0
+    line_color = "#36ffae" if cur_eq >= BASE else "#ff5f6d"
+
+    return f"""
+    <div class="grid grid-3" style="margin-bottom:10px">
+      {card("現值", f"${cur_eq:.2f}", f"{delta:+.2f}% vs ${BASE:.2f}", line_color)}
+      {card("峰值", f"${peak:.2f}", "補資後高點", "#36ffae")}
+      {card("起算", f"${BASE:.2f}", f"{SINCE} 補資")}
+    </div>
+    <div style="position:relative;height:180px">
+      <canvas id="okxEquityChart"></canvas>
+    </div>
+    <script>
+    (function() {{
+      new Chart(document.getElementById('okxEquityChart').getContext('2d'), {{
+        type: 'line',
+        data: {{
+          labels: {_json.dumps(labels)},
+          datasets: [{{ label: 'Equity $', data: {_json.dumps(eq)},
+            borderColor: '{line_color}', backgroundColor: 'rgba(255,255,255,0.04)',
+            fill: true, tension: 0.25, borderWidth: 2, pointRadius: 2 }}]
+        }},
+        options: {{
+          responsive: true, maintainAspectRatio: false,
+          plugins: {{
+            legend: {{ display: false }},
+            annotation: {{ annotations: {{
+              base: {{ type: 'line', yMin: {BASE}, yMax: {BASE},
+                       borderColor: 'rgba(154,160,166,0.45)', borderWidth: 1, borderDash: [5,5] }}
+            }} }}
+          }},
+          scales: {{
+            x: {{ ticks: {{ color: 'rgba(154,160,166,0.85)', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(255,255,255,0.06)' }} }},
+            y: {{ ticks: {{ color: 'rgba(232,234,237,0.92)', font: {{ size: 9 }} }}, grid: {{ color: 'rgba(255,255,255,0.06)' }},
+                  title: {{ display: true, text: 'Equity $', color: 'rgba(154,160,166,0.8)' }} }}
+          }}
+        }}
+      }});
+    }})();
+    </script>"""
