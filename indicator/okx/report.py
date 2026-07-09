@@ -256,6 +256,53 @@ EXECUTOR_RESTART_CAPITAL_USD = 105.15
 EXECUTOR_RESTART_SINCE = "2026-06-07"
 
 
+def _get_equity_mdd(since: str) -> Optional[float]:
+    """Max drawdown (%) of the live wallet equity since `since` (peak→trough)."""
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT total_eq_usd FROM v7_okx_balance_snapshots "
+                "WHERE ts >= %s ORDER BY ts", (since,))
+            eqs = [float(r["total_eq_usd"]) for r in cur.fetchall()
+                   if r.get("total_eq_usd") is not None]
+    except Exception:
+        logger.exception("equity_mdd_query_failed")
+        return None
+    finally:
+        conn.close()
+    if len(eqs) < 2:
+        return None
+    peak, mdd = eqs[0], 0.0
+    for v in eqs:
+        peak = max(peak, v)
+        mdd = min(mdd, (v - peak) / peak * 100)
+    return mdd
+
+
+def _get_btc_benchmark(since: str) -> dict:
+    """BTC buy-and-hold return + MDD over the same window (indicator_history)."""
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT close FROM indicator_history "
+                "WHERE dt >= %s AND close IS NOT NULL ORDER BY dt", (since,))
+            px = [float(r["close"]) for r in cur.fetchall()]
+    except Exception:
+        logger.exception("btc_benchmark_query_failed")
+        return {}
+    finally:
+        conn.close()
+    if len(px) < 2:
+        return {}
+    peak, mdd = px[0], 0.0
+    for v in px:
+        peak = max(peak, v)
+        mdd = min(mdd, (v - peak) / peak * 100)
+    return {"btc_ret_pct": (px[-1] - px[0]) / px[0] * 100, "btc_mdd_pct": mdd}
+
+
 def compute_okx_summary() -> dict:
     """Aggregate stats for the OKX live cohort.
 
@@ -287,6 +334,30 @@ def compute_okx_summary() -> dict:
                if n else 0.0)
     cum_equity_pct = (sum((t.get("equity_ret_pct") or 0) for t in closed)
                       if n else 0.0)
+
+    # ── Professional metrics ────────────────────────────────────────────
+    _nets = [float(t.get("net_pct") or 0) for t in closed]
+    _wins = [x for x in _nets if x > 0]
+    _losses = [x for x in _nets if x < 0]
+    avg_win_pct = (sum(_wins) / len(_wins) * 100) if _wins else 0.0
+    avg_loss_pct = (sum(_losses) / len(_losses) * 100) if _losses else 0.0
+    payoff_ratio = (avg_win_pct / abs(avg_loss_pct)) if _losses else None
+    profit_factor = (sum(_wins) / abs(sum(_losses))) if _losses else None
+    cost_drag_bps = (sum(((t.get("gross_pct") or 0) - (t.get("net_pct") or 0))
+                         for t in closed) / n * 10000) if n else 0.0
+    cum_gross_pct = (sum((t.get("gross_pct") or 0) for t in closed) * 100
+                     if n else 0.0)
+
+    def _side_stats(side: str) -> dict:
+        sub = [t for t in closed if (t.get("direction") or "").upper() == side]
+        ns = len(sub)
+        w = sum(1 for t in sub if (t.get("net_pct") or 0) > 0)
+        return {"n": ns,
+                "cum_pct": sum((t.get("net_pct") or 0) for t in sub) * 100,
+                "wr": (w / ns * 100 if ns else 0.0)}
+    long_stats, short_stats = _side_stats("LONG"), _side_stats("SHORT")
+    mdd_pct = _get_equity_mdd(EXECUTOR_RESTART_SINCE)
+    benchmark = _get_btc_benchmark(EXECUTOR_RESTART_SINCE)
 
     # Sharpe — per-trade + naive annualised by observed cadence
     net_pcts = [float(t.get("net_pct") or 0) for t in closed]
@@ -336,6 +407,16 @@ def compute_okx_summary() -> dict:
         "avg_net_bps": avg_bps,
         "cum_net_pct": cum_pct,
         "cum_equity_pct": cum_equity_pct,
+        "avg_win_pct": avg_win_pct,
+        "avg_loss_pct": avg_loss_pct,
+        "payoff_ratio": payoff_ratio,
+        "profit_factor": profit_factor,
+        "cost_drag_bps": cost_drag_bps,
+        "cum_gross_pct": cum_gross_pct,
+        "long_stats": long_stats,
+        "short_stats": short_stats,
+        "mdd_pct": mdd_pct,
+        "benchmark": benchmark,
         "sharpe_per_trade": pt_sharpe,
         "sharpe_annualised": ann_sharpe,
         "gate_b": gate_b,

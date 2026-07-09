@@ -21,7 +21,9 @@ def render_performance() -> str:
     parts = [
         section("🔴 OKX LIVE Stage 3 · 2x 有效槓桿（補資後起算）", "okxlive", True,
                 _build_okx_live()),
-        section("📈 LIVE 淨值曲線（補資後 6/7 起）", "okxequity", True,
+        section("📊 專業指標（vs BTC · payoff · 多空 · 成本）", "okxpro", True,
+                _build_okx_pro_metrics()),
+        section("📈 LIVE 淨值曲線（補資後 6/7 起 · vs BTC）", "okxequity", True,
                 _build_okx_equity_chart()),
     ]
     return "\n".join(parts)
@@ -271,6 +273,7 @@ def _build_okx_equity_chart() -> str:
         EXECUTOR_RESTART_CAPITAL_USD as BASE,
         EXECUTOR_RESTART_SINCE as SINCE,
     )
+    conn = None
     try:
         conn = get_db_conn()
         with conn.cursor() as cur:
@@ -281,9 +284,18 @@ def _build_okx_equity_chart() -> str:
                 "ORDER BY ts",
                 (SINCE,))
             rows = cur.fetchall()
-        conn.close()
+            cur.execute(
+                "SELECT dt, close FROM indicator_history "
+                "WHERE dt IN (SELECT MAX(dt) FROM indicator_history "
+                "             WHERE dt >= %s GROUP BY DATE(dt)) "
+                "ORDER BY dt",
+                (SINCE,))
+            btc_rows = cur.fetchall()
     except Exception as e:
         return f'<div style="color:rgba(154,160,166,0.5)">淨值曲線載入失敗: {e}</div>'
+    finally:
+        if conn:
+            conn.close()
 
     if len(rows) < 2:
         return '<div style="color:rgba(154,160,166,0.5)">補資後淨值資料不足</div>'
@@ -294,6 +306,19 @@ def _build_okx_equity_chart() -> str:
     cur_eq, peak = eq[-1], max(eq)
     delta = (cur_eq - BASE) / BASE * 100 if BASE else 0
     line_color = "#36ffae" if cur_eq >= BASE else "#ff5f6d"
+
+    # BTC buy&hold normalised to $BASE at cohort start, aligned by date
+    btc_map = {(r["dt"].date() if hasattr(r["dt"], "date") else str(r["dt"])[:10]):
+               float(r["close"]) for r in btc_rows if r.get("close") is not None}
+    btc_line, btc0, last = [], None, None
+    for r in rows:
+        dkey = r["ts"].date() if hasattr(r["ts"], "date") else str(r["ts"])[:10]
+        v = btc_map.get(dkey, last)
+        last = v if v is not None else last
+        if btc0 is None and last is not None:
+            btc0 = last
+        btc_line.append(round(BASE * last / btc0, 2)
+                        if (last is not None and btc0) else None)
 
     return f"""
     <div class="grid grid-3" style="margin-bottom:10px">
@@ -310,14 +335,19 @@ def _build_okx_equity_chart() -> str:
         type: 'line',
         data: {{
           labels: {_json.dumps(labels)},
-          datasets: [{{ label: 'Equity $', data: {_json.dumps(eq)},
-            borderColor: '{line_color}', backgroundColor: 'rgba(255,255,255,0.04)',
-            fill: true, tension: 0.25, borderWidth: 2, pointRadius: 2 }}]
+          datasets: [
+            {{ label: '策略 Equity $', data: {_json.dumps(eq)},
+               borderColor: '{line_color}', backgroundColor: 'rgba(255,255,255,0.04)',
+               fill: true, tension: 0.25, borderWidth: 2, pointRadius: 2 }},
+            {{ label: 'BTC 買入持有', data: {_json.dumps(btc_line)},
+               borderColor: 'rgba(245,181,68,0.9)', backgroundColor: 'transparent',
+               fill: false, tension: 0.25, borderWidth: 1.5, borderDash: [4,3], pointRadius: 0 }}
+          ]
         }},
         options: {{
           responsive: true, maintainAspectRatio: false,
           plugins: {{
-            legend: {{ display: false }},
+            legend: {{ display: true, labels: {{ color: 'rgba(154,160,166,0.85)', font: {{ size: 9 }}, boxWidth: 12 }} }},
             annotation: {{ annotations: {{
               base: {{ type: 'line', yMin: {BASE}, yMax: {BASE},
                        borderColor: 'rgba(154,160,166,0.45)', borderWidth: 1, borderDash: [5,5] }}
@@ -332,3 +362,62 @@ def _build_okx_equity_chart() -> str:
       }});
     }})();
     </script>"""
+
+
+# ── Professional metrics (benchmark / payoff / long-short / cost / MDD) ─
+
+def _build_okx_pro_metrics() -> str:
+    """Pro live-trading metrics from the post-refund executor cohort:
+    vs Buy&Hold BTC, payoff structure, long/short split, cost drag, MDD.
+    """
+    from indicator.okx.report import EXECUTOR_RESTART_SINCE as SINCE
+    try:
+        from indicator.okx.report import compute_okx_summary
+        s = compute_okx_summary()
+    except Exception as e:
+        return f'<div style="color:#ff5f6d">專業指標載入失敗: {e}</div>'
+    if not s.get("n_closed"):
+        return ('<div style="color:rgba(154,160,166,0.6);font-size:12px">'
+                '尚無已平倉 trade</div>')
+
+    strat_ret = s.get("eq_pct_from_initial") or 0.0
+    mdd = s.get("mdd_pct")
+    bm = s.get("benchmark") or {}
+    btc_ret, btc_mdd = bm.get("btc_ret_pct"), bm.get("btc_mdd_pct")
+    payoff, pf = s.get("payoff_ratio"), s.get("profit_factor")
+    aw, al = s.get("avg_win_pct", 0), s.get("avg_loss_pct", 0)
+    cum_g, cum_n = s.get("cum_gross_pct", 0), s.get("cum_net_pct", 0)
+    drag = s.get("cost_drag_bps", 0)
+    ls, ss = s.get("long_stats", {}), s.get("short_stats", {})
+
+    beat = (btc_ret is not None and strat_ret >= btc_ret)
+    bm_color = "#36ffae" if beat else "#ff5f6d"
+    btc_ret_str = f"{btc_ret:+.2f}%" if btc_ret is not None else "--"
+    btc_mdd_str = f"{btc_mdd:.1f}%" if btc_mdd is not None else "--"
+    payoff_str = f"{payoff:.2f}" if payoff is not None else "n/a"
+    pf_str = f"{pf:.2f}" if pf is not None else "n/a"
+    pf_color = "#36ffae" if (pf is not None and pf >= 1) else "#d9606a"
+
+    def _side_card(label, st):
+        c = "#36ffae" if st.get("cum_pct", 0) >= 0 else "#ff5f6d"
+        return card(label, f"{st.get('cum_pct', 0):+.2f}%",
+                    f"{st.get('n', 0)} 筆 · WR {st.get('wr', 0):.0f}%", c)
+
+    return f"""
+    <div style="color:rgba(154,160,166,0.75);font-size:11px;margin-bottom:6px">
+      vs Buy&amp;Hold BTC（同期 {SINCE} 起）</div>
+    <div class="grid grid-4" style="margin-bottom:12px">
+      {card("策略報酬", f"{strat_ret:+.2f}%", f"BTC {btc_ret_str}", bm_color)}
+      {card("策略 MDD", f"{mdd:.1f}%" if mdd is not None else "--", f"BTC {btc_mdd_str}", "#ff5f6d")}
+      {card("Payoff", payoff_str, f"平均 {aw:+.2f}% / {al:+.2f}%")}
+      {card("Profit Factor", pf_str, "總獲利 / 總虧損", pf_color)}
+    </div>
+    <div style="color:rgba(154,160,166,0.75);font-size:11px;margin-bottom:6px">
+      多空拆分 · 成本拖累</div>
+    <div class="grid grid-4">
+      {_side_card("LONG", ls)}
+      {_side_card("SHORT", ss)}
+      {card("成本拖累", f"{drag:.1f} bps/筆", f"每筆 gross−net 差", "#f5b544")}
+      {card("gross → net", f"{cum_n:+.2f}%", f"gross {cum_g:+.2f}%，費用吃 {cum_g - cum_n:+.2f}%")}
+    </div>
+    """
