@@ -186,7 +186,7 @@ def _get_closed_trades() -> list[dict]:
                     SELECT id, entry_time, exit_time, direction, entry_tier,
                            entry_price, exit_price, exit_reason,
                            net_pct, gross_pct, equity_ret_pct, equity_after,
-                           notional_usd, size_contracts
+                           equity_before, notional_usd, size_contracts
                     FROM v7_okx_positions
                     WHERE status IN ('CLOSED', 'DEMOTED')
                       AND (model_version IS NULL
@@ -246,7 +246,14 @@ def _get_recent_kill_log(days: int = 7) -> list[dict]:
 # ── Composition ───────────────────────────────────────────────────────
 
 
-INITIAL_CAPITAL_USD = 155.0   # Stage 3 baseline (2026-06-01)
+INITIAL_CAPITAL_USD = 155.0   # original Stage 3 deposit (2026-05-31, $154.86)
+
+# Live-P&L baseline. The executor restarted after the 2026-06-05 manual
+# blow-up on a $105.15 refund deposited 2026-06-07. The headline % is
+# measured from here so it reflects the system's own performance and
+# excludes the operator's manual error (user decision 2026-07-09).
+EXECUTOR_RESTART_CAPITAL_USD = 105.15
+EXECUTOR_RESTART_SINCE = "2026-06-07"
 
 
 def compute_okx_summary() -> dict:
@@ -297,8 +304,9 @@ def compute_okx_summary() -> dict:
     current_eq = (float(balance["total_eq_usd"])
                   if balance and balance.get("total_eq_usd") is not None
                   else None)
+    base_cap = EXECUTOR_RESTART_CAPITAL_USD
     eq_pct_from_initial = (
-        ((current_eq - INITIAL_CAPITAL_USD) / INITIAL_CAPITAL_USD * 100)
+        ((current_eq - base_cap) / base_cap * 100)
         if current_eq is not None else None
     )
 
@@ -310,7 +318,8 @@ def compute_okx_summary() -> dict:
         "balance_age_sec": (
             (datetime.utcnow() - balance["ts"]).total_seconds()
             if balance and balance.get("ts") else None),
-        "initial_capital_usd": INITIAL_CAPITAL_USD,
+        "initial_capital_usd": base_cap,
+        "capital_basis_since": EXECUTOR_RESTART_SINCE,
         "eq_pct_from_initial": eq_pct_from_initial,
         "executor_status": (state.get("status") if state else "UNKNOWN"),
         "executor_reason": (state.get("reason") if state else None),
@@ -339,7 +348,7 @@ def compute_okx_summary() -> dict:
 def format_okx_report(summary: dict) -> str:
     """Telegram-friendly HTML report."""
     lines: list[str] = []
-    lines.append("<b>OKX LIVE Stage 3 ($100 + 10x)</b>")
+    lines.append("<b>OKX LIVE Stage 3 · 2x 有效槓桿</b>")
     lines.append("")
 
     # Account
@@ -349,7 +358,8 @@ def format_okx_report(summary: dict) -> str:
         age = summary.get("balance_age_sec") or 0
         lines.append(
             f"💰 Equity: ${eq:.2f}  "
-            f"({delta:+.2f}% from ${summary['initial_capital_usd']:.0f})")
+            f"({delta:+.2f}% since 補資 ${summary['initial_capital_usd']:.2f} "
+            f"@ {summary.get('capital_basis_since', '')})")
         lines.append(f"   Available: ${summary.get('available_usd', 0):.2f}  "
                      f"(updated {age:.0f}s ago)")
     else:

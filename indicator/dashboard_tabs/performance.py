@@ -19,14 +19,13 @@ logger = logging.getLogger(__name__)
 
 def render_performance() -> str:
     parts = [
-        section("🔴 OKX LIVE Stage 3 ($100 · 2x 有效槓桿)", "okxlive", True,
+        section("🔴 OKX LIVE Stage 3 · 2x 有效槓桿（補資後起算）", "okxlive", True,
                 _build_okx_live()),
         section("Alpha Decay Monitor", "decay", True, _build_alpha_decay()),
         section("IC / 勝率趨勢 (7 天)", "ictrend", True, _build_ic_trend()),
         section("信號累計曲線", "equity", True, _build_equity_curve()),
         section("信心分佈 (48h)", "confdist", True, _build_confidence_dist()),
         section("預測 vs 實際 (24h)", "predva", True, _build_pred_vs_actual()),
-        section("連續錯誤追蹤", "drawdown", True, _build_drawdown()),
         section("時段勝率熱力圖", "hourly_wr", True, _build_hourly_heatmap()),
     ]
     return "\n".join(parts)
@@ -50,6 +49,7 @@ def _build_okx_live() -> str:
     eq = s.get("current_equity_usd")
     avail = s.get("available_usd")
     initial = s.get("initial_capital_usd", 155.0)
+    basis_since = s.get("capital_basis_since")
     delta_pct = s.get("eq_pct_from_initial")
     age = s.get("balance_age_sec")
     status = s.get("executor_status") or "UNKNOWN"
@@ -67,14 +67,15 @@ def _build_okx_live() -> str:
     # ── Row 1: account state
     if eq is not None:
         eq_color = "#36ffae" if (delta_pct or 0) >= 0 else "#ff5f6d"
-        delta_str = f"{delta_pct:+.2f}% vs ${initial:.0f}"
+        delta_str = f"{delta_pct:+.2f}% vs ${initial:.2f}"
         age_str = f"{age:.0f}s 前更新" if age is not None else "--"
         row1 = f"""
         <div class="grid grid-4" style="margin-bottom:12px">
           {card("Equity", f"${eq:.2f}", delta_str, eq_color)}
           {card("Available", f"${avail or 0:.2f}", age_str)}
           {card("Executor", status, reason[:40] if reason else "", status_color)}
-          {card("Starting Capital", f"${initial:.0f}", "Stage 3 baseline")}
+          {card("Starting Capital", f"${initial:.2f}",
+                f"executor 補資後 ({basis_since})" if basis_since else "Stage 3 baseline")}
         </div>"""
     else:
         row1 = f"""
@@ -612,80 +613,6 @@ def _build_pred_vs_actual() -> str:
       }});
     }})();
     </script>"""
-
-
-# ── Drawdown (Consecutive Errors) ────────────────────────────────────
-
-def _build_drawdown() -> str:
-    try:
-        conn = get_db_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT signal_time, direction, correct, strength, actual_return_4h
-                FROM tracked_signals
-                WHERE filled = 1
-                ORDER BY signal_time ASC
-            """)
-            rows = cur.fetchall()
-        conn.close()
-    except Exception as e:
-        return f'<div style="color:rgba(154,160,166,0.5)">{e}</div>'
-
-    if len(rows) < 5:
-        return '<div style="color:rgba(154,160,166,0.5)">追蹤信號不足</div>'
-
-    # Compute streaks
-    current_streak = 0
-    max_loss_streak = 0
-    max_win_streak = 0
-    current_type = None  # 'win' or 'loss'
-    streaks = []
-
-    for r in rows:
-        is_correct = bool(r["correct"])
-        if is_correct:
-            if current_type == "win":
-                current_streak += 1
-            else:
-                current_streak = 1
-                current_type = "win"
-            max_win_streak = max(max_win_streak, current_streak)
-        else:
-            if current_type == "loss":
-                current_streak += 1
-            else:
-                current_streak = 1
-                current_type = "loss"
-            max_loss_streak = max(max_loss_streak, current_streak)
-
-    # Current active streak
-    recent_streak = 0
-    recent_type = None
-    for r in reversed(rows):
-        is_correct = bool(r["correct"])
-        if recent_type is None:
-            recent_type = "win" if is_correct else "loss"
-            recent_streak = 1
-        elif (is_correct and recent_type == "win") or (not is_correct and recent_type == "loss"):
-            recent_streak += 1
-        else:
-            break
-
-    streak_color = "#36ffae" if recent_type == "win" else "#ff5f6d"
-    alert = ""
-    if recent_type == "loss" and recent_streak >= max_loss_streak and recent_streak >= 3:
-        alert = '<div style="color:#ff5f6d;font-weight:600;margin-top:6px">&#9888; 目前連敗次數已達歷史最高！</div>'
-
-    return f"""
-    <div class="grid grid-4">
-      {card("當前連續", f'{recent_streak} {("連勝" if recent_type == "win" else "連敗")}',
-            "", streak_color)}
-      {card("歷史最長連勝", str(max_win_streak), "", "#36ffae")}
-      {card("歷史最長連敗", str(max_loss_streak), "", "#ff5f6d")}
-      {card("總信號數", str(len(rows)), "")}
-    </div>
-    {alert}
-    """
 
 
 # ── Hourly Win Rate Heatmap ──────────────────────────────────────────
