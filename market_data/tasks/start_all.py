@@ -24,6 +24,7 @@ from market_data.storage.db import run_migration
 from market_data.tasks.run_trade_streams import main as start_streams
 from market_data.tasks.flush_flow_bars import flush_loop
 from market_data.tasks.cleanup import cleanup_once
+from market_data.adapters.depth_delta_collector import DepthDeltaCollector
 
 logging.basicConfig(
     level=logging.INFO,
@@ -66,6 +67,13 @@ def main():
 
     threading.Thread(target=_cleanup_loop, daemon=True, name="cleanup").start()
     logger.info("Data cleanup started (trades: 3d, flow_bars: 90d).")
+
+    # Start depth-delta collector (per-side add/cancel from Binance incremental
+    # book → depth_deltas_1m). Forward-collection for the squeeze "path of least
+    # resistance" research; self-contained (own schema, flush, WS reconnect).
+    threading.Thread(target=DepthDeltaCollector().start, daemon=True,
+                     name="depth-delta").start()
+    logger.info("Depth-delta collector started (depth_deltas_1m).")
 
     # Start trade streams (blocking — must be last)
     start_streams()
