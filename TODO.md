@@ -62,6 +62,20 @@ H3 三旗共振子集 r_scaleout CI 下緣 >0。
 - [ ] EP2 英文版發 LinkedIn；EP3 細修後發（Medium 英文版已備）
 - [ ] EP12 素材「AI 當槓桿不當許願池」已入 roadmap（docs/linkedin_ep_series_roadmap.md）
 
+### 6. ★ 徹底掌握自己的系統（面試就緒度 — 求職關鍵）
+「系統會跑但講不清 why」是最大面試風險（很多是 AI 寫的）。面試官不問「還能做什麼」，
+問「這個為什麼這樣做」。詳細手冊：docs/system_mastery.md（+ Claude 生成的
+rfobot_系統精通手冊.docx 含完整標準答案）。逐層攻破，每層要能不看筆記回答灵魂拷問：
+- [ ] 層 1 數據層（notional 換算 / 1e12 時間戳 / share-data-not-code）
+- [ ] 層 2 特徵層（look-ahead 防範 / 加特徵流程 / 為何不用 MACD）
+- [ ] 層 3 模型層（雙 regressor / walk-forward purge+embargo / IC 0.063 / in-sample 陷阱）
+- [ ] 層 4 訊號層（rolling percentile / Strong-only / Gate A 算法）
+- [ ] 層 5 執行層（5 種 reconcile / 狀態機四態 / 3 個 kill trigger / fail-closed / 不用 CCXT）
+- [ ] 層 6 風控數學（2.0x 怎麼算 / 何時放寬 / hit kill 降階重驗）
+- [ ] mistake.md 六個失敗故事能講成 30 秒
+- [ ] 回 Claude 做面試官壓力測試（跨層追問）
+自測進度 2026-07-07：層 1 Q1 60分（漏 notional）、Q2/Q3 知識債 → 已補入手冊
+
 ---
 
 ## 已歸檔（2026-04 舊計畫，多數已被後續工作取代）
