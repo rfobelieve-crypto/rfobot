@@ -7,3 +7,4 @@ pandas
 numpy
 plotly
 kaleido
+cryptography

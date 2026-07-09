@@ -699,6 +699,29 @@ def update_cycle() -> dict:
         except Exception as e:
             _record_executor_failure("V7 OKX executor", e)
 
+        # ── Follow-trading accounts (Phase 1, 2026-07-07).  Same signal,
+        # each friend account runs an isolated executor stack (own creds,
+        # own v7_okx_a<id>_* tables, own kill switches).  One account's
+        # failure must never break main or the other accounts.
+        try:
+            from indicator.okx import runner as okx_runner
+            from indicator.model_version import get_current_model_version
+            for acct_label, acct_ex in okx_runner.get_account_executors():
+                try:
+                    acct_result = acct_ex.cycle(
+                        klines=klines, signal_direction=direction,
+                        signal_strength=strength,
+                        model_version=get_current_model_version(),
+                    )
+                    logger.info("okx_cycle[%s] action=%s detail=%s",
+                                acct_label, acct_result.action,
+                                acct_result.detail)
+                except Exception:
+                    logger.exception("okx_acct_cycle_failed label=%s",
+                                     acct_label)
+        except Exception as e:
+            logger.warning("okx_account_fanout_failed: %s", e)
+
         logger.info("Update complete: %s conf=%.0f %s",
                      direction, conf, strength)
 
@@ -1076,6 +1099,164 @@ def research_exit_variants_api():
         "n_variants_run": len(results),
         "results": _sanitise(results),
     })
+
+
+@app.route("/research/feature-halflife", methods=["GET"])
+def research_feature_halflife_api():
+    """AR(1) half-life ranker for V7 features. Mobile-friendly HTML output.
+
+    Scans every numeric column in features_all.parquet, fits AR(1), and
+    surfaces three buckets:
+      - Top N slowest-decaying (most tradable, ρ closest to 1)
+      - Short half-life (< short_cutoff bars — prune candidates)
+      - Non-stationary / non-persistent (ρ outside (0,1))
+
+    Designed to be hit from a phone browser — same admin token gate as
+    /research/exit-variants. Reads features_all.parquet from the cache
+    path; fails gracefully if not present.
+
+    Query params:
+      top:           how many slowest features to list (default 30)
+      short_cutoff:  half-life below this flags a feature as decaying
+                     too fast to trade economically (default 5 bars)
+      filter:        prefix filter on feature names (e.g. "cg_")
+      token:         required if ADMIN_HEAL_TOKEN env var is set
+    """
+    from flask import request
+    from pathlib import Path
+
+    expected_token = os.environ.get("ADMIN_HEAL_TOKEN", "")
+    if expected_token and request.args.get("token", "") != expected_token:
+        return "missing/invalid ?token", 403
+
+    try:
+        top = max(5, min(200, int(request.args.get("top", 30))))
+        short_cutoff = float(request.args.get("short_cutoff", 5.0))
+    except ValueError:
+        return "bad numeric param", 400
+    name_filter = request.args.get("filter", "").strip()
+
+    cache_path = Path("research/dual_model/.cache/features_all.parquet")
+    if not cache_path.exists():
+        return (f"<h3 style='color:#ef4444'>feature cache not found at "
+                f"{cache_path}</h3><p>Regenerate via "
+                f"research.dual_model.shared_data first.</p>"), 500
+
+    try:
+        import pandas as pd
+        import numpy as np
+        df = pd.read_parquet(cache_path)
+    except Exception as e:
+        logger.exception("feature_halflife_load_failed")
+        return f"<h3 style='color:#ef4444'>load failed: {e}</h3>", 500
+
+    def _ar1_halflife(series):
+        s = series.dropna().astype(float)
+        if len(s) < 100:
+            return None, None, len(s)
+        x_lag = s.iloc[:-1].values
+        x_now = s.iloc[1:].values
+        xl = x_lag - x_lag.mean()
+        xn = x_now - x_now.mean()
+        denom = (xl ** 2).sum()
+        if denom <= 0:
+            return None, None, len(s)
+        rho = float((xl * xn).sum() / denom)
+        if not (0 < rho < 1):
+            return rho, None, len(s)
+        return rho, float(-np.log(2) / np.log(rho)), len(s)
+
+    # Skip obvious non-feature columns
+    skip_prefixes = ("y_", "endpoint_", "abs_path", "ret_", "regime_label")
+    skip_exact = {"open", "high", "low", "close", "volume", "dt", "ts"}
+    cols = [c for c in df.columns
+            if df[c].dtype.kind in "fc"
+            and c not in skip_exact
+            and not any(c.startswith(p) for p in skip_prefixes)]
+    if name_filter:
+        cols = [c for c in cols if c.startswith(name_filter)]
+
+    rows = []
+    for col in cols:
+        rho, h, n = _ar1_halflife(df[col])
+        rows.append((col, rho, h, n))
+
+    # Sort: stationary first (by halflife desc), then non-stationary
+    stationary = sorted(
+        [r for r in rows if r[2] is not None],
+        key=lambda r: -r[2])
+    non_stat = [r for r in rows if r[2] is None]
+    short = [r for r in stationary if r[2] < short_cutoff]
+
+    def _tbl(items, max_rows):
+        if not items:
+            return ("<i style='color:#9ca3af'>none</i>")
+        out = ("<table><tr><th>feature</th><th>ρ</th>"
+               "<th>half-life (bars)</th><th>n</th></tr>")
+        for col, rho, h, n in items[:max_rows]:
+            rho_s = f"{rho:.4f}" if rho is not None else "—"
+            h_s = f"{h:.1f}" if h is not None else "—"
+            # Truncate long feature names for mobile
+            disp = col if len(col) <= 42 else col[:40] + "…"
+            out += (f"<tr><td>{disp}</td><td>{rho_s}</td>"
+                    f"<td>{h_s}</td><td>{n}</td></tr>")
+        out += "</table>"
+        return out
+
+    filter_str = f" · filter={name_filter}" if name_filter else ""
+    html = f"""<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature Half-Life</title>
+<style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+          background: #0d1117; color: #e6edf3; margin: 12px;
+          font-size: 13px; line-height: 1.45; }}
+  h1 {{ color: #f5f5f5; font-size: 20px; margin: 0 0 4px 0; }}
+  h2 {{ color: #36ffae; margin-top: 24px; font-size: 15px;
+        border-bottom: 1px solid #30363d; padding-bottom: 4px; }}
+  h2.short {{ color: #ef4444; }}
+  .meta {{ color: #9ca3af; font-size: 11px; margin-bottom: 14px; }}
+  .summary {{ background: #161b22; padding: 10px 14px; border-radius: 6px;
+              border-left: 3px solid #36ffae; margin-bottom: 16px;
+              font-size: 13px; }}
+  table {{ border-collapse: collapse; width: 100%; font-size: 11px;
+           margin-bottom: 8px; }}
+  th, td {{ border: 1px solid #30363d; padding: 4px 8px; text-align: left; }}
+  th {{ background: #21262d; color: #f5f5f5; }}
+  tr:nth-child(even) {{ background: rgba(255,255,255,0.03); }}
+  .footer {{ margin-top: 24px; color: #6b7280; font-size: 10px; }}
+</style></head><body>
+
+<h1>📊 Feature Half-Life Check</h1>
+<div class="meta">
+  AR(1) persistence — t½ = −ln(2)/ln(ρ) — scanned {len(rows)} features{filter_str}
+</div>
+
+<div class="summary">
+  <b>Summary</b><br>
+  Stationary (ρ ∈ (0,1)): <b>{len(stationary)}</b><br>
+  Non-stationary / random: <b>{len(non_stat)}</b><br>
+  Short half-life (&lt; {short_cutoff} bars):
+  <b style="color:#ef4444">{len(short)}</b> ← prune candidates
+</div>
+
+<h2>Top {top} slowest-decaying (most tradable)</h2>
+{_tbl(stationary, top)}
+
+<h2 class="short">Short half-life (&lt; {short_cutoff} bars) — prune candidates</h2>
+{_tbl(short, 50)}
+
+<h2>Non-stationary / non-persistent (first 20)</h2>
+{_tbl(non_stat, 20)}
+
+<div class="footer">
+  Query params: ?top=30 &amp; short_cutoff=5 &amp; filter=cg_ &amp; token=…
+</div>
+</body></html>"""
+
+    return html
 
 
 @app.route("/okx-admin/heal", methods=["GET", "POST"])

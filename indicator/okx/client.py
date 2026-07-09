@@ -112,6 +112,13 @@ class OkxClient:
     def get_server_time(self) -> Optional[float]:
         return self._rest.get_server_time()
 
+    def set_leverage_detail(self, *, inst_id: str, lever: int, mgn_mode: str,
+                            pos_side: Optional[str] = None) -> dict:
+        """Proxy to OkxRestClient.set_leverage_detail (diagnostic surface)."""
+        return self._rest.set_leverage_detail(
+            inst_id=inst_id, lever=lever, mgn_mode=mgn_mode, pos_side=pos_side,
+        )
+
     # ── WS subscription passthrough ────────────────────────────────────
 
     def subscribe_orders(self,

@@ -17,3 +17,5 @@ plotly
 shap
 anthropic
 websocket-client
+cryptography
+mcp

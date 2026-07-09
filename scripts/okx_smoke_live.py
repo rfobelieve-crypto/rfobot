@@ -7,12 +7,17 @@ What it does (in order, each must pass):
   4. GET /api/v5/account/balance → returns a Balance
   5. GET /api/v5/account/positions → returns list (likely empty)
   6. PositionReconciler.reconcile_cycle → CONSISTENT
+  6b. (only if td_mode == "isolated") POST set-leverage idempotent dry-check
+      for each posSide that will be used at open time. Verifies that next
+      Strong signal will not abort with "set_leverage_failed". No order, no
+      margin change beyond what OKX already has.
   7. Start WS, subscribe to orders/positions/account, wait for auth +
      first heartbeat (≤ 15 s)
   8. Print summary + exit clean
 
 What it does NOT do: submit any order, amend any algo, cancel anything.
-Zero financial side effects.
+Zero financial side effects. set-leverage (step 6b) is idempotent — if the
+account already shows isolated 10x/10x on the OKX UI, the call just confirms.
 
 Usage:
     # Required env (or .env):
@@ -177,6 +182,46 @@ def main(stage: str = "live") -> int:
         _step("reconciliation (local DB vs OKX)", step_recon)
     except StepFailed:
         return 6
+
+    # 6b. Isolated-mode pre-flight: verify set-leverage works for the posSides
+    #     the executor will call before opening. Skipped for cross/cash modes
+    #     where executor does not pre-call set-leverage.
+    #
+    #     This is the check that surfaces the "🔴 OKX OPEN ABORTED — set-leverage
+    #     failed" condition BEFORE a real Strong signal arrives. If OKX UI
+    #     doesn't have isolated 10x/10x set up, this step fails and tells you
+    #     exactly which posSide needs setup, with zero risk of placing an order.
+    if cfg.td_mode == "isolated":
+        def step_set_leverage():
+            # Which posSides we need to verify depends on pos_mode.
+            #   long_short_mode → executor needs BOTH "long" and "short"
+            #                     pre-configured (one per side)
+            #   net_mode        → executor calls set-leverage with posSide=None
+            if cfg.pos_mode == "long_short_mode":
+                sides_to_check: list[Optional[str]] = ["long", "short"]
+            else:
+                sides_to_check = [None]
+            results: list[str] = []
+            for ps in sides_to_check:
+                ok = client.set_leverage(
+                    inst_id=cfg.inst_id, lever=cfg.leverage,
+                    mgn_mode="isolated", pos_side=ps,
+                )
+                label = ps or "net"
+                results.append(f"{label}={'ok' if ok else 'FAIL'}")
+                if not ok:
+                    raise StepFailed(
+                        f"set-leverage(isolated {cfg.leverage}x posSide={label}) "
+                        f"failed — OKX UI needs BTC-USDT-SWAP set to "
+                        f"isolated · 10x · 10x BEFORE this will pass. "
+                        f"Account must be FLAT to change margin mode."
+                    )
+            return f"isolated {cfg.leverage}x: " + " · ".join(results)
+        try:
+            _step("set-leverage idempotent dry-check (isolated only)",
+                  step_set_leverage)
+        except StepFailed:
+            return 8
 
     # 7. WS auth + first heartbeat
     def step_ws():

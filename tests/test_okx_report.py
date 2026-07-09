@@ -12,6 +12,8 @@ import pytest
 
 from indicator.okx.report import (
     annualised_sharpe,
+    bootstrap_mean_ci_bps,
+    compute_gate_b_status,
     format_okx_report,
     per_trade_sharpe,
 )
@@ -83,11 +85,26 @@ class TestFormatReport:
             "n_closed": 0,
             "wins": 0,
             "win_rate_pct": 0.0,
+            "wins_net": 0,
+            "win_rate_pct_net": 0.0,
+            "wins_equity": 0,
+            "win_rate_pct_equity": 0.0,
             "avg_net_bps": 0.0,
             "cum_net_pct": 0.0,
             "cum_equity_pct": 0.0,
             "sharpe_per_trade": None,
             "sharpe_annualised": None,
+            "gate_b": {
+                "status": "accumulating",
+                "n_closed": 0,
+                "sample_min": 30,
+                "sample_target": 50,
+                "progress_pct": 0.0,
+                "avg_net_bps": 0.0,
+                "ci_lo_bps": None,
+                "ci_hi_bps": None,
+                "summary": "累積中 0/30 (目標 50)",
+            },
             "open_position": None,
             "recent_trades": [],
             "kill_log_7d": [],
@@ -106,17 +123,41 @@ class TestFormatReport:
     def test_with_trades(self):
         summary = self._base_summary(
             n_closed=3, wins=2, win_rate_pct=66.67,
+            wins_net=2, win_rate_pct_net=66.67,
+            wins_equity=1, win_rate_pct_equity=33.33,
             avg_net_bps=120.0, cum_net_pct=3.6,
             cum_equity_pct=36.0, sharpe_per_trade=0.85,
             sharpe_annualised=4.2,
         )
         out = format_okx_report(summary)
         assert "Trades: 3" in out
-        assert "2/3" in out
+        # Three WR lines now rendered side-by-side
+        assert "WR gross:" in out
+        assert "WR net:" in out
+        assert "WR equity:" in out
+        assert "2/3" in out                  # gross + net both 2/3 (line shared text)
+        assert "1/3" in out                  # equity 1/3
+        assert "(wallet truth)" in out
         assert "+120.0 bps" in out
         assert "+3.60%" in out
         assert "Sharpe/trade: 0.85" in out
         assert "annualised: 4.20" in out
+
+    def test_wr_definitions_diverge(self):
+        """Realistic case: more gross wins than equity wins (cost + funding eat
+        thin-margin gross winners)."""
+        summary = self._base_summary(
+            n_closed=10,
+            wins=6, win_rate_pct=60.0,           # gross 60%
+            wins_net=5, win_rate_pct_net=50.0,   # net 50%
+            wins_equity=4, win_rate_pct_equity=40.0,  # equity 40%
+            avg_net_bps=-5.0, cum_net_pct=-0.5,
+            cum_equity_pct=-0.8,
+        )
+        out = format_okx_report(summary)
+        assert "60%" in out  # gross
+        assert "50%" in out  # net
+        assert "40%" in out  # equity
 
     def test_with_open_position(self):
         summary = self._base_summary(
@@ -159,3 +200,90 @@ class TestFormatReport:
         out = format_okx_report(summary)
         assert "no balance snapshot yet" in out
         # Should not crash
+
+    def test_gate_b_accumulating_renders(self):
+        out = format_okx_report(self._base_summary())
+        assert "Gate B" in out
+        assert "累積中" in out
+        assert "🟡" in out
+
+    def test_gate_b_passed_renders_green(self):
+        summary = self._base_summary(
+            n_closed=40, gate_b={
+                "status": "passed", "n_closed": 40,
+                "sample_min": 30, "sample_target": 50,
+                "progress_pct": 80.0, "avg_net_bps": 15.2,
+                "ci_lo_bps": 3.4, "ci_hi_bps": 27.1,
+                "summary": "avg net +15.2 bps, 95% CI [+3.4, +27.1] — Gate B 通過",
+            }
+        )
+        out = format_okx_report(summary)
+        assert "Gate B" in out
+        assert "通過" in out
+        assert "🟢" in out
+
+
+# ── Gate B status logic ───────────────────────────────────────────────
+
+
+class TestGateBStatus:
+    def test_accumulating_below_min_sample(self):
+        result = compute_gate_b_status(
+            n_closed=10, net_pcts=[0.005] * 10, avg_net_bps=50.0)
+        assert result["status"] == "accumulating"
+        assert "累積中" in result["summary"]
+        assert result["n_closed"] == 10
+
+    def test_failed_when_avg_negative(self):
+        # Negative avg even with 30+ trades → fail
+        result = compute_gate_b_status(
+            n_closed=30,
+            net_pcts=[-0.001] * 30,
+            avg_net_bps=-10.0,
+        )
+        assert result["status"] == "failed"
+        assert "edge 未驗到" in result["summary"]
+
+    def test_passed_when_avg_and_ci_lower_positive(self):
+        # Consistently positive trades — CI lower should be > 0
+        net_pcts = [0.005, 0.008, 0.003, 0.010, 0.006] * 8  # n=40, all +
+        avg_net_bps = sum(net_pcts) / len(net_pcts) * 10000
+        result = compute_gate_b_status(
+            n_closed=40, net_pcts=net_pcts, avg_net_bps=avg_net_bps)
+        assert result["status"] == "passed"
+        assert result["ci_lo_bps"] > 0
+
+    def test_marginal_when_ci_straddles_zero(self):
+        # Wide spread — avg slightly positive but CI lower < 0
+        net_pcts = [0.05, -0.04, 0.06, -0.05, 0.03, -0.02] * 6  # n=36, noisy
+        avg_net_bps = sum(net_pcts) / len(net_pcts) * 10000
+        result = compute_gate_b_status(
+            n_closed=36, net_pcts=net_pcts, avg_net_bps=avg_net_bps)
+        # Avg may be slightly positive but CI lower should straddle 0
+        if avg_net_bps > 0:
+            assert result["status"] == "marginal"
+            assert result["ci_lo_bps"] <= 0
+
+    def test_progress_pct_caps_at_100(self):
+        result = compute_gate_b_status(
+            n_closed=100, net_pcts=[0.0] * 100, avg_net_bps=0.0)
+        assert result["progress_pct"] == 100.0
+
+
+class TestBootstrapCI:
+    def test_too_few_samples_returns_none(self):
+        assert bootstrap_mean_ci_bps([0.01, 0.02]) is None
+
+    def test_positive_constant_ci_stays_positive(self):
+        # All trades exactly +50 bps — CI must be tight around +50
+        ci = bootstrap_mean_ci_bps([0.005] * 30)
+        assert ci is not None
+        lo, hi = ci
+        assert lo == pytest.approx(50.0, abs=0.1)
+        assert hi == pytest.approx(50.0, abs=0.1)
+
+    def test_deterministic_with_seed(self):
+        net_pcts = [0.005, -0.003, 0.007, -0.001, 0.002] * 6  # n=30
+        ci1 = bootstrap_mean_ci_bps(net_pcts, seed=42)
+        ci2 = bootstrap_mean_ci_bps(net_pcts, seed=42)
+        assert ci1 == ci2

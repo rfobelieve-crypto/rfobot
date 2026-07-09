@@ -289,3 +289,8 @@ y_path_ret_4h = mean(close[t+1..t+4]) / close[t] - 1 (TWAP path return)
 - 階段 4：特徵工程（目前重點 — 自訂 alpha 特徵 + 數據累積）
 - 階段 5：模型開發（Magnitude 已重訓 v2, Direction 等 2 週後重訓）
 - 階段 9：持續迭代（績效追蹤、IC 監控、衰退警報已上線）
+
+## 跨 session 任務同步（2026-07-07）
+- **TODO.md 是唯一的跨 session 任務真相源**。每次開工先讀 TODO.md 的「當前任務」區。
+- Session 內建任務清單（TaskCreate）只作單次對話的進度追蹤——它存在本機
+  session 狀態、不進 git、不跨機器。凡是隔天/換機器還要做的事，寫進 TODO.md 並 push。

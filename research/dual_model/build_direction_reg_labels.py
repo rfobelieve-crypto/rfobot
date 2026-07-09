@@ -1,15 +1,14 @@
 """
-Direction REGRESSION label construction (4h horizon, path-integrated).
+Direction REGRESSION label construction (path-integrated, horizon-parametric).
 
-Produces a continuous signed target — the 4h path-integrated (TWAP) return.
-The model learns the full return distribution, and Strong signals are
-extracted at inference time by thresholding the predicted value.
+Produces a continuous signed target — the path-integrated (TWAP) return over
+the next `horizon_bars` 1h bars.
 
 Label (path / TWAP):
-    y_path_ret_4h[t] = mean(close[t+1..t+4]) / close[t] - 1
+    y_path_ret_{H}h[t] = mean(close[t+1..t+H]) / close[t] - 1
 
 Why path return instead of endpoint:
-    Endpoint return (close[t+4]/close[t]-1) treats a whipsaw that happens to
+    Endpoint return (close[t+H]/close[t]-1) treats a whipsaw that happens to
     close at the same price as a clean trend identically. Path return assigns
     smaller magnitude to whipsaws (the mean of the intra-horizon path is
     pulled back toward close[t] when the path oscillates), so the model
@@ -19,12 +18,15 @@ Why path return instead of endpoint:
 
 Design notes:
     - No deadzone — regression uses every labeled bar.
-    - Tail bars (last 4 rows) get NaN via forward close indexing and are
+    - Tail bars (last H rows) get NaN via forward close indexing and are
       excluded from training by the notna() mask.
-    - No look-ahead: close[t+k] for k in [1, 4] is strictly future-only and
+    - No look-ahead: close[t+k] for k in [1, H] is strictly future-only and
       only used where it has already materialized.
-    - `endpoint_ret_4h` is also returned for diagnostic parity with the
+    - `endpoint_ret_{H}h` is also returned for diagnostic parity with the
       production outcome tracker (which measures realized PnL at endpoint).
+    - Column names are horizon-suffixed so multiple horizons (1h, 4h, 24h)
+      can live in the same DataFrame without collision — needed by Path 1
+      multi-horizon portfolio plan (docs/path1_multi_horizon_plan.md).
 """
 from __future__ import annotations
 
@@ -38,26 +40,39 @@ logger = logging.getLogger(__name__)
 HORIZON_BARS = 4
 
 
+def _label_cols(horizon_bars: int) -> tuple[str, str, str]:
+    """Return (y_path_col, endpoint_col, abs_col) for a given horizon.
+
+    Default 4h preserves legacy column names (`y_path_ret_4h`,
+    `endpoint_ret_4h`, `abs_path_ret`) so any code that reads these
+    directly continues to work without changes.
+    """
+    y_path_col = f"y_path_ret_{horizon_bars}h"
+    endpoint_col = f"endpoint_ret_{horizon_bars}h"
+    abs_col = "abs_path_ret"  # not horizon-suffixed — one horizon active per run
+    return y_path_col, endpoint_col, abs_col
+
+
 def build_direction_reg_labels(
     df: pd.DataFrame,
     horizon_bars: int = HORIZON_BARS,
 ) -> pd.DataFrame:
     """
-    Build signed 4h path-integrated return as regression target.
+    Build signed path-integrated return as regression target.
 
     Parameters
     ----------
     df : Feature DataFrame with 'close' column and datetime index.
-    horizon_bars : Forward horizon in 1h bars (default 4).
+    horizon_bars : Forward horizon in 1h bars (1 / 4 / 24 supported).
 
     Returns
     -------
     DataFrame with:
-        y_path_ret_4h : mean(close[t+1..t+h]) / close[t] - 1  (TWAP, signed)
-                        THIS IS THE TRAINING TARGET.
-        endpoint_ret_4h : close[t+h] / close[t] - 1
-                          kept for outcome-tracker parity and IC diagnostics.
-        abs_path_ret  : |y_path_ret_4h|
+        y_path_ret_{H}h : mean(close[t+1..t+H]) / close[t] - 1  (TWAP, signed)
+                          THIS IS THE TRAINING TARGET.
+        endpoint_ret_{H}h : close[t+H] / close[t] - 1
+                            kept for outcome-tracker parity and IC diagnostics.
+        abs_path_ret : |y_path_ret_{H}h|
     """
     close = df["close"].values.astype(float)
     n = len(close)
@@ -75,20 +90,21 @@ def build_direction_reg_labels(
         # Endpoint return (diagnostic only)
         y_endpoint[i] = close[i + horizon_bars] / close[i] - 1.0
 
+    y_path_col, endpoint_col, abs_col = _label_cols(horizon_bars)
     result = pd.DataFrame({
-        "y_path_ret_4h": y_path,
-        "endpoint_ret_4h": y_endpoint,
-        "abs_path_ret": np.abs(y_path),
+        y_path_col: y_path,
+        endpoint_col: y_endpoint,
+        abs_col: np.abs(y_path),
     }, index=df.index)
 
     valid = np.isfinite(y_path)
     if valid.any():
         logger.info(
-            "Direction reg labels (PATH/TWAP): n=%d valid=%d "
+            "Direction reg labels (PATH/TWAP, horizon=%dh): n=%d valid=%d "
             "mean=%+.5f std=%.5f | P(|y|>=0.006)=%.1f%% "
             "P(|y|>=0.008)=%.1f%% P(|y|>=0.010)=%.1f%% P(|y|>=0.015)=%.1f%% "
             "| endpoint/path ratio=%.2f",
-            n, int(valid.sum()),
+            horizon_bars, n, int(valid.sum()),
             float(np.nanmean(y_path)), float(np.nanstd(y_path)),
             100 * float(np.nanmean(np.abs(y_path[valid]) >= 0.006)),
             100 * float(np.nanmean(np.abs(y_path[valid]) >= 0.008)),

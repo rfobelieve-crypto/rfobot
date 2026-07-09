@@ -483,6 +483,68 @@ class TestPresubmitGuard:
         assert not r3.triggered
 
 
+class TestFacadeSignatureParity:
+    """Regression for the trail-bug class of failures: a facade method that
+    should proxy to OkxRestClient but doesn't, causing isolated opens (or any
+    new exchange call) to throw a phantom error that hides the real cause.
+
+    Discovered 2026-06-16 via live: V7OkxExecutor called
+    self._client.set_leverage(...) on OkxClient, but the facade had no such
+    method, so every isolated open aborted with 'set-leverage failed' before
+    even reaching OKX.
+    """
+
+    def test_okx_client_has_set_leverage(self):
+        from indicator.okx.client import OkxClient
+        assert hasattr(OkxClient, "set_leverage"), (
+            "OkxClient must expose set_leverage — executor._open_position "
+            "calls self._client.set_leverage for isolated-margin opens."
+        )
+        assert callable(getattr(OkxClient, "set_leverage"))
+
+    def test_okx_client_has_set_leverage_detail(self):
+        from indicator.okx.client import OkxClient
+        assert hasattr(OkxClient, "set_leverage_detail"), (
+            "OkxClient must expose set_leverage_detail for diagnostic "
+            "surfaces (e.g. /okx-admin/isolated-check)."
+        )
+
+    def test_executor_called_methods_exist_on_facade(self):
+        """All OkxClient method names called by executor.py exist on OkxClient.
+
+        This is the broader version of the lesson: every method the executor
+        invokes through self._client must exist on the facade, not just on
+        the underlying REST client.
+        """
+        import ast
+        from pathlib import Path
+        from indicator.okx.client import OkxClient
+
+        executor_src = Path(
+            "indicator/okx/executor.py").read_text()
+        tree = ast.parse(executor_src)
+        called = set()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Attribute):
+                continue
+            # Match: self._client.<method>
+            v = node.value
+            if (isinstance(v, ast.Attribute)
+                and v.attr == "_client"
+                and isinstance(v.value, ast.Name)
+                and v.value.id == "self"):
+                called.add(node.attr)
+        # Subtract attributes that are intentionally provided by the underlying
+        # sub-clients but not on the facade.  (None right now — flag any.)
+        missing = sorted(m for m in called
+                          if not hasattr(OkxClient, m))
+        assert not missing, (
+            f"executor.py calls self._client.<X> for X in {missing}, "
+            f"but OkxClient does not expose those methods. Add proxy "
+            f"methods to OkxClient (see set_leverage for the pattern)."
+        )
+
+
 class TestKillSwitchRecovery:
     def test_halt_auto_resumes_when_condition_clears(self):
         # NTP halt this cycle, clears next cycle -> back to ACTIVE

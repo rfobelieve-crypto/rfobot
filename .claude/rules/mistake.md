@@ -59,6 +59,119 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-06-20: 一個 case 的 FOMO 差點變成 threshold-sweep overfit（避免成功、紀律守住）
+
+**What happened:**
+2026-06-19 01:02 (TPE) 一根 **Moderate** BULLISH 訊號（BTC $62,664、Confidence 85、Mag p98、Driver = cg_bfx_margin_delta +90,359、Regime TRENDING_BEAR）我按紀律沒進場（current rule: Strong-only），但 46h 後 BTC 回到 $63,930（+2.02%）—— 訊號方向 + 時間都對。
+
+我自然想問：「**Strong threshold 2.5% 是不是太緊？**」「**改 5% 是不是更好？**」
+
+差點就跑 threshold sweep（top 2.5% / 3% / 4% / 5% / 6% / 7% 各算 WR、avg bps、cum），找「歷史最 CP 值的 threshold」並改 production。
+
+幸好 user 自己 spot 到：「**可是這會 overfit 不是嗎**」——當場叫停。
+
+**Root cause（為什麼這是經典陷阱）:**
+
+1. **單一 case bias**: 6/19 那筆是 1 個 sample。整個歷史證據 stack（5.5mo backtest, 1980 tracked_signals, live cohort）都顯示 Strong > Moderate。改 rule 需要等比例的證據，不是 1 case + 直覺。
+
+2. **Threshold sweep ≠ 中性研究**: 即使跑 walk-forward，掃連續 threshold = multiple comparisons + selection bias。1980 樣本切 5 個 threshold 桶 = 每桶 ~400 有效樣本，期望 25% false positive rate (5 tests × p=0.05)。「最好那個」80% 是運氣不是 edge。
+
+3. **Crypto regime non-stationary**: 即使歷史 optimal 在 5%，未來 regime 變了不一定還在。Past optimal threshold 是 in-sample fit、forward 沒保證。
+
+4. **Optimization 對象錯了**: 想擠 0.5% threshold-tuning alpha vs 加新的真實 alpha source（cross-asset / 異源資料 / compound trigger），時間 ROI 完全不成比例。Threshold tuning 是 low-yield high-overfit 的研究路線。
+
+5. **FOMO 偽裝成 research**: 「我漏掉 6/19」的情緒 → 「該改 rule」的合理化 → threshold sweep 看似嚴謹但本質是 chase。
+
+**Correct approach（守住的紀律）:**
+
+- **Strong-only rule 不動**。已有 5.5mo backtest + 1980 tracked_signals + live cohort 三層證據撐住，改變需要相同等級的證據。
+- **不 sweep threshold**——撤回原本要 commit 的 `scripts/threshold_sweep.py`。
+- 若未來確實想驗證「premium Moderate 有沒有 edge」，正確路徑 = **categorical compound trigger watcher**（不 sweep、不改 entry）：
+    ```
+    TIER_B candidate = Moderate tier
+                     + Mag p95+ (categorical flag, 不是 tuned threshold)
+                     + Driver class in [whale_margin, short_squeeze_setup]
+                     + Regime in [TRENDING_BEAR, CHOPPY]
+    ```
+    fire 時純 Telegram alert（不 auto take）→ 累積 6 個月 → 30+ case + WR 統計顯著才考慮 carve out 成新 tier。
+- **不是 data-driven search**（容易 overfit）→ 是 **hypothesis-driven testing**（基於 domain knowledge）。
+- 即使這個方案也只「先收集 evidence」，不直接改 entry rule。
+
+**Rule（給未來的 self 跟 Claude）:**
+
+1. **單一 case ≠ rule change**。改 entry rule 的舉證責任 = 對應原始 rule 的證據強度。Strong-only 用 5.5mo backtest + 1980 signal + live 驗過 → 推翻它需要等比例 evidence、不是 1 個亮眼 case。
+
+2. **Threshold sweep 永遠是 last resort、不是 first response**。每次想 sweep 之前先問：(a) 是不是因為最近某個 case 觸發？(b) 連續 search space 是不是會放大 selection bias？(c) sample 夠不夠每個桶 > 200？任一答「是」就停。
+
+3. **FOMO-driven research = bad research**。「我漏掉那筆」的情緒永遠不該是 research direction 的觸發點。情緒當下記筆記、24h 後冷靜再評估，多數時候會發現原本紀律是對的。
+
+4. **改 rule = categorical > continuous**。Compound trigger（多個 categorical flag 共振）比 threshold tuning（連續參數 search）overfit 風險低 5x。前者基於 hypothesis，後者基於 data mining。
+
+5. **「漏掉好訊號」是紀律的成本、不是 bug**。期望值 EV 高的 rule 必然會錯過部分好機會（type I error 換 type II error 的取捨）。機構紀律：寧願漏掉 10 個 6/19，不要為不漏改 rule 然後吃 30 個爛單。
+
+**這是「avoided mistake」的紀錄，不是「committed mistake」**——這類紀錄比真實踩雷更 valuable：它證明紀律在情緒衝擊下守住了，下次同類情境（必然會再來）能更快識別。
+
+---
+
+## 2026-06-16: facade signature drift（第 2 次重演）—— OkxClient 缺 set_leverage proxy，每次 isolated 開倉 AttributeError 被吞成「set-leverage failed」
+
+**What happened:**
+2026-06-16 23:03 (TPE) 收到 `🔴 OKX OPEN ABORTED set-leverage(isolated 10x posSide=long) failed — no order sent`。我（跟 user）一開始全程往「OKX UI 設定不對」方向 debug：檢查持倉模式、margin mode、雙向 leverage、帳戶子模式。耗了多次來回 user 都回「OKX 都有設好」。
+
+最後 grep `set_leverage` 才發現真相：`indicator/okx/executor.py:1010` 呼叫 `self._client.set_leverage(...)`，`self._client` 是 `OkxClient` facade，**而 `OkxClient` 根本沒有 `set_leverage` 這個 method**。OkxClient 只 proxy 了 `submit_market_order / submit_algo_stop / amend_algo_stop / cancel_algo_stop / get_positions / get_balance / get_account_config / get_server_time` 8 個 method，2f04e4d 加 isolated path 時忘了補 set_leverage。
+
+執行流程實際上是：
+```
+1. cfg.td_mode == "isolated" → 進入 set_leverage 路徑
+2. self._client.set_leverage(...)  → Python AttributeError（method 不存在）
+3. executor.py:1014 的 except Exception 接住 → lev_ok = False
+4. 觸發 abort + Telegram alert「set-leverage failed」
+```
+
+**完全沒打到 OKX 一次 request**。user 怎麼調 OKX UI 都沒救——這個 abort 是 Python 物件層級錯誤，不是 API 拒絕。但 Telegram alert 的文字寫「set-leverage failed」，誤導 user（跟我）以為是 OKX 那邊的問題。
+
+時間軸：2f04e4d（2026-06-XX）加 isolated dormant capability，沒同步 OkxClient → 期間 cross 模式不會觸發、bug 潛伏。user 啟用 `OKX_TD_MODE=isolated` 那一刻起，每個 Strong signal 都會 abort。第一次 abort 才暴露。
+
+**Root cause:**
+
+**這是 [[mistake 2026-06-07 trail bug 三輪修]] 的 P0-2「facade 對齊」教訓的第 2 次重演**——只是換成「facade 整個缺 method」而不是「facade signature 缺參數」。同 root pattern：
+
+> **新功能加在 REST adapter 層，忘了在 facade 層加 proxy。**
+
+trail bug：`OkxRestClient.amend_algo_stop` 加了 `inst_id` 參數、`OkxClient.amend_algo_stop` 沒加 → TypeError 被吞。
+這次：`OkxRestClient.set_leverage` 存在、`OkxClient.set_leverage` 整個沒有 → AttributeError 被吞。
+
+兩個都被 executor 的 generic `except Exception` 吞掉，alert 文字只寫「failed」、不寫真實 exception type，**讓使用者（含未來的我）誤以為是 exchange 那邊的問題**——這是更深層的設計缺陷：fail-safe 設計把錯誤捕獲了但**沒把錯誤分類傳遞**給操作員。
+
+放大因素：
+1. **Telegram alert 文字過度泛化**（「set-leverage failed」對「AttributeError」跟「OKX 50014」一視同仁）→ 誤導診斷方向
+2. **executor.py:1015 用 `logger.exception("set_leverage_exception")`** 確實會 log 完整 traceback，但 Railway logs 不在 alert 流程裡，user 手機看不到、跟我之前對話也沒查
+3. **07eadff 修 trail 時加的 signature-parity 測試只覆蓋 amend_algo_stop**，沒擴展到「整個 OkxClient 對 executor 用的所有 method」
+
+**Correct approach（已修，commit 914870c）:**
+
+1. **OkxClient 補 set_leverage + set_leverage_detail proxy**（純 passthrough 給 `self._rest`）。
+2. **rest.set_leverage_detail 新方法**回傳 `{ok, code, msg, raw}` 完整 OKX response，給診斷介面（未來的 `/okx-admin/isolated-check` endpoint）surface 真實錯誤碼用。
+3. **rest.set_leverage 失敗時 `logger.error` 帶 code + msg**——bool wrapper 不再吃掉錯誤資訊，Railway logs 能看到真實 OKX 5xxxx。
+4. **加 AST-based signature-parity 測試** `test_executor_called_methods_exist_on_facade`：scan `executor.py` 找所有 `self._client.<X>` 呼叫，assert 全部存在於 OkxClient。這是 trail bug 修法（07eadff signature-parity test）的**自動化升級版**——不靠人列出哪些 method 要驗，AST 直接抓 callgraph。
+
+**Rule:**
+
+新功能加 OkxRestClient method 時，**必須同步加 OkxClient proxy**——這條沒人會記得，所以靠 test 強制。AST signature-parity test 已部署，未來任何 facade drift 都會在 pre-commit / CI fail。
+
+**更根本的 rule（給未來自己跟未來 AI 協作）**：
+
+**fail-safe except 必須分類錯誤後再決定 user-facing 文字**。寫 generic `except Exception: alert("X failed")` 是把所有問題壓成同一條訊息、誤導 downstream debug。正確做法：
+- `except AttributeError` → alert 「internal facade error, missing method X」+ raise to top
+- `except OkxAPIError` → alert 「OKX rejected: code=Y msg=Z」
+- `except (ConnectionError, TimeoutError)` → alert 「network unreachable, will retry」
+
+每一種 user 採取的下一步動作完全不同。把它們合併成「failed」= 強迫操作員猜根因 = 浪費時間 + 誤判風險。
+
+**Symptom-to-search 規則**：看到「某 exchange method failed」alert，第一個 grep 不是 OKX docs，是 `grep -n "<method>" indicator/okx/*.py` 看 facade chain 是不是斷的。**Trail bug 兩次、set_leverage 一次，這個方向應該排第 1。**
+
+---
+
 ## 2026-06-07: admin_heal 第二次造孤兒倉——破壞性操作掛在無認證 GET + 只改 DB 不平 OKX
 
 **What happened:**

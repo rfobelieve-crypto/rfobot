@@ -1,15 +1,22 @@
 """Entry-policy backtest under the REAL exit logic + 1-position occupancy.
 
-Answers: under the live exit (3xATR TRAILING stop + 72h time cap + opposite-
-signal exit) and max_position_count=1, does opening ONLY Strong beat opening
-Strong+Moderate? The proxy sims (tier_occupancy_sim) said yes on a fixed-hold
-path-return proxy; this uses the faithful exit so the verdict is decision-grade.
+Answers: under the live exit (3xATR TRAILING stop + opposite-signal exit,
+optionally a fixed time cap) and max_position_count=1, does opening ONLY
+Strong beat opening Strong+Moderate? The proxy sims (tier_occupancy_sim)
+said yes on a fixed-hold path-return proxy; this uses the faithful exit
+so the verdict is decision-grade.
 
 Faithful to indicator/okx/executor.py:
-  TRAIL_MULT=3.0, TIME_CAP_HOURS=72, opp_signal = ANY opposite reading
-  (Moderate or Strong), exit at that bar's close. Trailing stop ratchets the
-  extreme each completed bar; the updated stop is active for the NEXT bar
-  (no intrabar look-ahead). Entry = next bar open after the signal.
+  TRAIL_MULT=3.0, opp_signal = ANY opposite reading (Moderate or Strong),
+  exit at that bar's close. Trailing stop ratchets the extreme each
+  completed bar; the updated stop is active for the NEXT bar (no intrabar
+  look-ahead). Entry = next bar open after the signal.
+
+Time-cap policy (changed 2026-06-10):
+  Default --time-cap 72 reproduces the original Strong-only 62% / both 53%
+  comparison cited in indicator/okx/config.py.
+  Use --time-cap 0 to disable the cap and reflect current live behaviour
+  (cap removed per CLAUDE.md 2026-06-10 — winners run to trail/opp only).
 
 Reuses verify_kernel_method_c primitives (decode_tiers rolling-percentile =
 live decode, atr_wilder, _trade_pnl, FEE_RT, metrics) so numbers are directly
@@ -21,9 +28,14 @@ Policies (all under 1-position occupancy):
   BOTH_PREempt enter S/M; if holding and an opposite STRONG fires, flip
   + a derived BOTH_MODHALF view (stage4 incumbent: Moderate sized 0.5)
 
+Usage:
+    python research/dual_model/entry_policy_real_exit_bt.py             # 72h cap (original)
+    python research/dual_model/entry_policy_real_exit_bt.py --time-cap 0  # current live
+
 Output: research/results/dual_model/entry_policy_real_exit.csv
 """
 from __future__ import annotations
+import argparse
 import sys
 from pathlib import Path
 import numpy as np
@@ -42,10 +54,10 @@ V71_OOS = ROOT / "research" / "results" / "dual_model" / "direction_reg_oos_mse.
 OUT = ROOT / "research" / "results" / "dual_model" / "entry_policy_real_exit.csv"
 
 TRAIL_MULT = 3.0
-TIME_CAP = 72
+DEFAULT_TIME_CAP = 72  # original comparison's cap; live is now 0 (disabled)
 
 
-def run_policy(k, decoded, atr, policy: str) -> pd.DataFrame:
+def run_policy(k, decoded, atr, policy: str, time_cap: int) -> pd.DataFrame:
     idx = k.index
     openp = k["open"].to_numpy(float)
     high = k["high"].to_numpy(float)
@@ -81,7 +93,10 @@ def run_policy(k, decoded, atr, policy: str) -> pd.DataFrame:
         extreme = entry_px
         stop_px = entry_px - stop_dist if d == "UP" else entry_px + stop_dist
         exit_i = exit_px = reason = None
-        for j in range(entry_i, min(entry_i + TIME_CAP, n)):
+        # When time_cap=0 (current live), let the loop scan to the data end —
+        # exits then come from trail or opp signal only.
+        end_j = min(entry_i + time_cap, n) if time_cap > 0 else n
+        for j in range(entry_i, end_j):
             # 1) trailing stop active from prior bar's extreme — intrabar hit
             if d == "UP" and low[j] <= stop_px:
                 exit_i, exit_px, reason = j, stop_px, "trail_stop"
@@ -106,9 +121,17 @@ def run_policy(k, decoded, atr, policy: str) -> pd.DataFrame:
             else:
                 extreme = min(extreme, low[j])
                 stop_px = extreme + stop_dist
-        if exit_i is None:                          # hit 72h cap
-            exit_i = min(entry_i + TIME_CAP - 1, n - 1)
-            exit_px, reason = close[exit_i], "time_cap"
+        if exit_i is None:
+            # Two ways to land here:
+            #   1) time_cap > 0 and the loop walked the full cap window → time_cap exit
+            #   2) time_cap = 0 and we ran to the dataset end → data_end exit
+            #      (flagged as not a real strategy exit)
+            if time_cap > 0:
+                exit_i = min(entry_i + time_cap - 1, n - 1)
+                exit_px, reason = close[exit_i], "time_cap"
+            else:
+                exit_i = n - 1
+                exit_px, reason = close[exit_i], "data_end"
         gross, net = _trade_pnl(d, entry_px, exit_px)
         rows.append(dict(
             signal_ts=idx[i], entry_ts=idx[entry_i], exit_ts=idx[exit_i],
@@ -123,6 +146,13 @@ def run_policy(k, decoded, atr, policy: str) -> pd.DataFrame:
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--time-cap", type=int, default=DEFAULT_TIME_CAP,
+                    help=("Time cap in hours. Default 72 reproduces the "
+                          "original Strong-only 62%% / both 53%% comparison. "
+                          "Use 0 to disable cap (current live behaviour)."))
+    args = ap.parse_args()
+
     k = pd.read_parquet(KLINES)[["open", "high", "low", "close"]].dropna()
     k.index = _strip_tz(k.index)
     k = k[~k.index.duplicated(keep="last")].sort_index()
@@ -136,11 +166,14 @@ def main():
     print(f"OOS span {v.index[0]:%Y-%m-%d} → {v.index[-1]:%Y-%m-%d}  ({len(v)} bars)")
     nS = int((decoded["tier"] == "Strong").sum())
     nM = int((decoded["tier"] == "Moderate").sum())
+    cap_str = f"{args.time_cap}h" if args.time_cap > 0 else "disabled (live)"
     print(f"decoded signal bars: Strong={nS} Moderate={nM}  "
-          f"(real live decode, rolling percentile)\n")
+          f"(real live decode, rolling percentile)")
+    print(f"time cap: {cap_str}\n")
 
     policies = ["STRONG", "BOTH", "BOTH_PREempt"]
-    trades = {p: run_policy(k, decoded, atr, p) for p in policies}
+    trades = {p: run_policy(k, decoded, atr, p, args.time_cap)
+              for p in policies}
     M = {p: metrics(trades[p], k) for p in policies}
 
     print("=" * 104)

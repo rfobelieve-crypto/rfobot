@@ -241,10 +241,41 @@ class OkxRestClient:
                      pos_side: Optional[str] = None) -> bool:
         """Set leverage for (instId, mgnMode[, posSide]).  Returns True on code==0.
 
-        Isolated margin REQUIRES leverage configured per (instId, isolated,
-        posSide) or OKX rejects the order (long_short_mode needs one call per
-        side).  Idempotent — safe to call before every open.  cross mode omits
-        posSide.  3x retry (do not retry 4xx — a bad request won't fix itself).
+        Thin wrapper over set_leverage_detail() preserved for backward-compat
+        with executor / smoke / tests. New callers that need to surface the
+        actual OKX error code (e.g. the /okx-admin/isolated-check endpoint)
+        should call set_leverage_detail() directly.
+        """
+        detail = self.set_leverage_detail(
+            inst_id=inst_id, lever=lever, mgn_mode=mgn_mode, pos_side=pos_side)
+        ok = detail["ok"]
+        if not ok:
+            # Log the OKX error so it surfaces in Railway logs at least, even
+            # when the caller only checks the bool (executor's abort path).
+            logger.error(
+                "set_leverage_failed code=%s msg=%s inst=%s lev=%s mgn=%s ps=%s",
+                detail.get("code"), detail.get("msg"),
+                inst_id, lever, mgn_mode, pos_side,
+            )
+        return ok
+
+    def set_leverage_detail(self, *, inst_id: str, lever: int, mgn_mode: str,
+                            pos_side: Optional[str] = None) -> dict:
+        """Same call as set_leverage but returns the full OKX response detail.
+
+        Returns a dict with keys:
+            ok: bool   — True iff OKX returned top-level code == "0"
+            code: str  — OKX response code (top-level, plus inner sCode if
+                         present, joined by "/"); "network" on retry exhaust
+            msg: str   — OKX message or fallback "circuit-open / retries
+                         exhausted"
+            raw: dict  — OKX full response, or None on retry exhaust
+
+        Designed for diagnostic surfaces (the phone-friendly
+        /okx-admin/isolated-check endpoint) where the operator needs to see
+        the real OKX error code without SSH access.  Idempotent — safe to
+        call at will; sets leverage to the requested value, which OKX
+        no-ops if already at that value.
         """
         path = "/api/v5/account/set-leverage"
         body = {"instId": inst_id, "lever": str(lever), "mgnMode": mgn_mode}
@@ -255,8 +286,25 @@ class OkxRestClient:
             retry_on_4xx=False,
         )
         if result is None:
-            return False
-        return str(result.get("code")) == "0"
+            return {"ok": False, "code": "network", "raw": None,
+                    "msg": "circuit-open or all retries exhausted"}
+        code = str(result.get("code", ""))
+        # OKX wraps the real instrument-level error in result["data"][0] when
+        # the top-level code is "1" (request accepted, inner rejection).
+        data_msg = ""
+        try:
+            data_list = result.get("data") or []
+            if data_list and isinstance(data_list[0], dict):
+                data_msg = (data_list[0].get("sMsg")
+                            or data_list[0].get("msg") or "")
+                data_code = (data_list[0].get("sCode")
+                             or data_list[0].get("code"))
+                if data_code and str(data_code) != "0":
+                    code = f"{code}/{data_code}"
+        except Exception:
+            pass
+        msg = result.get("msg") or data_msg or ""
+        return {"ok": code == "0", "code": code, "raw": result, "msg": msg}
 
     def get_order(self, *, inst_id: str, ord_id: str) -> Optional[OrderDetails]:
         """Read back one order's true fill (avgPx + accumulated fee).
