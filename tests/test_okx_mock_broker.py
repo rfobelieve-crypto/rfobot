@@ -521,7 +521,7 @@ class TestFacadeSignatureParity:
         from indicator.okx.client import OkxClient
 
         executor_src = Path(
-            "indicator/okx/executor.py").read_text()
+            "indicator/okx/executor.py").read_text(encoding="utf-8")
         tree = ast.parse(executor_src)
         called = set()
         for node in ast.walk(tree):
