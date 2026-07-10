@@ -2749,6 +2749,53 @@ def _heartbeat_watchdog():
         _t.sleep(CHECK_SEC)
 
 
+_depth_fresh_state = {"alerted": False}
+
+
+def _depth_freshness_check():
+    """Depth-delta collector dead-man's switch (2026-07-10).
+
+    depth_deltas_1m is the only data stream that CANNOT be backfilled — a
+    dead collector permanently loses that day, and both the 8/10 bar-level
+    lead checkpoint and the ~10月 flow-reentry gate depend on it. Service 2
+    writes it; this job (Service 1, which owns Telegram plumbing) watches
+    the table's freshness. One alert on stall, one on recovery — same
+    dedup pattern as _heartbeat_watchdog. Pure monitoring; swallows all
+    errors.
+    """
+    STALE_MIN = 120
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT MAX(minute_start_ms) AS mx FROM "
+                            "depth_deltas_1m WHERE canonical_symbol='BTC-USD'")
+                row = cur.fetchone() or {}
+        finally:
+            conn.close()
+        mx = row.get("mx")
+        now_ms = datetime.now(timezone.utc).timestamp() * 1000
+        age_min = (now_ms - float(mx)) / 60000.0 if mx else None
+        chat = os.environ.get("TG_CRITICAL_CHAT_ID", "") or ""
+        if age_min is None or age_min > STALE_MIN:
+            if not _depth_fresh_state["alerted"]:
+                age_str = "無資料" if age_min is None else f"{age_min:.0f} 分鐘"
+                _send_telegram_text(
+                    "⚠️ <b>撤單收集器停更</b>\n"
+                    f"depth_deltas_1m 最新資料已 {age_str} 沒進來。\n"
+                    "此資料不可回填——每停一小時就永久缺一小時。\n"
+                    "查 Service 2 (market_data) 的 Railway logs：depth-delta thread。",
+                    chat_id=chat)
+                _depth_fresh_state["alerted"] = True
+                logger.error("depth_freshness_alert age=%s", age_str)
+        elif _depth_fresh_state["alerted"]:
+            _send_telegram_text("✅ <b>撤單收集器恢復寫入</b>", chat_id=chat)
+            _depth_fresh_state["alerted"] = False
+    except Exception:
+        logger.exception("depth_freshness_check_error")
+
+
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -2758,6 +2805,11 @@ def start_scheduler():
     scheduler.add_job(update_cycle, "cron", minute="2",
                       misfire_grace_time=300, max_instances=1,
                       id="update_cycle")
+
+    # Depth-delta freshness (2026-07-10): unbackfillable stream watchdog
+    scheduler.add_job(_depth_freshness_check, "cron", minute="8,38",
+                      misfire_grace_time=600, max_instances=1,
+                      id="depth_freshness")
 
     # Agent watchdog: quick sweep every hour at :15, full sweep every 4h at :20
     scheduler.add_job(_run_watchdog_quick, "cron", minute="15",
