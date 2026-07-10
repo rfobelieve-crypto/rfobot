@@ -72,7 +72,10 @@ def run_policy(k, decoded, atr, policy: str, time_cap: int) -> pd.DataFrame:
         d, ti = dir_arr[i], tier_arr[i]
         if d == "NEUTRAL":
             return False
-        if policy == "STRONG":
+        if policy.startswith("STRONG"):
+            # STRONG (flip semantics: rescan includes the exit bar, so an
+            # opposite-Strong exit re-enters next bar) and STRONG_NOFLIP
+            # (faithful live: opp exit returns without entering that cycle).
             return ti == "Strong"
         return ti in ("Strong", "Moderate")     # BOTH / BOTH_PREempt
 
@@ -140,8 +143,16 @@ def run_policy(k, decoded, atr, policy: str, time_cap: int) -> pd.DataFrame:
             hold_h=(idx[exit_i] - idx[entry_i]).total_seconds() / 3600.0,
             gross=gross, net=net,
         ))
-        # occupancy: resume scanning AFTER the exit bar (slot freed)
+        # occupancy: resume scanning AT the exit bar (slot freed; a qualifying
+        # signal on the exit bar re-enters next bar = flip semantics).
         i = max(exit_i, entry_i)
+        # STRONG_NOFLIP — faithful to live executor (2026-07-10 verified,
+        # executor.py:575: opp exit closes and RETURNS, no same-cycle entry):
+        # skip the exit bar's signal when the exit came from an opposite
+        # reading. Trail exits keep flip semantics in both variants (OKX
+        # fills the stop intrabar, executor is flat by cycle time).
+        if policy == "STRONG_NOFLIP" and reason in ("opp_signal", "opp_strong"):
+            i += 1
     return pd.DataFrame(rows)
 
 
