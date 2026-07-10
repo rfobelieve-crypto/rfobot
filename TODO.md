@@ -4,32 +4,51 @@
 > 凡是要「本機 / 雲端 / 下一次對話」都看得到的任務，寫這裡並 push。
 > 每次開工：先讀「當前任務」區。
 
-## 當前任務（2026-07-07 更新）
+## 當前任務（2026-07-09 更新）
 
 ### 1. 擠壓指標 × 訂單流系統結合（策略 #2 候選）★ 最優先
 流動性真空假說：壓縮後價格往阻力小的一側走，撤單領先成交洩露方向。
-工具鏈已全部完成（branch `claude/general-session-HEJed`）：
-- `research/squeeze_events.py` — Pine v2.4 移植的事件採樣器（結算語義已對齊，勿改內部邏輯）
-- `research/squeeze_events_cli.py` — 事件表 CLI（對接既有 klines parquet）
-- `research/squeeze_flow_join.py` — H1/H2/H3 假設檢驗（joins orderbook_snapshots_1m + flow_bars_1m）
-- `market_data/adapters/depth_delta_collector.py` — 真撤單收集器（standalone，未接 service）
+工具鏈全部完成（已 merge 進 main）：`squeeze_events{,_cli}.py`、`squeeze_flow_join.py`、
+`depth_delta_collector.py`。
 
-執行順序：
-- [ ] Step 0-a Pine 對帳：TV 端（filterMode=OFF, confirmOnClose=ON）事件 vs
-      `squeeze_events_cli.py` 輸出，時間戳+方向 100% 一致才放行
-      （注意：atr_bo 欄=band=ATR×0.9；丟棄前 3×max(period) 根暖機）
-- [ ] Step 0-b 無條件基線：`python research/squeeze_events_cli.py --start 2025-06-01`
-- [ ] Step 1 flag 統計：`python research/squeeze_flow_join.py`（H1/H2/H3 + 前後半穩定性）
-- [ ] Step 2 啟動撤單收集器累積 depth_deltas_1m（3-6 個月後跑精細版）
+執行進度（2026-07-09 session）：
+- [x] Step 0-b 無條件基線：**122 事件**（sl_first 53.8%、r_scaleout +0.455、MFE/MAE 2.71/1.23R）
+- [x] **Step 2 撤單收集器已上線**：`depth_delta_collector` 掛進 market_data service（commit 927b4b7 pushed），
+      `depth_deltas_1m` 自 2026-07-09 起 24/7 累積（本地 smoke 通過，每分鐘 bid/ask add/cancel）。← **資料時鐘已啟動**
+- [~] Step 1 flag 統計：`squeeze_flow_join` 兩個 bug 已修（`window_start` 欄名 + cp950 輸出），管線跑通；
+      但 `orderbook_snapshots_1m` 深度僅回溯 2026-05-11 → 122 事件只有 **26 個**有覆蓋、全 cell n<100 → **無法下結論**（如預警）
+- [ ] Step 0-a Pine 對帳（仍是正式放行門，需 TV 端比對，未做）
+      （atr_bo 欄=band=ATR×0.9；丟棄前 3×max(period) 根暖機；TV filterMode=OFF, confirmOnClose=ON）
 
-預先登記假設（2026-07-07，看資料前寫定）：
-H1 薄側一致 → sl_first 較低；H2 撤單側 → 突破同側 >55%（CI 下緣>50%）；
-H3 三旗共振子集 r_scaleout CI 下緣 >0。
+本 session 額外 powered 檢驗（taker/衍生品訂單流，非撤單）：
+- horizon-IC：taker flow 無條件對 1-12h ≈ 0（1h 尺度訊號已衰減殆盡）；squeeze 條件 h2-4 微弱駝峰但 n=119 CI 全含 0
+- hybrid 篩選（8 訂單流特徵 × 突破成敗）：廣撒混合體 **OOS NO-GO**（LOO-CV AUC 0.564 CI[0.457,0.671] 含 0.5）；
+  唯一 univariate 冒頭 = 方向對齊 Coinbase 現貨溢價（IC +0.23，CI 邊緣離 0，多重比較存疑，可能已在 V7）；taker 系全死
+- context 搜索（全 6290 bar，有統計力）：壓縮/Donchian突破/測試關卡/高波動 **無一** context 把 taker IC 拉離 0 →
+  **powered NULL**，且戳破 squeeze 駝峰（很可能小樣本雜訊）
+- **結論**：taker/衍生品訂單流 × 傳統指標，1h+ 視野 = 已飽和/擁擠（第 4 次驗證）。火花只可能在
+  **(a) 差異化訊號 = 撤單（`depth_deltas_1m` 收集中）** 或 **(b) 次小時視野（訂單流還活著的尺度）**
+
+下一步（取代原執行順序）：
+- [ ] （被動）等 `depth_deltas_1m` 累積 3-6 個月 → 用今天的 `horizon_ic` / `context_ic` 腳本**原樣換撤單訊號**重跑（差異化訊號的第一次真正檢驗）
+- [ ] Pine 對帳（Step 0-a），讓事件時間戳可信
+- [ ] 把 scratchpad 的 `horizon_ic.py` / `context_ic.py` / `hybrid_screen.py` 整進 `research/` + 留「換撤單訊號」接口（目前僅在 scratchpad）
+- [ ] （可選、便宜）單獨驗 spot-premium：walk-forward + conditional IC vs V7 residual，確認真火花 or 噪音/冗餘
+
+預先登記假設（2026-07-07 定，撤單資料到位後仍用）：
+H1 薄側一致 → sl_first 較低；H2 撤單側 → 突破同側 >55%（CI 下緣>50%）；H3 三旗共振 r_scaleout CI 下緣 >0。
 紀律鎖：cell n<100 不下結論；前後半同向才算過；看資料後禁改 flag 定義。
-樣本量預警：1h BTC 一年約 30-60 事件，第一輪多半「方向有趣樣本不足」→ 擴樣本
-（15m / ETH），不降標準。定位：走完整 staged framework，倉位與 V7 合併計算。
+樣本量預警：1h BTC 一年約 30-60 事件（含叢聚 122）→ 第一輪樣本不足，可擴 15m / ETH，不降標準。
 
-### 2. OKX.AI Genesis 黑客松 — 以 ASP 身份參賽（修正 2026-07-07）
+### 2. OKX.AI Genesis 黑客松 — ⏸️ 擱置（2026-07-10 決定）
+**使用者叫停原 ASP 方向**：賣訊號解讀 = 把系統 edge 分享出去（alpha 擁擠即衰退），
+per-call 收費完全不對價。okx-asp repo 保留（含已完成的 Claude 解讀層 a95edae）但**不部署、不上架**。
+7/17 截止前若要參賽只剩 pivot 到不洩訊號的題目；預設不參賽。
+⚠️ 相關事實：主系統 `/json` endpoint 目前**完全公開**（admin guard 刻意豁免），任何人可抓
+direction/tier/confidence——使用者知情後選擇**先留公開**（保留產品化彈性）；若立場改變，把 `/json`
+加進 guard 前先查內部呼叫者（圖表/bot）。$80 Claude 促銷積分改留給自用（如 sentiment 異源原型）。
+
+<details><summary>原參賽計畫（點開，僅存檔）</summary>
 角色 = ASP（Agent Service Provider，賣方）：把量化系統包裝成可被呼叫/
 付費的 AI Agent 服務並上架 okx.ai。核心要求「打造並成功上架一個有真實價值
 的 ASP」；評審重視 Revenue Rocket（收入+聲譽累積）。
@@ -43,6 +62,8 @@ H3 三旗共振子集 r_scaleout CI 下緣 >0。
 - [ ] **IP 保護**：Skill Square 提交用包裝版/簡化版，V7 真實 edge 不公開
 - 加分動機：參賽過程 = EP 系列 + LinkedIn 素材 + 履歷素材（OKX 官方賽事排名可驗證）
 - 風險認知：ROI 榜首多為高槓桿樂透倉，不以奪榜為目標，以「完賽 + 正收益 + 內容產出」為目標
+
+</details>
 
 ### 3. 朋友跟單系統部署（Phase 0+1 程式碼已完成）
 - [ ] Railway env：`OKX_CRED_MASTER_KEY`（Fernet key，存密碼管理器）+ `TG_ADMIN_CHAT_ID`
@@ -117,6 +138,9 @@ rfobot_系統精通手冊.docx 含完整標準答案）。逐層攻破，每層�
 - [x] Gate A 通過（2026-06-10：Strong n=739, WR 59.5%, CI [56.0, 63.2]）
 - [x] 3-WR 透明化 /okx-perf + Gate B 進度卡
 - [x] 多帳戶跟單 Phase 0+1 程式碼（accounts registry + executor fan-out）
+- [x] admin/OKX routes token guard 上線（`ADMIN_HEAL_TOKEN` 兩 service 設定 + fail-closed guard，2026-07-09 pushed）
+- [x] branch `claude/general-session-HEJed` merge 進 main + push（本 TODO 即出自此 merge）
+- [x] 撤單收集器 `depth_delta_collector` 上線 Service 2（2026-07-09，`depth_deltas_1m` 開始累積）
 
 ## 回測失敗（已排除，勿重跑）
 - [x] ~~流動性獵取反轉~~ — 4h 週期上 IC ≈ 0
@@ -127,3 +151,4 @@ rfobot_系統精通手冊.docx 含完整標準答案）。逐層攻破，每層�
 - [x] ~~WQ101 alphas (6)~~ — aggregate lift 被 outlier fold 撐起，per-fold 負
 - [x] ~~liquidity proxy features (21)~~ — univariate IC 高但 ensemble 零提升
 - [x] ~~exit-variants sweep + 不對稱 cutoff Option C~~ — 雙 NO-GO（5d83da2）
+- [x] ~~taker/衍生品訂單流 × 傳統指標 context~~ — powered NULL（2026-07-09；壓縮/突破/關卡/高波動 4 context 無一把 taker IC 拉離 0；1h+ 已飽和；火花改押撤單訊號 or 次小時視野）
