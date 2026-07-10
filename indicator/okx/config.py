@@ -82,6 +82,16 @@ class OkxConfig:
     # Does NOT touch management of an already-open position.
     strong_only_entry: bool = False
 
+    # Flip on opposite-Strong (2026-07-10).  Evidence
+    # (research/dual_model/strong_preempt_bt, real exit + occupancy, 5mo OOS):
+    # flipped entries n=24, +63bps/tr, bootstrap CI[+18.7,+116.2] bps, first/
+    # second half agree, cum +6.8pp vs no-flip.  Live previously closed on an
+    # opposite reading and RETURNED (executor.py opp exit), catching the
+    # reversal only if the next bar still decoded Strong.  With this flag the
+    # executor enters the NEW direction in the same cycle when the opposite
+    # reading is Strong-tier.  Disable live via OKX_FLIP_ON_OPP_STRONG=0.
+    flip_on_opp_strong: bool = True
+
     # Time-cap exit (hours). 0 = DISABLED (removed 2026-06-10 per user) — let
     # winners run; exits then come only from the 3xATR TRAILING stop or an
     # opposite signal. The rare trades that previously hit the 72h cap were the
@@ -171,6 +181,9 @@ def load_okx_config_from_env(stage: Literal["testnet", "live"] = "testnet") -> O
     soe = os.environ.get("OKX_STRONG_ONLY_ENTRY", "").strip().lower()
     if soe in ("1", "true", "yes", "on"):
         kwargs["strong_only_entry"] = True
+    fos = os.environ.get("OKX_FLIP_ON_OPP_STRONG", "").strip().lower()
+    if fos in ("0", "false", "no", "off"):
+        kwargs["flip_on_opp_strong"] = False
     tch = os.environ.get("OKX_TIME_CAP_HOURS", "").strip()
     if tch:
         try:

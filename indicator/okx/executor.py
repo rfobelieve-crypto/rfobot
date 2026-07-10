@@ -370,8 +370,32 @@ class V7OkxExecutor:
         # 4. Manage existing position
         pos = self._store.get_open_position()
         if pos:
-            return self._manage_position(pos, klines=klines,
-                                         signal_direction=signal_direction)
+            res = self._manage_position(pos, klines=klines,
+                                        signal_direction=signal_direction)
+            # Flip on opposite-Strong (2026-07-10, strong_preempt_bt GO):
+            # the opp_signal close used to end the cycle, catching the
+            # reversal only if the NEXT bar still decoded Strong. When the
+            # opposite reading is Strong-tier, enter the new direction now.
+            if (self._cfg.flip_on_opp_strong
+                    and res.action == "close"
+                    and (res.detail or {}).get("exit_reason") == "opp_signal"
+                    and signal_strength == "Strong"
+                    and signal_direction in ("UP", "DOWN")
+                    and self._status == ExecutorStatus.ACTIVE
+                    and self._flip_daily_cap_ok(res)):
+                logger.info("flip_on_opp_strong: closed pos %s, entering %s",
+                            (res.detail or {}).get("position_id"),
+                            signal_direction)
+                flip = self._open_position(
+                    klines=klines, signal_direction=signal_direction,
+                    signal_strength=signal_strength,
+                    model_version=model_version)
+                return CycleResult(
+                    action="flip",
+                    detail={"closed": res.detail,
+                            "open_action": flip.action,
+                            "opened": flip.detail})
+            return res
 
         # 5. Open new position if signal valid. (Paper cohort removed
         # 2026-06-05 — LIVE OKX is now the sole cohort, so there is no
@@ -396,6 +420,30 @@ class V7OkxExecutor:
                                        model_version=model_version)
 
         return CycleResult(action="none", detail={"reason": "no_signal_no_pos"})
+
+    def _flip_daily_cap_ok(self, close_res: CycleResult) -> bool:
+        """Guard the flip entry against the one-cycle kill-check window.
+
+        Kill checks ran BEFORE the opp close this cycle; if the realized
+        loss just breached the daily cap, entering again would front-run
+        next cycle's HALT.  Fail-closed: any lookup problem skips the flip
+        (the flip is an enhancement — never worth a guard exception).
+        """
+        try:
+            eq_after = float((close_res.detail or {}).get("equity_after") or 0)
+            day_start = self._store.get_day_start_equity()
+            if eq_after <= 0 or not day_start or float(day_start) <= 0:
+                return False
+            day_pct = (eq_after / float(day_start) - 1.0) * 100.0
+            if day_pct <= self._cfg.daily_loss_cap_pct:
+                logger.warning(
+                    "flip skipped: day P&L %.2f%% breaches daily cap %.1f%%",
+                    day_pct, self._cfg.daily_loss_cap_pct)
+                return False
+            return True
+        except Exception:
+            logger.exception("flip_daily_cap_guard_failed — skipping flip")
+            return False
 
     # ── Auto-heal ──────────────────────────────────────────────────────
 

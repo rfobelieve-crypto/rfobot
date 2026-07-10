@@ -95,7 +95,6 @@ def load_window(t0_ms: int, t1_ms: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def shadow_one(ev: dict, window_min: int) -> dict | None:
     d = 1 if ev["direction"] == "LONG" else -1
-    px0 = float(ev["entry_price"])
     t0 = int(pd.Timestamp(ev["entry_time"]).value // 1_000_000)
     t1 = t0 + window_min * 60_000
     book, dd = load_window(t0, t1)
@@ -103,6 +102,12 @@ def shadow_one(ev: dict, window_min: int) -> dict | None:
         return None
     for c in ("mid_price", "bid_l1_price", "ask_l1_price", "imbalance_l20"):
         book[c] = book[c].astype(float)
+    # Hypothetical (signal-level) entries carry no fill price — the baseline
+    # is the taker price at the first snapshot after the signal.
+    px0 = float(ev.get("entry_price") or 0)
+    if px0 <= 0:
+        first = book.iloc[0]
+        px0 = float(first["ask_l1_price"] if d == 1 else first["bid_l1_price"])
 
     skew_by_min: dict[int, float] = {}
     if len(dd):
@@ -163,13 +168,36 @@ def boot_ci(x: np.ndarray) -> tuple[float, float, float]:
     return float(np.mean(x)), float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5))
 
 
+def load_signal_entries() -> list[dict]:
+    """Hypothetical entries from ALL tracked Strong signals with book
+    coverage (L20 collector live since 2026-05-11). SUPPORTING evidence to
+    accelerate confidence — the pre-registered switch gate stays on live
+    entries (n >= 30, CI-low > 0)."""
+    rows = _fetch(
+        "SELECT id, signal_time, direction FROM tracked_signals "
+        "WHERE strength='Strong' AND direction IN ('UP','DOWN') "
+        "  AND signal_time >= '2026-05-11' ORDER BY signal_time")
+    return [{"id": f"s{r['id']}", "entry_time": r["signal_time"],
+             "direction": "LONG" if r["direction"] == "UP" else "SHORT",
+             "entry_price": None} for r in rows]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--window-min", type=int, default=60)
+    ap.add_argument("--signals", action="store_true",
+                    help="signal-level backfill (hypothetical entries at every "
+                         "tracked Strong signal) — supporting evidence only")
     args = ap.parse_args()
 
-    entries = load_entries()
-    print(f"{len(entries)} live entries since 2026-06-07 (manual_test excluded)")
+    if args.signals:
+        entries = load_signal_entries()
+        print(f"{len(entries)} hypothetical entries from tracked Strong signals "
+              f"since 2026-05-11 (SUPPORTING evidence — switch gate stays on "
+              f"live entries)")
+    else:
+        entries = load_entries()
+        print(f"{len(entries)} live entries since 2026-06-07 (manual_test excluded)")
     rows, skipped = [], 0
     for ev in entries:
         r = shadow_one(ev, args.window_min)
@@ -195,7 +223,9 @@ def main() -> int:
                  else f"filled {int(df['r2_filled'].sum())}/{len(df)}")
         print(f"\n{name.upper()} mean edge {m:+.1f} bps  CI[{lo:+.1f},{hi:+.1f}]  ({extra})")
 
-    out = PROJECT_ROOT / "research" / "results" / "shadow_exec_window.parquet"
+    out = PROJECT_ROOT / "research" / "results" / (
+        "shadow_exec_window_signals.parquet" if args.signals
+        else "shadow_exec_window.parquet")
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out, index=False)
     print(f"\nWrote → {out}")
