@@ -76,8 +76,26 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
 ### 4. 研究腳本待跑（皆需資料層）
 - [ ] `python research/poc_sweep_study.py` — POC × 流動性獵取（手動交易輔助），
       跑完把 Section 1+2 給 Claude 判讀
-- [ ] `python research/exit_decomposition.py` — exit regret 歸因
-      （先確認 5d83da2 的 exit-variants 雙 NO-GO 是否已覆蓋此問題，是則關閉）
+- [x] `python research/exit_decomposition.py` — **2026-07-10 已跑**：opp_signal 出場是
+      利潤引擎（86% WR / +152bps / 多抱反虧 60-75bps → 不可動）；trail 平均 regret≈0，
+      只有最差 1/4 漏 70-130bps（其中 9/13 是 Moderate 進場——Strong-only live 大半不存在）。
+      結論：出場規則不改；剩餘槓桿 = 條件性重進場（下行）
+- [ ] **flow 重進場**（pre-registered 2026-07-10，`research/flow_reentry_bt.py`，規則已凍結）：
+      trail 掃出後 60min 內 cancel_skew 與 imbalance 都仍偏原方向 → 下根 bar 重進場。
+      停損完整不動，只決定「要不要買回票」。Gate：n≥30 + CI 下緣>0 + 前後半同號，
+      預計 **~2026-10**（backtest 節奏 ~8-9 trail 出場/月）。跑前需刷新 klines parquet
+      （事件驅動：daily_collect.bat 只管 coinglass/ 子夾；root parquet 靠訓練/月度復驗刷）
+
+### 4.5 基建完善（2026-07-10 審視——防「新基建靜默失敗」族）
+- [ ] **depth_delta_collector freshness 監控**（最高優先）：`depth_deltas_1m` 最新分鐘
+      落後 >2h → Telegram 告警。撤單資料**不可回填**——collector 死一天 = 永久缺一天，
+      且 8/10 與 10 月兩個判決日都靠它。掛進既有 watchdog/health 路徑
+- [ ] **depth_deltas_1m 每日 parquet 匯出**：目前只活在 Railway MySQL，DB 事故 = 不可
+      回填資料史全滅。daily_collect.bat 加一行 export（比照其他 parquet 備援線）
+- [ ] Drawdown governor（先 alert-only）：回撤加深自動縮 size 的觸發邏輯，
+      對症 M2M MDD -21% 破 Stage3→4a 門檻
+- 📅 研究判決日曆：8/5 月度復驗（自動）→ **8/10 撤單 bar 級領先性**（cancel_lead_ic,
+      n≥40k）→ **8月中 shadow maker 裁決**（live n≥30）→ **~10月 flow 重進場 gate**（n≥30）
 
 ### 5. 內容線
 - [ ] EP2 英文版發 LinkedIn；EP3 細修後發（Medium 英文版已備）
