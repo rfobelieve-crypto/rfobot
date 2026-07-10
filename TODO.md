@@ -87,11 +87,11 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       （事件驅動：daily_collect.bat 只管 coinglass/ 子夾；root parquet 靠訓練/月度復驗刷）
 
 ### 4.5 基建完善（2026-07-10 審視——防「新基建靜默失敗」族）
-- [ ] **depth_delta_collector freshness 監控**（最高優先）：`depth_deltas_1m` 最新分鐘
-      落後 >2h → Telegram 告警。撤單資料**不可回填**——collector 死一天 = 永久缺一天，
-      且 8/10 與 10 月兩個判決日都靠它。掛進既有 watchdog/health 路徑
-- [ ] **depth_deltas_1m 每日 parquet 匯出**：目前只活在 Railway MySQL，DB 事故 = 不可
-      回填資料史全滅。daily_collect.bat 加一行 export（比照其他 parquet 備援線）
+- [x] **depth_delta_collector freshness 監控**（2026-07-10 完成，a23d174）：APScheduler
+      每 30 分查 `depth_deltas_1m` 最新分鐘，落後 >120min → TG 告警（停更+恢復各一次）
+- [x] **depth_deltas_1m 每日 parquet 匯出**（2026-07-10 完成）：export_depth_deltas.py
+      掛進 daily_collect.bat（注意 bat 被 gitignore＝本機檔，改動已生效於明日 04:00）。
+      首跑備份 1837 行，收集器 31h 近零斷點
 - [ ] Drawdown governor（先 alert-only）：回撤加深自動縮 size 的觸發邏輯，
       對症 M2M MDD -21% 破 Stage3→4a 門檻
 - 📅 研究判決日曆：8/5 月度復驗（自動）→ **8/10 撤單 bar 級領先性**（cancel_lead_ic,
