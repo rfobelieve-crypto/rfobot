@@ -74,7 +74,7 @@ def load(hours: int | None) -> pd.DataFrame:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--hours", type=int, default=0, help="0 = full depth era")
-    ap.add_argument("--smooth", type=int, default=20, help="skew rolling minutes")
+    ap.add_argument("--smooth", type=int, default=30, help="skew rolling minutes")
     args = ap.parse_args()
 
     df = load(args.hours or None)
@@ -111,33 +111,52 @@ def main() -> int:
             s.set_color(GRID)
         ax.tick_params(colors=SUB, labelsize=9)
 
-    # A: price + strong-skew event marks
-    a1.plot(df.index, df["mid"], color="#d0d0d0", lw=1.2)
-    strong = skew_s.abs() > 0.5
-    up = strong & (skew_s > 0); dn = strong & (skew_s < 0)
-    a1.scatter(df.index[up], df["mid"][up], s=14, color=GREEN, zorder=5,
-               label="賣側被抽 (向上真空)")
-    a1.scatter(df.index[dn], df["mid"][dn], s=14, color=RED, zorder=5,
-               label="買側被抽 (向下真空)")
-    a1.set_ylabel("Mid price", color=TXT, fontsize=10)
-    a1.legend(facecolor="#161b22", edgecolor=GRID, labelcolor=TXT, fontsize=9, loc="upper left")
+    x = df.index
+    z = skew_s.fillna(0).values
+    EP = 0.30                                    # 顯著不對稱門檻(顯示用)
+    # 用連續色帶標「該時段哪一側被抽」,跨三格對齊(取代雜亂散點)
+    def bands(vals, cond, color):
+        m = cond
+        i = 0; n = len(m)
+        while i < n:
+            if m[i]:
+                j = i
+                while j + 1 < n and m[j + 1]:
+                    j += 1
+                if j - i >= max(3, args.smooth // 4):   # 只畫夠長的時段
+                    for ax in (a1, a2, a3):
+                        ax.axvspan(x[i], x[j], color=color, alpha=0.10, zorder=0)
+                i = j + 1
+            else:
+                i += 1
+    bands(z, z >= EP, GREEN)
+    bands(z, z <= -EP, RED)
 
-    # B: cancel skew (smoothed diverging fill)
-    x = df.index; z = skew_s.fillna(0).values
+    # A: price(乾淨線,無散點)
+    a1.plot(x, df["mid"], color="#e8e8e8", lw=1.3)
+    a1.set_ylabel("價格 (mid)", color=TXT, fontsize=10)
+    a1.text(0.006, 0.93, "綠帶=賣側被抽(偏多真空)   紅帶=買側被抽(偏空真空)",
+            transform=a1.transAxes, color=SUB, fontsize=9)
+
+    # B: cancel skew(只留平滑填色,無散點)
     a2.axhline(0, color=SUB, lw=0.8)
-    a2.fill_between(x, 0, z, where=z >= 0, color=GREEN, alpha=0.55, interpolate=True)
-    a2.fill_between(x, 0, z, where=z < 0, color=RED, alpha=0.55, interpolate=True)
-    a2.scatter(x, skew.values, s=3, color=SUB, alpha=0.35)
-    a2.set_ylim(-1.05, 1.05)
-    a2.set_ylabel(f"撤單不對稱\n({args.smooth}m 平滑·去均值 {baseline:+.2f})", color=TXT, fontsize=10)
-    a2.text(0.005, 0.9, "＋賣側被抽 (偏多真空)", transform=a2.transAxes, color=GREEN, fontsize=8.5)
-    a2.text(0.005, 0.06, "－買側被抽 (偏空真空)", transform=a2.transAxes, color=RED, fontsize=8.5)
+    for lv in (0.3, -0.3):
+        a2.axhline(lv, color=GRID, lw=0.7, ls="--")
+    a2.fill_between(x, 0, z, where=z >= 0, color=GREEN, alpha=0.65, interpolate=True, lw=0)
+    a2.fill_between(x, 0, z, where=z < 0, color=RED, alpha=0.65, interpolate=True, lw=0)
+    a2.set_ylim(-0.8, 0.8)
+    a2.set_ylabel(f"撤單不對稱\n({args.smooth}m 平滑)", color=TXT, fontsize=10)
+    a2.text(0.006, 0.88, "＋ 賣側撤多", transform=a2.transAxes, color=GREEN, fontsize=9)
+    a2.text(0.006, 0.06, "－ 買側撤多", transform=a2.transAxes, color=RED, fontsize=9)
 
-    # C: cancellation intensity (total pulled qty, smoothed)
-    a3.fill_between(x, 0, intensity.values, color="#8ab4f8", alpha=0.5)
-    a3.plot(x, intensity.values, color="#8ab4f8", lw=1.0)
-    a3.set_ylabel(f"撤單強度\n(兩側總量)", color=TXT, fontsize=10)
-    a3.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d\n%H:%M"))
+    # C: cancellation intensity(乾淨面積)
+    a3.fill_between(x, 0, intensity.values, color="#8ab4f8", alpha=0.45, lw=0)
+    a3.plot(x, intensity.values, color="#8ab4f8", lw=1.1)
+    a3.set_ylabel("撤單強度\n(兩側總量)", color=TXT, fontsize=10)
+    a3.margins(y=0.05)
+    a3.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M"))
+    for lb in a3.get_xticklabels():
+        lb.set_rotation(0)
 
     out = PROJECT_ROOT / "research" / "results" / "cancel_flow_monitor.png"
     out.parent.mkdir(parents=True, exist_ok=True)
