@@ -71,6 +71,32 @@ def load(hours: int | None) -> pd.DataFrame:
     return df
 
 
+def _overlay_signals(ax, df: pd.DataFrame) -> None:
+    """Overlay v7 Strong signals on the price panel — read-only, best-effort."""
+    try:
+        conn = get_db_conn()
+        try:
+            sig = pd.read_sql(
+                "SELECT signal_time, direction FROM tracked_signals "
+                "WHERE strength='Strong' AND direction IN ('UP','DOWN') "
+                "AND signal_time >= %s AND signal_time <= %s",
+                conn, params=(str(df.index.min()), str(df.index.max())))
+        finally:
+            conn.close()
+        if sig.empty:
+            return
+        sig["signal_time"] = pd.to_datetime(sig["signal_time"])
+        px = df["mid"].reindex(
+            df.index[df.index.searchsorted(sig["signal_time"]).clip(0, len(df) - 1)]).values
+        up = sig["direction"].values == "UP"
+        ax.scatter(sig["signal_time"][up], px[up], marker="^", s=70,
+                   color=GREEN, edgecolor="white", lw=0.6, zorder=6)
+        ax.scatter(sig["signal_time"][~up], px[~up], marker="v", s=70,
+                   color=RED, edgecolor="white", lw=0.6, zorder=6)
+    except Exception as e:
+        print(f"(signal overlay skipped: {e})")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--hours", type=int, default=0, help="0 = full depth era")
@@ -132,10 +158,11 @@ def main() -> int:
     bands(z, z >= EP, GREEN)
     bands(z, z <= -EP, RED)
 
-    # A: price(乾淨線,無散點)
+    # A: price(乾淨線,無散點)+ v7 Strong 信號疊加(read-only)
     a1.plot(x, df["mid"], color="#e8e8e8", lw=1.3)
     a1.set_ylabel("價格 (mid)", color=TXT, fontsize=10)
-    a1.text(0.006, 0.93, "綠帶=賣側被抽(偏多真空)   紅帶=買側被抽(偏空真空)",
+    _overlay_signals(a1, df)
+    a1.text(0.006, 0.93, "▲UP ▼DOWN = v7 Strong 信號   綠帶=賣側被抽 紅帶=買側被抽",
             transform=a1.transAxes, color=SUB, fontsize=9)
 
     # B: cancel skew(只留平滑填色,無散點)
