@@ -183,6 +183,31 @@ edge 確信度」的漸進過程。
 
 **注意**：訊號方向準確率（59.5%）≠ 交易獲利（扣成本/停損後）。Gate A 證「edge 存在」，Gate B 才證「執行能把它變成 +EV」——兩個都要，缺一不可。
 
+## Stage 3 資本 top-up 至 $197.55（2026-07-14，第 4 次 informed override）
+
+**背景**：2026-07-13 使用者暫時把 OKX 資金轉出（觸發 CAP-4 DEMOTE——kill switch
+分不出 operator 資金調度和策略虧損，見 mistake.md 2026-07-13），轉回時存入
+$197.55（原帳上規模 ~$105.15 + 累計損益 ≈ $105.2）。使用者決定**以 $197.55 作為
+新的 Stage 3 基準**，不轉出多餘部分。
+
+**這條 override 違反的既有規則**：§當前策略「$100 live = Stage 3 上限，未進
+Stage 4a 不准加碼（即使 $100 賺到 $200 也是 $100 keep）」。這次是 deposit 加碼
+（$105 → $197.55），不是獲利留存。
+
+**執行的變更**：
+- Railway env `OKX_INITIAL_CAPITAL_USD` = 197（kill switch 基準；config 上限 $200，197 剛好過）
+- `indicator/okx/report.py` EXECUTOR_RESTART_CAPITAL_USD = 197.55、SINCE = 2026-07-14
+  （live-P&L 報表基準，排除 operator 資金移動）
+
+**新基準下的絕對數字**：
+- daily cap −20% = −$39.5／total cap −30% = −$59.3（DEMOTE）
+- CAP-2 over-funding 上限 = 1.5 × 197 = $295.5
+- 2x 名目 sizing ≈ $395 notional／~$39.5 保證金（10x 帳戶槓桿設定下）
+
+**代價自負**：單筆 stop-out 的美元損失放大 ~1.9x；$197.55 貼著 Stage 3 config
+硬上限 $200，**這是最後一次 Stage 3 內加碼**——再加就必須走 Gate A+B 通過後的
+正式放大（$300-500 一級），不准再用 informed override。
+
 ## 仍然禁止的（避免在錯的階段做錯事）
 - **Stage 2-3**：禁鬆 hard kill switches 以外的 trigger；leverage hard cap = 10x（不可再放寬）
 - **Stage 3**：禁未經 manual approval 5 筆就切自動（paper cohort 已於 2026-06-05 移除，不再有「paper 停寫」這條）

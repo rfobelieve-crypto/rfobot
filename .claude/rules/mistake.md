@@ -4,6 +4,43 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-07-13: 資金調度觸發 CAP-4 DEMOTE——kill switch 分不出 operator transfer 和 strategy loss
+
+**What happened:**
+使用者臨時需要資金，把 OKX 交易帳戶的錢轉出。CAP-4（total loss cap −30%）看到
+equity 對 initial capital 掉了超過 30%，判定「策略累積虧損超限」→ DEMOTE（終態，
+需人工介入）。資金轉回（$197.55）後又因為超過舊基準（$89）的 1.5x 觸發 CAP-2
+over-funding HALT。整個過程**沒有任何一筆策略虧損**，純粹是 operator 資金調度，
+但系統經歷了 DEMOTE + HALT 兩次停機，恢復耗掉一整個 session。
+
+**恢復路徑（記下來，下次照做）：**
+1. DEMOTED 只活在 process 記憶體（`executor.py` cycle guard 不回讀 DB）→
+   **重啟 service 就會重新 init**（空 commit push main 觸發 Railway redeploy 即可）
+2. 重啟後 `start()` 重跑全部檢查，kill check 用當前 equity 重算——資金回來了
+   CAP-4 就不再觸發
+3. CAP-2/CAP-3 的 HALT 是可自動恢復的：trigger 條件消失後下一個 cycle 自動回 ACTIVE
+4. 若 equity 和 `OKX_INITIAL_CAPITAL_USD` 基準對不上，改 env（Railway 會自動
+   redeploy）；報表基準另在 `report.py` EXECUTOR_RESTART_CAPITAL_USD
+
+**Root cause:**
+Kill switch 的輸入只有 equity 數字，沒有「錢為什麼變少」的資訊。策略虧損是
+一筆一筆漸變（每筆 trade 有 v7_okx_positions 紀錄對得上），operator transfer
+是無對應 trade 的瞬間階躍——這個特徵完全可以機器判別，但目前沒有做。
+
+**Correct approach（未來修法，擇一）：**
+1. 加 `/okx-admin/pause` endpoint（POST + confirm）：operator 資金調度前先合法
+   暫停 executor，調完 resume——kill switch 不會看到「假虧損」
+2. CAP-4 觸發前檢查「equity 階躍是否有對應的已平倉 trade」：無 trade 對應的
+   大階躍 → 改推「偵測到資金轉出，請確認」告警而不是直接 DEMOTE
+
+**Rule:** 動帳戶資金（轉入/轉出）之前，先想 kill switch 會看到什麼。目前系統下，
+轉出 >30% 必觸發 CAP-4 DEMOTE、轉入超過基準 1.5x 必觸發 CAP-2 HALT——這不是 bug，
+是 cap 的設計本意（防 ruin / 防意外注資），但 operator 要把「資金調度 → 先 pause
+或事後照上面恢復路徑走」當成標準流程。kill trigger 的告警文字如果跟實際操作
+（自己轉錢）對得上，不要當成策略故障去 debug。
+
+---
+
 ## 2026-07-05: 月度復驗三重靜默失敗——舊資料上的 PASS、沒人收到的推送、假裝在跑的排程
 
 **What happened:**

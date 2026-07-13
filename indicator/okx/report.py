@@ -248,12 +248,14 @@ def _get_recent_kill_log(days: int = 7) -> list[dict]:
 
 INITIAL_CAPITAL_USD = 155.0   # original Stage 3 deposit (2026-05-31, $154.86)
 
-# Live-P&L baseline. The executor restarted after the 2026-06-05 manual
-# blow-up on a $105.15 refund deposited 2026-06-07. The headline % is
-# measured from here so it reflects the system's own performance and
-# excludes the operator's manual error (user decision 2026-07-09).
-EXECUTOR_RESTART_CAPITAL_USD = 105.15
-EXECUTOR_RESTART_SINCE = "2026-06-07"
+# Live-P&L baseline. History: 2026-06-05 manual blow-up → $105.15 refund
+# deposited 2026-06-07 → 2026-07-13 operator temporarily withdrew funds
+# (tripped CAP-4 DEMOTE), then re-deposited $197.55 (informed capital
+# top-up, user decision 2026-07-14 — see CLAUDE.md §Stage 3 top-up).
+# The headline % is measured from the latest deposit so it reflects the
+# system's own performance and excludes operator fund movements.
+EXECUTOR_RESTART_CAPITAL_USD = 197.55
+EXECUTOR_RESTART_SINCE = "2026-07-14"
 
 
 def _get_equity_curve_stats(since: str) -> dict:

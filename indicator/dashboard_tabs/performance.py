@@ -23,7 +23,7 @@ def render_performance() -> str:
                 _build_okx_live()),
         section("📊 專業指標（vs BTC · payoff · 多空 · 成本）", "okxpro", True,
                 _build_okx_pro_metrics()),
-        section("📈 LIVE 淨值曲線（補資後 6/7 起 · vs BTC）", "okxequity", True,
+        section("📈 LIVE 淨值曲線（補資後 7/14 起 · vs BTC）", "okxequity", True,
                 _build_okx_equity_chart()),
     ]
     return "\n".join(parts)
@@ -260,14 +260,14 @@ def _build_gate_b_card(gb: dict | None) -> str:
     """
 
 
-# ── LIVE Equity Curve (post-refund 6/7) ──────────────────────────────
+# ── LIVE Equity Curve (post-top-up 7/14) ─────────────────────────────
 
 def _build_okx_equity_chart() -> str:
     """Live wallet equity curve since the 2026-06-07 executor restart.
 
-    Daily-close equity from v7_okx_balance_snapshots — the real post-refund
-    account trajectory (NOT signal returns). Dashed baseline at the $105.15
-    refund so above/below is obvious.
+    Daily-close equity from v7_okx_balance_snapshots — the real post-top-up
+    account trajectory (NOT signal returns). Dashed baseline at the latest
+    deposit (EXECUTOR_RESTART_CAPITAL_USD) so above/below is obvious.
     """
     from indicator.okx.report import (
         EXECUTOR_RESTART_CAPITAL_USD as BASE,
