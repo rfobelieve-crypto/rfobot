@@ -70,7 +70,10 @@ class OkxConfig:
     # belong to the pre-blowup account and would fake a -47% drawdown).
     dd_warn_pct: float = -15.0      # first alert
     dd_breach_pct: float = -20.0    # Stage-3→4a gate line
-    dd_peak_since_utc: str = "2026-06-07"
+    # 2026-07-14: reset from 2026-06-07 after the flat withdrawal ($0.01) +
+    # $197.55 redeposit — earlier peaks belong to the withdrawn account and
+    # would fake a -100% drawdown.
+    dd_peak_since_utc: str = "2026-07-14"
 
     # Strong-only entry gate (2026-06-09, reversible; default OFF = no change).
     # When True, only Strong-tier signals open a position; Moderate signals are
@@ -100,11 +103,12 @@ class OkxConfig:
     time_cap_hours: int = 0
 
     # ── Risk caps (Stage 3 defaults; tightened for 10x leverage)
-    # Default bumped 100→155 on 2026-06-01: user deposited $154.86 to
-    # OKX trading account; CAP-2 (equity > 1.5×initial → HALT) was
-    # tripping immediately because $154 > $150.  Configurable via
-    # OKX_INITIAL_CAPITAL_USD env var if you adjust the deposit later.
-    initial_capital_usd: float = 155.0
+    # Default bumped 100→155 (2026-06-01, $154.86 deposit), then 155→197.55
+    # (2026-07-14) after the flat withdrawal + $197.55 redeposit. CAP-2
+    # (equity > 1.5×initial → HALT) and the loss-cap bases key off this, so
+    # it MUST match the real deposit. Railway OKX_INITIAL_CAPITAL_USD env
+    # overrides this default — keep them in sync.
+    initial_capital_usd: float = 197.55
     risk_frac: float = 0.02
     max_position_count: int = 1
     # Tightened on 2026-05-28 for 10x leverage.  At 10x, a 2% BTC move
