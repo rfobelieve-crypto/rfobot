@@ -37,7 +37,8 @@ from shared.db import get_db_conn
 
 logger = logging.getLogger(__name__)
 
-WS_URL = "wss://stream.binance.com:9443/ws/btcusdt@depth@100ms"
+WS_URL = "wss://stream.binance.com:9443/ws/btcusdt@depth@100ms"   # spot
+PERP_WS_URL = "wss://fstream.binance.com/ws/btcusdt@depth@100ms"  # USDT-M perp
 CANONICAL = "BTC-USD"
 FLUSH_SEC = 10
 
@@ -68,9 +69,17 @@ def _ensure_schema() -> None:
 
 
 class DepthDeltaCollector:
-    """Tracks per-level qty between diff messages, buckets add/cancel by minute."""
+    """Tracks per-level qty between diff messages, buckets add/cancel by minute.
 
-    def __init__(self) -> None:
+    Defaults preserve the original spot stream (exchange='binance') exactly —
+    the spot series must stay unbroken for the pre-registered cancel tests.
+    Pass ws_url=PERP_WS_URL, exchange='binance_perp' for the parallel
+    futures-book instance (2026-07-15).
+    """
+
+    def __init__(self, ws_url: str = WS_URL, exchange: str = "binance") -> None:
+        self._ws_url = ws_url
+        self._exchange = exchange
         self._book: dict[str, dict[float, float]] = {"bid": {}, "ask": {}}
         self._buckets: dict[int, dict[str, float]] = {}
         self._lock = threading.Lock()
@@ -133,7 +142,7 @@ class DepthDeltaCollector:
                             (exchange, canonical_symbol, minute_start_ms,
                              bid_add_qty, bid_cancel_qty,
                              ask_add_qty, ask_cancel_qty, update_count)
-                        VALUES ('binance', %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                         ON DUPLICATE KEY UPDATE
                             bid_add_qty = bid_add_qty + VALUES(bid_add_qty),
                             bid_cancel_qty = bid_cancel_qty + VALUES(bid_cancel_qty),
@@ -141,10 +150,11 @@ class DepthDeltaCollector:
                             ask_cancel_qty = ask_cancel_qty + VALUES(ask_cancel_qty),
                             update_count = update_count + VALUES(update_count)
                         """,
-                        (CANONICAL, m, v["bid_add"], v["bid_cancel"],
-                         v["ask_add"], v["ask_cancel"], v["n"]))
+                        (self._exchange, CANONICAL, m, v["bid_add"],
+                         v["bid_cancel"], v["ask_add"], v["ask_cancel"], v["n"]))
             conn.commit()
-            logger.info("depth_delta_flush minutes=%d", len(done))
+            logger.info("depth_delta_flush exchange=%s minutes=%d",
+                        self._exchange, len(done))
         finally:
             conn.close()
 
@@ -155,7 +165,7 @@ class DepthDeltaCollector:
         while True:   # reconnect loop — same pattern as trade adapters
             try:
                 self._ws = websocket.WebSocketApp(
-                    WS_URL, on_message=self._on_message,
+                    self._ws_url, on_message=self._on_message,
                     on_error=self._on_error)
                 self._ws.run_forever(ping_interval=20, ping_timeout=10)
             except Exception:
@@ -168,9 +178,16 @@ class DepthDeltaCollector:
 
 
 def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--market", choices=["spot", "perp"], default="spot")
+    args = ap.parse_args()
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
-    DepthDeltaCollector().start()
+    if args.market == "perp":
+        DepthDeltaCollector(ws_url=PERP_WS_URL, exchange="binance_perp").start()
+    else:
+        DepthDeltaCollector().start()
 
 
 if __name__ == "__main__":

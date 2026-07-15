@@ -86,6 +86,21 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       預計 **~2026-10**（backtest 節奏 ~8-9 trail 出場/月）。跑前需刷新 klines parquet
       （事件驅動：daily_collect.bat 只管 coinglass/ 子夾；root parquet 靠訓練/月度復驗刷）
 
+### 4.6 V7 多幣化可行性研究（2026-07-15 啟動）
+動機：核心瓶頸是樣本速度（~265 Strong/年、73% 被單槽擠掉），多幣化 = 同機制
+樣本產出 ×N，非找新 alpha。純 research track（`research/multicoin/`），不碰生產。
+- [x] **Step 1 資料審計完成**（見 `research/multicoin/audit_results.md`）：
+      ETH 特徵覆蓋 ~97%（只缺 coinbase premium 家族 3 個 + etf_aum）、SOL ~92%
+      （再缺 DVOL 家族）。資料層不是瓶頸。陷阱：`/coinbase-premium-index` 無視
+      symbol 參數（三幣回同值）→ 新增幣種端點必跑值差異化檢查（`verify_value_diff.py`）
+- [ ] Step 2 ETH 移植實驗：backfill ETH 歷史（13 端點）→ 建 ETH 特徵表 →
+      同一套乾淨 WF（purge+embargo、無 early-stop 洩漏），對照 BTC clean AUC 0.5412
+- [ ] Step 3 訊號重合率：ETH Strong vs BTC Strong 時間對齊統計
+- **Go/No-Go（預先登記）**：ETH clean AUC ≥ ~0.54 且重合率 <50% → 繼續（考慮 SOL、
+  談 production 化）；任一不過 → 多幣化對 V7 無性價比，資源回異源資料線。
+- 紀律：BTC Gate A 乾淨版仍未過門檻（57.6%/CI 下緣 51.5%）——多幣化是「乘以 N」，
+  乘的對象要先證明；production 化討論必須在 Gate A 重跑通過之後。
+
 ### 4.5 基建完善（2026-07-10 審視——防「新基建靜默失敗」族）
 - [x] **depth_delta_collector freshness 監控**（2026-07-10 完成，a23d174）：APScheduler
       每 30 分查 `depth_deltas_1m` 最新分鐘，落後 >120min → TG 告警（停更+恢復各一次）
@@ -96,6 +111,15 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       對症 M2M MDD -21% 破 Stage3→4a 門檻
 - 📅 研究判決日曆：8/5 月度復驗（自動）→ **8/10 撤單 bar 級領先性**（cancel_lead_ic,
       n≥40k）→ **8月中 shadow maker 裁決**（live n≥30）→ **~10月 flow 重進場 gate**（n≥30）
+- [ ] **perp 撤單收集器部署**（2026-07-15 code 完成待 push）：depth_delta_collector
+      參數化 + start_all.py 平行起 binance_perp 實例（fstream，同表 exchange 區分），
+      本機 smoke 通過（perp 撤單量 ~8x 現貨）。現貨流不動（凍結檢定的序列），
+      五支分析腳本已加 exchange='binance' 過濾防污染。push 即開始累積，
+      perp 40k 判決點 ≈ 部署日 +28 天
+- 撤單檢定家族現況（皆凍結）：F1 skew 水位（07-10 註冊）8/10 判決；
+  F2 變化幅度 shock（07-15 註冊，smoke: intensity→|ret| 5m IC +0.113 CI 全正，待 powered）；
+  F3 深帶翻轉事件（07-15 註冊，6 天 0 事件，需 ≥30/方向）；
+  主觀判讀日誌 research/results/eyeball_log.md（30 筆判決，前瞻記錄才算）
 - 凍結假說（2026-07-11 註冊，看 depth 資料前寫定；皆隨撤單檢驗點跑）：
   - **P-cascade**：撤單強度（total_cancel/total_add）top-decile 分鐘 → 之後 15min 內
     出現巨量（vol top-1%）機率顯著高於基準（CI 離 0 + 前後半同號）。

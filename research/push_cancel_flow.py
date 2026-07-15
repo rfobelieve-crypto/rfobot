@@ -12,8 +12,8 @@ read from env, falling back to parsing .env — same convention as the
 rest of the repo.
 
 Usage:
-    python research/push_cancel_flow.py            # full depth era
-    python research/push_cancel_flow.py --hours 24 # last 24h
+    python research/push_cancel_flow.py            # last 24h (plot default)
+    python research/push_cancel_flow.py --hours 168 # weekly baseline view
 """
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ def _load_env_val(*keys: str) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--hours", type=int, default=0)
+    ap.add_argument("--hours", type=int, default=0)  # 0 = plot script default (24h)
     args = ap.parse_args()
 
     # 1) render (subprocess = full isolation from this process)

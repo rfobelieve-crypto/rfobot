@@ -50,6 +50,7 @@ def load_joined() -> pd.DataFrame:
                 "SELECT minute_start_ms, bid_cancel_qty, ask_cancel_qty, "
                 "       bid_add_qty, ask_add_qty "
                 "FROM depth_deltas_1m WHERE canonical_symbol='BTC-USD' "
+                "AND exchange='binance' "  # spot series only — the registered one
                 "ORDER BY minute_start_ms")
             dd = pd.DataFrame(cur.fetchall())
             cur.execute(

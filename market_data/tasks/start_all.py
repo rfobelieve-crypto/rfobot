@@ -24,7 +24,8 @@ from market_data.storage.db import run_migration
 from market_data.tasks.run_trade_streams import main as start_streams
 from market_data.tasks.flush_flow_bars import flush_loop
 from market_data.tasks.cleanup import cleanup_once
-from market_data.adapters.depth_delta_collector import DepthDeltaCollector
+from market_data.adapters.depth_delta_collector import (
+    DepthDeltaCollector, PERP_WS_URL)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,6 +75,16 @@ def main():
     threading.Thread(target=DepthDeltaCollector().start, daemon=True,
                      name="depth-delta").start()
     logger.info("Depth-delta collector started (depth_deltas_1m).")
+
+    # Parallel PERP-book instance (2026-07-15): same decomposition on the
+    # Binance USDT-M futures incremental book, rows tagged exchange=
+    # 'binance_perp'. The spot stream above is untouched — its series feeds
+    # the pre-registered cancel tests and must stay unbroken.
+    threading.Thread(
+        target=DepthDeltaCollector(ws_url=PERP_WS_URL,
+                                   exchange="binance_perp").start,
+        daemon=True, name="depth-delta-perp").start()
+    logger.info("Depth-delta PERP collector started (exchange=binance_perp).")
 
     # Start trade streams (blocking — must be last)
     start_streams()

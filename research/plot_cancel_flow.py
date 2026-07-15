@@ -10,9 +10,9 @@ until the 2026-08-10 cancel_lead_ic verdict. Read-only; no production
 import; does not touch the Telegram static/interactive charts.
 
 Usage:
-    python research/plot_cancel_flow.py                # full depth era
-    python research/plot_cancel_flow.py --hours 24     # last 24h
-    python research/plot_cancel_flow.py --smooth 30    # 30-min skew smoothing
+    python research/plot_cancel_flow.py                # last 24h (default)
+    python research/plot_cancel_flow.py --hours 0      # full depth era (debug)
+    python research/plot_cancel_flow.py --smooth 60    # heavier skew smoothing
 """
 from __future__ import annotations
 
@@ -49,7 +49,8 @@ def load(hours: int | None) -> pd.DataFrame:
         dd = pd.read_sql(
             "SELECT minute_start_ms ms, bid_add_qty, bid_cancel_qty, "
             "ask_add_qty, ask_cancel_qty FROM depth_deltas_1m "
-            "WHERE canonical_symbol='BTC-USD' ORDER BY minute_start_ms", conn)
+            "WHERE canonical_symbol='BTC-USD' AND exchange='binance' "
+            "ORDER BY minute_start_ms", conn)
         ob = pd.read_sql(
             "SELECT ts_ms ms, mid_price FROM orderbook_snapshots_1m "
             "WHERE canonical_symbol='BTC-USD' ORDER BY ts_ms", conn)
@@ -99,8 +100,11 @@ def _overlay_signals(ax, df: pd.DataFrame) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--hours", type=int, default=0, help="0 = full depth era")
-    ap.add_argument("--smooth", type=int, default=30, help="skew rolling minutes")
+    # 24h window / 15m smooth: info half-life ≤60m means only the right edge
+    # is actionable; the rest of the 24h is baseline + review context. Longer
+    # windows compress 1m spikes below pixel resolution (0 = full era, debug).
+    ap.add_argument("--hours", type=int, default=24, help="0 = full depth era")
+    ap.add_argument("--smooth", type=int, default=15, help="skew rolling minutes")
     args = ap.parse_args()
 
     df = load(args.hours or None)
