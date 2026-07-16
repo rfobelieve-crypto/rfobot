@@ -121,6 +121,8 @@ def main() -> int:
     # windows compress 1m spikes below pixel resolution (0 = full era, debug).
     ap.add_argument("--hours", type=int, default=24, help="0 = full depth era")
     ap.add_argument("--smooth", type=int, default=15, help="skew rolling minutes")
+    ap.add_argument("--candle", type=int, default=0,
+                    help="K線分鐘數 (0 = 自動: ≤30h→15m, ≤80h→30m, 其餘→60m)")
     args = ap.parse_args()
 
     df = load(args.hours or None)
@@ -178,9 +180,26 @@ def main() -> int:
     bands(z, z >= EP, GREEN)
     bands(z, z <= -EP, RED)
 
-    # A: price(乾淨線,無散點)+ v7 Strong 信號疊加(read-only)
-    a1.plot(x, df["mid"], color="#e8e8e8", lw=1.3)
-    a1.set_ylabel("價格 (mid)", color=TXT, fontsize=10)
+    # A: 價格 K 線(1m mid 重採樣 OHLC — 無逐筆成交價,mid 是最誠實的近似)
+    c_min = args.candle if args.candle > 0 else (
+        15 if span_h <= 30 else 30 if span_h <= 80 else 60)
+    ohlc = df["mid"].resample(f"{c_min}min").agg(
+        ["first", "max", "min", "last"]).dropna()
+    cx = ohlc.index + pd.Timedelta(minutes=c_min / 2)   # bar 中心
+    body_w = (c_min * 0.7) / 1440.0                     # datetime 軸: 天為單位
+    eps = float(df["mid"].max()) * 2e-5                 # 十字星最小可見實體
+    rising = (ohlc["last"] >= ohlc["first"]).values
+    for m, col in ((rising, GREEN), (~rising, RED)):
+        seg = ohlc[m]
+        if seg.empty:
+            continue
+        cc = cx[m]
+        a1.vlines(cc, seg["min"], seg["max"], color=col, lw=0.9, zorder=3)
+        bot = np.minimum(seg["first"].values, seg["last"].values)
+        h = np.maximum(np.abs(seg["last"].values - seg["first"].values), eps)
+        a1.bar(cc, h, bottom=bot, width=body_w, color=col,
+               edgecolor=col, lw=0.4, zorder=4)
+    a1.set_ylabel(f"價格 ({c_min}m K · mid)", color=TXT, fontsize=10)
     _overlay_signals(a1, df)
     a1.text(0.006, 0.93, "▲UP ▼DOWN = v7 Strong 信號   綠帶=賣側被抽 紅帶=買側被抽",
             transform=a1.transAxes, color=SUB, fontsize=9)

@@ -1460,6 +1460,9 @@ def _render_cancel_flow(request, jsonify, send_file, _sp, _sys):
     hours = request.args.get("hours", "").strip()
     if hours.isdigit():
         cmd += ["--hours", hours]
+    candle = request.args.get("candle", "").strip()
+    if candle.isdigit():
+        cmd += ["--candle", candle]
     try:
         r = _sp.run(cmd, capture_output=True, text=True, timeout=90,
                     cwd=str(root))
