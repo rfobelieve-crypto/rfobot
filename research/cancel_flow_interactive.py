@@ -141,6 +141,14 @@ def main() -> int:
     skew = (dd["ask_cancel_qty"] - dd["bid_cancel_qty"]) / tot.replace(0, np.nan)
     skew = skew - skew.mean()  # remove structural ask-heavy bias, cf. plot_cancel_flow
     skew_s = skew.rolling(SMOOTH_MIN, min_periods=max(3, SMOOTH_MIN // 3)).mean()
+    # 淨偏斜 = (賣側淨抽離 − 買側淨抽離)/總撤,淨抽離 = 撤 − 加。
+    # 換防(撤多少補多少)時歸零 → 拆穿毛撤單的假象;毛高+淨高才是真撤離。
+    # display-only:凍結檢定(cancel_lead_ic / cancel_shock_ic)不用此欄。
+    net_num = ((dd["ask_cancel_qty"] - dd["ask_add_qty"])
+               - (dd["bid_cancel_qty"] - dd["bid_add_qty"]))
+    net_skew = net_num / tot.replace(0, np.nan)
+    net_skew = net_skew - net_skew.mean()
+    net_s = net_skew.rolling(SMOOTH_MIN, min_periods=max(3, SMOOTH_MIN // 3)).mean()
     intensity = tot.rolling(SMOOTH_MIN, min_periods=3).mean()
     # change-magnitude (shock): raw per-minute total vs trailing 60m median —
     # frozen definition shared with cancel_shock_ic.py (registered 2026-07-15)
@@ -163,7 +171,7 @@ def main() -> int:
                          "color": "rgba(38,162,105,0.6)" if 2 * tb >= v
                                   else "rgba(224,27,36,0.6)"})
 
-    skew_bars, int_bars, shock_bars = [], [], []
+    skew_bars, net_bars, int_bars, shock_bars = [], [], [], []
     for i in range(len(dd)):
         ts = int(dd["ms"].iloc[i]) // 1000 + TZ_OFFSET_S
         z = skew_s.iloc[i]
@@ -172,6 +180,12 @@ def main() -> int:
             color = (("#26a269" if deep else "#1e5c3f") if z >= 0
                      else ("#e01b24" if deep else "#7a2028"))
             skew_bars.append({"time": ts, "value": round(float(z), 4), "color": color})
+        nz = net_s.iloc[i]
+        if not np.isnan(nz):
+            deep = abs(nz) >= 0.30
+            color = (("#26a269" if deep else "#1e5c3f") if nz >= 0
+                     else ("#e01b24" if deep else "#7a2028"))
+            net_bars.append({"time": ts, "value": round(float(nz), 4), "color": color})
         v = intensity.iloc[i]
         if not np.isnan(v):
             int_bars.append({"time": ts, "value": round(float(v), 2),
@@ -193,7 +207,7 @@ def main() -> int:
     html = HTML_TEMPLATE.format(
         title=f"撤單流覆盤 BTC-USD ({span_h:.0f}h)",
         candles=json.dumps(candles), volume=json.dumps(vol_bars),
-        skew=json.dumps(skew_bars),
+        skew=json.dumps(skew_bars), netskew=json.dumps(net_bars),
         intensity=json.dumps(int_bars), markers=json.dumps(markers),
         span_h=f"{span_h:.0f}", n=len(dd), smooth=SMOOTH_MIN)
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -220,7 +234,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
  · ▲▼=v7 Strong · 深色柱=|不對稱|≥0.30 · 量色=taker買綠/賣紅 · 研究工具非信號 (edge 待 8/10)</div>
 <div class="pane"><div class="lbl">價格 1m K棒</div><div id="c1"></div></div>
 <div class="pane"><div class="lbl">成交量 1m (綠=taker買佔優 / 紅=賣佔優)</div><div id="cv"></div></div>
-<div class="pane"><div class="lbl">撤單不對稱 (＋賣側撤多 / －買側撤多)</div><div id="c2"></div></div>
+<div class="pane"><div class="lbl">毛撤單偏斜 (＋賣側撤多 / －買側撤多) — 動作</div><div id="c2"></div></div>
+<div class="pane"><div class="lbl">淨偏斜 (撤−加) — 牆真的變薄才動;毛高淨零=換防假象</div><div id="c4"></div></div>
 <div class="pane"><div class="lbl">撤單強度 (兩側總量)</div><div id="c3"></div></div>
 <script>
 const OPTS = {{
@@ -235,14 +250,16 @@ function mk(id, h) {{
   return LightweightCharts.createChart(el, Object.assign({{}}, OPTS,
       {{ width: el.clientWidth || window.innerWidth, height: h }}));
 }}
-const c1 = mk('c1', Math.max(240, window.innerHeight * 0.36));
-const cv = mk('cv', Math.max(80,  window.innerHeight * 0.13));
-const c2 = mk('c2', Math.max(130, window.innerHeight * 0.21));
-const c3 = mk('c3', Math.max(100, window.innerHeight * 0.15));
+const c1 = mk('c1', Math.max(220, window.innerHeight * 0.32));
+const cv = mk('cv', Math.max(70,  window.innerHeight * 0.11));
+const c2 = mk('c2', Math.max(110, window.innerHeight * 0.17));
+const c4 = mk('c4', Math.max(110, window.innerHeight * 0.17));
+const c3 = mk('c3', Math.max(90,  window.innerHeight * 0.12));
 
 const CANDLES = {candles};
 const VOL = {volume};
 const SKEW = {skew};
+const NETSKEW = {netskew};
 const INTEN = {intensity};
 
 const candle = c1.addCandlestickSeries({{
@@ -260,6 +277,12 @@ skew.setData(SKEW);
   {{ price: v, color:'#555c66', lineWidth:1, lineStyle:2, title:'' }}));
 skew.createPriceLine({{ price: 0, color:'#9aa0a6', lineWidth:1, lineStyle:0, title:'' }});
 
+const netskew = c4.addHistogramSeries({{ priceFormat: {{ type:'price', precision:2, minMove:0.01 }} }});
+netskew.setData(NETSKEW);
+[0.30, -0.30].forEach(v => netskew.createPriceLine(
+  {{ price: v, color:'#555c66', lineWidth:1, lineStyle:2, title:'' }}));
+netskew.createPriceLine({{ price: 0, color:'#9aa0a6', lineWidth:1, lineStyle:0, title:'' }});
+
 const inten = c3.addHistogramSeries({{ priceFormat: {{ type:'volume' }} }});
 inten.setData(INTEN);
 
@@ -268,10 +291,11 @@ const byTime = arr => {{ const m = new Map();
   arr.forEach(d => m.set(d.time, d.value !== undefined ? d.value : d.close));
   return m; }};
 const panes = [
-  {{ chart: c1, series: candle, map: byTime(CANDLES) }},
-  {{ chart: cv, series: vol,    map: byTime(VOL) }},
-  {{ chart: c2, series: skew,   map: byTime(SKEW) }},
-  {{ chart: c3, series: inten,  map: byTime(INTEN) }},
+  {{ chart: c1, series: candle,  map: byTime(CANDLES) }},
+  {{ chart: cv, series: vol,     map: byTime(VOL) }},
+  {{ chart: c2, series: skew,    map: byTime(SKEW) }},
+  {{ chart: c4, series: netskew, map: byTime(NETSKEW) }},
+  {{ chart: c3, series: inten,   map: byTime(INTEN) }},
 ];
 const charts = panes.map(p => p.chart);
 let syncing = false;
