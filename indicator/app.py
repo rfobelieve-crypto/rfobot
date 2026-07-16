@@ -84,6 +84,7 @@ def _make_reply_markup():
         ],
         [
             {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
+            {"text": "\U0001f9f2 撤單流", "callback_data": "cancel_flow"},
         ],
     ]})
 

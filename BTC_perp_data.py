@@ -1691,6 +1691,7 @@ _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
     ],
     [
         {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
+        {"text": "\U0001f9f2 撤單流", "callback_data": "cancel_flow"},
     ],
 ]})
 
@@ -1804,6 +1805,41 @@ def _handle_alpha_decay(chat_id: str):
         send_message(chat_id, f"❌ Alpha decay 檢查失敗: {e}")
 
 
+def _handle_cancel_flow(chat_id: str, hours: int = 24):
+    """Fetch cancel-flow monitor chart (research eyeball tool) from Indicator service.
+
+    /research/cancel-flow returns the rendered PNG inline (image/png);
+    on failure it returns diagnosable JSON instead.
+    """
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/research/cancel-flow",
+                            params={"hours": hours}, timeout=120)
+        ctype = resp.headers.get("Content-Type", "")
+        if resp.status_code != 200 or not ctype.startswith("image/"):
+            err = ""
+            try:
+                err = resp.json().get("error", "")
+            except Exception:
+                pass
+            send_message(chat_id, f"❌ 撤單流圖表未就緒 ({resp.status_code}) {err}")
+            return
+        window = "全 depth 時代" if hours == 0 else f"最近 {hours}h"
+        caption = (
+            "撤單流監控（研究圖·非信號）\n"
+            f"視窗: {window}\n"
+            "上=價格 | 中=撤單不對稱(綠賣側撤/紅買側撤) | 下=撤單強度\n"
+            "撤+量低=真空反轉 | 撤+量大破位=續走 | 量大守住=吸收\n"
+            "edge 待 8/10 判決"
+        )
+        _send_photo_with_buttons(chat_id, resp.content, caption)
+    except Exception as e:
+        logger.exception("cancel flow chart fetch error: %s", e)
+        send_message(chat_id, f"❌ 取得撤單流圖表失敗: {e}")
+
+
 def _handle_signal_perf(chat_id: str):
     """Fetch Strong signal performance report from Indicator service."""
     if not INDICATOR_SERVICE_URL:
@@ -1894,7 +1930,8 @@ def _send_help(chat_id: str):
         "/score - 最近事件評分\n"
         "/history - 事件歷史\n"
         "\n<b>--- 其他 ---</b>\n"
-        "/flow_chart - 訂單流圖表\n\n"
+        "/flow_chart - 訂單流圖表\n"
+        "/cancelflow - 撤單流監控圖 (研究·非信號; 可帶小時數如 /cancelflow 168)\n\n"
         "<i>也可直接點擊下方按鈕操作</i>"
     )
     keyboard = json_mod.dumps({"inline_keyboard": [
@@ -1912,6 +1949,10 @@ def _send_help(chat_id: str):
             {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
             {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
             {"text": "\u2753 Help", "callback_data": "help"},
+        ],
+        [
+            {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
+            {"text": "\U0001f9f2 \u64a4\u55ae\u6d41", "callback_data": "cancel_flow"},
         ],
     ]})
     url = f"{API_URL}/sendMessage"
@@ -2064,6 +2105,8 @@ def webhook():
                 threading.Thread(target=_handle_alpha_decay, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "okx_perf":
                 threading.Thread(target=_handle_okx_perf, args=(cb_chat_id,), daemon=True).start()
+            elif cb_data == "cancel_flow":
+                threading.Thread(target=_handle_cancel_flow, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "help":
                 _send_help(cb_chat_id)
             return "ok"
@@ -2147,6 +2190,12 @@ def webhook():
 
         elif cmd == "/decay":
             threading.Thread(target=_handle_alpha_decay, args=(chat_id,), daemon=True).start()
+
+        elif cmd == "/cancelflow" or cmd.startswith("/cancelflow "):
+            # /cancelflow → last 24h; /cancelflow 168 → weekly; /cancelflow 0 → full era
+            parts = raw_text.split()
+            cf_hours = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 24
+            threading.Thread(target=_handle_cancel_flow, args=(chat_id, cf_hours), daemon=True).start()
 
         elif cmd == "/update":
             threading.Thread(target=_handle_force_update, args=(chat_id,), daemon=True).start()
