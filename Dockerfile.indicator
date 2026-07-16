@@ -2,10 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# CJK font for research charts (plot_cancel_flow) — slim has none
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.indicator.txt .
 RUN pip install --no-cache-dir -r requirements.indicator.txt
 
 COPY indicator/ ./indicator/
 COPY shared/ ./shared/
+# research/ = offline analysis scripts; needed by /research/cancel-flow
+# (renders plot_cancel_flow.py in a subprocess). Read-only, not hot path.
+COPY research/ ./research/
 
 CMD gunicorn indicator.wsgi:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --timeout 120

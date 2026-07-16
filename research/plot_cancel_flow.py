@@ -35,7 +35,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
-plt.rcParams["font.sans-serif"] = ["Microsoft JhengHei", "Microsoft YaHei", "SimHei"]
+plt.rcParams["font.sans-serif"] = ["Microsoft JhengHei", "Microsoft YaHei", "SimHei",
+                                   "Noto Sans CJK TC", "Noto Sans CJK SC",
+                                   "WenQuanYi Zen Hei"]  # MS = local Win; Noto = Railway image
 plt.rcParams["axes.unicode_minus"] = False
 
 from shared.db import get_db_conn

@@ -1410,6 +1410,74 @@ def okx_admin_heal_api():
     })
 
 
+@app.route("/research/cancel-flow", methods=["GET"])
+def research_cancel_flow_api():
+    """Cancel-flow monitor chart (research/eyeball aid — NOT a signal).
+
+    Renders research/plot_cancel_flow.py (depth_deltas_1m vs mid price)
+    in a subprocess and returns the PNG inline, so the operator can view
+    it from a phone browser.  Add ?push=YES to instead send the PNG to
+    the operator's Telegram chat (returns JSON status).
+
+    Read-only w.r.t. trading state — the only side effect is the optional
+    Telegram photo to the operator's own chat (benign), so GET is fine
+    here, unlike /okx-admin/heal (mistake.md 2026-06-07).
+
+    Query params:
+      hours=<int>   lookback window (default: plot script's 24h)
+      push=YES      sendPhoto to Telegram instead of inline response
+    """
+    from flask import request, jsonify, send_file
+    import subprocess as _sp
+    import sys as _sys
+
+    root = Path(__file__).resolve().parent.parent
+    script = root / "research" / "plot_cancel_flow.py"
+    png_path = root / "research" / "results" / "cancel_flow_monitor.png"
+    if not script.exists():
+        return jsonify({
+            "error": "research/ not present in this image — "
+                     "needs the Dockerfile.indicator that COPYs research/",
+        }), 501
+
+    cmd = [_sys.executable, str(script)]
+    hours = request.args.get("hours", "").strip()
+    if hours.isdigit():
+        cmd += ["--hours", hours]
+    try:
+        r = _sp.run(cmd, capture_output=True, text=True, timeout=90,
+                    cwd=str(root))
+    except _sp.TimeoutExpired:
+        return jsonify({"error": "render timed out (90s)"}), 500
+    if r.returncode != 0 or not png_path.exists():
+        return jsonify({
+            "error": "render failed",
+            "stdout": (r.stdout or "")[-800:],
+            "stderr": (r.stderr or "")[-800:],
+        }), 500
+
+    if request.args.get("push", "").upper() == "YES":
+        if not BOT_TOKEN or not CHAT_ID:
+            return jsonify({"rendered": True,
+                            "telegram_push": "skipped: creds missing"}), 200
+        caption = ("\U0001f4ca 撤單流監控（研究圖·非信號）\n"
+                   "上=價格 | 中=撤單不對稱(綠賣側撤/紅買側撤) | 下=撤單強度")
+        try:
+            with open(png_path, "rb") as f:
+                resp = requests.post(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto",
+                    data={"chat_id": CHAT_ID, "caption": caption},
+                    files={"photo": ("cancel_flow.png", f, "image/png")},
+                    timeout=30,
+                )
+            pushed = "ok" if resp.ok else f"failed: {resp.status_code}"
+        except Exception as e:  # network — report, don't 500
+            pushed = f"failed: {e}"
+        return jsonify({"rendered": True, "telegram_push": pushed})
+
+    return send_file(png_path, mimetype="image/png", max_age=0)
+
+
 @app.route("/okx-status", methods=["GET"])
 def okx_status_api():
     """Inspect OKX runner singleton state.  Returns diagnostic info
