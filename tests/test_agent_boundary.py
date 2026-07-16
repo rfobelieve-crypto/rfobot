@@ -85,7 +85,14 @@ def test_importing_agent_does_not_load_executor():
     Run in a SUBPROCESS with a pristine interpreter so the check measures
     exactly what the agent import pulls in — and so it never mutates the
     parent test session's sys.modules (which would corrupt other tests).
+
+    Skips when the `mcp` package is not importable in this interpreter
+    (e.g. local Python 3.9 — mcp needs >=3.10): server.py cannot even be
+    imported there, so the probe would fail for an unrelated reason. CI
+    runs 3.11 with requirements.indicator installed, so the boundary
+    stays machine-enforced where it matters.
     """
+    pytest.importorskip("mcp")
     import subprocess
     import sys
 

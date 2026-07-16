@@ -15,6 +15,10 @@
 - [ ] 8/10 `cancel_lead_ic`/`cancel_shock_ic` 判決日一起檢視；表現好的劇本
       才有資格升格下一個 pre-registered family
 - 紀律：記錄定義凍結不准調；告警門檻屬 UX 可調；此線永不接 executor
+- 2026-07-17 三階分析入口完成：① `research/cancel_flow_analyze.py`
+  (table/--summary/--json) ② MCP `analyze_cancel_flow`（Claude Desktop 需
+  Python≥3.10 env，本機 l30d 3.12 已裝 mcp）③ TG `/cancelanalyze [mins]`
+  → 進入實盤驗證階段：事件自動累積中，等 n≥30/劇本 + 8/10 判決
 
 ### 1. 擠壓指標 × 訂單流系統結合（策略 #2 候選）★ 最優先
 流動性真空假說：壓縮後價格往阻力小的一側走，撤單領先成交洩露方向。

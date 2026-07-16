@@ -1544,6 +1544,41 @@ def research_cancel_flow_interactive_api():
                     "trace": _tb.format_exc()[-1500:]}), 500
 
 
+@app.route("/research/cancel-analyze", methods=["GET"])
+def research_cancel_analyze_api():
+    """Deterministic cancel-flow window summary (research aid — NOT a signal).
+
+    Runs research/cancel_flow_analyze.py --summary in a subprocess and
+    returns {"text": ...} for the main bot's /cancelanalyze command.
+    Params: mins=N (default 90) OR from=/to= (TPE "YYYY-MM-DD HH:MM").
+    Admin-guarded via the /research/ prefix.
+    """
+    from flask import request as _rq, jsonify as _js
+    import subprocess as _sp
+    import sys as _sys
+    root = Path(__file__).resolve().parent.parent
+    script = root / "research" / "cancel_flow_analyze.py"
+    if not script.exists():
+        return _js({"error": "research/ not in this image"}), 501
+    cmd = [_sys.executable, str(script), "--summary"]
+    f, t = _rq.args.get("from", "").strip(), _rq.args.get("to", "").strip()
+    if f and t:
+        cmd += ["--from", f, "--to", t]
+    else:
+        mins = _rq.args.get("mins", "").strip()
+        cmd += ["--mins", mins if mins.isdigit() else "90"]
+    try:
+        r = _sp.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                    timeout=90, cwd=str(root))
+    except _sp.TimeoutExpired:
+        return _js({"error": "analyze timed out (90s)"}), 500
+    if r.returncode != 0 or not (r.stdout or "").strip():
+        return _js({"error": "analyze failed",
+                    "stdout": (r.stdout or "")[-500:],
+                    "stderr": (r.stderr or "")[-500:]}), 500
+    return _js({"text": r.stdout.strip()})
+
+
 @app.route("/okx-status", methods=["GET"])
 def okx_status_api():
     """Inspect OKX runner singleton state.  Returns diagnostic info

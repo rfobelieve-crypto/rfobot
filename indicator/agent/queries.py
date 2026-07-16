@@ -267,6 +267,54 @@ def _latest_atr() -> Optional[float]:
     return _f(row.get("atr")) if row else None
 
 
+# ── Tool 5: cancel-flow window analysis ────────────────────────────────
+
+def cancel_flow_analysis(minutes: int = 90, t_from: Optional[str] = None,
+                         t_to: Optional[str] = None,
+                         include_perp: bool = True) -> dict[str, Any]:
+    """Read-only forensic window analysis of cancellation flow.
+
+    Delegates to research.cancel_flow_analyze.analyze_window (pure SELECTs
+    over depth_deltas_1m / flow_bars_1m / orderbook_snapshots_1m /
+    cancel_playbook_events + pure computation — no trading-system import,
+    see agent-boundary.md).
+    """
+    if _seed_mode():
+        return {
+            "meta": {"from_tpe": "07-16 20:30", "to_tpe": "07-16 20:50",
+                     "n_min": 21, "lag_min": 0.0, "def_version": "v1-2026-07-16"},
+            "verdict": {"gate_minutes": 3, "max_shock": 4.3, "lean": "偏多",
+                        "note": "3 分鐘過鬧鐘門檻"},
+            "right_edge": {"px": 63910.0, "shock": 3.1, "skew15": 0.06,
+                           "net15": -0.27, "vshock": 5.6},
+            "events": [{"t": "07-16 20:46", "playbook": "真破",
+                        "direction": "UP", "px": 63910.0, "shock": 3.1,
+                        "vshock": 5.6, "fwd_ret_60m": 0.0049,
+                        "hit_60m": 1, "alerted": 0}],
+            "minutes": [], "gate_minutes": [], "taker_bursts": [],
+            "tilt": {}, "disclaimer": DISCLAIMER, "_source": "seed",
+        }
+    import time as _time
+
+    import pandas as _pd
+
+    # Lazy import: research/ is a namespace package at the repo root; the
+    # MCP server runs with cwd=repo root (see server docstring config).
+    from research.cancel_flow_analyze import analyze_window
+
+    tpe = _pd.Timedelta(hours=8)
+    if t_from and t_to:
+        t0 = int((_pd.Timestamp(t_from) - tpe).timestamp() * 1000)
+        t1 = int((_pd.Timestamp(t_to) - tpe).timestamp() * 1000)
+    else:
+        t1 = int(_time.time() * 1000)
+        t0 = t1 - max(10, min(int(minutes), 24 * 60)) * 60_000
+    res = analyze_window(t0, t1, perp=include_perp)
+    res["disclaimer"] = DISCLAIMER + " " + str(res.get("disclaimer", ""))
+    res["_source"] = "live"
+    return res
+
+
 # ── helpers ────────────────────────────────────────────────────────────
 
 def _f(x) -> Optional[float]:

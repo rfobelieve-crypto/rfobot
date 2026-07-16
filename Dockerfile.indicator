@@ -12,6 +12,10 @@ RUN pip install --no-cache-dir -r requirements.indicator.txt
 
 COPY indicator/ ./indicator/
 COPY shared/ ./shared/
+# market_data = frozen cancel-playbook feature definitions, imported by
+# research/cancel_flow_analyze.py (/research/cancel-analyze). No service
+# from it runs here — code import only.
+COPY market_data/ ./market_data/
 # research/ = offline analysis scripts; needed by /research/cancel-flow
 # (renders plot_cancel_flow.py in a subprocess). Read-only, not hot path.
 COPY research/ ./research/

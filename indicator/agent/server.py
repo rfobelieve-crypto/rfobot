@@ -82,6 +82,25 @@ def get_risk_frame(entry_price: float, direction: str,
     return queries.risk_frame(entry_price, direction, atr)
 
 
+@mcp.tool()
+def analyze_cancel_flow(minutes: int = 90, t_from: Optional[str] = None,
+                        t_to: Optional[str] = None,
+                        include_perp: bool = True) -> dict:
+    """Forensic analysis of BTC order-book cancellation flow for a window.
+
+    Covers the live right edge (default: last `minutes` minutes) or any
+    historical window (t_from/t_to as TPE "YYYY-MM-DD HH:MM", UTC+8).
+    Returns the frozen-definition features per minute (cancel shock,
+    gross skew, net skew), taker-volume bursts, gate minutes, recorded
+    playbook events with outcomes, and a deterministic lean verdict —
+    structured so the calling assistant can narrate the五步 read
+    (鬧鐘→毛/淨→量→價→持續). Research/eyeball aid over a self-built
+    exchange data pipeline; NOT a trading signal (edge unverified until
+    the 2026-08-10 pre-registered verdict).
+    """
+    return queries.cancel_flow_analysis(minutes, t_from, t_to, include_perp)
+
+
 def main() -> None:
     mcp.run()   # stdio transport by default
 

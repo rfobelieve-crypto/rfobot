@@ -22,7 +22,11 @@ Files under `indicator/agent/` MUST NOT import, at any depth:
 ## Allowed
 - Read-only SELECT via `shared/db.get_db_conn()` on existing tables:
   `tracked_signals`, `v7_okx_positions`, `orderbook_snapshots_1m`,
-  `flow_bars_1m`, `indicator_history`
+  `flow_bars_1m`, `indicator_history`, `depth_deltas_1m`,
+  `cancel_playbook_events` (research line, 2026-07-17)
+- Pure-computation imports from `market_data.tasks.cancel_playbook_watcher`
+  / `research.cancel_flow_analyze` (frozen feature definitions — read-only
+  code path; the agent never calls their write/alert functions)
 - The agent's own new tables, prefixed `agent_*` (e.g. `agent_request_log`).
   Writes go ONLY to its own namespace, never to quant tables.
 - Pure computation (Kelly, ATR maths) on values already read from DB.

@@ -315,6 +315,7 @@ def alert_events(fresh: list[dict]) -> None:
             ]
             if chart:
                 lines.append(chart)
+            lines.append("深入: /cancelanalyze 90 (五步摘要) 或問 agent")
             lines.append(f"def {DEF_VERSION} · edge 未驗證 · 勿作交易依據")
             try:
                 resp = requests.post(
