@@ -69,7 +69,7 @@ ALERTABLE = {"absorption", "true_break", "vacuum"}   # two_sided logs only
 ALERT_MIN_VSHOCK = 20.0    # replay-sim 2026-07-16: ≈4.4 alerts/day
 ALERT_MIN_NET = 0.30
 ZH = {"absorption": "吸收", "true_break": "真破", "vacuum": "真空",
-      "two_sided": "雙側避險"}
+      "two_sided": "雙側避險", "gate_only": "純爆量"}
 
 
 # ── schema ───────────────────────────────────────────────────────────────────
@@ -191,7 +191,10 @@ def classify_minute(r: pd.Series) -> tuple[str, str] | None:
             return "vacuum", "DOWN"
         if abs(sk) < FLAT and abs(nt) < FLAT:
             return "two_sided", "NONE"
-    return None
+    # gate fired but no playbook matched — log anyway (additive 2026-07-16,
+    # same session as v1): gives the unconditional base-rate denominator for
+    # later stats. Never alerted; playbook labels above are unchanged.
+    return "gate_only", "NONE"
 
 
 def scan(df_feat: pd.DataFrame, minutes: list[int]) -> list[dict]:
