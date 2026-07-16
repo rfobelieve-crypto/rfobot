@@ -1816,7 +1816,8 @@ def _handle_cancel_flow(chat_id: str, hours: int = 24):
         return
     try:
         resp = requests.get(f"{INDICATOR_SERVICE_URL}/research/cancel-flow",
-                            params={"hours": hours}, timeout=120)
+                            params={"hours": hours}, timeout=120,
+                            headers=_indicator_admin_headers())
         ctype = resp.headers.get("Content-Type", "")
         if resp.status_code != 200 or not ctype.startswith("image/"):
             err = ""
