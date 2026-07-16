@@ -60,6 +60,10 @@ def load(hours: int | None) -> pd.DataFrame:
         conn.close()
     if dd.empty:
         return dd
+    # Newer pandas (Railway image) reads DB numerics as arrow-backed str;
+    # local Windows pandas reads them as ints. Coerce so // works on both.
+    dd["ms"] = pd.to_numeric(dd["ms"])
+    ob["ms"] = pd.to_numeric(ob["ms"])
     dd["m"] = (dd["ms"] // 60000).astype("int64")
     ob["m"] = (ob["ms"] // 60000).astype("int64")
     dd = dd.groupby("m").last()
