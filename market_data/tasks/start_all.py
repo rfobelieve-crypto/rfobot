@@ -86,6 +86,15 @@ def main():
         daemon=True, name="depth-delta-perp").start()
     logger.info("Depth-delta PERP collector started (exchange=binance_perp).")
 
+    # Cancel-playbook watcher (2026-07-16): machine-prospective event logger
+    # for the cancel-flow playbooks (frozen defs v1) + rate-limited TG alerts.
+    # Read-only on quant tables; writes only cancel_playbook_events. Research
+    # aid — NOT a trading signal, never touches the executor.
+    from market_data.tasks.cancel_playbook_watcher import watch_loop
+    threading.Thread(target=watch_loop, daemon=True,
+                     name="cancel-playbook").start()
+    logger.info("Cancel-playbook watcher started (cancel_playbook_events).")
+
     # Start trade streams (blocking — must be last)
     start_streams()
 

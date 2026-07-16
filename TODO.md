@@ -4,7 +4,17 @@
 > 凡是要「本機 / 雲端 / 下一次對話」都看得到的任務，寫這裡並 push。
 > 每次開工：先讀「當前任務」區。
 
-## 當前任務（2026-07-09 更新）
+## 當前任務（2026-07-16 更新）
+
+### 0. 撤單劇本偵測器已上線（2026-07-16）
+`market_data/tasks/cancel_playbook_watcher.py` 掛進 Service 2：機器前瞻記錄
+撤單劇本事件（凍結定義 v1-2026-07-16：吸收/真破/真空/雙側避險）→
+`cancel_playbook_events` 表 + 30/60/120m 結果自動回填 + TG 告警
+（政策：vshock≥20 或 |淨|≥0.30，全域 60m cooldown，~4 則/天）。
+- [ ] 累積 30+ 筆/劇本後看 hit_60m 統計（7 天 replay 煙測 ≈ 硬幣，屬預期）
+- [ ] 8/10 `cancel_lead_ic`/`cancel_shock_ic` 判決日一起檢視；表現好的劇本
+      才有資格升格下一個 pre-registered family
+- 紀律：記錄定義凍結不准調；告警門檻屬 UX 可調；此線永不接 executor
 
 ### 1. 擠壓指標 × 訂單流系統結合（策略 #2 候選）★ 最優先
 流動性真空假說：壓縮後價格往阻力小的一側走，撤單領先成交洩露方向。
@@ -111,11 +121,11 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       對症 M2M MDD -21% 破 Stage3→4a 門檻
 - 📅 研究判決日曆：8/5 月度復驗（自動）→ **8/10 撤單 bar 級領先性**（cancel_lead_ic,
       n≥40k）→ **8月中 shadow maker 裁決**（live n≥30）→ **~10月 flow 重進場 gate**（n≥30）
-- [ ] **perp 撤單收集器部署**（2026-07-15 code 完成待 push）：depth_delta_collector
+- [x] **perp 撤單收集器部署**（2026-07-15 完成，168e8b2 pushed）：depth_delta_collector
       參數化 + start_all.py 平行起 binance_perp 實例（fstream，同表 exchange 區分），
       本機 smoke 通過（perp 撤單量 ~8x 現貨）。現貨流不動（凍結檢定的序列），
-      五支分析腳本已加 exchange='binance' 過濾防污染。push 即開始累積，
-      perp 40k 判決點 ≈ 部署日 +28 天
+      五支分析腳本已加 exchange='binance' 過濾防污染。DB 已確認 binance_perp
+      自 2026-07-15 09:06 UTC 起累積、近零斷點 → **perp 40k 判決點 ≈ 2026-08-12**
 - 撤單檢定家族現況（皆凍結）：F1 skew 水位（07-10 註冊）8/10 判決；
   F2 變化幅度 shock（07-15 註冊，smoke: intensity→|ret| 5m IC +0.113 CI 全正，待 powered）；
   F3 深帶翻轉事件（07-15 註冊，6 天 0 事件，需 ≥30/方向）；
