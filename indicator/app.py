@@ -882,8 +882,11 @@ def _admin_guard():
         return jsonify({"error": "admin routes locked: ADMIN_HEAL_TOKEN "
                                  "not configured on this service"}), 503
     provided = (request.headers.get("X-Admin-Token", "")
-                or request.values.get("token", ""))
-    if not hmac.compare_digest(provided, expected):
+                or request.values.get("token", "")).strip()
+    # bytes compare: str compare_digest raises TypeError on non-ASCII input
+    # (easy to hit from a phone keyboard) — that must be a 403, not a 500.
+    if not hmac.compare_digest(provided.encode("utf-8", "replace"),
+                               expected.encode("utf-8", "replace")):
         return jsonify({"error": "missing/invalid admin token"}), 403
     return None
 
@@ -1430,7 +1433,20 @@ def research_cancel_flow_api():
     from flask import request, jsonify, send_file
     import subprocess as _sp
     import sys as _sys
+    import traceback as _tb
 
+    try:
+        return _render_cancel_flow(request, jsonify, send_file, _sp, _sys)
+    except Exception:
+        logger.exception("cancel_flow_route_failed")
+        return jsonify({"error": "cancel-flow route crashed",
+                        "trace": _tb.format_exc()[-1500:]}), 500
+
+
+def _render_cancel_flow(request, jsonify, send_file, _sp, _sys):
+    """Body of /research/cancel-flow — separated so the route wrapper can
+    convert ANY unhandled exception into diagnosable JSON instead of the
+    bare Werkzeug 500 page."""
     root = Path(__file__).resolve().parent.parent
     script = root / "research" / "plot_cancel_flow.py"
     png_path = root / "research" / "results" / "cancel_flow_monitor.png"
