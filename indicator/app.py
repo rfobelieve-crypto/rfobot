@@ -1498,6 +1498,52 @@ def _render_cancel_flow(request, jsonify, send_file, _sp, _sys):
     return send_file(png_path, mimetype="image/png", max_age=0)
 
 
+@app.route("/research/cancel-flow-i", methods=["GET"])
+def research_cancel_flow_interactive_api():
+    """Interactive cancel-flow review chart (research/eyeball aid — NOT a signal).
+
+    Renders research/cancel_flow_interactive.py (1m candles + cancel skew +
+    cancel intensity, three synced Lightweight-Charts panes) in a subprocess
+    and returns the HTML inline. Re-renders on every load so the right edge
+    is always fresh. Admin-guarded via the /research/ prefix (?token= works
+    for phone-browser links).
+
+    Query params:
+      hours=<int>   lookback window, 0 = full depth era (default 48)
+    """
+    from flask import request as _rq, jsonify as _js, send_file as _sf
+    import subprocess as _sp
+    import sys as _sys
+    import traceback as _tb
+
+    root = Path(__file__).resolve().parent.parent
+    script = root / "research" / "cancel_flow_interactive.py"
+    out = root / "research" / "results" / "cancel_flow_review.html"
+    if not script.exists():
+        return _js({"error": "research/ not present in this image — "
+                             "needs the Dockerfile.indicator that COPYs research/"}), 501
+    hours = _rq.args.get("hours", "").strip()
+    cmd = [_sys.executable, str(script),
+           "--hours", hours if hours.isdigit() else "48"]
+    try:
+        # stale-output guard: the script exits 0 without saving when depth
+        # data is too young — never serve a leftover HTML as if it were fresh
+        out.unlink(missing_ok=True)
+        r = _sp.run(cmd, capture_output=True, text=True, timeout=100,
+                    cwd=str(root))
+        if r.returncode != 0 or not out.exists():
+            return _js({"error": "render failed",
+                        "stdout": (r.stdout or "")[-800:],
+                        "stderr": (r.stderr or "")[-800:]}), 500
+        return _sf(out, mimetype="text/html", max_age=0)
+    except _sp.TimeoutExpired:
+        return _js({"error": "render timed out (100s)"}), 500
+    except Exception:
+        logger.exception("cancel_flow_interactive_route_failed")
+        return _js({"error": "cancel-flow-i route crashed",
+                    "trace": _tb.format_exc()[-1500:]}), 500
+
+
 @app.route("/okx-status", methods=["GET"])
 def okx_status_api():
     """Inspect OKX runner singleton state.  Returns diagnostic info

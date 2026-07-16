@@ -43,21 +43,33 @@ TZ_OFFSET_S = 8 * 3600  # display as UTC+8, same convention as chart_interactive
 OUT = PROJECT_ROOT / "research" / "results" / "cancel_flow_review.html"
 
 
+def _q(conn, sql: str, params=None) -> pd.DataFrame:
+    """DB → DataFrame without pd.read_sql: its handling of DictCursor rows
+    differs across pandas versions (the container's newer pandas turned the
+    column ALIAS into row values). dict rows via pd.DataFrame() are stable."""
+    with conn.cursor() as cur:
+        cur.execute(sql, params or None)
+        rows = cur.fetchall() or []
+    return pd.DataFrame(rows)
+
+
 def load_depth(hours: int | None) -> pd.DataFrame:
     conn = get_db_conn()
     try:
-        dd = pd.read_sql(
+        dd = _q(conn,
             "SELECT minute_start_ms ms, bid_add_qty, bid_cancel_qty, "
             "ask_add_qty, ask_cancel_qty FROM depth_deltas_1m "
             "WHERE canonical_symbol='BTC-USD' AND exchange='binance' "
-            "ORDER BY minute_start_ms", conn)
+            "ORDER BY minute_start_ms")
     finally:
         conn.close()
     if dd.empty:
         return dd
     for c in ("bid_add_qty", "bid_cancel_qty", "ask_add_qty", "ask_cancel_qty"):
         dd[c] = dd[c].astype(float)
-    dd["ms"] = dd["ms"].astype("int64")
+    # Newer pandas (Railway image) reads DB numerics as arrow-backed str;
+    # local Windows pandas reads them as ints. Coerce so int64 works on both.
+    dd["ms"] = pd.to_numeric(dd["ms"]).astype("int64")
     if hours:
         dd = dd[dd["ms"] >= dd["ms"].max() - hours * 3600_000]
     return dd.reset_index(drop=True)
@@ -89,12 +101,12 @@ def load_strong_signals(start_ms: int, end_ms: int) -> list[dict]:
     try:
         conn = get_db_conn()
         try:
-            sig = pd.read_sql(
+            sig = _q(conn,
                 "SELECT signal_time, direction FROM tracked_signals "
                 "WHERE strength='Strong' AND direction IN ('UP','DOWN') "
                 "AND signal_time >= %s AND signal_time <= %s",
-                conn, params=(str(pd.Timestamp(start_ms, unit="ms")),
-                              str(pd.Timestamp(end_ms, unit="ms"))))
+                params=(str(pd.Timestamp(start_ms, unit="ms")),
+                        str(pd.Timestamp(end_ms, unit="ms"))))
         finally:
             conn.close()
     except Exception as e:  # noqa: BLE001

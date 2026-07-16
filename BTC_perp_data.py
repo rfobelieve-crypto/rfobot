@@ -1805,40 +1805,27 @@ def _handle_alpha_decay(chat_id: str):
         send_message(chat_id, f"❌ Alpha decay 檢查失敗: {e}")
 
 
-def _handle_cancel_flow(chat_id: str, hours: int = 24):
-    """Fetch cancel-flow monitor chart (research eyeball tool) from Indicator service.
+def _handle_cancel_flow(chat_id: str, hours: int = 48):
+    """Send link to the interactive cancel-flow review chart (research tool).
 
-    /research/cancel-flow returns the rendered PNG inline (image/png);
-    on failure it returns diagnosable JSON instead.
+    /research/* is admin-guarded; embed ?token= in the URL so the link opens
+    from a phone browser — same pattern as the Dashboard button (operator-only
+    chat, so the URL stays private). The page re-renders on every load.
     """
     if not INDICATOR_SERVICE_URL:
         send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
         return
-    try:
-        resp = requests.get(f"{INDICATOR_SERVICE_URL}/research/cancel-flow",
-                            params={"hours": hours}, timeout=120,
-                            headers=_indicator_admin_headers())
-        ctype = resp.headers.get("Content-Type", "")
-        if resp.status_code != 200 or not ctype.startswith("image/"):
-            err = ""
-            try:
-                err = resp.json().get("error", "")
-            except Exception:
-                pass
-            send_message(chat_id, f"❌ 撤單流圖表未就緒 ({resp.status_code}) {err}")
-            return
-        window = "全 depth 時代" if hours == 0 else f"最近 {hours}h"
-        caption = (
-            "撤單流監控（研究圖·非信號）\n"
-            f"視窗: {window}\n"
-            "上=價格 | 中=撤單不對稱(綠賣側撤/紅買側撤) | 下=撤單強度\n"
-            "撤+量低=真空反轉 | 撤+量大破位=續走 | 量大守住=吸收\n"
-            "edge 待 8/10 判決"
-        )
-        _send_photo_with_buttons(chat_id, resp.content, caption)
-    except Exception as e:
-        logger.exception("cancel flow chart fetch error: %s", e)
-        send_message(chat_id, f"❌ 取得撤單流圖表失敗: {e}")
+    url = f"{INDICATOR_SERVICE_URL}/research/cancel-flow-i?hours={hours}"
+    tok = os.getenv("ADMIN_HEAL_TOKEN", "")
+    if tok:
+        url += f"&token={tok}"
+    window = "全 depth 時代" if hours == 0 else f"最近 {hours}h"
+    send_message(chat_id,
+        f"<b>撤單流覆盤（互動圖·研究非信號）</b>\n\n"
+        f"<a href=\"{url}\">點擊開啟互動覆盤圖</a>\n\n"
+        f"視窗: {window}（/cancelflow 168 改週視角, 0=全期間）\n"
+        f"1m K棒 + 撤單不對稱 + 撤單強度, 三面板同步縮放/十字線\n"
+        f"▲▼=v7 Strong · 開啟後等數秒 render · edge 待 8/10 判決")
 
 
 def _handle_signal_perf(chat_id: str):
@@ -1932,7 +1919,7 @@ def _send_help(chat_id: str):
         "/history - 事件歷史\n"
         "\n<b>--- 其他 ---</b>\n"
         "/flow_chart - 訂單流圖表\n"
-        "/cancelflow - 撤單流監控圖 (研究·非信號; 可帶小時數如 /cancelflow 168)\n\n"
+        "/cancelflow - 撤單流互動覆盤圖 (研究·非信號; 可帶小時數如 /cancelflow 168)\n\n"
         "<i>也可直接點擊下方按鈕操作</i>"
     )
     keyboard = json_mod.dumps({"inline_keyboard": [
@@ -2193,9 +2180,9 @@ def webhook():
             threading.Thread(target=_handle_alpha_decay, args=(chat_id,), daemon=True).start()
 
         elif cmd == "/cancelflow" or cmd.startswith("/cancelflow "):
-            # /cancelflow → last 24h; /cancelflow 168 → weekly; /cancelflow 0 → full era
+            # /cancelflow → last 48h; /cancelflow 168 → weekly; /cancelflow 0 → full era
             parts = raw_text.split()
-            cf_hours = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 24
+            cf_hours = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 48
             threading.Thread(target=_handle_cancel_flow, args=(chat_id, cf_hours), daemon=True).start()
 
         elif cmd == "/update":
