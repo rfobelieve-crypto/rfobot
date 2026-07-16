@@ -92,9 +92,10 @@ def fetch_klines_1m(start_ms: int, end_ms: int) -> pd.DataFrame:
         time.sleep(0.15)
     df = pd.DataFrame(rows, columns=[
         "open_time", "o", "h", "l", "c", "v", "ct", "qv", "n", "tbb", "tbq", "ig"])
-    for col in ("o", "h", "l", "c"):
+    # v = 總量(base), tbb = taker 買方主動量 → 賣方 = v - tbb,量價三分法用
+    for col in ("o", "h", "l", "c", "v", "tbb"):
         df[col] = df[col].astype(float)
-    return df[["open_time", "o", "h", "l", "c"]]
+    return df[["open_time", "o", "h", "l", "c", "v", "tbb"]]
 
 
 def load_strong_signals(start_ms: int, end_ms: int) -> list[dict]:
@@ -152,9 +153,15 @@ def main() -> int:
     kl = fetch_klines_1m(start_ms, end_ms)
     print(f"{len(kl)} candles, {len(dd)} depth minutes")
 
-    candles = [{"time": int(t) // 1000 + TZ_OFFSET_S, "open": o, "high": h,
-                "low": lo, "close": c}
-               for t, o, h, lo, c in kl.itertuples(index=False)]
+    candles = []
+    vol_bars = []
+    for t, o, h, lo, c, v, tb in kl.itertuples(index=False):
+        ts = int(t) // 1000 + TZ_OFFSET_S
+        candles.append({"time": ts, "open": o, "high": h, "low": lo, "close": c})
+        # taker 買佔優(2*tbb ≥ v)綠 / 賣佔優紅 — 配撤單面板做「真空/真破/吸收」三分
+        vol_bars.append({"time": ts, "value": round(v, 3),
+                         "color": "rgba(38,162,105,0.6)" if 2 * tb >= v
+                                  else "rgba(224,27,36,0.6)"})
 
     skew_bars, int_bars, shock_bars = [], [], []
     for i in range(len(dd)):
@@ -185,7 +192,8 @@ def main() -> int:
 
     html = HTML_TEMPLATE.format(
         title=f"撤單流覆盤 BTC-USD ({span_h:.0f}h)",
-        candles=json.dumps(candles), skew=json.dumps(skew_bars),
+        candles=json.dumps(candles), volume=json.dumps(vol_bars),
+        skew=json.dumps(skew_bars),
         intensity=json.dumps(int_bars), markers=json.dumps(markers),
         span_h=f"{span_h:.0f}", n=len(dd), smooth=SMOOTH_MIN)
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -209,8 +217,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           font-size:12px; color:#9aa0a6; pointer-events:none; }}
 </style></head><body>
 <div id="hdr"><b>撤單流覆盤 BTC-USD</b> · {span_h}h · n={n} 分鐘 · 撤單面板 {smooth}m 平滑/去均值
- · ▲▼=v7 Strong · 深色柱=|不對稱|≥0.30 · 研究工具非信號 (edge 待 8/10)</div>
+ · ▲▼=v7 Strong · 深色柱=|不對稱|≥0.30 · 量色=taker買綠/賣紅 · 研究工具非信號 (edge 待 8/10)</div>
 <div class="pane"><div class="lbl">價格 1m K棒</div><div id="c1"></div></div>
+<div class="pane"><div class="lbl">成交量 1m (綠=taker買佔優 / 紅=賣佔優)</div><div id="cv"></div></div>
 <div class="pane"><div class="lbl">撤單不對稱 (＋賣側撤多 / －買側撤多)</div><div id="c2"></div></div>
 <div class="pane"><div class="lbl">撤單強度 (兩側總量)</div><div id="c3"></div></div>
 <script>
@@ -226,11 +235,13 @@ function mk(id, h) {{
   return LightweightCharts.createChart(el, Object.assign({{}}, OPTS,
       {{ width: el.clientWidth || window.innerWidth, height: h }}));
 }}
-const c1 = mk('c1', Math.max(260, window.innerHeight * 0.42));
-const c2 = mk('c2', Math.max(150, window.innerHeight * 0.24));
-const c3 = mk('c3', Math.max(110, window.innerHeight * 0.18));
+const c1 = mk('c1', Math.max(240, window.innerHeight * 0.36));
+const cv = mk('cv', Math.max(80,  window.innerHeight * 0.13));
+const c2 = mk('c2', Math.max(130, window.innerHeight * 0.21));
+const c3 = mk('c3', Math.max(100, window.innerHeight * 0.15));
 
 const CANDLES = {candles};
+const VOL = {volume};
 const SKEW = {skew};
 const INTEN = {intensity};
 
@@ -239,6 +250,9 @@ const candle = c1.addCandlestickSeries({{
   wickUpColor:'#26a269', wickDownColor:'#e01b24', borderVisible:false }});
 candle.setData(CANDLES);
 candle.setMarkers({markers});
+
+const vol = cv.addHistogramSeries({{ priceFormat: {{ type:'volume' }} }});
+vol.setData(VOL);
 
 const skew = c2.addHistogramSeries({{ priceFormat: {{ type:'price', precision:2, minMove:0.01 }} }});
 skew.setData(SKEW);
@@ -255,6 +269,7 @@ const byTime = arr => {{ const m = new Map();
   return m; }};
 const panes = [
   {{ chart: c1, series: candle, map: byTime(CANDLES) }},
+  {{ chart: cv, series: vol,    map: byTime(VOL) }},
   {{ chart: c2, series: skew,   map: byTime(SKEW) }},
   {{ chart: c3, series: inten,  map: byTime(INTEN) }},
 ];

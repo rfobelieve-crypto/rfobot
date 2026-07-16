@@ -1824,7 +1824,7 @@ def _handle_cancel_flow(chat_id: str, hours: int = 48):
         f"<b>撤單流覆盤（互動圖·研究非信號）</b>\n\n"
         f"<a href=\"{url}\">點擊開啟互動覆盤圖</a>\n\n"
         f"視窗: {window}（/cancelflow 168 改週視角, 0=全期間）\n"
-        f"1m K棒 + 撤單不對稱 + 撤單強度, 三面板同步縮放/十字線\n"
+        f"1m K棒 + 成交量(taker買賣色) + 撤單不對稱 + 撤單強度, 四面板同步\n"
         f"▲▼=v7 Strong · 開啟後等數秒 render · edge 待 8/10 判決")
 
 
