@@ -45,17 +45,27 @@ from shared.db import get_db_conn
 BG = "#0e1116"; GREEN = "#26a269"; RED = "#e01b24"; TXT = "#e3e3e3"; SUB = "#9aa0a6"; GRID = "#2a2f38"
 
 
+def _q(conn, sql: str, params=None) -> pd.DataFrame:
+    """DB → DataFrame without pd.read_sql: its handling of DictCursor rows
+    differs across pandas versions (the container's newer pandas turned the
+    column ALIAS into row values). dict rows via pd.DataFrame() are stable."""
+    with conn.cursor() as cur:
+        cur.execute(sql, params or None)
+        rows = cur.fetchall() or []
+    return pd.DataFrame(rows)
+
+
 def load(hours: int | None) -> pd.DataFrame:
     conn = get_db_conn()
     try:
-        dd = pd.read_sql(
+        dd = _q(conn,
             "SELECT minute_start_ms ms, bid_add_qty, bid_cancel_qty, "
             "ask_add_qty, ask_cancel_qty FROM depth_deltas_1m "
             "WHERE canonical_symbol='BTC-USD' AND exchange='binance' "
-            "ORDER BY minute_start_ms", conn)
-        ob = pd.read_sql(
+            "ORDER BY minute_start_ms")
+        ob = _q(conn,
             "SELECT ts_ms ms, mid_price FROM orderbook_snapshots_1m "
-            "WHERE canonical_symbol='BTC-USD' ORDER BY ts_ms", conn)
+            "WHERE canonical_symbol='BTC-USD' ORDER BY ts_ms")
     finally:
         conn.close()
     if dd.empty:
@@ -83,11 +93,11 @@ def _overlay_signals(ax, df: pd.DataFrame) -> None:
     try:
         conn = get_db_conn()
         try:
-            sig = pd.read_sql(
+            sig = _q(conn,
                 "SELECT signal_time, direction FROM tracked_signals "
                 "WHERE strength='Strong' AND direction IN ('UP','DOWN') "
                 "AND signal_time >= %s AND signal_time <= %s",
-                conn, params=(str(df.index.min()), str(df.index.max())))
+                params=(str(df.index.min()), str(df.index.max())))
         finally:
             conn.close()
         if sig.empty:
