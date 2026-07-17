@@ -100,6 +100,28 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       預計 **~2026-10**（backtest 節奏 ~8-9 trail 出場/月）。跑前需刷新 klines parquet
       （事件驅動：daily_collect.bat 只管 coinglass/ 子夾；root parquet 靠訓練/月度復驗刷）
 
+### 4.65 次小時（分鐘級）系統可行性（2026-07-18 Phase 0 已判決：PARK）
+使用者假說：1h 取樣把訂單流資訊平均掉，分鐘取樣可在衰退前捕捉 → 值得整套
+搬到分鐘級。**Phase 0 依凍結 pre-registration 執行**（`research/subhourly/PREREG.md`
+先 commit 固定時間戳 dd0558e → 才跑 `minute_ic_scan.py`，結果
+`research/results/subhourly_ic_scan.csv`）：
+- **G1 資訊存在：PASS ✅（假說的「資訊」半邊被證實）**——ohlcv_1m 15 個月
+  （2025-01→2026-03，654k 分鐘）+ flow_bars 90 天兩時代交叉：taker 失衡/淨流 z/
+  短期動量在 h=15-30m 月均 IC −0.03~−0.04、**15/15 個月同號**、前後半同號。
+  IC×horizon 衰退曲線形狀完全符合假說：峰在 15-30m、到 4h 衰成 −0.013
+  （= V7 在 4h 看不到它的原因）。註：**符號是負的**——分鐘級是「反著做」
+  （fade taker flow / 短期均值回歸），不是跟單流；vshock 方向 IC≈0（與 F2
+  「強度預測幅度不預測方向」一致）；obi 是唯一順向訊號（h=5m +0.034，30m 前死）
+- **G2 經濟可行：FAIL ❌（假說的「可交易」半邊被否決）**——top-5% 條件桶
+  在 30/60m **全部 138 格淨值為負**（扣 8bps=2×maker）；最好的一格
+  （Era B ret_60@60m，且是純價格反轉非訂單流）毛利僅 ~6.2bps < 8bps 門檻，
+  還有 138 格多重比較加持。IC 0.03-0.04 的單筆可轉化毛利就是付不起費率——
+  市場把分鐘級可預測性磨到剛好低於成本前緣
+- **處置（照凍結規則，不凹）**：G2 FAIL → 不跑 G3、**不重寫系統**、計畫
+  PARK。復活條件：`depth_deltas_1m` 累積 ≥3-6 個月後帶撤單特徵 **re-run
+  一次**（同門檻）；另 8/10 F1 判決是撤單側的獨立分鐘級檢定。
+  V7 全程零改動（Phase 0 從頭到尾沒碰生產）
+
 ### 4.6 V7 多幣化可行性研究（2026-07-15 啟動）
 動機：核心瓶頸是樣本速度（~265 Strong/年、73% 被單槽擠掉），多幣化 = 同機制
 樣本產出 ×N，非找新 alpha。純 research track（`research/multicoin/`），不碰生產。
