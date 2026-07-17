@@ -95,6 +95,16 @@ def main():
                      name="cancel-playbook").start()
     logger.info("Cancel-playbook watcher started (cancel_playbook_events).")
 
+    # TV-alert poller (2026-07-17): consumes tv_alert_events written by the
+    # main bot's /tv webhook (DB as bus), computes the cancel-flow display
+    # state at trigger, pushes a simplified event card, and backfills the
+    # 30/60/120m 判定窗 — the H-R sample clock starts here. Research aid,
+    # never touches the executor.
+    from market_data.tasks.tv_alert_poller import poll_loop
+    threading.Thread(target=poll_loop, daemon=True,
+                     name="tv-alert-poller").start()
+    logger.info("TV-alert poller started (tv_alert_events).")
+
     # Start trade streams (blocking — must be last)
     start_streams()
 

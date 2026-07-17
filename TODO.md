@@ -199,7 +199,14 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       （事件管線從未產出資料——TV 快訊 → `/tv` webhook 這條源頭目前是死的）。
       H-R 不是「寫好 harness 等資料」而是**先復活事件源才會開始累積**；
       復活 = A3 的 TV webhook 事件源（使用者在 TV 畫關卡設快訊）——
-      這使 A3 的 TV 源部分從「UX 加值」升級為「H-R 的硬前置」。原凍結假說↓
+      這使 A3 的 TV 源部分從「UX 加值」升級為「H-R 的硬前置」。
+      ✅ **07-17 接收端已上線**：`/tv` 加寫 `tv_alert_events`（BTC+secret 驗證後、
+      liquidity_side gate 前——純關卡快訊無 side 也收；`{"window":N}` 自訂回看）
+      + Service 2 `tv_alert_poller`（觸發分鐘收盤後算狀態→推簡版事件卡→
+      30/60/120m 判定窗回填，與機器事件同管線=人機命中率可比）。
+      **剩使用者動作：在 TV 畫關卡設快訊指到 /tv**（帶 secret/price/event；
+      含 liquidity_side buy/sell 的同時餵舊 liquidity_events 管線=H-R 時鐘）。
+      原凍結假說↓
       基率警告：掃穿延續 ~2/3 → **盲目接反轉 = -EV**，edge 全在濾網。
       凍結假說：sweep 事件塵埃落定段（強度尖峰回落後 15min 內）雙旗標
       **(a) 被掃側淨回填**（cancel−add 轉負）**+ (b) 對側淨撤離**（偏斜翻轉到

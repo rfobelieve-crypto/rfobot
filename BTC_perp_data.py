@@ -1569,6 +1569,34 @@ def tradingview_webhook():
             logger.warning("Ignored non-BTC TV event: %s", symbol)
             return {"status": "ignored", "reason": "only BTC supported"}, 200
 
+        # ── tv_alert_events bus（2026-07-17，additive）──
+        # 每個通過 secret+BTC 驗證的 TV 快訊也落一筆 tv_alert_events，
+        # 供 Service 2 撤單事件卡輪詢（DB 當匯流排，share data not code）。
+        # 放在 liquidity_side gate 之前：純關卡快訊（無 side）也要收。
+        # 可選欄位 {"window": N} 自訂回看分鐘數。絕不影響下方既有管線。
+        try:
+            _w = data.get("window", 90)
+            tv_window = int(_w) if str(_w).strip().isdigit() else 90
+            tv_window = max(15, min(360, tv_window))
+            _payload = json.dumps({k: v for k, v in data.items()
+                                   if k != "secret"}, ensure_ascii=False)[:2000]
+            _tv_conn = get_db_conn()
+            try:
+                with _tv_conn.cursor() as _tv_cur:
+                    _tv_cur.execute(
+                        "INSERT INTO tv_alert_events (received_ms, symbol, "
+                        "event, liquidity_side, price, window_mins, raw_json) "
+                        "VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                        (int(time.time() * 1000), symbol[:32], event[:64],
+                         liquidity_side[:8] if liquidity_side != "unknown" else "",
+                         price if price > 0 else None, tv_window, _payload))
+                _tv_conn.commit()
+            finally:
+                _tv_conn.close()
+        except Exception as tv_bus_err:
+            logger.warning("tv_alert_events insert failed (non-fatal): %s",
+                           tv_bus_err)
+
         if liquidity_side not in ("buy", "sell"):
             logger.warning("Ignored invalid liquidity_side: %s", liquidity_side)
             return {"status": "ignored", "reason": "invalid liquidity_side"}, 200
