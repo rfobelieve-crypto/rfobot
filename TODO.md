@@ -121,6 +121,11 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
   PARK。復活條件：`depth_deltas_1m` 累積 ≥3-6 個月後帶撤單特徵 **re-run
   一次**（同門檻）；另 8/10 F1 判決是撤單側的獨立分鐘級檢定。
   V7 全程零改動（Phase 0 從頭到尾沒碰生產）
+- **07-18 補 2：V7 換 15m bar 的重做成本已判**——direction 模型 importance
+  拆解：**67.7% 的權重在 1h+/日頻原生源**（Coinglass OI/LS/margin 家族，
+  top-10 佔 8 席；15m 網格上只是 ffill 階梯函數且無 15m 歷史可 backfill），
+  fast 半邊（32.3%）正是 Phase 0 判弱的家族 → re-base = 重做全部工程去
+  搬進更弱的資訊 regime，維持 NO-GO；「15m 輕量實驗」= G3，已被 G2 FAIL 封
 - **07-18 補：re-run 必要贏面已量化**（`required_bar.py` + PREREG 附錄 A，
   家族在看資料前宣告）：撤單特徵須在 30-60m top-5% 桶交出 **≥8bps 毛捕捉
   ≈ 條件勝率 57.5%+**（最佳 taker cell 55.8%、真流系 cell 只有 53%）。
