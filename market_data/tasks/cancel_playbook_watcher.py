@@ -224,6 +224,29 @@ STATE_META = {
 _PLAYBOOK_TO_STATE = {"absorption": "absorption", "true_break": "cascade",
                       "two_sided": "rotation", "gate_only": "surge"}
 
+# Display hex per state — single source for every chart surface (interactive
+# review ribbon, sweep zoom card). Same colour language as the emoji set:
+# green=UP vacuum, red=DOWN vacuum, gray=no-direction, None=don't draw (calm)
+# or direction-coloured (absorption).
+STATE_COLOR = {
+    "calm": None,
+    "rotation": "#8a919c",
+    "surge": "#8a919c",
+    "cascade": "#c0c6cf",
+    "vacuum_up": "#26a269",
+    "vacuum_down": "#e01b24",
+    "absorption": None,          # direction-coloured below
+}
+
+
+def state_color(s: dict) -> str | None:
+    """Ribbon colour for a classify_state dict; None = draw nothing (calm)."""
+    c = STATE_COLOR.get(s["state"])
+    if c is not None or s["state"] == "calm":
+        return c
+    return "#26a269" if s["direction"] == "UP" else (
+        "#e01b24" if s["direction"] == "DOWN" else "#8a919c")
+
 
 def classify_state(r: pd.Series) -> dict:
     """Display state for one feature row (from compute_features).

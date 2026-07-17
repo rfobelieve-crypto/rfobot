@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 
 from market_data.tasks.cancel_playbook_watcher import (
-    STATE_META, classify_minute, classify_state)
+    STATE_META, classify_minute, classify_state, state_color)
 
 
 def row(shock=1.0, vshock=1.0, taker_ratio=0.0, ret_1m=0.0,
@@ -106,3 +106,23 @@ class TestNoDriftFromFrozenClassifier:
             assert zh
             if key != "absorption":     # absorption is direction-coloured
                 assert emoji
+
+
+class TestStateColor:
+    """Ribbon colours (A2): one colour language across every chart surface."""
+
+    def test_calm_draws_nothing(self):
+        assert state_color({"state": "calm", "direction": "NONE"}) is None
+
+    def test_vacuum_green_red(self):
+        assert state_color({"state": "vacuum_up", "direction": "UP"}) == "#26a269"
+        assert state_color({"state": "vacuum_down", "direction": "DOWN"}) == "#e01b24"
+
+    def test_absorption_direction_coloured(self):
+        assert state_color({"state": "absorption", "direction": "UP"}) == "#26a269"
+        assert state_color({"state": "absorption", "direction": "DOWN"}) == "#e01b24"
+
+    def test_no_direction_states_gray(self):
+        for s in ("rotation", "surge"):
+            assert state_color({"state": s, "direction": "NONE"}) == "#8a919c"
+        assert state_color({"state": "cascade", "direction": "DOWN"}) == "#c0c6cf"

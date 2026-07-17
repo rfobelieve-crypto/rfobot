@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.db import get_db_conn
 from market_data.tasks.cancel_playbook_watcher import (
     DEF_VERSION, STATE_META, _tg_creds, classify_state, compute_features,
-    load_frame)
+    load_frame, state_color)
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +137,78 @@ def _send_tg(text: str) -> bool:
         return False
 
 
+def _send_tg_photo(caption: str, png: bytes) -> bool:
+    token, chat = _tg_creds()
+    if not token or not chat:
+        return False
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{token}/sendPhoto",
+            data={"chat_id": chat, "caption": caption[:1024]},
+            files={"photo": ("tv_zoom.png", png, "image/png")}, timeout=30)
+        return resp.status_code == 200
+    except Exception:
+        logger.exception("tv photo send failed")
+        return False
+
+
+def render_zoom_png(recv_ms: int, window: int, level_px: float | None,
+                    win_feat: pd.DataFrame) -> bytes | None:
+    """A2-3 sweep 特寫圖: 1m K 線 + 狀態色格 + 被掃價位線 + 觸發時刻線.
+
+    plotly+kaleido (both in the marketdata image); any failure → None and
+    the caller falls back to the text card. Right side extends only as far
+    as data exists at render time (觸發後 ~1min) — the A3 second-stage card
+    will own the post-event view."""
+    try:
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+    except Exception:
+        logger.info("zoom card: plotly unavailable, text fallback")
+        return None
+    try:
+        t0 = recv_ms - window * 60_000
+        t1 = min(int(time.time() * 1000), recv_ms + 90 * 60_000)
+        resp = requests.get("https://api.binance.com/api/v3/klines", params={
+            "symbol": "BTCUSDT", "interval": "1m",
+            "startTime": t0, "endTime": t1, "limit": 1000}, timeout=20)
+        kl = resp.json()
+        if not isinstance(kl, list) or len(kl) < 10:
+            return None
+        tpe = pd.Timedelta(hours=8)
+        times = [pd.Timestamp(int(k[0]), unit="ms") + tpe for k in kl]
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                            row_heights=[0.88, 0.12], vertical_spacing=0.02)
+        fig.add_trace(go.Candlestick(
+            x=times,
+            open=[float(k[1]) for k in kl], high=[float(k[2]) for k in kl],
+            low=[float(k[3]) for k in kl], close=[float(k[4]) for k in kl],
+            increasing_line_color="#26a269", decreasing_line_color="#e01b24",
+            showlegend=False), row=1, col=1)
+        xs, cs = [], []
+        for m, r in win_feat.iterrows():
+            col = state_color(classify_state(r))
+            xs.append(pd.Timestamp(int(m) * 60_000, unit="ms") + tpe)
+            cs.append(col or "rgba(0,0,0,0)")
+        fig.add_trace(go.Bar(x=xs, y=[1] * len(xs), marker_color=cs,
+                             showlegend=False), row=2, col=1)
+        if level_px:
+            fig.add_hline(y=float(level_px), line_dash="dash",
+                          line_color="#f2b544", row=1, col=1)
+        fig.add_vline(x=pd.Timestamp(recv_ms, unit="ms") + tpe,
+                      line_dash="dot", line_color="#f2b544")
+        fig.update_layout(
+            template="plotly_dark", width=900, height=520,
+            margin=dict(l=45, r=25, t=40, b=25), showlegend=False,
+            xaxis_rangeslider_visible=False,
+            title=f"TV 快訊特寫 回看{window}m (TPE) · 色格=撤單狀態 · 研究非信號")
+        fig.update_yaxes(visible=False, row=2, col=1)
+        return fig.to_image(format="png", scale=2)
+    except Exception:
+        logger.exception("zoom card render failed")
+        return None
+
+
 def process_new(send: bool = True) -> int:
     """Handle unprocessed alerts whose trigger minute has closed."""
     now_ms = int(time.time() * 1000)
@@ -160,7 +232,7 @@ def process_new(send: bool = True) -> int:
         recv_ms = int(row["received_ms"])
         age_min = (now_ms - recv_ms) / 60_000
         window = int(row["window_mins"] or 90)
-        result_state, card = "no_data", None
+        result_state, card, win_feat = "no_data", None, None
 
         if age_min > MAX_AGE_MIN:
             result_state = "expired"
@@ -172,6 +244,7 @@ def process_new(send: bool = True) -> int:
                 win = feat.loc[(feat.index > trig_min - window)
                                & (feat.index <= trig_min)]
                 if not win.empty:
+                    win_feat = win
                     states = [classify_state(x) for _, x in win.iterrows()]
                     cur_state = states[-1]
                     result_state = cur_state["state"]
@@ -181,7 +254,17 @@ def process_new(send: bool = True) -> int:
                 continue          # collector may just be lagging — retry
 
         if card and send:
-            _send_tg(card)
+            # sweep-type alerts (liquidity_side present) get the zoom card
+            png = None
+            side = str(row.get("liquidity_side") or "").strip()
+            if side in ("buy", "sell") and win_feat is not None:
+                try:
+                    px = float(row["price"]) if row.get("price") else None
+                except (TypeError, ValueError):
+                    px = None
+                png = render_zoom_png(recv_ms, window, px, win_feat)
+            if not (png and _send_tg_photo(card, png)):
+                _send_tg(card)
 
         conn = get_db_conn()
         try:

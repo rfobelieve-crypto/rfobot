@@ -173,8 +173,13 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       classify_minute 零漂移），六態 + gate_only 殘餘誠實顯示為「爆量未定」⚪；
       TG `/cancelstate [mins]` 上線（狀態行+特徵值+回看窗分布+持續時間，
       走 `/research/cancel-analyze?mode=state` 同管線）。
-      **待做 A2**（狀態畫進 K 線面板+獵取標記+sweep 特寫圖）、**A3**（事件卡
-      +按鈕即日誌+TV webhook）↓ 原 spec：把 shock/毛/淨/
+      **A2 完成（07-18）**：①互動覆盤圖價格 pane 底部 6% overlay 狀態色格
+      （blank=平靜/灰=換防·爆量·瀑布/🟢🔴=真空·吸收，色值單一來源
+      `state_color()` in watcher）②獵取標記層（tv_alert_events+liquidity_events
+      → ⚡ marker+被掃價位黃虛線，空表安全）③sweep 特寫圖：poller 對帶
+      liquidity_side 的快訊渲染 plotly+kaleido 回看窗 K 線+狀態格+價位線
+      PNG 作卡片附圖（deps 缺→優雅退文字卡；marketdata image 兩者都有）。
+      **待做 A3 剩餘**（四鍵按鈕即日誌+sweep 二段式卡）↓ 原 spec：把 shock/毛/淨/
       量比/taker 融合成單一「當前狀態」輸出——**分類狀態機不是加權分數**
       （CDP 墓碑：合成分數稀釋信號 + 權重可調 = overfit）。六態：平靜/換防警戒
       （毛高淨零）/瀑布中（強度尖峰）/向上真空/向下真空/吸收（量大守住）。

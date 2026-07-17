@@ -37,8 +37,11 @@ except Exception:
     pass
 
 from shared.db import get_db_conn
+from market_data.tasks.cancel_playbook_watcher import (
+    classify_state, compute_features, load_frame, state_color)
 
 SMOOTH_MIN = 15
+MAX_LEVEL_LINES = 12
 TZ_OFFSET_S = 8 * 3600  # display as UTC+8, same convention as chart_interactive
 OUT = PROJECT_ROOT / "research" / "results" / "cancel_flow_review.html"
 
@@ -124,6 +127,89 @@ def load_strong_signals(start_ms: int, end_ms: int) -> list[dict]:
     return sorted(out, key=lambda m: m["time"])
 
 
+def build_state_strip(start_ms: int, end_ms: int) -> list[dict]:
+    """A2-1 (2026-07-18): per-minute display state under each candle.
+
+    classify_state = the frozen v1 classifier's 1:1 relabelling (single
+    state function shared with /cancelstate and the watcher) — the ribbon
+    adds NO new thresholds. calm minutes draw nothing (blank = 平靜).
+    """
+    try:
+        now_ms = int(time.time() * 1000)
+        lookback = int((now_ms - start_ms) / 60_000) + 120
+        wf = load_frame(lookback_min=lookback)
+        if wf.empty:
+            return []
+        feat = compute_features(wf)
+        m0, m1 = start_ms // 60_000, end_ms // 60_000
+        out = []
+        for m, r in feat.loc[(feat.index >= m0) & (feat.index <= m1)].iterrows():
+            col = state_color(classify_state(r))
+            if col:
+                out.append({"time": int(m) * 60 + TZ_OFFSET_S,
+                            "value": 1, "color": col})
+        return out
+    except Exception as e:  # noqa: BLE001
+        print(f"(state strip skipped: {e})")
+        return []
+
+
+def load_hunt_events(start_ms: int, end_ms: int) -> tuple[list[dict], list[dict]]:
+    """A2-2 (2026-07-18): liquidity-hunt marker layer.
+
+    Sources: tv_alert_events (user-drawn levels via /tv, state stamped by
+    the poller) + liquidity_events (legacy sweep pipeline). Both tables are
+    empty until TV alerts are wired — defensive by design.
+    Returns (markers ⚡, level price lines)."""
+    markers, levels = [], []
+    try:
+        conn = get_db_conn()
+        try:
+            tv = _q(conn,
+                "SELECT received_ms ms, event, liquidity_side side, price, state "
+                "FROM tv_alert_events WHERE received_ms BETWEEN %s AND %s "
+                "AND price IS NOT NULL ORDER BY received_ms",
+                params=(start_ms, end_ms))
+            try:
+                liq = _q(conn,
+                    "SELECT trigger_ts ms, liquidity_side side, entry_price price "
+                    "FROM liquidity_events WHERE trigger_ts BETWEEN %s AND %s "
+                    "ORDER BY trigger_ts", params=(start_ms, end_ms))
+            except Exception:
+                liq = pd.DataFrame()
+        finally:
+            conn.close()
+    except Exception as e:  # noqa: BLE001
+        print(f"(hunt overlay skipped: {e})")
+        return [], []
+    frames = [f for f in (tv, liq) if not f.empty]
+    for f in frames:
+        for _, r in f.iterrows():
+            try:
+                ts = int(pd.to_numeric(r["ms"])) // 1000 + TZ_OFFSET_S
+                px = float(r["price"])
+            except (TypeError, ValueError):
+                continue
+            side = str(r.get("side") or "").strip()
+            label = str(r.get("event") or side or "level")
+            state = str(r.get("state") or "")
+            markers.append({
+                "time": ts,
+                "position": "aboveBar" if side == "buy" else "belowBar",
+                "shape": "circle", "color": "#f2b544", "size": 1,
+                "text": "⚡" + (state if state not in ("", "calm") else ""),
+            })
+            levels.append({"price": round(px, 1), "title": label[:16]})
+    # de-dup level lines by price, keep the most recent few
+    seen, uniq = set(), []
+    for lv in reversed(levels):
+        if lv["price"] in seen:
+            continue
+        seen.add(lv["price"])
+        uniq.append(lv)
+    return sorted(markers, key=lambda m: m["time"]), uniq[:MAX_LEVEL_LINES]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--hours", type=int, default=0, help="0 = full depth era")
@@ -202,6 +288,13 @@ def main() -> int:
     if args.shock_dots:
         markers = sorted(markers + shock_bars, key=lambda m: m["time"])
         print(f"{len(shock_bars)} shock(>=3x) markers overlaid")
+
+    state_strip = build_state_strip(start_ms, end_ms)
+    hunt_markers, level_lines = load_hunt_events(start_ms, end_ms)
+    if hunt_markers:
+        markers = sorted(markers + hunt_markers, key=lambda m: m["time"])
+    print(f"state strip: {len(state_strip)} non-calm minutes; "
+          f"hunt: {len(hunt_markers)} markers / {len(level_lines)} level lines")
     span_h = (end_ms - start_ms) / 3600_000
 
     html = HTML_TEMPLATE.format(
@@ -209,6 +302,7 @@ def main() -> int:
         candles=json.dumps(candles), volume=json.dumps(vol_bars),
         skew=json.dumps(skew_bars), netskew=json.dumps(net_bars),
         intensity=json.dumps(int_bars), markers=json.dumps(markers),
+        states=json.dumps(state_strip), levels=json.dumps(level_lines),
         span_h=f"{span_h:.0f}", n=len(dd), smooth=SMOOTH_MIN)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(html, encoding="utf-8")
@@ -231,8 +325,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           font-size:12px; color:#9aa0a6; pointer-events:none; }}
 </style></head><body>
 <div id="hdr"><b>撤單流覆盤 BTC-USD</b> · {span_h}h · n={n} 分鐘 · 撤單面板 {smooth}m 平滑/去均值
- · ▲▼=v7 Strong · 深色柱=|不對稱|≥0.30 · 量色=taker買綠/賣紅 · 研究工具非信號 (edge 待 8/10)</div>
-<div class="pane"><div class="lbl">價格 1m K棒</div><div id="c1"></div></div>
+ · ▲▼=v7 Strong · 深色柱=|不對稱|≥0.30 · 量色=taker買綠/賣紅
+ · K 腳色格=狀態(🟢向上真空/🔴向下真空/灰=換防·爆量·瀑布/空白=平靜, 吸收依方向)
+ · ⚡=獵取事件(黃虛線=被掃價位) · 研究工具非信號 (edge 待 8/10)</div>
+<div class="pane"><div class="lbl">價格 1m K棒 + 狀態色格</div><div id="c1"></div></div>
 <div class="pane"><div class="lbl">成交量 1m (綠=taker買佔優 / 紅=賣佔優)</div><div id="cv"></div></div>
 <div class="pane"><div class="lbl">毛撤單偏斜 (＋賣側撤多 / －買側撤多) — 動作</div><div id="c2"></div></div>
 <div class="pane"><div class="lbl">淨偏斜 (撤−加) — 牆真的變薄才動;毛高淨零=換防假象</div><div id="c4"></div></div>
@@ -267,6 +363,19 @@ const candle = c1.addCandlestickSeries({{
   wickUpColor:'#26a269', wickDownColor:'#e01b24', borderVisible:false }});
 candle.setData(CANDLES);
 candle.setMarkers({markers});
+
+// A2-1 狀態色格 — 貼在價格 pane 底部 6% 的 overlay histogram
+const STATES = {states};
+const stateStrip = c1.addHistogramSeries({{ priceScaleId:'state',
+  priceFormat: {{ type:'volume' }}, lastValueVisible:false,
+  priceLineVisible:false }});
+stateStrip.priceScale().applyOptions({{ scaleMargins: {{ top: 0.94, bottom: 0 }} }});
+stateStrip.setData(STATES);
+
+// A2-2 獵取被掃價位虛線
+const LEVELS = {levels};
+LEVELS.forEach(l => candle.createPriceLine(
+  {{ price: l.price, color:'#f2b544', lineWidth:1, lineStyle:2, title:l.title }}));
 
 const vol = cv.addHistogramSeries({{ priceFormat: {{ type:'volume' }} }});
 vol.setData(VOL);
