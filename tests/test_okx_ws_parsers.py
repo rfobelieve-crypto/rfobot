@@ -47,6 +47,25 @@ class TestTestnetUrl:
         assert url == cfg.ws_private
 
 
+# ── Heartbeat frames (2026-07-18 live log flood) ─────────────────────
+
+
+class TestHeartbeatFrames:
+    """Non-JSON heartbeat frames must be ignored silently — on live every
+    "pong"/empty frame logged a full JSONDecodeError traceback
+    (~130/15min), drowning the errors that matter."""
+
+    @pytest.mark.parametrize("frame", ["pong", "ping", "", " ", "pong\n"])
+    def test_heartbeat_frame_ignored(self, frame):
+        ws = _mk_ws()
+        ws._handle_message(frame)          # must not raise
+
+    def test_genuine_garbage_still_raises_for_on_message_to_log(self):
+        ws = _mk_ws()
+        with pytest.raises(json.JSONDecodeError):
+            ws._handle_message("not-json-at-all")
+
+
 # ── Order channel dispatch ────────────────────────────────────────────
 
 

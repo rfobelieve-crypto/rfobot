@@ -422,6 +422,14 @@ class OkxWsPrivateClient:
     # ── Internal: message dispatch ─────────────────────────────────────
 
     def _handle_message(self, raw: str) -> None:
+        # OKX heartbeat frames are plain text, not JSON ("pong" replies /
+        # empty keepalives). Expected traffic — skip BEFORE json.loads,
+        # otherwise every heartbeat logs a full JSONDecodeError traceback
+        # (live 2026-07-18: ~130 tracebacks/15min drowning the log stream).
+        # Genuine garbage still raises so on_message logs it.
+        stripped = raw.strip() if raw else ""
+        if not stripped or stripped in ("ping", "pong"):
+            return
         msg = json.loads(raw)
         # Auth response
         if msg.get("event") == "login":
