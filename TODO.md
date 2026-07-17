@@ -171,6 +171,17 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
         假跌破反轉）**：掃穿瞬間 = 資訊黑洞（撤單全是保護性雜訊），第一段卡只報
         「⚡掃穿+瀑布中,判讀待塵埃落定」；強度回落後（3-15min）自動觸發第二段卡
         給結論（反轉條件成立/未現）+ 四鍵——使用者的決策時刻在第二段
+- [ ] **MCP agent 遠端化（2026-07-17 登記，使用者需求：在任何 Claude session
+      直接查撤單流分析）**：現況 stdio 版只有本機 Claude Desktop 能用，雲端
+      Claude Code / 手機 app 都摸不到。改法：`indicator/agent/server.py` 的
+      FastMCP 換 HTTP transport（framework 原生支援）+ token 認證（比照
+      ADMIN_HEAL_TOKEN 模式，fail-closed）+ 掛 Railway（可與指標 service 同容器
+      不同 port，或獨立 service）→ claude.ai Connectors 加入 → 所有 Claude
+      介面可直接呼叫 cancel-flow 分析工具（fc44106 的 MCP 工具已存在，
+      只差 transport）。邊界不變：agent-boundary.md 全部照舊（read-only、
+      不碰 executor、AST 測試守著）。副作用：MCP agent 從 demo 變成
+      「作者本人日用的生產工具」——面試/履歷素材直接升級。
+      過渡期替代：TG `/cancelanalyze 90` 輸出貼給 Claude 人工判讀
 - [ ] **H-R 獵取反轉濾網（2026-07-17 登記，使用者主 setup 的專屬檢定）**：
       基率警告：掃穿延續 ~2/3 → **盲目接反轉 = -EV**，edge 全在濾網。
       凍結假說：sweep 事件塵埃落定段（強度尖峰回落後 15min 內）雙旗標
