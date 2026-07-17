@@ -191,7 +191,14 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       → ⚡ marker+被掃價位黃虛線，空表安全）③sweep 特寫圖：poller 對帶
       liquidity_side 的快訊渲染 plotly+kaleido 回看窗 K 線+狀態格+價位線
       PNG 作卡片附圖（deps 缺→優雅退文字卡；marketdata image 兩者都有）。
-      **待做 A3 剩餘**（四鍵按鈕即日誌+sweep 二段式卡）↓ 原 spec：把 shock/毛/淨/
+      **A3 完成（07-19）**：①四鍵按鈕即日誌——watcher 劇本告警 + TV 事件卡都帶
+      `[🟢同意][🔴相反][⏸不確定][✗略過]`（callback `ceb|src|id|verdict` →
+      Service 1 webhook → `cancel_eyeball_log`，INSERT IGNORE **首判鎖定不可
+      事後改**、skip 不落表、60/120m 判定窗自動回填=人機同尺）②sweep 二段式：
+      第 1 段掃穿瞬間只報事實+特寫圖無按鈕；強度回落（3-15min，15 強制）後
+      第 2 段卡帶 **H-R 凍結雙旗標**（被掃側淨回填+對側淨撤離）結論+四鍵。
+      32 測試綠+e2e 煙測（二段流程/首判鎖定/真實旗標卡）。
+      eyeball_log.md 手填流程可退役——按鈕版取代。↓ 原 spec：把 shock/毛/淨/
       量比/taker 融合成單一「當前狀態」輸出——**分類狀態機不是加權分數**
       （CDP 墓碑：合成分數稀釋信號 + 權重可調 = overfit）。六態：平靜/換防警戒
       （毛高淨零）/瀑布中（強度尖峰）/向上真空/向下真空/吸收（量大守住）。

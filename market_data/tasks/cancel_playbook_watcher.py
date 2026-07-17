@@ -39,6 +39,7 @@ Run modes:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -248,6 +249,20 @@ def state_color(s: dict) -> str | None:
         "#e01b24" if s["direction"] == "DOWN" else "#8a919c")
 
 
+def verdict_keyboard(source: str, source_id: int) -> dict:
+    """A3 四鍵按鈕即日誌 (2026-07-19)。callback 格式 ceb|{src}|{id}|{verdict}
+    (≤64 bytes) — Service 1 webhook 解析後寫 cancel_eyeball_log(DB as bus,
+    首判 INSERT IGNORE 鎖定不可改, skip 不落表)。共用於 watcher 劇本告警
+    與 tv_alert_poller 事件卡。"""
+    def mk(text, v):
+        return {"text": text,
+                "callback_data": f"ceb|{source}|{source_id}|{v}"}
+    return {"inline_keyboard": [
+        [mk("🟢 同意", "agree"), mk("🔴 相反", "opposite")],
+        [mk("⏸ 不確定", "unsure"), mk("✗ 略過不記", "skip")],
+    ]}
+
+
 def classify_state(r: pd.Series) -> dict:
     """Display state for one feature row (from compute_features).
 
@@ -313,6 +328,7 @@ def insert_events(events: list[dict]) -> list[dict]:
                      e["direction"], e["px"], e["shock"], e["skew15"],
                      e["net15"], e["vshock"], e["taker_ratio"], e["ret_1m"]))
                 if cur.rowcount > 0:
+                    e["id"] = cur.lastrowid    # for the A3 verdict buttons
                     fresh.append(e)
         conn.commit()
     finally:
@@ -389,11 +405,14 @@ def alert_events(fresh: list[dict]) -> None:
                 lines.append(chart)
             lines.append("深入: /cancelanalyze 90 (五步摘要) 或問 agent")
             lines.append(f"def {DEF_VERSION} · edge 未驗證 · 勿作交易依據")
+            payload = {"chat_id": chat, "text": "\n".join(lines)}
+            if e.get("id"):     # A3 按鈕即日誌 — 判讀落 cancel_eyeball_log
+                payload["reply_markup"] = json.dumps(
+                    verdict_keyboard("pb", int(e["id"])))
             try:
                 resp = requests.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
-                    data={"chat_id": chat, "text": "\n".join(lines)},
-                    timeout=15)
+                    data=payload, timeout=15)
                 ok = resp.status_code == 200
             except Exception:
                 logger.exception("playbook alert send failed")

@@ -1902,6 +1902,94 @@ def _handle_cancel_state(chat_id: str, mins: int = 90):
         send_message(chat_id, f"❌ 撤單狀態查詢失敗: {e}")
 
 
+def _remove_inline_buttons(chat_id: str, message_id) -> None:
+    """Clear a card's inline keyboard once the verdict locks in."""
+    if not message_id:
+        return
+    try:
+        requests.post(f"{API_URL}/editMessageReplyMarkup",
+                      data={"chat_id": chat_id, "message_id": message_id,
+                            "reply_markup": json.dumps({"inline_keyboard": []})},
+                      timeout=10)
+    except Exception:
+        pass
+
+
+def _handle_eyeball_verdict(chat_id: str, cb_data: str, message_id=None):
+    """A3 按鈕即日誌: ceb|{src}|{id}|{verdict} → cancel_eyeball_log。
+
+    首判 INSERT IGNORE 鎖定（前瞻紀錄不可事後改）；skip 不落表。
+    表由 Service 2 poller 建置與回填——這裡只寫人的判讀（DB as bus，
+    share data not code）。"""
+    try:
+        parts = cb_data.split("|")
+        if len(parts) != 4:
+            return
+        _, src, sid_s, verdict = parts
+        if (src not in ("tv", "pb")
+                or verdict not in ("agree", "opposite", "unsure", "skip")):
+            return
+        sid = int(sid_s)
+        if verdict == "skip":
+            _remove_inline_buttons(chat_id, message_id)
+            send_message(chat_id, f"✗ 略過不記 ({src}#{sid})")
+            return
+
+        event_ms = state = direction = None
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                if src == "tv":
+                    cur.execute("SELECT received_ms, state, liquidity_side "
+                                "FROM tv_alert_events WHERE id=%s", (sid,))
+                    r = cur.fetchone()
+                    if r:
+                        event_ms = int(r["received_ms"])
+                        state = r.get("state")
+                        direction = r.get("liquidity_side") or None
+                else:
+                    cur.execute("SELECT minute_start_ms, playbook, direction "
+                                "FROM cancel_playbook_events WHERE id=%s", (sid,))
+                    r = cur.fetchone()
+                    if r:
+                        event_ms = int(r["minute_start_ms"])
+                        state = r.get("playbook")
+                        direction = r.get("direction")
+                if event_ms is None:
+                    send_message(chat_id, f"❌ 找不到事件 ({src}#{sid})")
+                    return
+                cur.execute(
+                    "INSERT IGNORE INTO cancel_eyeball_log "
+                    "(source, source_id, event_ms, card_state, card_direction, "
+                    " verdict, verdict_ms) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                    (src, sid, event_ms, state, direction, verdict,
+                     int(time.time() * 1000)))
+                inserted = cur.rowcount > 0
+                prev = None
+                if not inserted:
+                    cur.execute("SELECT verdict FROM cancel_eyeball_log "
+                                "WHERE source=%s AND source_id=%s", (src, sid))
+                    pr = cur.fetchone()
+                    prev = pr["verdict"] if pr else "?"
+            conn.commit()
+        finally:
+            conn.close()
+
+        zh = {"agree": "🟢 同意", "opposite": "🔴 相反", "unsure": "⏸ 不確定"}
+        if inserted:
+            _remove_inline_buttons(chat_id, message_id)
+            send_message(chat_id,
+                         f"✅ 已落表 {src}#{sid} → {zh.get(verdict, verdict)}"
+                         f"（前瞻紀錄，判定窗到期自動回填）")
+        else:
+            send_message(chat_id,
+                         f"🔒 {src}#{sid} 首判已鎖定（{zh.get(prev, prev)}）"
+                         f"——前瞻紀錄不可事後改")
+    except Exception as e:
+        logger.exception("eyeball verdict error: %s", e)
+        send_message(chat_id, f"❌ 判讀落表失敗: {e}")
+
+
 def _handle_signal_perf(chat_id: str):
     """Fetch Strong signal performance report from Indicator service."""
     if not INDICATOR_SERVICE_URL:
@@ -2143,6 +2231,13 @@ def webhook():
             except Exception:
                 pass
             if ALLOWED_USERS and cb_chat_id not in ALLOWED_USERS:
+                return "ok"
+            if cb_data.startswith("ceb|"):
+                # A3 撤單事件卡四鍵判讀 → cancel_eyeball_log
+                cb_msg_id = callback.get("message", {}).get("message_id")
+                threading.Thread(target=_handle_eyeball_verdict,
+                                 args=(cb_chat_id, cb_data, cb_msg_id),
+                                 daemon=True).start()
                 return "ok"
             if cb_data == "chart":
                 threading.Thread(target=_handle_indicator_chart, args=(cb_chat_id,), daemon=True).start()
