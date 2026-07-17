@@ -71,3 +71,46 @@ Horizon 集（凍結，禁事後加減）：h ∈ {5, 15, 30, 60, 120, 240} 分�
 - 單月亮眼不構成提前 GO；禁 sweep 門檻、禁 p-hack horizon。
 - Phase 0-1 期間 V7 與 executor 零改動。
 - 本檔為「改寫整套系統」大工程的第 0 步：**先證明 edge 存在，再談工程。**
+
+---
+
+## 附錄 A — Phase 0 判決後的 re-run 設計註記（2026-07-18 登記；gates 不變）
+
+Phase 0a 判決：G1 PASS / G2 FAIL → PARK（見 TODO 4.65 與
+`research/results/subhourly_ic_scan.csv`）。本附錄只做兩件事：
+**在看撤單資料之前**宣告 re-run 的測試家族，以及把 G2 門檻翻譯成
+可操作的必要贏面（`required_bar.py`，power analysis 非新檢定）。
+
+### A.1 必要贏面（撤單特徵 re-run 要打敗的數字）
+
+| 已判最佳 cell | top-5% 條件 E\|move\| | 毛捕捉 | 隱含方向 p | 過 G2 需 p | 需放大 |
+|---|---|---|---|---|---|
+| A/ti_15@30m | 14.6bps | +0.90bps | 53.1% | 77.3% | 8.9x |
+| A/ret_15@30m | 49.2bps | +1.37bps | 51.4% | 58.1% | 5.9x |
+| B/dz_60@60m | 39.8bps | +2.81bps | 53.5% | 60.0% | 2.8x |
+| B/ret_60@60m | 53.0bps | +6.20bps | 55.8% | 57.5% | 1.29x |
+
+**翻譯**：re-run 的撤單特徵要在 30-60m 的 top-5% 桶交出 ≥8bps 毛捕捉 =
+把條件方向勝率推到 ~57.5%+（在條件 |move| ~50bps 的選擇下）。
+
+### A.2 兩個結構性洞見（re-run 分析必須回答）
+
+1. **流極端 ≠ 動能**：taker 失衡 top-5% 的分鐘條件 |move| 只有 14.6bps
+   （比無條件 21.2 還小）——流的極端發生在安靜盤，選了流就選不到波動。
+2. **安靜分鐘的捕捉天花板**：F1b 假說預測撤單資訊集中在低量分鐘，但低量
+   分鐘本身 |move| 小 → 就算方向勝率高也付不起 8bps。**撤單訊號要過 G2
+   的唯一路徑 = 安靜分鐘的訊號預測「隨後的擴張波」**（壓縮→真空→突破的
+   squeeze 論），re-run 必須直接量測「訊號分鐘之後 forward 窗的條件
+   |move| 是否擴大 + 方向偏斜是否同時存在」。
+
+### A.3 re-run 家族宣告（現在宣告、10 月才看）
+
+僅此一次 re-run，家族固定為：
+1. 撤單特徵——沿用 watcher def v1 凍結定義（skew15 / net15 / shock），
+   加 depth_deltas 原生 bid/ask add/cancel 的 5/15/60m 聚合（不新調參）
+2. 簿型特徵——orderbook_snapshots_1m 既有欄位原樣：wall_distance_bps
+   （雙側）、spread_bps、imbalance_l5/l20（不衍生新定義）
+3. 對照組——Phase 0a 原 taker 家族（量測「撤單相對 taker 的增量」）
+
+Gates 原封不動（G1/G2/G3 同 §Phase 0b）；多重比較以「G1 需月同號 70% +
+前後半同號」承擔。時間窗：spot depth_deltas ≥3 個月 → **最早 2026-10-09**。
