@@ -1851,6 +1851,29 @@ def _handle_cancel_analyze(chat_id: str, mins: int = 90):
         send_message(chat_id, f"❌ 撤單分析失敗: {e}")
 
 
+def _handle_cancel_state(chat_id: str, mins: int = 90):
+    """Current cancel-flow display state, one-liner (research aid, not a signal)."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        return
+    try:
+        resp = requests.get(f"{INDICATOR_SERVICE_URL}/research/cancel-analyze",
+                            params={"mode": "state", "mins": mins}, timeout=120,
+                            headers=_indicator_admin_headers())
+        try:
+            data = resp.json()
+        except Exception:
+            data = {}
+        if resp.status_code != 200:
+            send_message(chat_id,
+                         f"❌ 撤單狀態查詢失敗 ({resp.status_code}) {data.get('error', '')}")
+            return
+        send_message(chat_id, data.get("text", "N/A"))
+    except Exception as e:
+        logger.exception("cancel state error: %s", e)
+        send_message(chat_id, f"❌ 撤單狀態查詢失敗: {e}")
+
+
 def _handle_signal_perf(chat_id: str):
     """Fetch Strong signal performance report from Indicator service."""
     if not INDICATOR_SERVICE_URL:
@@ -1943,7 +1966,8 @@ def _send_help(chat_id: str):
         "\n<b>--- 其他 ---</b>\n"
         "/flow_chart - 訂單流圖表\n"
         "/cancelflow - 撤單流互動覆盤圖 (研究·非信號; 可帶小時數如 /cancelflow 168)\n"
-        "/cancelanalyze - 撤單流五步摘要 (預設 90 分鐘; /cancelanalyze 240)\n\n"
+        "/cancelanalyze - 撤單流五步摘要 (預設 90 分鐘; /cancelanalyze 240)\n"
+        "/cancelstate - 撤單流當前狀態一行 (六態; /cancelstate 240)\n\n"
         "<i>也可直接點擊下方按鈕操作</i>"
     )
     keyboard = json_mod.dumps({"inline_keyboard": [
@@ -2214,6 +2238,12 @@ def webhook():
             parts = raw_text.split()
             ca_mins = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 90
             threading.Thread(target=_handle_cancel_analyze, args=(chat_id, ca_mins), daemon=True).start()
+
+        elif cmd == "/cancelstate" or cmd.startswith("/cancelstate "):
+            # /cancelstate [mins] → 當前六態狀態行 (回看窗預設 90 分鐘)
+            parts = raw_text.split()
+            cs_mins = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 90
+            threading.Thread(target=_handle_cancel_state, args=(chat_id, cs_mins), daemon=True).start()
 
         elif cmd == "/update":
             threading.Thread(target=_handle_force_update, args=(chat_id,), daemon=True).start()

@@ -34,7 +34,7 @@ except Exception:
 
 from shared.db import get_db_conn
 from market_data.tasks.cancel_playbook_watcher import (
-    compute_features, ZH, DEF_VERSION, GATE_SHOCK)
+    compute_features, classify_state, STATE_META, ZH, DEF_VERSION, GATE_SHOCK)
 
 TPE = pd.Timedelta(hours=8)
 WARMUP_MIN = 90
@@ -284,6 +284,57 @@ def format_table(r: dict) -> str:
     return "\n".join(out)
 
 
+def state_report(mins: int = 90) -> str:
+    """當前撤單狀態一行 + 回看窗分布 (TG /cancelstate).
+
+    顯示層: classify_state 是凍結 v1 分類器的 1:1 重標籤 (單一狀態函數,
+    watcher 告警與未來 K 線色格共用), 非信號。右緣即時, 不支援 --from/--to。
+    """
+    t1 = int(time.time() * 1000)
+    t0 = t1 - mins * 60_000
+    df, _ev = _load(t0, t1)
+    if df.empty:
+        return "❌ 視窗內無 depth 資料（collector 2026-07-09 起）"
+    feat = compute_features(df)
+    v = feat.loc[feat.index >= t0 // 60_000]
+    if v.empty:
+        return "❌ 視窗內無資料"
+
+    states = [classify_state(r) for _, r in v.iterrows()]
+    cur = states[-1]
+    run = 0
+    for s in reversed(states):
+        if s["state"] != cur["state"]:
+            break
+        run += 1
+    last = v.iloc[-1]
+    lag_min = max(0.0, (time.time() - int(v.index.max()) * 60 - 60) / 60)
+
+    def g(k, spec):
+        vv = last[k]
+        return format(vv, spec) if np.isfinite(vv) else "?"
+
+    cur_label = cur["zh"] + (f"→{cur['direction']}" if cur["direction"] != "NONE"
+                             else "")
+    run_txt = f"≥{run}" if run == len(states) else str(run)
+    order = ["calm", "rotation", "surge", "cascade", "absorption",
+             "vacuum_up", "vacuum_down"]
+    counts = {}
+    for s in states:
+        counts[s["state"]] = counts.get(s["state"], 0) + 1
+    dist = " · ".join(f"{STATE_META[k][0]}{counts[k]}"
+                      for k in order if counts.get(k))
+    return (
+        f"{cur['emoji']} {cur_label} | {_t(int(v.index.max()))} TPE"
+        f" (lag {lag_min:.0f}m, 已持續 {run_txt}m)\n"
+        f"shock {g('shock', '.1f')}x 量 {g('vshock', '.1f')}x"
+        f" taker {g('taker_ratio', '+.2f')} 毛 {g('skew15', '+.2f')}"
+        f" 淨 {g('net15', '+.2f')}\n"
+        f"近{int(len(v))}m: {dist}\n"
+        f"def {DEF_VERSION} · 顯示層非信號"
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--mins", type=int, default=90)
@@ -292,7 +343,13 @@ def main() -> int:
     ap.add_argument("--perp", action="store_true")
     ap.add_argument("--summary", action="store_true", help="TG 版壓縮摘要")
     ap.add_argument("--json", action="store_true", help="輸出完整 dict")
+    ap.add_argument("--state", action="store_true",
+                    help="當前狀態一行 (TG /cancelstate; 只看右緣, 忽略 --from/--to)")
     args = ap.parse_args()
+
+    if args.state:
+        print(state_report(args.mins))
+        return 0
 
     if args.t_from and args.t_to:
         t0 = int((pd.Timestamp(args.t_from) - TPE).timestamp() * 1000)

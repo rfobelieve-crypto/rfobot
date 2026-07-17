@@ -1560,7 +1560,10 @@ def research_cancel_analyze_api():
     script = root / "research" / "cancel_flow_analyze.py"
     if not script.exists():
         return _js({"error": "research/ not in this image"}), 501
-    cmd = [_sys.executable, str(script), "--summary"]
+    # mode=state → 當前六態狀態行 (/cancelstate); default = five-step summary
+    mode = _rq.args.get("mode", "").strip()
+    cmd = [_sys.executable, str(script),
+           "--state" if mode == "state" else "--summary"]
     f, t = _rq.args.get("from", "").strip(), _rq.args.get("to", "").strip()
     if f and t:
         cmd += ["--from", f, "--to", t]

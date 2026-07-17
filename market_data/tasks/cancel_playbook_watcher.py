@@ -197,6 +197,55 @@ def classify_minute(r: pd.Series) -> tuple[str, str] | None:
     return "gate_only", "NONE"
 
 
+# ── Display state machine (2026-07-17, additive) ─────────────────────────────
+# Single state function shared by every display outlet (TG /cancelstate, the
+# review-chart ribbon, event cards). It is a 1:1 relabelling of the frozen v1
+# classifier above — NO new thresholds, NO tunable parameters (CDP tombstone:
+# a weighted composite score dilutes signal and its weights invite overfit).
+# classify_minute stays the single source of truth; this never writes events
+# and never alerts.
+#
+# Colour language (system-wide, one set): direction UP → 🟢, DOWN → 🔴,
+# no-direction states (rotation / cascade / surge) → ⚪, calm → ⚫.
+# "gate_only" is the frozen classifier's own residual label (surge with no
+# playbook match) — surfaced honestly as 爆量未定 instead of being forced
+# into a named state.
+
+STATE_META = {
+    "calm":       ("平靜", "⚫"),
+    "absorption": ("吸收", None),      # direction-coloured (量大守住 → 反轉義)
+    "cascade":    ("瀑布中", "⚪"),     # true_break minute — 資訊權在量價
+    "vacuum_up":  ("向上真空", "🟢"),
+    "vacuum_down": ("向下真空", "🔴"),
+    "rotation":   ("換防警戒", "⚪"),   # two_sided — 毛高淨零
+    "surge":      ("爆量未定", "⚪"),   # gate_only residual
+}
+
+_PLAYBOOK_TO_STATE = {"absorption": "absorption", "true_break": "cascade",
+                      "two_sided": "rotation", "gate_only": "surge"}
+
+
+def classify_state(r: pd.Series) -> dict:
+    """Display state for one feature row (from compute_features).
+
+    Returns {state, zh, emoji, direction} — a pure relabelling of
+    classify_minute; falls back to 平靜 when the shock gate is closed.
+    """
+    res = classify_minute(r)
+    if res is None:
+        zh, emoji = STATE_META["calm"]
+        return {"state": "calm", "zh": zh, "emoji": emoji, "direction": "NONE"}
+    playbook, direction = res
+    if playbook == "vacuum":
+        state = "vacuum_up" if direction == "UP" else "vacuum_down"
+    else:
+        state = _PLAYBOOK_TO_STATE[playbook]
+    zh, emoji = STATE_META[state]
+    if emoji is None:   # direction-coloured state (absorption)
+        emoji = "🟢" if direction == "UP" else ("🔴" if direction == "DOWN" else "⚪")
+    return {"state": state, "zh": zh, "emoji": emoji, "direction": direction}
+
+
 def scan(df_feat: pd.DataFrame, minutes: list[int]) -> list[dict]:
     events = []
     for m in minutes:
