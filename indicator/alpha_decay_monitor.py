@@ -23,8 +23,6 @@ logger = logging.getLogger(__name__)
 
 TZ_TPE = timezone(timedelta(hours=8))
 
-CURRENT_MODEL_DEPLOY = "2026-04-17"
-
 
 def _get_db_conn():
     from shared.db import get_db_conn
@@ -95,10 +93,27 @@ def check_ic_trend() -> dict:
 
 # ── Signal 2: Feature Importance Drift ──────────────────────────────────
 
+def _snapshot_predates_model(snapshot_stem: str, deploy_date: str) -> bool:
+    """True if a history snapshot (direction_importance_{YYYYMMDD}_{tag})
+    was taken BEFORE the current model's deploy date (YYYY-MM-DD).
+
+    Comparing the current CSV against such a snapshot measures the retrain
+    diff, not live drift — it stays "critical" forever after every retrain
+    (2026-07-17 false alarm: 05-01 model vs 04-19 snapshot = 3/10 overlap).
+    """
+    try:
+        snap_date = snapshot_stem.split("_")[2]
+        return snap_date < deploy_date.replace("-", "")
+    except Exception:
+        return False
+
+
 def check_importance_drift() -> dict:
     """Check if top-10 features shifted since last snapshot."""
     try:
         from pathlib import Path
+
+        from indicator.model_version import get_current_model_deploy_date
 
         history_dir = Path("indicator/model_artifacts/dual_model/history")
         current_csv = Path("indicator/model_artifacts/dual_model/direction_importance.csv")
@@ -119,6 +134,19 @@ def check_importance_drift() -> dict:
         if not snapshots:
             return {"status": "no_history", "detail": "無歷史快照",
                     "top10": list(top10_current)}
+
+        deploy_date = get_current_model_deploy_date()
+        if _snapshot_predates_model(snapshots[-1].stem, deploy_date):
+            return {
+                "status": "stale_baseline",
+                "snapshot_file": snapshots[-1].name,
+                "model_deploy": deploy_date,
+                "detail": (
+                    f"快照 {snapshots[-1].name} 早於現行模型 ({deploy_date})，"
+                    "比對無意義 — 跑 `python research/feature_importance_tracker.py "
+                    "snapshot` 重建基準"
+                ),
+            }
 
         prev = pd.read_csv(snapshots[-1])
         prev.columns = ["feature", "importance"] + list(prev.columns[2:])
@@ -225,6 +253,9 @@ def check_confidence_wr_decoupling() -> dict:
     If they're the same, confidence score has lost discriminative power.
     """
     try:
+        from indicator.model_version import get_current_model_deploy_date
+
+        model_deploy = get_current_model_deploy_date()
         conn = _get_db_conn()
         try:
             with conn.cursor() as cur:
@@ -234,7 +265,7 @@ def check_confidence_wr_decoupling() -> dict:
                     WHERE filled = 1 AND strength IN ('Strong', 'Moderate')
                       AND signal_time >= %s
                     ORDER BY signal_time ASC
-                """, (CURRENT_MODEL_DEPLOY,))
+                """, (model_deploy,))
                 rows = cur.fetchall()
         finally:
             conn.close()
@@ -274,6 +305,7 @@ def check_confidence_wr_decoupling() -> dict:
 
         return {
             "status": status,
+            "since_model_deploy": model_deploy,
             "n_signals": len(df),
             "wr_overall": round(wr_all, 3),
             "wr_high_conf": round(wr_hi, 3) if wr_hi is not None else None,
@@ -376,6 +408,7 @@ STATUS_ICON = {
     "error": "⚫",
     "insufficient_data": "⏳",
     "no_history": "⏳",
+    "stale_baseline": "⏳",
 }
 
 
@@ -395,7 +428,7 @@ def run_full_check() -> dict:
         results["overall"] = "critical"
     elif "warning" in statuses:
         results["overall"] = "warning"
-    elif all(s in ("healthy", "insufficient_data", "no_history") for s in statuses):
+    elif all(s in ("healthy", "insufficient_data", "no_history", "stale_baseline") for s in statuses):
         results["overall"] = "healthy"
     else:
         results["overall"] = "unknown"

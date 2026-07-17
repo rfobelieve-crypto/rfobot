@@ -1795,9 +1795,12 @@ def indicator_performance():
         "n_folds": 77,
         "train_end": "2026-04-16",
     }
-    # Signals before this date came from different model versions or
-    # contaminated rolling buffers — do not count toward current model perf.
-    CURRENT_MODEL_DEPLOY = "2026-04-17"
+    # Signals before the current model's deploy date came from different
+    # model versions or contaminated rolling buffers — do not count toward
+    # current model perf. Resolved from direction_reg_config trained_at so
+    # a retrain never leaves this stale (2026-07-17 decay false alarm).
+    from indicator.model_version import get_current_model_deploy_date
+    CURRENT_MODEL_DEPLOY = get_current_model_deploy_date()
 
     try:
         from shared.db import get_db_conn

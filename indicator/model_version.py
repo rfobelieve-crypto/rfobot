@@ -59,3 +59,23 @@ def get_current_model_version() -> str:
     except Exception as e:
         logger.warning("get_current_model_version failed: %s", e)
         return "unknown"
+
+
+# Last known retrain date. Fallback only — must never be EARLIER than the
+# real deploy date, so a broken config narrows the sample window instead of
+# silently mixing model versions (mistake.md 2026-04-13 calibration lesson).
+_DEPLOY_DATE_FALLBACK = "2026-05-01"
+
+
+def get_current_model_deploy_date() -> str:
+    """Deploy date (YYYY-MM-DD) of the current direction model.
+
+    Use this for every since-filter on live-performance queries
+    (tracked_signals, indicator_history) instead of hardcoding a date —
+    a hardcoded date goes stale at the next retrain and the query starts
+    mixing model versions (2026-07-17 alpha-decay false alarm).
+    """
+    version = get_current_model_version()
+    if version != "unknown" and len(version) >= 10:
+        return version[:10]
+    return _DEPLOY_DATE_FALLBACK

@@ -1,0 +1,27 @@
+{
+  "date": "20260717",
+  "sha": "e4ebf7a",
+  "timestamp": "2026-07-17T19:50:01.664663",
+  "magnitude_config": {
+    "feature_set": "expanded",
+    "target": "y_vol_adj_abs",
+    "n_features": 76,
+    "n_samples": 3991,
+    "y_mean": 1.738380825202426,
+    "y_std": 2.152423420543752,
+    "params": {
+      "objective": "reg:squarederror",
+      "eval_metric": "mae",
+      "max_depth": 4,
+      "learning_rate": 0.05,
+      "n_estimators": 300,
+      "subsample": 0.8,
+      "colsample_bytree": 0.7,
+      "min_child_weight": 10,
+      "reg_alpha": 0.1,
+      "reg_lambda": 1.0,
+      "random_state": 42,
+      "verbosity": 0
+    }
+  }
+}
