@@ -101,6 +101,36 @@ def analyze_cancel_flow(minutes: int = 90, t_from: Optional[str] = None,
     return queries.cancel_flow_analysis(minutes, t_from, t_to, include_perp)
 
 
+@mcp.tool()
+def log_verdict(direction: str, basis: str = "",
+                event_source: Optional[str] = None,
+                event_id: Optional[int] = None) -> dict:
+    """Log THIS assistant's own prospective market judgement (三方判讀對照).
+
+    Third cohort of the judgment experiment — machine (frozen playbooks)
+    vs human (four-button eyeball log) vs LLM (this tool). Call AFTER
+    forming a view from the analysis tools: direction UP/DOWN/UNSURE plus
+    a short basis (what evidence drove the call). The verdict is stamped
+    to the current minute (prospective by construction), scored later on
+    60/120m forward mid returns, and can never be edited. Optionally link
+    the event card being judged (event_source 'tv' or 'pb' + event_id).
+    Research log only — never an order, not financial advice.
+    """
+    return queries.log_agent_verdict(direction, basis, event_source, event_id)
+
+
+@mcp.tool()
+def get_verdict_stats() -> dict:
+    """Prospective hit-rate of this assistant's logged verdicts.
+
+    Lazily backfills matured verdicts (>=121 min old) with 60/120m forward
+    mid returns, then returns per-direction counts, hit rates and recent
+    entries. The formal three-cohort comparison runs as a repo research
+    script once samples accumulate.
+    """
+    return queries.agent_verdict_stats()
+
+
 def main() -> None:
     mcp.run()   # stdio transport by default
 

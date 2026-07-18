@@ -326,3 +326,146 @@ def _f(x) -> Optional[float]:
 
 def _pct(x) -> Optional[float]:
     return round(float(x) * 100, 1) if x is not None else None
+
+
+# ── Agent verdict cohort（三方判讀對照 LLM 端, 2026-07-18） ───────────────
+# agent 只寫自己的 agent_* 命名空間（agent-boundary.md 明文允許）;
+# 讀取僅 orderbook_snapshots_1m mid（允許表）。前瞻紀錄, 落表後不可改。
+
+_VERDICT_DDL = """
+CREATE TABLE IF NOT EXISTS agent_verdicts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_ms BIGINT NOT NULL,
+    direction VARCHAR(8) NOT NULL,
+    basis VARCHAR(500) NULL,
+    event_source VARCHAR(12) NULL,
+    event_id BIGINT NULL,
+    base_mid DOUBLE NULL,
+    fwd_ret_60m DOUBLE NULL,
+    fwd_ret_120m DOUBLE NULL,
+    hit_60m TINYINT NULL,
+    outcome_done TINYINT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_out (outcome_done, event_ms)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""
+
+
+def _mid_at_minute(cur, minute: int) -> Optional[float]:
+    cur.execute(
+        "SELECT mid_price FROM orderbook_snapshots_1m "
+        "WHERE canonical_symbol='BTC-USD' AND ts_ms >= %s AND ts_ms < %s "
+        "ORDER BY ts_ms DESC LIMIT 1",
+        (minute * 60_000, (minute + 1) * 60_000))
+    r = cur.fetchone()
+    return float(r["mid_price"]) if r else None
+
+
+def log_agent_verdict(direction: str, basis: str = "",
+                      event_source: Optional[str] = None,
+                      event_id: Optional[int] = None) -> dict:
+    import time as _t
+    from shared.db import get_db_conn
+    direction = (direction or "").strip().upper()
+    if direction not in ("UP", "DOWN", "UNSURE"):
+        return {"error": "direction must be UP / DOWN / UNSURE"}
+    if event_source not in (None, "", "tv", "pb"):
+        return {"error": "event_source must be 'tv' or 'pb' (or omitted)"}
+    event_ms = (int(_t.time() * 1000) // 60_000) * 60_000
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_VERDICT_DDL)
+            base = _mid_at_minute(cur, event_ms // 60_000)
+            cur.execute(
+                "INSERT INTO agent_verdicts (event_ms, direction, basis, "
+                "event_source, event_id, base_mid) VALUES (%s,%s,%s,%s,%s,%s)",
+                (event_ms, direction, (basis or "")[:500],
+                 event_source or None, event_id, base))
+            vid = cur.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+    return {
+        "verdict_id": int(vid),
+        "direction": direction,
+        "minute_utc": datetime.fromtimestamp(
+            event_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
+        "base_mid": base,
+        "scoring": "fwd mid return at 60/120m, lazily backfilled; "
+                   "UNSURE 不計入命中率",
+        "immutable": "前瞻紀錄, 落表後不可改",
+        "disclaimer": DISCLAIMER,
+    }
+
+
+def agent_verdict_stats() -> dict:
+    import time as _t
+    from shared.db import get_db_conn
+    now_ms = int(_t.time() * 1000)
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_VERDICT_DDL)
+            cur.execute("SELECT id, event_ms, direction, base_mid "
+                        "FROM agent_verdicts WHERE outcome_done=0 "
+                        "AND event_ms <= %s", (now_ms - 121 * 60_000,))
+            for r in cur.fetchall():
+                m0 = int(r["event_ms"]) // 60_000
+                base = (float(r["base_mid"]) if r["base_mid"]
+                        else _mid_at_minute(cur, m0))
+                sets, vals = ["outcome_done=1"], []
+                if base:
+                    for h in (60, 120):
+                        mid = _mid_at_minute(cur, m0 + h)
+                        if mid:
+                            fwd = mid / base - 1
+                            sets.append(f"fwd_ret_{h}m=%s")
+                            vals.append(fwd)
+                            if h == 60 and r["direction"] in ("UP", "DOWN"):
+                                sets.append("hit_60m=%s")
+                                vals.append(1 if (fwd > 0) ==
+                                            (r["direction"] == "UP") else 0)
+                vals.append(int(r["id"]))
+                cur.execute("UPDATE agent_verdicts SET " + ", ".join(sets)
+                            + " WHERE id=%s", vals)
+            conn.commit()
+            cur.execute(
+                "SELECT direction, COUNT(*) n, AVG(hit_60m) hr60, "
+                "AVG(fwd_ret_60m) r60, AVG(fwd_ret_120m) r120 "
+                "FROM agent_verdicts WHERE outcome_done=1 "
+                "GROUP BY direction")
+            scored = {r["direction"]: {
+                "n": int(r["n"]),
+                "hit_60m": _pct(_f(r["hr60"])),
+                "avg_fwd_60m_pct": _pct(_f(r["r60"])),
+                "avg_fwd_120m_pct": _pct(_f(r["r120"])),
+            } for r in cur.fetchall()}
+            cur.execute("SELECT COUNT(*) n FROM agent_verdicts "
+                        "WHERE outcome_done=0")
+            pending = int(cur.fetchone()["n"])
+            cur.execute(
+                "SELECT id, event_ms, direction, basis, hit_60m, fwd_ret_60m "
+                "FROM agent_verdicts ORDER BY id DESC LIMIT 5")
+            recent = [{
+                "id": int(r["id"]),
+                "minute_utc": datetime.fromtimestamp(
+                    int(r["event_ms"]) / 1000,
+                    tz=timezone.utc).strftime("%m-%d %H:%M"),
+                "direction": r["direction"],
+                "basis": (r["basis"] or "")[:120],
+                "hit_60m": (None if r["hit_60m"] is None
+                            else int(r["hit_60m"])),
+                "fwd_ret_60m_pct": _pct(_f(r["fwd_ret_60m"])),
+            } for r in cur.fetchall()]
+    finally:
+        conn.close()
+    return {
+        "cohort": "LLM (this assistant) — 三方判讀對照之第三軌",
+        "scored_by_direction": scored,
+        "pending": pending,
+        "recent": recent,
+        "comparison_note": "machine=cancel_playbook_events, human="
+                           "cancel_eyeball_log; 三軌對照統計待樣本累積後"
+                           "以 repo research script 執行",
+        "disclaimer": DISCLAIMER,
+    }
