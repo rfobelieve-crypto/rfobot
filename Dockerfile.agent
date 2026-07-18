@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.indicator.txt .
+RUN pip install --no-cache-dir -r requirements.indicator.txt
+
+# read-only MCP agent needs: agent code + shared DB + the frozen feature
+# definitions it's allowed to import (agent-boundary.md)
+COPY indicator/ ./indicator/
+COPY shared/ ./shared/
+COPY market_data/ ./market_data/
+COPY research/ ./research/
+
+CMD ["python", "-m", "indicator.agent.http_server"]
