@@ -42,6 +42,7 @@ from market_data.tasks.cancel_playbook_watcher import (
 
 SMOOTH_MIN = 15
 MAX_LEVEL_LINES = 12
+CALM_HEX = "#232936"    # 平靜底格色 — 帶子連續可見但不搶戲
 TZ_OFFSET_S = 8 * 3600  # display as UTC+8, same convention as chart_interactive
 OUT = PROJECT_ROOT / "research" / "results" / "cancel_flow_review.html"
 
@@ -146,7 +147,7 @@ def build_state_strip(start_ms: int, end_ms: int) -> list[dict]:
         for m, r in feat.loc[(feat.index >= m0) & (feat.index <= m1)].iterrows():
             # calm 也畫一格極暗底色——帶子連續可見(非平靜佔比 ~1%,全空白
             # 會讓整層看起來不存在, 2026-07-18 UX 修正)
-            col = state_color(classify_state(r)) or "#1c212b"
+            col = state_color(classify_state(r)) or CALM_HEX
             out.append({"time": int(m) * 60 + TZ_OFFSET_S,
                         "value": 1, "color": col})
         return out
@@ -294,7 +295,7 @@ def main() -> int:
     hunt_markers, level_lines = load_hunt_events(start_ms, end_ms)
     if hunt_markers:
         markers = sorted(markers + hunt_markers, key=lambda m: m["time"])
-    n_coloured = sum(1 for s in state_strip if s["color"] != "#1c212b")
+    n_coloured = sum(1 for s in state_strip if s["color"] != CALM_HEX)
     print(f"state strip: {len(state_strip)} minutes ({n_coloured} coloured); "
           f"hunt: {len(hunt_markers)} markers / {len(level_lines)} level lines")
     span_h = (end_ms - start_ms) / 3600_000
@@ -371,7 +372,7 @@ const STATES = {states};
 const stateStrip = c1.addHistogramSeries({{ priceScaleId:'state',
   priceFormat: {{ type:'volume' }}, lastValueVisible:false,
   priceLineVisible:false }});
-stateStrip.priceScale().applyOptions({{ scaleMargins: {{ top: 0.94, bottom: 0 }} }});
+stateStrip.priceScale().applyOptions({{ scaleMargins: {{ top: 0.90, bottom: 0 }} }});
 stateStrip.setData(STATES);
 
 // A2-2 獵取被掃價位虛線
