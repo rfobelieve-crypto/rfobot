@@ -229,13 +229,16 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
         假跌破反轉）**：掃穿瞬間 = 資訊黑洞（撤單全是保護性雜訊），第一段卡只報
         「⚡掃穿+瀑布中,判讀待塵埃落定」；強度回落後（3-15min）自動觸發第二段卡
         給結論（反轉條件成立/未現）+ 四鍵——使用者的決策時刻在第二段
-- [~] **MCP agent 遠端化（2026-07-17 登記；07-18 code 完成 170f0be）**：
+- [x] **MCP agent 遠端化（2026-07-17 登記；07-18 全部完成並上線）**：
       `indicator/agent/http_server.py` streamable-HTTP + AGENT_MCP_TOKEN
-      路徑認證（fail-closed：無 token 拒啟動、錯路徑 404），本地 e2e 過、
-      boundary AST 守衛涵蓋。**剩使用者側**：Railway 建獨立 service
-      （Dockerfile.indicator + start `python -m indicator.agent.http_server`
-      + MYSQL_*/AGENT_MCP_TOKEN + Generate Domain）→ claude.ai Connectors
-      貼 `https://<domain>/<token>/mcp`。原 spec：現況 stdio 版只有本機 Claude Desktop 能用，雲端
+      路徑認證（fail-closed：無 token 拒啟動、錯路徑 404、421 rebinding
+      修正 708a7c2）。Railway `agent-mcp` service 用 CLI 全自動建立
+      （Dockerfile.agent image、repo 綁定 main 自動部署、MYSQL 內部連線）：
+      `https://agent-mcp-production-46d7.up.railway.app/<token>/mcp`
+      公網 initialize 200 實測通過。**剩使用者一步**：claude.ai →
+      Settings → Connectors → Add custom connector 貼上完整 URL。
+      Railway CLI 已裝並授權（rfobelieve1@gmail.com）＝未來 Railway
+      操作可全代管。原 spec：現況 stdio 版只有本機 Claude Desktop 能用，雲端
       Claude Code / 手機 app 都摸不到。改法：`indicator/agent/server.py` 的
       FastMCP 換 HTTP transport（framework 原生支援）+ token 認證（比照
       ADMIN_HEAL_TOKEN 模式，fail-closed）+ 掛 Railway（可與指標 service 同容器
