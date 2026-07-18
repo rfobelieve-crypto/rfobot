@@ -22,6 +22,8 @@ from __future__ import annotations
 import os
 import sys
 
+from mcp.server.transport_security import TransportSecuritySettings
+
 from indicator.agent.server import mcp
 
 
@@ -35,6 +37,10 @@ def main() -> int:
     mcp.settings.host = "0.0.0.0"
     mcp.settings.port = int(os.getenv("PORT", "8080"))
     mcp.settings.streamable_http_path = f"/{token}/mcp"
+    # DNS-rebinding Host 檢查是本機 server 的防線;公網 HTTPS + 路徑 token
+    # 下反而把 Railway domain 擋成 421 — 關閉(auth 邊界在 token 路徑)
+    mcp.settings.transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=False)
     print(f"rfobot-orderflow MCP (streamable-http) on "
           f":{mcp.settings.port}/<token>/mcp", file=sys.stderr)
     mcp.run(transport="streamable-http")
