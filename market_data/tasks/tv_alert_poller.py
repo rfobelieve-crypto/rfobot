@@ -357,7 +357,31 @@ def process_new(send: bool = True) -> int:
 
         if card and send:
             side = str(row.get("liquidity_side") or "").strip()
-            if side in ("buy", "sell"):
+            # 2026-07-18 使用者定版: 快訊價位即其標記的獵取位 → 無 side 但
+            # 有價格一律視為 sweep, 方向由「觸發價 vs 觸發前 mid」推斷,
+            # 存 buy?/sell?(與明示聲明可分層), 同走二段式+H-R 旗標
+            if (side not in ("buy", "sell") and row.get("price")
+                    and win_feat is not None
+                    and win_feat["mid"].notna().any()):
+                try:
+                    mids = win_feat["mid"].dropna()
+                    ref = float(mids.iloc[-6] if len(mids) >= 6
+                                else mids.iloc[0])
+                    side = ("buy" if float(row["price"]) >= ref
+                            else "sell") + "?"
+                    row["liquidity_side"] = side
+                    conn = get_db_conn()
+                    try:
+                        with conn.cursor() as cur2:
+                            cur2.execute("UPDATE tv_alert_events SET "
+                                         "liquidity_side=%s WHERE id=%s",
+                                         (side, rid))
+                        conn.commit()
+                    finally:
+                        conn.close()
+                except (TypeError, ValueError):
+                    side = ""
+            if side.rstrip("?") in ("buy", "sell"):
                 # sweep 二段式第 1 段: 只報事實+特寫圖, 無按鈕 —
                 # 判讀鍵在第 2 段 (process_stage2, 塵埃落定後)
                 stage1 = format_stage1_card(row)
@@ -395,7 +419,7 @@ def process_stage2(send: bool = True) -> int:
         rows = _q(conn, "SELECT id, received_ms, event, liquidity_side, "
                         "price, window_mins FROM tv_alert_events "
                         "WHERE processed=1 AND stage2_done=0 "
-                        "AND liquidity_side IN ('buy','sell') "
+                        "AND liquidity_side IN ('buy','sell','buy?','sell?') "
                         "AND received_ms <= %s ORDER BY id LIMIT 5",
                   (now_ms - STAGE2_MIN_AGE * 60_000,))
     finally:
@@ -426,7 +450,8 @@ def process_stage2(send: bool = True) -> int:
                               and (not np.isfinite(last["vshock"])
                                    or last["vshock"] < 3.0))
                     if calmed or age_min >= STAGE2_FORCE_AGE:
-                        flags = hr_flags(seg, str(row["liquidity_side"]))
+                        flags = hr_flags(
+                            seg, str(row["liquidity_side"]).rstrip("?"))
                         card = format_stage2_card(
                             row, flags, classify_state(last), len(seg), age_min)
                         kb = verdict_keyboard("tv", rid)
