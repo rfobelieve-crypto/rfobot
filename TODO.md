@@ -229,8 +229,13 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
         假跌破反轉）**：掃穿瞬間 = 資訊黑洞（撤單全是保護性雜訊），第一段卡只報
         「⚡掃穿+瀑布中,判讀待塵埃落定」；強度回落後（3-15min）自動觸發第二段卡
         給結論（反轉條件成立/未現）+ 四鍵——使用者的決策時刻在第二段
-- [ ] **MCP agent 遠端化（2026-07-17 登記，使用者需求：在任何 Claude session
-      直接查撤單流分析）**：現況 stdio 版只有本機 Claude Desktop 能用，雲端
+- [~] **MCP agent 遠端化（2026-07-17 登記；07-18 code 完成 170f0be）**：
+      `indicator/agent/http_server.py` streamable-HTTP + AGENT_MCP_TOKEN
+      路徑認證（fail-closed：無 token 拒啟動、錯路徑 404），本地 e2e 過、
+      boundary AST 守衛涵蓋。**剩使用者側**：Railway 建獨立 service
+      （Dockerfile.indicator + start `python -m indicator.agent.http_server`
+      + MYSQL_*/AGENT_MCP_TOKEN + Generate Domain）→ claude.ai Connectors
+      貼 `https://<domain>/<token>/mcp`。原 spec：現況 stdio 版只有本機 Claude Desktop 能用，雲端
       Claude Code / 手機 app 都摸不到。改法：`indicator/agent/server.py` 的
       FastMCP 換 HTTP transport（framework 原生支援）+ token 認證（比照
       ADMIN_HEAL_TOKEN 模式，fail-closed）+ 掛 Railway（可與指標 service 同容器
