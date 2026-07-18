@@ -291,7 +291,7 @@ def render_zoom_png(recv_ms: int, window: int, level_px: float | None,
         for m, r in win_feat.iterrows():
             col = state_color(classify_state(r))
             xs.append(pd.Timestamp(int(m) * 60_000, unit="ms") + tpe)
-            cs.append(col or "rgba(0,0,0,0)")
+            cs.append(col or "#1c212b")     # calm=暗底格, 帶子連續可見
         fig.add_trace(go.Bar(x=xs, y=[1] * len(xs), marker_color=cs,
                              showlegend=False), row=2, col=1)
         if level_px:

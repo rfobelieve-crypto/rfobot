@@ -144,10 +144,11 @@ def build_state_strip(start_ms: int, end_ms: int) -> list[dict]:
         m0, m1 = start_ms // 60_000, end_ms // 60_000
         out = []
         for m, r in feat.loc[(feat.index >= m0) & (feat.index <= m1)].iterrows():
-            col = state_color(classify_state(r))
-            if col:
-                out.append({"time": int(m) * 60 + TZ_OFFSET_S,
-                            "value": 1, "color": col})
+            # calm 也畫一格極暗底色——帶子連續可見(非平靜佔比 ~1%,全空白
+            # 會讓整層看起來不存在, 2026-07-18 UX 修正)
+            col = state_color(classify_state(r)) or "#1c212b"
+            out.append({"time": int(m) * 60 + TZ_OFFSET_S,
+                        "value": 1, "color": col})
         return out
     except Exception as e:  # noqa: BLE001
         print(f"(state strip skipped: {e})")
@@ -293,7 +294,8 @@ def main() -> int:
     hunt_markers, level_lines = load_hunt_events(start_ms, end_ms)
     if hunt_markers:
         markers = sorted(markers + hunt_markers, key=lambda m: m["time"])
-    print(f"state strip: {len(state_strip)} non-calm minutes; "
+    n_coloured = sum(1 for s in state_strip if s["color"] != "#1c212b")
+    print(f"state strip: {len(state_strip)} minutes ({n_coloured} coloured); "
           f"hunt: {len(hunt_markers)} markers / {len(level_lines)} level lines")
     span_h = (end_ms - start_ms) / 3600_000
 
@@ -326,7 +328,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </style></head><body>
 <div id="hdr"><b>撤單流覆盤 BTC-USD</b> · {span_h}h · n={n} 分鐘 · 撤單面板 {smooth}m 平滑/去均值
  · ▲▼=v7 Strong · 深色柱=|不對稱|≥0.30 · 量色=taker買綠/賣紅
- · K 腳色格=狀態(🟢向上真空/🔴向下真空/灰=換防·爆量·瀑布/空白=平靜, 吸收依方向)
+ · K 腳色格=狀態(🟢向上真空/🔴向下真空/亮灰=換防·爆量·瀑布/深灰底=平靜, 吸收依方向)
  · ⚡=獵取事件(黃虛線=被掃價位) · 研究工具非信號 (edge 待 8/10)</div>
 <div class="pane"><div class="lbl">價格 1m K棒 + 狀態色格</div><div id="c1"></div></div>
 <div class="pane"><div class="lbl">成交量 1m (綠=taker買佔優 / 紅=賣佔優)</div><div id="cv"></div></div>
