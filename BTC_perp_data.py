@@ -1927,7 +1927,8 @@ def _handle_eyeball_verdict(chat_id: str, cb_data: str, message_id=None):
             return
         _, src, sid_s, verdict = parts
         if (src not in ("tv", "pb")
-                or verdict not in ("agree", "opposite", "unsure", "skip")):
+                or verdict not in ("up", "down", "agree", "opposite",
+                                   "unsure", "skip")):
             return
         sid = int(sid_s)
         if verdict == "skip":
@@ -1975,7 +1976,8 @@ def _handle_eyeball_verdict(chat_id: str, cb_data: str, message_id=None):
         finally:
             conn.close()
 
-        zh = {"agree": "🟢 同意", "opposite": "🔴 相反", "unsure": "⏸ 不確定"}
+        zh = {"up": "🔼 漲", "down": "🔽 跌", "agree": "🟢 同意",
+              "opposite": "🔴 相反", "unsure": "⏸ 不確定"}
         if inserted:
             _remove_inline_buttons(chat_id, message_id)
             send_message(chat_id,

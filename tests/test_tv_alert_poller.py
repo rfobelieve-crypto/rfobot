@@ -90,9 +90,9 @@ class TestVerdictKeyboard:
         flat = [b for row_ in kb["inline_keyboard"] for b in row_]
         assert len(flat) == 4
         datas = [b["callback_data"] for b in flat]
-        assert datas[0] == "ceb|tv|123456|agree"
+        assert datas[0] == "ceb|tv|123456|up"
         assert {d.split("|")[3] for d in datas} == {
-            "agree", "opposite", "unsure", "skip"}
+            "up", "down", "unsure", "skip"}
         # Telegram callback_data hard limit
         assert all(len(d.encode()) <= 64 for d in datas)
 

@@ -257,8 +257,11 @@ def verdict_keyboard(source: str, source_id: int) -> dict:
     def mk(text, v):
         return {"text": text,
                 "callback_data": f"ceb|{source}|{source_id}|{v}"}
+    # 2026-07-18 改絕對方向式(嚴格優於同意/相反: 記獨立方向, 機器結論
+    # 在卡上可事後推導一致性; NONE 態無歧義)。舊值 agree/opposite 仍被
+    # Service 1 接受(歷史卡片)。
     return {"inline_keyboard": [
-        [mk("🟢 同意", "agree"), mk("🔴 相反", "opposite")],
+        [mk("🔼 漲", "up"), mk("🔽 跌", "down")],
         [mk("⏸ 不確定", "unsure"), mk("✗ 略過不記", "skip")],
     ]}
 
