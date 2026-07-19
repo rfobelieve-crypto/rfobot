@@ -1719,7 +1719,6 @@ _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
     ],
     [
         {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
-        {"text": "\U0001f9f2 撤單流", "callback_data": "cancel_flow"},
     ],
 ]})
 
@@ -1833,7 +1832,20 @@ def _handle_alpha_decay(chat_id: str):
         send_message(chat_id, f"❌ Alpha decay 檢查失敗: {e}")
 
 
-def _handle_cancel_flow(chat_id: str, hours: int = 48):
+def _say_via(api, chat_id: str, text: str) -> None:
+    """Reply via the given bot API (cancel bot) or the main bot."""
+    if api:
+        try:
+            requests.post(f"{api}/sendMessage",
+                          data={"chat_id": chat_id, "text": text,
+                                "parse_mode": "HTML"}, timeout=15)
+        except Exception:
+            logger.exception("say_via failed")
+    else:
+        send_message(chat_id, text)
+
+
+def _handle_cancel_flow(chat_id: str, hours: int = 48, api: str = None):
     """Send link to the interactive cancel-flow review chart (research tool).
 
     /research/* is admin-guarded; embed ?token= in the URL so the link opens
@@ -1841,14 +1853,14 @@ def _handle_cancel_flow(chat_id: str, hours: int = 48):
     chat, so the URL stays private). The page re-renders on every load.
     """
     if not INDICATOR_SERVICE_URL:
-        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        _say_via(api, chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
         return
     url = f"{INDICATOR_SERVICE_URL}/research/cancel-flow-i?hours={hours}"
     tok = os.getenv("ADMIN_HEAL_TOKEN", "")
     if tok:
         url += f"&token={tok}"
     window = "全 depth 時代" if hours == 0 else f"最近 {hours}h"
-    send_message(chat_id,
+    _say_via(api, chat_id,
         f"<b>撤單流覆盤（互動圖·研究非信號）</b>\n\n"
         f"<a href=\"{url}\">點擊開啟互動覆盤圖</a>\n\n"
         f"視窗: {window}（/cancelflow 168 改週視角, 0=全期間）\n"
@@ -1856,10 +1868,10 @@ def _handle_cancel_flow(chat_id: str, hours: int = 48):
         f"▲▼=v7 Strong · 開啟後等數秒 render · edge 待 8/10 判決")
 
 
-def _handle_cancel_analyze(chat_id: str, mins: int = 90):
+def _handle_cancel_analyze(chat_id: str, mins: int = 90, api: str = None):
     """Cancel-flow deterministic window summary (research aid, not a signal)."""
     if not INDICATOR_SERVICE_URL:
-        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        _say_via(api, chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
         return
     try:
         resp = requests.get(f"{INDICATOR_SERVICE_URL}/research/cancel-analyze",
@@ -1870,19 +1882,19 @@ def _handle_cancel_analyze(chat_id: str, mins: int = 90):
         except Exception:
             data = {}
         if resp.status_code != 200:
-            send_message(chat_id,
-                         f"❌ 撤單分析失敗 ({resp.status_code}) {data.get('error', '')}")
+            _say_via(api, chat_id,
+                     f"❌ 撤單分析失敗 ({resp.status_code}) {data.get('error', '')}")
             return
-        send_message(chat_id, data.get("text", "N/A"))
+        _say_via(api, chat_id, data.get("text", "N/A"))
     except Exception as e:
         logger.exception("cancel analyze error: %s", e)
-        send_message(chat_id, f"❌ 撤單分析失敗: {e}")
+        _say_via(api, chat_id, f"❌ 撤單分析失敗: {e}")
 
 
-def _handle_cancel_state(chat_id: str, mins: int = 90):
+def _handle_cancel_state(chat_id: str, mins: int = 90, api: str = None):
     """Current cancel-flow display state, one-liner (research aid, not a signal)."""
     if not INDICATOR_SERVICE_URL:
-        send_message(chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
+        _say_via(api, chat_id, "❌ INDICATOR_SERVICE_URL 未設定")
         return
     try:
         resp = requests.get(f"{INDICATOR_SERVICE_URL}/research/cancel-analyze",
@@ -1893,13 +1905,13 @@ def _handle_cancel_state(chat_id: str, mins: int = 90):
         except Exception:
             data = {}
         if resp.status_code != 200:
-            send_message(chat_id,
-                         f"❌ 撤單狀態查詢失敗 ({resp.status_code}) {data.get('error', '')}")
+            _say_via(api, chat_id,
+                     f"❌ 撤單狀態查詢失敗 ({resp.status_code}) {data.get('error', '')}")
             return
-        send_message(chat_id, data.get("text", "N/A"))
+        _say_via(api, chat_id, data.get("text", "N/A"))
     except Exception as e:
         logger.exception("cancel state error: %s", e)
-        send_message(chat_id, f"❌ 撤單狀態查詢失敗: {e}")
+        _say_via(api, chat_id, f"❌ 撤單狀態查詢失敗: {e}")
 
 
 def _remove_inline_buttons(chat_id: str, message_id, api: str = None) -> None:
@@ -2005,29 +2017,91 @@ CANCEL_TG_TOKEN = os.getenv("CANCEL_TG_BOT_TOKEN", "").strip()
 if CANCEL_TG_TOKEN:
     _CANCEL_API = f"https://api.telegram.org/bot{CANCEL_TG_TOKEN}"
 
+    def _cancel_menu(chat_id: str) -> None:
+        kb = {"inline_keyboard": [
+            [{"text": "📈 覆盤圖 48h", "callback_data": "cf_chart"},
+             {"text": "🎛 當前狀態", "callback_data": "cf_state"}],
+            [{"text": "📋 五步摘要 90m", "callback_data": "cf_analyze"}],
+        ]}
+        try:
+            requests.post(f"{_CANCEL_API}/sendMessage", data={
+                "chat_id": chat_id, "parse_mode": "HTML",
+                "text": ("<b>撤單流研究 bot</b>（研究·非信號）\n\n"
+                         "/cancelflow [h] - 互動覆盤圖（168=週, 0=全期）\n"
+                         "/cancelstate [m] - 六態狀態一行\n"
+                         "/cancelanalyze [m] - 五步摘要\n\n"
+                         "事件卡自動推送：watcher 劇本 + TV 快訊"
+                         "（sweep 二段式+H-R 旗標）；四鍵=前瞻判讀落表"),
+                "reply_markup": json.dumps(kb)}, timeout=15)
+        except Exception:
+            logger.exception("cancel menu send failed")
+
     @app.route(f"/cancelbot/{CANCEL_TG_TOKEN}", methods=["POST"])
     def cancel_bot_webhook():
-        """撤單 bot 只服務 ceb| 判讀 callback；其餘更新一律 ok。"""
+        """撤單流 bot：指令/選單 + ceb| 判讀 callback，回覆全走 _CANCEL_API。"""
         try:
             data = request.get_json(silent=True) or {}
             cb = data.get("callback_query")
-            if not cb:
-                return "ok"
-            try:
-                requests.post(f"{_CANCEL_API}/answerCallbackQuery",
-                              data={"callback_query_id": cb.get("id", "")},
-                              timeout=5)
-            except Exception:
-                pass
-            cb_chat = str(cb.get("message", {}).get("chat", {}).get("id", ""))
-            if ALLOWED_USERS and cb_chat not in ALLOWED_USERS:
-                return "ok"
-            cb_data = cb.get("data", "")
-            if cb_data.startswith("ceb|"):
+            if cb:
+                try:
+                    requests.post(f"{_CANCEL_API}/answerCallbackQuery",
+                                  data={"callback_query_id": cb.get("id", "")},
+                                  timeout=5)
+                except Exception:
+                    pass
+                cb_chat = str(cb.get("message", {}).get("chat", {})
+                              .get("id", ""))
+                if ALLOWED_USERS and cb_chat not in ALLOWED_USERS:
+                    return "ok"
+                cb_data = cb.get("data", "")
                 mid = cb.get("message", {}).get("message_id")
-                threading.Thread(target=_handle_eyeball_verdict,
-                                 args=(cb_chat, cb_data, mid, _CANCEL_API),
-                                 daemon=True).start()
+                if cb_data.startswith("ceb|"):
+                    threading.Thread(
+                        target=_handle_eyeball_verdict,
+                        args=(cb_chat, cb_data, mid, _CANCEL_API),
+                        daemon=True).start()
+                elif cb_data == "cf_chart":
+                    threading.Thread(target=_handle_cancel_flow,
+                                     args=(cb_chat, 48, _CANCEL_API),
+                                     daemon=True).start()
+                elif cb_data == "cf_state":
+                    threading.Thread(target=_handle_cancel_state,
+                                     args=(cb_chat, 90, _CANCEL_API),
+                                     daemon=True).start()
+                elif cb_data == "cf_analyze":
+                    threading.Thread(target=_handle_cancel_analyze,
+                                     args=(cb_chat, 90, _CANCEL_API),
+                                     daemon=True).start()
+                return "ok"
+
+            msg = data.get("message", {})
+            chat_id = str(msg.get("chat", {}).get("id", ""))
+            text = str(msg.get("text", "")).strip()
+            if not chat_id or not text:
+                return "ok"
+            if ALLOWED_USERS and chat_id not in ALLOWED_USERS:
+                return "ok"
+            parts = text.split()
+            cmd = parts[0].split("@")[0].lower()
+            arg = (int(parts[1]) if len(parts) > 1 and parts[1].isdigit()
+                   else None)
+            if cmd in ("/start", "/help", "/menu"):
+                _cancel_menu(chat_id)
+            elif cmd == "/cancelflow":
+                threading.Thread(
+                    target=_handle_cancel_flow,
+                    args=(chat_id, 48 if arg is None else arg, _CANCEL_API),
+                    daemon=True).start()
+            elif cmd == "/cancelstate":
+                threading.Thread(
+                    target=_handle_cancel_state,
+                    args=(chat_id, arg or 90, _CANCEL_API),
+                    daemon=True).start()
+            elif cmd == "/cancelanalyze":
+                threading.Thread(
+                    target=_handle_cancel_analyze,
+                    args=(chat_id, arg or 90, _CANCEL_API),
+                    daemon=True).start()
             return "ok"
         except Exception:
             logger.exception("cancel bot webhook error")
@@ -2125,9 +2199,7 @@ def _send_help(chat_id: str):
         "/history - 事件歷史\n"
         "\n<b>--- 其他 ---</b>\n"
         "/flow_chart - 訂單流圖表\n"
-        "/cancelflow - 撤單流互動覆盤圖 (研究·非信號; 可帶小時數如 /cancelflow 168)\n"
-        "/cancelanalyze - 撤單流五步摘要 (預設 90 分鐘; /cancelanalyze 240)\n"
-        "/cancelstate - 撤單流當前狀態一行 (六態; /cancelstate 240)\n\n"
+        "(撤單流研究功能已移至獨立 bot)\n\n"
         "<i>也可直接點擊下方按鈕操作</i>"
     )
     keyboard = json_mod.dumps({"inline_keyboard": [
@@ -2148,7 +2220,6 @@ def _send_help(chat_id: str):
         ],
         [
             {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
-            {"text": "\U0001f9f2 \u64a4\u55ae\u6d41", "callback_data": "cancel_flow"},
         ],
     ]})
     url = f"{API_URL}/sendMessage"
@@ -2308,8 +2379,6 @@ def webhook():
                 threading.Thread(target=_handle_alpha_decay, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "okx_perf":
                 threading.Thread(target=_handle_okx_perf, args=(cb_chat_id,), daemon=True).start()
-            elif cb_data == "cancel_flow":
-                threading.Thread(target=_handle_cancel_flow, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "help":
                 _send_help(cb_chat_id)
             return "ok"
@@ -2394,23 +2463,7 @@ def webhook():
         elif cmd == "/decay":
             threading.Thread(target=_handle_alpha_decay, args=(chat_id,), daemon=True).start()
 
-        elif cmd == "/cancelflow" or cmd.startswith("/cancelflow "):
-            # /cancelflow → last 48h; /cancelflow 168 → weekly; /cancelflow 0 → full era
-            parts = raw_text.split()
-            cf_hours = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 48
-            threading.Thread(target=_handle_cancel_flow, args=(chat_id, cf_hours), daemon=True).start()
-
-        elif cmd == "/cancelanalyze" or cmd.startswith("/cancelanalyze "):
-            # /cancelanalyze [mins] → 撤單流五步摘要 (預設右緣 90 分鐘)
-            parts = raw_text.split()
-            ca_mins = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 90
-            threading.Thread(target=_handle_cancel_analyze, args=(chat_id, ca_mins), daemon=True).start()
-
-        elif cmd == "/cancelstate" or cmd.startswith("/cancelstate "):
-            # /cancelstate [mins] → 當前六態狀態行 (回看窗預設 90 分鐘)
-            parts = raw_text.split()
-            cs_mins = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 90
-            threading.Thread(target=_handle_cancel_state, args=(chat_id, cs_mins), daemon=True).start()
+        # 撤單流指令已全數移至獨立 bot（2026-07-19，cancel_bot_webhook）
 
         elif cmd == "/update":
             threading.Thread(target=_handle_force_update, args=(chat_id,), daemon=True).start()
