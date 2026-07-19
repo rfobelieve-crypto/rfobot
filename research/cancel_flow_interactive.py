@@ -356,18 +356,34 @@ function mk(id, h) {{
   return LightweightCharts.createChart(el, Object.assign({{}}, OPTS,
       {{ width: el.clientWidth || window.innerWidth, height: h }}));
 }}
-const c1 = mk('c1', Math.max(320, window.innerHeight * 0.52));
-const cv = mk('cv', Math.max(70,  window.innerHeight * 0.12));
-const c4 = mk('c4', Math.max(100, window.innerHeight * 0.18));
-const c2 = mk('c2', Math.max(100, window.innerHeight * 0.15));
-const c3 = mk('c3', Math.max(80,  window.innerHeight * 0.10));
+const c1 = mk('c1', 320);
+const cv = mk('cv', 80);
+const c4 = mk('c4', 100);
+const c2 = mk('c2', 100);
+const c3 = mk('c3', 80);
+let expertOn = false;
+function layout() {{
+  const H = window.innerHeight - 66;   // header 扣掉後填滿視窗
+  const W = window.innerWidth;
+  const set = (chart, id, frac, min) => {{
+    const h = Math.max(min, Math.floor(H * frac));
+    document.getElementById(id).style.height = h + 'px';
+    chart.applyOptions({{ width: W, height: h }});
+  }};
+  if (expertOn) {{
+    set(c1, 'c1', 0.42, 260); set(cv, 'cv', 0.10, 60);
+    set(c4, 'c4', 0.18, 90);  set(c2, 'c2', 0.16, 80);
+    set(c3, 'c3', 0.10, 60);
+  }} else {{
+    set(c1, 'c1', 0.76, 320); set(cv, 'cv', 0.21, 80);
+  }}
+}}
 function toggleExpert() {{
-  const e = document.getElementById('expert');
-  const show = e.style.display === 'none';
-  e.style.display = show ? 'block' : 'none';
-  document.getElementById('btnx').textContent = show ? '收起專家面板' : '🔬 專家面板';
-  if (show) {{
-    [c4, c2, c3].forEach(c => c.applyOptions({{ width: window.innerWidth }}));
+  expertOn = !expertOn;
+  document.getElementById('expert').style.display = expertOn ? 'block' : 'none';
+  document.getElementById('btnx').textContent = expertOn ? '收起專家面板' : '🔬 專家面板';
+  layout();
+  if (expertOn) {{
     const r = c1.timeScale().getVisibleLogicalRange();
     if (r) [c4, c2, c3].forEach(c => c.timeScale().setVisibleLogicalRange(r));
   }}
@@ -454,8 +470,8 @@ panes.forEach(src => {{
     xhairSyncing = false;
   }});
 }});
-window.addEventListener('resize', () => charts.forEach(c =>
-    c.applyOptions({{ width: window.innerWidth }})));
+window.addEventListener('resize', layout);
+layout();
 c1.timeScale().fitContent();
 </script></body></html>
 """
