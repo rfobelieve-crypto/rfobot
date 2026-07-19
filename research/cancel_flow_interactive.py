@@ -333,7 +333,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </style></head><body>
 <div id="hdr"><b>撤單流覆盤 BTC-USD</b> · {span_h}h ·
  <b>看 K 線腳下色格</b>: 🟢讓路看漲 · 🔴抽梯看跌 · 亮灰=有事不判方向 · 深灰=平靜
- · ⚡=獵取(黃線=被掃價位) · ▲▼=V7 訊號
+ · ⚡=獵取事件 · ▲▼=V7 訊號
  <button id="btnx" onclick="toggleExpert()">🔬 專家面板</button>
  <span class="muted">研究非信號 · edge 待 8/10 · n={n}m · {smooth}m 平滑</span></div>
 <div class="pane"><div class="lbl">價格 1m K棒 + 狀態色格</div><div id="c1"></div></div>
@@ -409,10 +409,8 @@ const stateStrip = c1.addHistogramSeries({{ priceScaleId:'state',
 stateStrip.priceScale().applyOptions({{ scaleMargins: {{ top: 0.90, bottom: 0 }} }});
 stateStrip.setData(STATES);
 
-// A2-2 獵取被掃價位虛線
-const LEVELS = {levels};
-LEVELS.forEach(l => candle.createPriceLine(
-  {{ price: l.price, color:'#f2b544', lineWidth:1, lineStyle:2, title:l.title }}));
+// A2-2 獵取事件只用 ⚡ marker 標示（2026-07-19 使用者定版:
+// 價位水平線太亂, 全部移除）
 
 const vol = cv.addHistogramSeries({{ priceFormat: {{ type:'volume' }} }});
 vol.setData(VOL);
