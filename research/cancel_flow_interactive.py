@@ -321,21 +321,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <style>
   body {{ margin:0; background:#0e1116; color:#e3e3e3;
          font-family:'Microsoft JhengHei',sans-serif; }}
-  #hdr {{ padding:8px 14px; font-size:13px; color:#9aa0a6; }}
-  #hdr b {{ color:#e3e3e3; }}
+  #hdr {{ padding:8px 14px; font-size:14px; color:#c8cdd4; line-height:1.7; }}
+  #hdr b {{ color:#ffffff; }}
+  #hdr button {{ background:#2a2f38; color:#e3e3e3; border:1px solid #3a4150;
+                 border-radius:6px; padding:2px 10px; cursor:pointer;
+                 font-size:12px; margin:0 6px; }}
+  .muted {{ color:#5f6672; font-size:11px; }}
   .pane {{ position:relative; }}
   .lbl {{ position:absolute; top:6px; left:10px; z-index:5;
           font-size:12px; color:#9aa0a6; pointer-events:none; }}
 </style></head><body>
-<div id="hdr"><b>撤單流覆盤 BTC-USD</b> · {span_h}h · n={n} 分鐘 · 撤單面板 {smooth}m 平滑/去均值
- · ▲▼=v7 Strong · 深色柱=|不對稱|≥0.30 · 量色=taker買綠/賣紅
- · K 腳色格=狀態(🟢向上真空/🔴向下真空/亮灰=換防·爆量·瀑布/深灰底=平靜, 吸收依方向)
- · ⚡=獵取事件(黃虛線=被掃價位) · 研究工具非信號 (edge 待 8/10)</div>
+<div id="hdr"><b>撤單流覆盤 BTC-USD</b> · {span_h}h ·
+ <b>看 K 線腳下色格</b>: 🟢讓路看漲 · 🔴抽梯看跌 · 亮灰=有事不判方向 · 深灰=平靜
+ · ⚡=獵取(黃線=被掃價位) · ▲▼=V7 訊號
+ <button id="btnx" onclick="toggleExpert()">🔬 專家面板</button>
+ <span class="muted">研究非信號 · edge 待 8/10 · n={n}m · {smooth}m 平滑</span></div>
 <div class="pane"><div class="lbl">價格 1m K棒 + 狀態色格</div><div id="c1"></div></div>
-<div class="pane"><div class="lbl">成交量 1m (綠=taker買佔優 / 紅=賣佔優)</div><div id="cv"></div></div>
-<div class="pane"><div class="lbl">毛撤單偏斜 (＋賣側撤多 / －買側撤多) — 動作</div><div id="c2"></div></div>
-<div class="pane"><div class="lbl">淨偏斜 (撤−加) — 牆真的變薄才動;毛高淨零=換防假象</div><div id="c4"></div></div>
+<div class="pane"><div class="lbl">成交量 (綠=買方主動 / 紅=賣方主動)</div><div id="cv"></div></div>
+<div class="pane"><div class="lbl">淨偏斜 (綠=賣單牆在變薄 / 紅=買單牆在變薄, 超過虛線才算數)</div><div id="c4"></div></div>
+<div id="expert" style="display:none">
+<div class="pane"><div class="lbl">毛撤單偏斜 (＋賣側撤多 / －買側撤多) — 動作;毛高淨零=換防假象</div><div id="c2"></div></div>
 <div class="pane"><div class="lbl">撤單強度 (兩側總量)</div><div id="c3"></div></div>
+</div>
 <script>
 const OPTS = {{
   layout: {{ background: {{ color: '#0e1116' }}, textColor: '#9aa0a6' }},
@@ -349,11 +356,22 @@ function mk(id, h) {{
   return LightweightCharts.createChart(el, Object.assign({{}}, OPTS,
       {{ width: el.clientWidth || window.innerWidth, height: h }}));
 }}
-const c1 = mk('c1', Math.max(220, window.innerHeight * 0.32));
-const cv = mk('cv', Math.max(70,  window.innerHeight * 0.11));
-const c2 = mk('c2', Math.max(110, window.innerHeight * 0.17));
-const c4 = mk('c4', Math.max(110, window.innerHeight * 0.17));
-const c3 = mk('c3', Math.max(90,  window.innerHeight * 0.12));
+const c1 = mk('c1', Math.max(320, window.innerHeight * 0.52));
+const cv = mk('cv', Math.max(70,  window.innerHeight * 0.12));
+const c4 = mk('c4', Math.max(100, window.innerHeight * 0.18));
+const c2 = mk('c2', Math.max(100, window.innerHeight * 0.15));
+const c3 = mk('c3', Math.max(80,  window.innerHeight * 0.10));
+function toggleExpert() {{
+  const e = document.getElementById('expert');
+  const show = e.style.display === 'none';
+  e.style.display = show ? 'block' : 'none';
+  document.getElementById('btnx').textContent = show ? '收起專家面板' : '🔬 專家面板';
+  if (show) {{
+    [c2, c3].forEach(c => c.applyOptions({{ width: window.innerWidth }}));
+    const r = c1.timeScale().getVisibleLogicalRange();
+    if (r) [c2, c3].forEach(c => c.timeScale().setVisibleLogicalRange(r));
+  }}
+}}
 
 const CANDLES = {candles};
 const VOL = {volume};
