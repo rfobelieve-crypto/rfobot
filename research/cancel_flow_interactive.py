@@ -338,8 +338,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
  <span class="muted">研究非信號 · edge 待 8/10 · n={n}m · {smooth}m 平滑</span></div>
 <div class="pane"><div class="lbl">價格 1m K棒 + 狀態色格</div><div id="c1"></div></div>
 <div class="pane"><div class="lbl">成交量 (綠=買方主動 / 紅=賣方主動)</div><div id="cv"></div></div>
-<div class="pane"><div class="lbl">淨偏斜 (綠=賣單牆在變薄 / 紅=買單牆在變薄, 超過虛線才算數)</div><div id="c4"></div></div>
 <div id="expert" style="display:none">
+<div class="pane"><div class="lbl">淨偏斜 (綠=賣單牆在變薄 / 紅=買單牆在變薄, 超過虛線才算數)</div><div id="c4"></div></div>
 <div class="pane"><div class="lbl">毛撤單偏斜 (＋賣側撤多 / －買側撤多) — 動作;毛高淨零=換防假象</div><div id="c2"></div></div>
 <div class="pane"><div class="lbl">撤單強度 (兩側總量)</div><div id="c3"></div></div>
 </div>
@@ -367,9 +367,9 @@ function toggleExpert() {{
   e.style.display = show ? 'block' : 'none';
   document.getElementById('btnx').textContent = show ? '收起專家面板' : '🔬 專家面板';
   if (show) {{
-    [c2, c3].forEach(c => c.applyOptions({{ width: window.innerWidth }}));
+    [c4, c2, c3].forEach(c => c.applyOptions({{ width: window.innerWidth }}));
     const r = c1.timeScale().getVisibleLogicalRange();
-    if (r) [c2, c3].forEach(c => c.timeScale().setVisibleLogicalRange(r));
+    if (r) [c4, c2, c3].forEach(c => c.timeScale().setVisibleLogicalRange(r));
   }}
 }}
 
