@@ -34,9 +34,10 @@ class TestFormatCard:
 
     def test_contains_level_state_and_window(self):
         card = format_card(self.ROW, VUP, feat_row(), "平靜88 · 向上真空2", 90)
-        assert "H4_resistance" in card and "(sell)" in card
+        assert "H4_resistance" in card and "(sell·下方流動性)" in card
         assert "118,250" in card
-        assert "🟢 向上真空→UP" in card
+        assert "🟢 向上真空" in card and "偏漲" in card
+        assert "發生了什麼:" in card and "掛單面:" in card   # 白話翻譯層
         assert "回看90m: 平靜88 · 向上真空2" in card
         assert "非信號" in card and "勿作交易依據" in card
 
@@ -82,6 +83,29 @@ class TestHRFlags:
         # sell=SSL 向下掃: bid 回補 + ask 淨撤 → 反轉 UP
         f = hr_flags(seg_frame(ba=9, bc=2, aa=1, ac=5), "sell")
         assert f["reversal"] and f["rev_dir"] == "UP"
+
+
+class TestHumanize:
+    """白話翻譯層 — display-only, 凍結定義不碰（2026-07-20）。"""
+
+    def test_story_absorption_up_mentions_reversal(self):
+        from market_data.tasks.cancel_playbook_watcher import humanize_story
+        s = humanize_story("absorption", "UP", vshock=28.9, taker_ratio=-0.50)
+        assert "吸收" in s and "反轉向上" in s and "29 倍" in s and "50%" in s
+
+    def test_story_vacuum_down_and_state_alias(self):
+        from market_data.tasks.cancel_playbook_watcher import humanize_story
+        assert "向下真空" in humanize_story("vacuum", "DOWN")
+        assert "向下真空" in humanize_story("vacuum_down", "DOWN")
+        assert "真破" in humanize_story("cascade", "UP", 5.0, 0.4)
+
+    def test_book_direction_language(self):
+        from market_data.tasks.cancel_playbook_watcher import humanize_book
+        up = humanize_book(shock=3.6, skew15=0.35, net15=0.32)
+        assert "3.6 倍" in up and "阻力在變薄" in up and "上方掛單淨撤離" in up
+        flat = humanize_book(shock=1.0, skew15=0.01, net15=-0.02)
+        assert "均衡" in flat and "無明顯淨撤離" in flat
+        assert humanize_book() == "掛單資料不足"
 
 
 class TestVerdictKeyboard:

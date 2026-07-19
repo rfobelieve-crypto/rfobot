@@ -34,8 +34,9 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.db import get_db_conn
 from market_data.tasks.cancel_playbook_watcher import (
-    DEF_VERSION, GATE_SHOCK, STATE_META, _tg_creds, classify_state,
-    compute_features, load_frame, state_color, verdict_keyboard)
+    DEF_VERSION, DIR_ZH, GATE_SHOCK, STATE_META, _tg_creds, classify_state,
+    compute_features, humanize_book, humanize_story, load_frame, state_color,
+    verdict_keyboard)
 
 logger = logging.getLogger(__name__)
 
@@ -155,15 +156,27 @@ def hr_flags(seg: pd.DataFrame, side: str) -> dict:
             "ask_net": ask_net, "bid_net": bid_net}
 
 
+def _side_zh(side: str) -> str:
+    """liquidity_side → 白話（buy=BSL 上方 / sell=SSL 下方；? = 推斷）。"""
+    s = side.rstrip("?")
+    guess = "·推斷" if side.endswith("?") else ""
+    if s == "buy":
+        return f"上方流動性{guess}"
+    if s == "sell":
+        return f"下方流動性{guess}"
+    return ""
+
+
 def format_stage1_card(row: dict) -> str:
     """sweep 二段式第 1 段：掃穿瞬間=資訊黑洞，只報事實、不判讀、無按鈕。"""
     t, label, side, px_s = _row_head(row)
     return "\n".join([
-        "⚡ 掃穿事件·第1段（研究·非信號）",
-        f"關卡: {label} ({side}) @ {px_s} | {t} TPE",
-        "瀑布中＝資訊黑洞（撤單全是保護性雜訊）——判讀待塵埃落定",
-        f"第2段卡（H-R 旗標＋判讀鍵）將於強度回落後 {STAGE2_MIN_AGE}-"
-        f"{STAGE2_FORCE_AGE}min 自動送達",
+        "⚡ 掃穿事件·第1段：只報事實（研究·非信號）",
+        f"關卡: {label} ({side}·{_side_zh(side)}) @ {px_s} | {t} TPE",
+        "價格剛掃穿這個關卡，現在是瀑布瞬間——此刻的撤單都是止損保護的"
+        "雜訊，看不出方向，先不判讀。",
+        f"塵埃落定後（約 {STAGE2_MIN_AGE}-{STAGE2_FORCE_AGE} 分鐘）會自動"
+        "送第2段判讀卡（含按鈕）",
     ])
 
 
@@ -171,17 +184,19 @@ def format_stage2_card(row: dict, flags: dict, cur: dict,
                        n_seg: int, age_min: float) -> str:
     """sweep 第 2 段：塵埃落定，H-R 旗標結論 + 四鍵——決策時刻在這裡。"""
     t, label, side, px_s = _row_head(row)
-    a = "✓" if flags["refill"] else "✗"
-    b = "✓" if flags["opp_pull"] else "✗"
-    concl = (f"反轉條件成立 → 預期回收關卡（{flags['rev_dir']}）"
+    a = "✓ 有（供給重建）" if flags["refill"] else "✗ 無"
+    b = "✓ 有（另一側在讓路）" if flags["opp_pull"] else "✗ 無"
+    concl = (f"反轉條件成立 → 預期價格收回關卡（方向 {flags['rev_dir']}）"
              if flags["reversal"]
-             else "反轉條件未現 → 傾向延續（掃穿延續基率 ~2/3）")
+             else "反轉條件未現 → 傾向延續掃穿方向（歷史基率：掃穿後約 2/3 延續）")
     return "\n".join([
-        f"🧲 掃穿第2段·塵埃落定（+{age_min:.0f}m）",
-        f"關卡: {label} ({side}) @ {px_s} | 觸發 {t} TPE",
-        f"H-R 旗標: 被掃側淨回填 {a} · 對側淨撤離 {b}（段 n={n_seg}m）",
+        f"🧲 掃穿第2段·塵埃落定（觸發後 {age_min:.0f} 分鐘）",
+        f"關卡: {label} ({side}·{_side_zh(side)}) @ {px_s} | 觸發 {t} TPE",
+        "檢查兩個反轉條件（H-R 凍結旗標）:",
+        f"① 被掃側掛單回補了嗎: {a}",
+        f"② 對側掛單在撤退嗎: {b}（統計掃穿後 {n_seg} 分鐘）",
         f"結論: {concl}",
-        f"當前狀態: {cur['emoji']} {cur['zh']} | 判定窗 120m 自動回填",
+        f"當下狀態: {cur['emoji']} {cur['zh']} | 120 分鐘後自動對答案",
         f"def {DEF_VERSION} · 旗標=凍結定義 · 盲接反轉=-EV · 勿作交易依據",
     ])
 
@@ -189,12 +204,7 @@ def format_stage2_card(row: dict, flags: dict, cur: dict,
 def format_card(row: dict, cur: dict, feat_last: pd.Series,
                 dist: str, n_lookback: int) -> str:
     """Simplified TV event card (pure text — plain, no parse_mode)."""
-    t = (pd.Timestamp(int(row["received_ms"]), unit="ms")
-         + pd.Timedelta(hours=8)).strftime("%m-%d %H:%M")
-    label = str(row.get("event") or "level")
-    side = str(row.get("liquidity_side") or "").strip()
-    px = row.get("price")
-    px_s = f"{float(px):,.0f}" if px else "?"
+    t, label, side, px_s = _row_head(row)
 
     def g(k, spec):
         v = feat_last.get(k)
@@ -203,16 +213,29 @@ def format_card(row: dict, cur: dict, feat_last: pd.Series,
         except (TypeError, ValueError):
             return "?"
 
-    cur_label = cur["zh"] + (f"→{cur['direction']}"
-                             if cur["direction"] != "NONE" else "")
+    def num(k):
+        v = feat_last.get(k)
+        try:
+            return float(v) if pd.notna(v) else None
+        except (TypeError, ValueError):
+            return None
+
+    state_line = f"{cur['emoji']} {cur['zh']}" + (
+        f" → {DIR_ZH[cur['direction']]}" if cur["direction"] != "NONE" else "")
     lines = [
-        "📍 TV 快訊事件卡（研究·非信號）",
-        f"關卡: {label}" + (f" ({side})" if side else "") + f" @ {px_s} | {t} TPE",
-        f"觸發時狀態: {cur['emoji']} {cur_label} | shock {g('shock', '.1f')}x"
-        f" 毛 {g('skew15', '+.2f')} 淨 {g('net15', '+.2f')}"
-        f" 量 {g('vshock', '.1f')}x taker {g('taker_ratio', '+.2f')}",
+        "📍 你畫的關卡有動靜（研究·非信號）",
+        f"關卡: {label}" + (f" ({side}·{_side_zh(side)})" if side else "")
+        + f" @ {px_s} | {t} TPE",
+        f"當下狀態: {state_line}",
+        "發生了什麼: " + humanize_story(cur["state"], cur["direction"],
+                                   num("vshock"), num("taker_ratio")),
+        "掛單面: " + humanize_book(num("shock"), num("skew15"), num("net15")),
         f"回看{n_lookback}m: {dist or '無資料'}",
-        f"判定窗 120m 自動回填 · def {DEF_VERSION} · 勿作交易依據",
+        "接下來: 120 分鐘自動對答案；你的判讀請按下面按鈕",
+        f"原始值: shock {g('shock', '.1f')}x 毛 {g('skew15', '+.2f')}"
+        f" 淨 {g('net15', '+.2f')} 量 {g('vshock', '.1f')}x"
+        f" taker {g('taker_ratio', '+.2f')}",
+        f"def {DEF_VERSION} · 勿作交易依據",
     ]
     return "\n".join(lines)
 

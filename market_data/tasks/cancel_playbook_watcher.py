@@ -287,6 +287,73 @@ def classify_state(r: pd.Series) -> dict:
     return {"state": state, "zh": zh, "emoji": emoji, "direction": direction}
 
 
+# ── 白話翻譯層 (2026-07-20, display-only) ────────────────────────────────────
+# 把凍結特徵翻成人話。只改「顯示」，不碰任何偵測/記錄定義；所有事件卡共用
+# （watcher 告警 + tv_alert_poller 三種卡），改文案只動這裡。
+
+DIR_ZH = {"UP": "偏漲 🟢", "DOWN": "偏跌 🔴", "NONE": "方向未定 ⚪"}
+
+
+def humanize_story(playbook: str, direction: str,
+                   vshock: float | None = None,
+                   taker_ratio: float | None = None) -> str:
+    """一句話講「發生了什麼」。接受劇本名或顯示狀態名（cascade/rotation/...）。"""
+    v = (f"{vshock:.0f} 倍" if vshock is not None and np.isfinite(vshock)
+         else "數倍")
+    tr = (f"佔成交 {abs(taker_ratio):.0%}"
+          if taker_ratio is not None and np.isfinite(taker_ratio) else "占比不明")
+    if playbook == "absorption":
+        if direction == "UP":
+            return (f"成交量爆到平時的 {v}、賣方主動砸盤（{tr}），但價格守住沒跌"
+                    "——賣壓被整批接走（吸收），此劇本預期反轉向上")
+        return (f"成交量爆到平時的 {v}、買方主動追價（{tr}），但價格推不上去"
+                "——買盤被倒貨吸收，此劇本預期反轉向下")
+    if playbook in ("true_break", "cascade"):
+        if direction == "UP":
+            return (f"成交量爆到平時的 {v}、買方主動追價（{tr}）且價格同步上移"
+                    "——攻擊性突破（真破），此劇本預期順勢向上")
+        if direction == "DOWN":
+            return (f"成交量爆到平時的 {v}、賣方主動砸盤（{tr}）且價格同步下移"
+                    "——攻擊性跌破（真破），此劇本預期順勢向下")
+        return f"成交量爆到平時的 {v}、價量激戰中——瀑布瞬間先不判方向"
+    if playbook in ("vacuum", "vacuum_up", "vacuum_down"):
+        d = direction if direction in ("UP", "DOWN") else (
+            "UP" if playbook == "vacuum_up" else "DOWN")
+        if d == "UP":
+            return ("成交清淡，但上方賣單正在大量淨撤離——阻力自己讓開"
+                    "（向上真空），價格容易被吸上去")
+        return ("成交清淡，但下方買單正在大量淨撤離——支撐自己抽走"
+                "（向下真空），價格容易向下墜")
+    if playbook in ("two_sided", "rotation"):
+        return "兩側掛單同時大量換防、淨方向不明——常見於波動放大之前"
+    if playbook in ("gate_only", "surge"):
+        return "撤單爆量但湊不齊任何已知劇本——先觀察，不判方向"
+    return "掛單面平靜，無異常"
+
+
+def humanize_book(shock: float | None = None, skew15: float | None = None,
+                  net15: float | None = None) -> str:
+    """掛單面一句話：撤單鬧鐘倍數 + 抽單偏向 + 淨撤離方向（門檻沿用凍結 FLAT）。"""
+    parts = []
+    if shock is not None and np.isfinite(shock):
+        parts.append(f"撤單量為平時的 {shock:.1f} 倍")
+    if skew15 is not None and np.isfinite(skew15):
+        if skew15 >= FLAT:
+            parts.append("抽單偏上方賣側（阻力在變薄）")
+        elif skew15 <= -FLAT:
+            parts.append("抽單偏下方買側（支撐在變薄）")
+        else:
+            parts.append("兩側抽單均衡")
+    if net15 is not None and np.isfinite(net15):
+        if net15 >= FLAT:
+            parts.append("上方掛單淨撤離明顯")
+        elif net15 <= -FLAT:
+            parts.append("下方掛單淨撤離明顯")
+        else:
+            parts.append("無明顯淨撤離")
+    return "；".join(parts) if parts else "掛單資料不足"
+
+
 def scan(df_feat: pd.DataFrame, minutes: list[int]) -> list[dict]:
     events = []
     for m in minutes:
@@ -398,17 +465,23 @@ def alert_events(fresh: list[dict]) -> None:
             def fmt(v, p="+.2f"):
                 return format(v, p) if v is not None else "?"
             lines = [
-                "🧲 撤單劇本偵測（研究·非信號）",
-                f"劇本: {ZH[e['playbook']]} → 預期 {e['direction']} (2h 內)",
-                f"時間: {t} TPE  價格: {px}",
-                f"shock {e['shock']:.1f}x | 毛 {fmt(e['skew15'])} | "
-                f"淨 {fmt(e['net15'])} | 量 {fmt(e['vshock'], '.1f')}x | "
+                f"🧲 撤單劇本: {ZH[e['playbook']]} → 未來 2 小時"
+                f"{DIR_ZH.get(e['direction'], e['direction'])}",
+                f"{t} TPE @ {px}",
+                "發生了什麼: " + humanize_story(
+                    e["playbook"], e["direction"],
+                    e["vshock"], e["taker_ratio"]),
+                "掛單面: " + humanize_book(
+                    e["shock"], e["skew15"], e["net15"]),
+                f"原始值: shock {e['shock']:.1f}x 毛 {fmt(e['skew15'])} "
+                f"淨 {fmt(e['net15'])} 量 {fmt(e['vshock'], '.1f')}x "
                 f"taker {fmt(e['taker_ratio'], '+.0%')}",
             ]
             if chart:
                 lines.append(chart)
             lines.append("深入: /cancelanalyze 90 (五步摘要) 或問 agent")
-            lines.append(f"def {DEF_VERSION} · edge 未驗證 · 勿作交易依據")
+            lines.append(f"def {DEF_VERSION} · 研究非信號 · edge 未驗證"
+                         " · 勿作交易依據")
             payload = {"chat_id": chat, "text": "\n".join(lines)}
             if e.get("id"):     # A3 按鈕即日誌 — 判讀落 cancel_eyeball_log
                 payload["reply_markup"] = json.dumps(
