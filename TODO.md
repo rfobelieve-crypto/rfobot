@@ -279,6 +279,14 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       成交越安靜撤單越大聲）②獵取的逼近段+收尾段（避開掃穿瞬間——那一刻
       資訊權在量價，撤單退場）③瀑布當下禁用。若 F1b 成立，判斷器的狀態
       權重應在低量時段調高撤單維度、高量時段讓位給量價（分工寫進 def v2）
+- [ ] **撤單流指令全遷新 bot（2026-07-19 登記）**：頻道分流非系統分家。
+      把 /cancelflow /cancelanalyze /cancelstate + 撤單流按鈕從主 bot 移除，
+      新 bot webhook route 加 message/指令處理（現只吃 ceb callback），
+      回覆全走 CANCEL_API。edge 證明後撤單流仍進 V7 判斷層（overlay 路線）
+- [ ] **撤單流多幣化（2026-07-19 登記）**：與 V7 多幣化（4.6）同方向——
+      depth_delta_collector 已參數化，起 ETH spot/perp 實例即開資料時鐘
+      （越早越好，10 月 re-run 與 F1 家族未來可跨幣）；watcher/圖表後續跟進。
+      紀律：BTC 凍結序列不動，ETH 為新增平行序列
 - 撤單檢定家族現況（皆凍結）：F1 skew 水位（07-10 註冊）8/10 判決；
   F2 變化幅度 shock（07-15 註冊，smoke: intensity→|ret| 5m IC +0.113 CI 全正，待 powered）；
   F3 深帶翻轉事件（07-15 註冊，6 天 0 事件，需 ≥30/方向）；
