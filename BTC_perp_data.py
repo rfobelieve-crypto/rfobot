@@ -1902,12 +1902,12 @@ def _handle_cancel_state(chat_id: str, mins: int = 90):
         send_message(chat_id, f"❌ 撤單狀態查詢失敗: {e}")
 
 
-def _remove_inline_buttons(chat_id: str, message_id) -> None:
+def _remove_inline_buttons(chat_id: str, message_id, api: str = None) -> None:
     """Clear a card's inline keyboard once the verdict locks in."""
     if not message_id:
         return
     try:
-        requests.post(f"{API_URL}/editMessageReplyMarkup",
+        requests.post(f"{api or API_URL}/editMessageReplyMarkup",
                       data={"chat_id": chat_id, "message_id": message_id,
                             "reply_markup": json.dumps({"inline_keyboard": []})},
                       timeout=10)
@@ -1915,12 +1915,22 @@ def _remove_inline_buttons(chat_id: str, message_id) -> None:
         pass
 
 
-def _handle_eyeball_verdict(chat_id: str, cb_data: str, message_id=None):
+def _handle_eyeball_verdict(chat_id: str, cb_data: str, message_id=None,
+                            api: str = None):
     """A3 按鈕即日誌: ceb|{src}|{id}|{verdict} → cancel_eyeball_log。
 
     首判 INSERT IGNORE 鎖定（前瞻紀錄不可事後改）；skip 不落表。
     表由 Service 2 poller 建置與回填——這裡只寫人的判讀（DB as bus，
-    share data not code）。"""
+    share data not code）。api 指定時（撤單獨立 bot）回覆走該 bot。"""
+    def say(t):
+        if api:
+            try:
+                requests.post(f"{api}/sendMessage",
+                              data={"chat_id": chat_id, "text": t}, timeout=10)
+            except Exception:
+                pass
+        else:
+            send_message(chat_id, t)
     try:
         parts = cb_data.split("|")
         if len(parts) != 4:
@@ -1932,8 +1942,8 @@ def _handle_eyeball_verdict(chat_id: str, cb_data: str, message_id=None):
             return
         sid = int(sid_s)
         if verdict == "skip":
-            _remove_inline_buttons(chat_id, message_id)
-            send_message(chat_id, f"✗ 略過不記 ({src}#{sid})")
+            _remove_inline_buttons(chat_id, message_id, api)
+            say(f"✗ 略過不記 ({src}#{sid})")
             return
 
         event_ms = state = direction = None
@@ -1957,7 +1967,7 @@ def _handle_eyeball_verdict(chat_id: str, cb_data: str, message_id=None):
                         state = r.get("playbook")
                         direction = r.get("direction")
                 if event_ms is None:
-                    send_message(chat_id, f"❌ 找不到事件 ({src}#{sid})")
+                    say(f"❌ 找不到事件 ({src}#{sid})")
                     return
                 cur.execute(
                     "INSERT IGNORE INTO cancel_eyeball_log "
@@ -1979,17 +1989,49 @@ def _handle_eyeball_verdict(chat_id: str, cb_data: str, message_id=None):
         zh = {"up": "🔼 漲", "down": "🔽 跌", "agree": "🟢 同意",
               "opposite": "🔴 相反", "unsure": "⏸ 不確定"}
         if inserted:
-            _remove_inline_buttons(chat_id, message_id)
-            send_message(chat_id,
-                         f"✅ 已落表 {src}#{sid} → {zh.get(verdict, verdict)}"
-                         f"（前瞻紀錄，判定窗到期自動回填）")
+            _remove_inline_buttons(chat_id, message_id, api)
+            say(f"✅ 已落表 {src}#{sid} → {zh.get(verdict, verdict)}"
+                f"（前瞻紀錄，判定窗到期自動回填）")
         else:
-            send_message(chat_id,
-                         f"🔒 {src}#{sid} 首判已鎖定（{zh.get(prev, prev)}）"
-                         f"——前瞻紀錄不可事後改")
+            say(f"🔒 {src}#{sid} 首判已鎖定（{zh.get(prev, prev)}）"
+                f"——前瞻紀錄不可事後改")
     except Exception as e:
         logger.exception("eyeball verdict error: %s", e)
-        send_message(chat_id, f"❌ 判讀落表失敗: {e}")
+        say(f"❌ 判讀落表失敗: {e}")
+
+
+# ── 撤單流獨立 bot webhook（2026-07-19，設 CANCEL_TG_BOT_TOKEN 才註冊）──
+CANCEL_TG_TOKEN = os.getenv("CANCEL_TG_BOT_TOKEN", "").strip()
+if CANCEL_TG_TOKEN:
+    _CANCEL_API = f"https://api.telegram.org/bot{CANCEL_TG_TOKEN}"
+
+    @app.route(f"/cancelbot/{CANCEL_TG_TOKEN}", methods=["POST"])
+    def cancel_bot_webhook():
+        """撤單 bot 只服務 ceb| 判讀 callback；其餘更新一律 ok。"""
+        try:
+            data = request.get_json(silent=True) or {}
+            cb = data.get("callback_query")
+            if not cb:
+                return "ok"
+            try:
+                requests.post(f"{_CANCEL_API}/answerCallbackQuery",
+                              data={"callback_query_id": cb.get("id", "")},
+                              timeout=5)
+            except Exception:
+                pass
+            cb_chat = str(cb.get("message", {}).get("chat", {}).get("id", ""))
+            if ALLOWED_USERS and cb_chat not in ALLOWED_USERS:
+                return "ok"
+            cb_data = cb.get("data", "")
+            if cb_data.startswith("ceb|"):
+                mid = cb.get("message", {}).get("message_id")
+                threading.Thread(target=_handle_eyeball_verdict,
+                                 args=(cb_chat, cb_data, mid, _CANCEL_API),
+                                 daemon=True).start()
+            return "ok"
+        except Exception:
+            logger.exception("cancel bot webhook error")
+            return "ok"
 
 
 def _handle_signal_perf(chat_id: str):

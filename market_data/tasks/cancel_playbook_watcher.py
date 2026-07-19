@@ -354,7 +354,8 @@ def _tg_creds() -> tuple[str, str]:
                     if k.strip() in keys and v.strip():
                         return v.strip().strip('"').strip("'")
         return ""
-    return (val("TELEGRAM_BOT_TOKEN"),
+    # 2026-07-19: 撤單流獨立 bot — CANCEL_TG_BOT_TOKEN 優先, 未設 fallback 主 bot
+    return (val("CANCEL_TG_BOT_TOKEN", "TELEGRAM_BOT_TOKEN"),
             val("TG_CRITICAL_CHAT_ID", "TELEGRAM_CHAT_ID"))
 
 
