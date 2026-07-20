@@ -97,6 +97,17 @@ def ensure_schema() -> None:
                 UNIQUE KEY uq_evt (def_version, minute_start_ms, playbook),
                 INDEX idx_min (minute_start_ms)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
+            # A 對答案 reply (2026-07-20) — additive columns
+            for ddl in (
+                "ALTER TABLE cancel_playbook_events "
+                "ADD COLUMN tg_message_id BIGINT NULL",
+                "ALTER TABLE cancel_playbook_events "
+                "ADD COLUMN outcome_replied TINYINT NOT NULL DEFAULT 0",
+            ):
+                try:
+                    cur.execute(ddl)
+                except Exception:
+                    pass      # 1060 duplicate column = already there
         conn.commit()
     finally:
         conn.close()
@@ -249,20 +260,20 @@ def state_color(s: dict) -> str | None:
         "#e01b24" if s["direction"] == "DOWN" else "#8a919c")
 
 
-def verdict_keyboard(source: str, source_id: int) -> dict:
-    """A3 四鍵按鈕即日誌 (2026-07-19)。callback 格式 ceb|{src}|{id}|{verdict}
-    (≤64 bytes) — Service 1 webhook 解析後寫 cancel_eyeball_log(DB as bus,
-    首判 INSERT IGNORE 鎖定不可改, skip 不落表)。共用於 watcher 劇本告警
-    與 tv_alert_poller 事件卡。"""
-    def mk(text, v):
+def action_keyboard(source: str, source_id: int) -> dict:
+    """行動鍵 (2026-07-20, 取代四鍵判讀)。callback 格式 cfa|{src}|{id}|{action}
+    (≤64 bytes) — Service 1 cancel-bot webhook 解析。判讀鍵退役原因：
+    卡片標題先給機器結論=錨定污染，人的判讀量到的是服從率非 alpha；
+    樣本速度+選擇偏誤也撐不起統計。改成「給工具」：
+      zoom=事件窗覆盤圖連結 deep=90m 五步摘要
+      star=收藏(cancel_eyeball_log verdict='star') dismiss=收鍵盤。
+    舊 ceb| 判讀 callback 的 Service 1 處理器保留（歷史卡片仍可按）。"""
+    def mk(text, a):
         return {"text": text,
-                "callback_data": f"ceb|{source}|{source_id}|{v}"}
-    # 2026-07-18 改絕對方向式(嚴格優於同意/相反: 記獨立方向, 機器結論
-    # 在卡上可事後推導一致性; NONE 態無歧義)。舊值 agree/opposite 仍被
-    # Service 1 接受(歷史卡片)。
+                "callback_data": f"cfa|{source}|{source_id}|{a}"}
     return {"inline_keyboard": [
-        [mk("🔼 漲", "up"), mk("🔽 跌", "down")],
-        [mk("⏸ 不確定", "unsure"), mk("✗ 略過不記", "skip")],
+        [mk("📊 特寫圖", "zoom"), mk("🔍 90m 深入", "deep")],
+        [mk("⭐ 收藏", "star"), mk("✗ 忽略", "dismiss")],
     ]}
 
 
@@ -483,24 +494,32 @@ def alert_events(fresh: list[dict]) -> None:
             lines.append(f"def {DEF_VERSION} · 研究非信號 · edge 未驗證"
                          " · 勿作交易依據")
             payload = {"chat_id": chat, "text": "\n".join(lines)}
-            if e.get("id"):     # A3 按鈕即日誌 — 判讀落 cancel_eyeball_log
+            if e.get("id"):     # 行動鍵 (zoom/deep/star/dismiss)
                 payload["reply_markup"] = json.dumps(
-                    verdict_keyboard("pb", int(e["id"])))
+                    action_keyboard("pb", int(e["id"])))
+            msg_id = None
             try:
                 resp = requests.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
                     data=payload, timeout=15)
                 ok = resp.status_code == 200
+                if ok:      # 存 message_id → 判定窗到期 reply 對答案
+                    try:
+                        msg_id = int(resp.json()["result"]["message_id"])
+                    except Exception:
+                        pass
             except Exception:
                 logger.exception("playbook alert send failed")
                 ok = False
             if ok:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "UPDATE cancel_playbook_events SET alerted=1 "
+                        "UPDATE cancel_playbook_events SET alerted=1, "
+                        "tg_message_id=COALESCE(%s, tg_message_id) "
                         "WHERE def_version=%s AND minute_start_ms=%s "
                         "AND playbook=%s",
-                        (DEF_VERSION, e["minute_start_ms"], e["playbook"]))
+                        (msg_id, DEF_VERSION, e["minute_start_ms"],
+                         e["playbook"]))
                 conn.commit()
     finally:
         conn.close()
@@ -559,6 +578,86 @@ def backfill_outcomes() -> None:
         conn.close()
 
 
+def format_outcome_reply(e: dict, stats: tuple[int, float] | None) -> str:
+    """「對答案」reply 文字 (2026-07-20)：事件結果 + 劇本滾動戰績。"""
+    t = (pd.Timestamp(int(e["minute_start_ms"]), unit="ms")
+         + pd.Timedelta(hours=8)).strftime("%m-%d %H:%M")
+    px = f"{e['px']:,.0f}" if e.get("px") else "?"
+    head = (f"↩️ 對答案: {ZH.get(e['playbook'], e['playbook'])}→"
+            f"{DIR_ZH.get(e['direction'], e['direction'])} @ {px}（{t}）")
+    parts = []
+    if e.get("fwd_ret_60m") is not None:
+        hit = e.get("hit_60m")
+        mark = " ✅ 命中" if hit == 1 else (" ❌ 未中" if hit == 0 else "")
+        parts.append(f"60m {e['fwd_ret_60m']:+.2%}{mark}")
+    if e.get("fwd_ret_120m") is not None:
+        parts.append(f"120m {e['fwd_ret_120m']:+.2%}")
+    lines = [head,
+             "之後走勢: " + (" · ".join(parts) if parts else "資料不足")]
+    if stats:
+        n, wr = stats
+        lines.append(f"{ZH.get(e['playbook'], e['playbook'])} "
+                     f"近 {n} 筆命中率 {wr:.0%}")
+    lines.append("(研究對照 · 勿作交易依據)")
+    return "\n".join(lines)
+
+
+def reply_outcomes() -> None:
+    """判定窗回填完成 → reply 原告警卡「對答案」(2026-07-20)。
+
+    只處理有推播過的事件（tg_message_id 非空）。送達或 4xx（卡片被刪等
+    永久失敗）都標 outcome_replied，網路錯誤留給下一輪重試。"""
+    token, chat = _tg_creds()
+    if not token or not chat:
+        return
+    conn = get_db_conn()
+    try:
+        due = _q(conn, "SELECT id, playbook, direction, px, minute_start_ms, "
+                       "fwd_ret_60m, fwd_ret_120m, hit_60m, tg_message_id "
+                       "FROM cancel_playbook_events "
+                       "WHERE outcome_replied=0 AND tg_message_id IS NOT NULL "
+                       "AND fwd_ret_120m IS NOT NULL LIMIT 10")
+        if due.empty:
+            return
+        for _, r in due.iterrows():
+            e = {k: (None if pd.isna(v) else v) for k, v in r.items()}
+            for k in ("px", "fwd_ret_60m", "fwd_ret_120m"):
+                e[k] = None if e[k] is None else float(e[k])
+            e["hit_60m"] = None if e["hit_60m"] is None else int(e["hit_60m"])
+            stats = None
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) n, AVG(hit_60m) wr FROM ("
+                    "SELECT hit_60m FROM cancel_playbook_events "
+                    "WHERE playbook=%s AND hit_60m IS NOT NULL "
+                    "ORDER BY minute_start_ms DESC LIMIT 30) t",
+                    (e["playbook"],))
+                s = cur.fetchone()
+                if s and s["n"]:
+                    stats = (int(s["n"]), float(s["wr"]))
+            permanent = False
+            try:
+                resp = requests.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    data={"chat_id": chat,
+                          "text": format_outcome_reply(e, stats),
+                          "reply_to_message_id": int(e["tg_message_id"]),
+                          "allow_sending_without_reply": "true"},
+                    timeout=15)
+                permanent = (resp.status_code == 200
+                             or 400 <= resp.status_code < 500)
+            except Exception:
+                logger.exception("outcome reply send failed")
+            if permanent:
+                with conn.cursor() as cur:
+                    cur.execute("UPDATE cancel_playbook_events "
+                                "SET outcome_replied=1 WHERE id=%s",
+                                (int(e["id"]),))
+                conn.commit()
+    finally:
+        conn.close()
+
+
 # ── daemon loop ──────────────────────────────────────────────────────────────
 
 def watch_loop() -> None:
@@ -579,6 +678,7 @@ def watch_loop() -> None:
                 if minutes:
                     last_seen = max(minutes)
             backfill_outcomes()
+            reply_outcomes()
         except Exception:
             logger.exception("playbook watcher cycle failed")
         time.sleep(60)

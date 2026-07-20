@@ -2012,6 +2012,74 @@ def _handle_eyeball_verdict(chat_id: str, cb_data: str, message_id=None,
         say(f"❌ 判讀落表失敗: {e}")
 
 
+def _handle_cancel_action(chat_id: str, cb_data: str, message_id=None,
+                          api: str = None):
+    """行動鍵 (2026-07-20，取代四鍵判讀): cfa|{src}|{id}|{action}。
+
+    zoom=事件窗互動覆盤圖連結 deep=90m 五步摘要
+    star=收藏（cancel_eyeball_log verdict='star'，回填照舊）
+    dismiss=收鍵盤。舊 ceb| 判讀處理器保留給歷史卡片。"""
+    def say(t):
+        try:
+            requests.post(f"{api or API_URL}/sendMessage",
+                          data={"chat_id": chat_id, "text": t}, timeout=10)
+        except Exception:
+            pass
+    try:
+        parts = cb_data.split("|")
+        if len(parts) != 4:
+            return
+        _, src, sid_s, action = parts
+        if (src not in ("tv", "pb")
+                or action not in ("zoom", "deep", "star", "dismiss")):
+            return
+        sid = int(sid_s)
+        if action == "dismiss":
+            _remove_inline_buttons(chat_id, message_id, api)
+            return
+        if action == "deep":
+            _handle_cancel_analyze(chat_id, 90, api)
+            return
+        event_ms = state = direction = None
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                if src == "tv":
+                    cur.execute("SELECT received_ms ms, state, "
+                                "liquidity_side d FROM tv_alert_events "
+                                "WHERE id=%s", (sid,))
+                else:
+                    cur.execute("SELECT minute_start_ms ms, playbook state, "
+                                "direction d FROM cancel_playbook_events "
+                                "WHERE id=%s", (sid,))
+                r = cur.fetchone()
+                if not r:
+                    say(f"❌ 找不到事件 ({src}#{sid})")
+                    return
+                event_ms = int(r["ms"])
+                state, direction = r.get("state"), r.get("d")
+                if action == "star":
+                    cur.execute(
+                        "INSERT IGNORE INTO cancel_eyeball_log "
+                        "(source, source_id, event_ms, card_state, "
+                        " card_direction, verdict, verdict_ms) "
+                        "VALUES (%s,%s,%s,%s,%s,'star',%s)",
+                        (src, sid, event_ms, state, direction or None,
+                         int(time.time() * 1000)))
+                    conn.commit()
+        finally:
+            conn.close()
+        if action == "star":
+            say(f"⭐ 已收藏 {src}#{sid}（判定窗到期自動回填結果）")
+            return
+        # zoom: 互動覆盤圖，視窗涵蓋事件時刻（事件越久遠窗開越大）
+        age_h = max(0.0, (time.time() * 1000 - event_ms) / 3_600_000)
+        _handle_cancel_flow(chat_id, max(2, int(age_h) + 2), api)
+    except Exception as e:
+        logger.exception("cancel action error: %s", e)
+        say(f"❌ 行動鍵失敗: {e}")
+
+
 # ── 撤單流獨立 bot webhook（2026-07-19，設 CANCEL_TG_BOT_TOKEN 才註冊）──
 CANCEL_TG_TOKEN = os.getenv("CANCEL_TG_BOT_TOKEN", "").strip()
 if CANCEL_TG_TOKEN:
@@ -2031,7 +2099,9 @@ if CANCEL_TG_TOKEN:
                          "/cancelstate [m] - 六態狀態一行\n"
                          "/cancelanalyze [m] - 五步摘要\n\n"
                          "事件卡自動推送：watcher 劇本 + TV 快訊"
-                         "（sweep 二段式+H-R 旗標）；四鍵=前瞻判讀落表"),
+                         "（sweep 二段式+H-R 旗標）\n"
+                         "卡片按鈕：特寫圖/90m深入/收藏/忽略；"
+                         "判定窗到期自動回覆「對答案」"),
                 "reply_markup": json.dumps(kb)}, timeout=15)
         except Exception:
             logger.exception("cancel menu send failed")
@@ -2058,6 +2128,11 @@ if CANCEL_TG_TOKEN:
                 if cb_data.startswith("ceb|"):
                     threading.Thread(
                         target=_handle_eyeball_verdict,
+                        args=(cb_chat, cb_data, mid, _CANCEL_API),
+                        daemon=True).start()
+                elif cb_data.startswith("cfa|"):
+                    threading.Thread(
+                        target=_handle_cancel_action,
                         args=(cb_chat, cb_data, mid, _CANCEL_API),
                         daemon=True).start()
                 elif cb_data == "cf_chart":

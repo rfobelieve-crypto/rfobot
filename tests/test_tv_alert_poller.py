@@ -2,10 +2,11 @@
 import numpy as np
 import pandas as pd
 
-from market_data.tasks.cancel_playbook_watcher import verdict_keyboard
+from market_data.tasks.cancel_playbook_watcher import (
+    action_keyboard, format_outcome_reply)
 from market_data.tasks.tv_alert_poller import (
-    format_card, format_stage1_card, format_stage2_card, hr_flags,
-    state_distribution)
+    format_card, format_stage1_card, format_stage2_card,
+    format_tv_outcome_reply, hr_flags, state_distribution)
 
 
 def feat_row(**kw) -> pd.Series:
@@ -108,17 +109,51 @@ class TestHumanize:
         assert humanize_book() == "掛單資料不足"
 
 
-class TestVerdictKeyboard:
+class TestActionKeyboard:
+    """行動鍵 (2026-07-20) — 判讀鍵退役, 按鈕改成給工具。"""
+
     def test_four_buttons_and_callback_format(self):
-        kb = verdict_keyboard("tv", 123456)
+        kb = action_keyboard("tv", 123456)
         flat = [b for row_ in kb["inline_keyboard"] for b in row_]
         assert len(flat) == 4
         datas = [b["callback_data"] for b in flat]
-        assert datas[0] == "ceb|tv|123456|up"
+        assert datas[0] == "cfa|tv|123456|zoom"
         assert {d.split("|")[3] for d in datas} == {
-            "up", "down", "unsure", "skip"}
+            "zoom", "deep", "star", "dismiss"}
         # Telegram callback_data hard limit
         assert all(len(d.encode()) <= 64 for d in datas)
+
+
+class TestOutcomeReply:
+    """對答案 reply (2026-07-20) — 純格式函數。"""
+
+    def test_playbook_hit_with_stats(self):
+        e = dict(playbook="absorption", direction="UP", px=64400.05,
+                 minute_start_ms=1789000000000, fwd_ret_60m=0.0042,
+                 fwd_ret_120m=0.0031, hit_60m=1)
+        t = format_outcome_reply(e, (20, 0.45))
+        assert "對答案" in t and "吸收" in t and "偏漲" in t
+        assert "60m +0.42% ✅ 命中" in t and "120m +0.31%" in t
+        assert "近 20 筆命中率 45%" in t and "勿作交易依據" in t
+
+    def test_playbook_miss_no_stats(self):
+        e = dict(playbook="true_break", direction="DOWN", px=64333.0,
+                 minute_start_ms=1789000000000, fwd_ret_60m=0.0062,
+                 fwd_ret_120m=None, hit_60m=0)
+        t = format_outcome_reply(e, None)
+        assert "❌ 未中" in t and "120m" not in t and "命中率" not in t
+
+    def test_tv_reply_returns_only(self):
+        row = dict(received_ms=1789000000000, event="H4_resistance",
+                   fwd_ret_30m=-0.001, fwd_ret_60m=0.002, fwd_ret_120m=0.005)
+        t = format_tv_outcome_reply(row)
+        assert "H4_resistance" in t
+        assert "30m -0.10%" in t and "60m +0.20%" in t and "120m +0.50%" in t
+
+    def test_tv_reply_missing_data(self):
+        row = dict(received_ms=1789000000000, event="",
+                   fwd_ret_30m=None, fwd_ret_60m=None, fwd_ret_120m=None)
+        assert "資料不足" in format_tv_outcome_reply(row)
 
 
 class TestStageCards:
