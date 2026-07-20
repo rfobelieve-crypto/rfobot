@@ -276,22 +276,17 @@ def outcome_watchdog(get_db_conn_func, send_message_func, chat_id: str):
                 except Exception as e:
                     logger.exception("Failed to save tracker: %s", e)
 
-                # 存入 buffer，供主程式 event_watchdog 合併通知
+                # 2026-07-20: Telegram 通知已移除（跟撤單流 bot 的事件卡
+                # 重複，使用者反饋 V7 bot 不該再講這件事）。DB 寫入
+                # （sweep_outcomes，上面 _save_to_db 已完成）不受影響——
+                # 這是 liquidity_events/sweep_outcomes 研究資料源，照舊累積。
+                # buffer 保留給 get_latest_finished_summary() 的既有呼叫者，
+                # 但不再有任何路徑把它送進 Telegram。
                 summary = format_tracker_summary(tracker)
                 with _finished_summaries_lock:
                     _finished_summaries.append(summary)
-
-                # 若主程式的 delta 追蹤沒跑（被 skip 的情況），自己發
-                # 主程式會透過 get_latest_finished_summary() 取走，
-                # 5 秒後還沒被取走就自己發
-                def _fallback_send(msg=summary):
-                    time.sleep(5)
-                    with _finished_summaries_lock:
-                        if msg in _finished_summaries:
-                            _finished_summaries.remove(msg)
-                            send_message_func(chat_id, msg)
-
-                threading.Thread(target=_fallback_send, daemon=True).start()
+                logger.info("Sweep tracker finished (notification suppressed): %s",
+                            tracker["event_uuid"][:8])
 
             time.sleep(2)
 
@@ -328,11 +323,10 @@ def check_interim_notifications(send_message_func, chat_id: str):
                         notified_15m.add(uid)
 
             for tracker in to_notify:
-                try:
-                    msg = format_15m_interim(tracker)
-                    send_message_func(chat_id, msg)
-                except Exception as e:
-                    logger.exception("Failed to send 15m interim: %s", e)
+                # 2026-07-20: Telegram 通知已移除（同上，DB 追蹤不受影響——
+                # 這個中途通知本來就不寫 DB，純顯示層）。
+                logger.info("Sweep tracker 15m interim (notification "
+                            "suppressed): %s", tracker["event_uuid"][:8])
 
             time.sleep(2)
 

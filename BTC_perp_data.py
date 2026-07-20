@@ -13,7 +13,6 @@ from flask import Flask, request
 from datetime import datetime, timedelta, timezone
 
 import outcome_tracker
-from market_data.query.flow_context import get_event_flow_context, format_flow_context
 from market_data.query.snapshot_query import (
     get_latest_snapshots, get_snapshots_by_uuid,
     get_latest_scores, get_event_history, get_pending_snapshot_count,
@@ -1212,25 +1211,14 @@ def event_watchdog():
                 except Exception as reg_err:
                     logger.exception("update_event_registry error: %s", reg_err)
 
-                # 合併 delta 結果 + sweep tracker 結果
-                summary = generate_event_summary(finished_event)
-                sweep_report = outcome_tracker.get_latest_finished_summary()
-                if sweep_report:
-                    summary += "\n" + "─" * 30 + "\n" + sweep_report
-
-                # Attach event-period market flow context (OKX+Binance)
-                try:
-                    obs_minutes = finished_event["observation_seconds"] // 60
-                    event_ctx = get_event_flow_context(
-                        "BTC-USD", finished_event["trigger_ts"], obs_minutes
-                    )
-                    summary += "\n" + "─" * 30 + "\n"
-                    summary += format_flow_context(event_ctx, title=f"事件期間 {obs_minutes}m 市場流")
-                except Exception as flow_err:
-                    logger.warning("Failed to get event flow context: %s", flow_err)
-
-                send_message(CHAT_ID, summary)
-                logger.info("Event finished: %s", finished_event["event_uuid"])
+                # 2026-07-20: 合併通知（delta + sweep tracker + 市場流）已
+                # 移除——跟撤單流 bot 的事件卡重複。save_event_to_db /
+                # update_event_registry（上面已跑完）不受影響，liquidity_events
+                # 照舊累積；outcome_tracker.get_latest_finished_summary() 的
+                # buffer 也還在跑（sweep_outcomes 寫入不受影響），只是不再有
+                # 任何路徑把摘要文字送進 Telegram。
+                logger.info("Event finished (notification suppressed): %s",
+                            finished_event["event_uuid"])
 
             time.sleep(2)
 
