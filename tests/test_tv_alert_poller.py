@@ -35,7 +35,7 @@ class TestFormatCard:
 
     def test_contains_level_state_and_window(self):
         card = format_card(self.ROW, VUP, feat_row(), "平靜88 · 向上真空2", 90)
-        assert "H4_resistance" in card and "(sell·下方流動性)" in card
+        assert "H4_resistance" in card and "(sell·賣方流動性·低點)" in card
         assert "118,250" in card
         assert "🟢 向上真空" in card and "偏漲" in card
         assert "發生了什麼:" in card and "掛單面:" in card   # 白話翻譯層

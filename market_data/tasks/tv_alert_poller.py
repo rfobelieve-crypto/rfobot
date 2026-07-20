@@ -164,13 +164,14 @@ def hr_flags(seg: pd.DataFrame, side: str) -> dict:
 
 
 def _side_zh(side: str) -> str:
-    """liquidity_side → 白話（buy=BSL 上方 / sell=SSL 下方；? = 推斷）。"""
+    """liquidity_side → 白話（2026-07-20 使用者定名：buy=BSL=買方流動性·高點
+    / sell=SSL=賣方流動性·低點；? = 推斷）。"""
     s = side.rstrip("?")
     guess = "·推斷" if side.endswith("?") else ""
     if s == "buy":
-        return f"上方流動性{guess}"
+        return f"買方流動性·高點{guess}"
     if s == "sell":
-        return f"下方流動性{guess}"
+        return f"賣方流動性·低點{guess}"
     return ""
 
 
