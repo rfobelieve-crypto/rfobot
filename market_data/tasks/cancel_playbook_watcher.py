@@ -78,6 +78,43 @@ ZH = {"absorption": "吸收", "true_break": "真破", "vacuum": "真空",
 PLAYBOOK_CALL_ZH = {"absorption": "反轉", "true_break": "順勢延續",
                     "vacuum": "順勢延續"}
 
+# ── first-hit-wins 平行診斷（FROZEN v1，2026-07-21，凍結於任何結果被看到
+# 之前）────────────────────────────────────────────────────────────────────
+# 動機：固定時間點(60m/120m)的正負號判斷，會把「方向對但慢」跟「方向真的
+# 錯」混成同一種「錯」——今晚實測過(21:47-21:53 那串真破 60m 全錯、120m
+# 全部翻正 +1.0%~+1.6%)。first-hit-wins 改成「逐分鐘看哪個價位先被碰到」，
+# 不受任意時間切片影響。門檻沿用 outcome_tracker.py 既有的 ±0.5%（非新造
+# 數字），觀察窗沿用既有 120 分鐘（不新開時間跨度）。這是跟固定時間點指標
+# 並行的新診斷，不取代它——F1/F1b/hit_60m 的判決仍然用固定時間點的尺，
+# 因為那才是跟 walk-forward IC 方法論一致、防止時間窗口 p-hacking 的量法。
+FIRST_HIT_THRESHOLD = 0.005    # ±0.5%，沿用 outcome_tracker.py 既有門檻
+
+
+def first_hit_verdict(entry_px: float, direction: str,
+                      fwd_mids: list[float]) -> str | None:
+    """逐分鐘掃 fwd_mids（觸發後、依時間排序），先碰目標價=hit，先碰反向價
+    =miss，都沒碰到=unresolved。direction 不是 UP/DOWN 或無資料 → None
+    （不適用，不硬判）。"""
+    if direction not in ("UP", "DOWN") or not fwd_mids:
+        return None
+    if direction == "UP":
+        target = entry_px * (1 + FIRST_HIT_THRESHOLD)
+        opposite = entry_px * (1 - FIRST_HIT_THRESHOLD)
+    else:
+        target = entry_px * (1 - FIRST_HIT_THRESHOLD)
+        opposite = entry_px * (1 + FIRST_HIT_THRESHOLD)
+    for mid in fwd_mids:
+        reached_target = (mid >= target) if direction == "UP" else (mid <= target)
+        reached_opposite = (mid <= opposite) if direction == "UP" else (mid >= opposite)
+        if reached_target:
+            return "hit"
+        if reached_opposite:
+            return "miss"
+    return "unresolved"
+
+
+FIRST_HIT_ZH = {"hit": "✅ 對了", "miss": "❌ 錯了", "unresolved": "⏳ 未定"}
+
 
 # ── schema ───────────────────────────────────────────────────────────────────
 
@@ -109,6 +146,10 @@ def ensure_schema() -> None:
                 "ADD COLUMN tg_message_id BIGINT NULL",
                 "ALTER TABLE cancel_playbook_events "
                 "ADD COLUMN outcome_replied TINYINT NOT NULL DEFAULT 0",
+                # 2026-07-21: first-hit-wins 平行診斷（見 first_hit_verdict
+                # 凍結定義）— 不取代 fwd_ret_Xm/hit_60m，並行顯示用
+                "ALTER TABLE cancel_playbook_events "
+                "ADD COLUMN first_hit_result VARCHAR(12) NULL",
             ):
                 try:
                     cur.execute(ddl)
@@ -532,14 +573,18 @@ def alert_events(fresh: list[dict]) -> None:
 
 
 def backfill_outcomes() -> None:
-    """Fill fwd returns for events whose horizons have elapsed."""
+    """Fill fwd returns for events whose horizons have elapsed.
+
+    2026-07-21: SELECT 放寬成「fwd_ret_120m 或 first_hit_result 任一缺」，
+    讓已經跑完 120m 判定窗、但還沒有 first_hit_result 的舊事件也能被撈到
+    補算（一次性追平新加的並行診斷，不用另寫回填腳本）。"""
     now_ms = int(time.time() * 1000)
     conn = get_db_conn()
     try:
         due = _q(conn, "SELECT id, minute_start_ms ms, px, direction "
                        "FROM cancel_playbook_events "
-                       "WHERE fwd_ret_120m IS NULL AND px IS NOT NULL "
-                       "AND minute_start_ms <= %s",
+                       "WHERE (fwd_ret_120m IS NULL OR first_hit_result IS NULL) "
+                       "AND px IS NOT NULL AND minute_start_ms <= %s",
                  (now_ms - 31 * 60_000,))
         if due.empty:
             return
@@ -560,6 +605,7 @@ def backfill_outcomes() -> None:
                 m0 = int(r["ms"]) // 60_000
                 sets, vals = [], []
                 fwd60 = None
+                window_complete = False
                 for h in HORIZONS_MIN:
                     if now_ms < int(r["ms"]) + (h + 1) * 60_000:
                         continue
@@ -569,10 +615,22 @@ def backfill_outcomes() -> None:
                         vals.append(fwd)
                         if h == 60:
                             fwd60 = fwd
+                        if h == 120:
+                            window_complete = True
                 if fwd60 is not None and r["direction"] in ("UP", "DOWN"):
                     sets.append("hit_60m=%s")
                     vals.append(1 if (fwd60 > 0) == (r["direction"] == "UP")
                                 else 0)
+
+                # first-hit-wins 平行診斷（見上方凍結定義）
+                fwd_mids = mids.loc[(mids.index > m0)
+                                    & (mids.index <= m0 + 120)].tolist()
+                fh = first_hit_verdict(float(r["px"]), r["direction"], fwd_mids)
+                if fh in ("hit", "miss") or (fh == "unresolved"
+                                             and window_complete):
+                    sets.append("first_hit_result=%s")
+                    vals.append(fh)
+
                 if sets:
                     vals.append(int(r["id"]))
                     cur.execute("UPDATE cancel_playbook_events SET "
@@ -620,6 +678,12 @@ def format_outcome_reply(e: dict, stats: tuple[int, float] | None) -> str:
         parts.append(f"120m {e['fwd_ret_120m']:+.2%}"
                      + (f" {m120}" if m120 else ""))
     lines.append("之後走勢: " + (" · ".join(parts) if parts else "資料不足"))
+
+    fh = e.get("first_hit_result")
+    if fh in FIRST_HIT_ZH:
+        lines.append(f"先觸價判斷(±0.5%): {FIRST_HIT_ZH[fh]}"
+                     f"（另一把尺，見說明）")
+
     if stats:
         n, wr = stats
         lines.append(f"{ZH.get(e['playbook'], e['playbook'])} "
@@ -639,8 +703,8 @@ def reply_outcomes() -> None:
     conn = get_db_conn()
     try:
         due = _q(conn, "SELECT id, playbook, direction, px, minute_start_ms, "
-                       "fwd_ret_60m, fwd_ret_120m, hit_60m, tg_message_id "
-                       "FROM cancel_playbook_events "
+                       "fwd_ret_60m, fwd_ret_120m, hit_60m, first_hit_result, "
+                       "tg_message_id FROM cancel_playbook_events "
                        "WHERE outcome_replied=0 AND tg_message_id IS NOT NULL "
                        "AND fwd_ret_120m IS NOT NULL LIMIT 10")
         if due.empty:

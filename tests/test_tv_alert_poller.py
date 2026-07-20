@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 from market_data.tasks.cancel_playbook_watcher import (
-    action_keyboard, format_outcome_reply, verdict_mark)
+    action_keyboard, first_hit_verdict, format_outcome_reply, verdict_mark)
 from market_data.tasks.tv_alert_poller import (
     format_card, format_stage1_card, format_stage2_card,
     format_tv_outcome_reply, hr_call_direction, hr_flags, state_distribution)
@@ -160,6 +160,45 @@ class TestOutcomeReply:
         assert verdict_mark("UP", -0.01) == "❌ 錯了"
         assert verdict_mark("DOWN", -0.01) == "✅ 對了"
 
+    def test_playbook_reply_shows_first_hit_line(self):
+        e = dict(playbook="true_break", direction="UP", px=64000.0,
+                 minute_start_ms=1789000000000, fwd_ret_60m=-0.001,
+                 fwd_ret_120m=0.012, hit_60m=0, first_hit_result="hit")
+        t = format_outcome_reply(e, None)
+        assert "先觸價判斷(±0.5%): ✅ 對了" in t
+
+    def test_playbook_reply_omits_first_hit_line_when_absent(self):
+        e = dict(playbook="true_break", direction="UP", px=64000.0,
+                 minute_start_ms=1789000000000, fwd_ret_60m=0.001,
+                 fwd_ret_120m=None, hit_60m=1, first_hit_result=None)
+        t = format_outcome_reply(e, None)
+        assert "先觸價判斷" not in t
+
+
+class TestFirstHitVerdict:
+    """FROZEN v1 (2026-07-21): ±0.5% 門檻沿用 outcome_tracker.py 既有值，
+    120 分鐘窗沿用既有 fwd_ret_120m 窗口——並行診斷，不取代固定時間點指標。"""
+
+    def test_up_hits_target_first(self):
+        mids = [64100, 64200, 64350]   # entry 64000, target 64320(+0.5%)
+        assert first_hit_verdict(64000.0, "UP", mids) == "hit"
+
+    def test_up_hits_opposite_first(self):
+        mids = [63900, 63680, 64500]   # opposite 63680(-0.5%) 先於 target
+        assert first_hit_verdict(64000.0, "UP", mids) == "miss"
+
+    def test_down_mirrors(self):
+        assert first_hit_verdict(64000.0, "DOWN", [63900, 63670]) == "hit"
+        assert first_hit_verdict(64000.0, "DOWN", [64100, 64330]) == "miss"
+
+    def test_neither_touched_is_unresolved(self):
+        assert first_hit_verdict(64000.0, "UP", [64050, 64100, 63980]) \
+            == "unresolved"
+
+    def test_none_direction_or_empty_mids(self):
+        assert first_hit_verdict(64000.0, "NONE", [64500]) is None
+        assert first_hit_verdict(64000.0, "UP", []) is None
+
     def test_tv_reply_returns_only(self):
         row = dict(received_ms=1789000000000, event="H4_resistance",
                    fwd_ret_30m=-0.001, fwd_ret_60m=0.002, fwd_ret_120m=0.005)
@@ -210,6 +249,21 @@ class TestOutcomeReply:
                    fwd_ret_30m=None, fwd_ret_60m=0.002, fwd_ret_120m=None)
         t = format_tv_outcome_reply(row)
         assert "判讀結果: ❌ 錯了（以 60m 為準）" in t
+
+    def test_tv_reply_shows_first_hit_line(self):
+        row = dict(received_ms=1789000000000, event="BSL_65058",
+                   liquidity_side="buy", hr_verdict="continuation",
+                   fwd_ret_30m=0.001, fwd_ret_60m=-0.001, fwd_ret_120m=0.02,
+                   first_hit_result="hit")
+        t = format_tv_outcome_reply(row)
+        assert "先觸價判斷(±0.5%): ✅ 對了" in t
+
+    def test_tv_reply_omits_first_hit_line_when_absent(self):
+        row = dict(received_ms=1789000000000, event="H4_resistance",
+                   fwd_ret_30m=0.001, fwd_ret_60m=None, fwd_ret_120m=None,
+                   first_hit_result=None)
+        t = format_tv_outcome_reply(row)
+        assert "先觸價判斷" not in t
 
 
 class TestHrCallDirection:

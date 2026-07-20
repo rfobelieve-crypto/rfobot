@@ -34,9 +34,9 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.db import get_db_conn
 from market_data.tasks.cancel_playbook_watcher import (
-    DEF_VERSION, DIR_ZH, GATE_SHOCK, STATE_META, _tg_creds, action_keyboard,
-    classify_state, compute_features, humanize_book, humanize_story,
-    load_frame, state_color, verdict_mark)
+    DEF_VERSION, DIR_ZH, FIRST_HIT_ZH, GATE_SHOCK, STATE_META, _tg_creds,
+    action_keyboard, classify_state, compute_features, first_hit_verdict,
+    humanize_book, humanize_story, load_frame, state_color, verdict_mark)
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,10 @@ def ensure_schema() -> None:
                 # 對答案 reply 引用「這張卡當初判的是什麼」
                 "ALTER TABLE tv_alert_events "
                 "ADD COLUMN hr_verdict VARCHAR(12) NULL",
+                # 2026-07-21: first-hit-wins 平行診斷（見 cancel_playbook_
+                # watcher.first_hit_verdict 凍結定義）
+                "ALTER TABLE tv_alert_events "
+                "ADD COLUMN first_hit_result VARCHAR(12) NULL",
             ):
                 try:
                     cur.execute(ddl)
@@ -641,13 +645,20 @@ def backfill_eyeball() -> None:
 
 
 def backfill_outcomes_tv() -> None:
-    """Fill fwd mid returns for processed alerts past the 120m 判定窗."""
+    """Fill fwd mid returns for processed alerts past the 120m 判定窗.
+
+    2026-07-21: SELECT 放寬成「outcome_done=0 或 first_hit_result 缺」，
+    讓已完成判定窗的舊事件（含今天早一點的 sweep 事件）也能被撈回來補算
+    first-hit-wins 平行診斷（見 cancel_playbook_watcher.first_hit_verdict
+    凍結定義），不用另寫一次性回填腳本。只有帶 hr_verdict 的 sweep 事件才
+    有方向可判；純關卡快訊維持 first_hit_result 空白。"""
     now_ms = int(time.time() * 1000)
     conn = get_db_conn()
     try:
-        due = _q(conn, "SELECT id, received_ms ms, price "
-                       "FROM tv_alert_events WHERE processed=1 "
-                       "AND outcome_done=0 AND state NOT IN ('expired','no_data') "
+        due = _q(conn, "SELECT id, received_ms ms, price, liquidity_side, "
+                       "hr_verdict FROM tv_alert_events WHERE processed=1 "
+                       "AND (outcome_done=0 OR first_hit_result IS NULL) "
+                       "AND state NOT IN ('expired','no_data') "
                        "AND received_ms <= %s",
                  (now_ms - (HORIZONS_MIN[-1] + 1) * 60_000,))
         if due.empty:
@@ -678,6 +689,18 @@ def backfill_outcomes_tv() -> None:
                         sets.append(f"fwd_ret_{h}m=%s")
                         vals.append(float(mids.loc[m0 + h] / base - 1))
                 sets.append("outcome_done=1")
+
+                verdict = r.get("hr_verdict")
+                if verdict in ("reversal", "continuation"):
+                    d = hr_call_direction(str(r.get("liquidity_side") or ""),
+                                          verdict)
+                    fwd_mids = mids.loc[(mids.index > m0)
+                                        & (mids.index <= m0 + 120)].tolist()
+                    fh = first_hit_verdict(float(base), d, fwd_mids)
+                    if fh:
+                        sets.append("first_hit_result=%s")
+                        vals.append(fh)
+
                 vals.append(int(r["id"]))
                 cur.execute("UPDATE tv_alert_events SET " + ", ".join(sets)
                             + " WHERE id=%s", vals)
@@ -728,6 +751,11 @@ def format_tv_outcome_reply(row: dict) -> str:
             lines.append(f"判讀結果: {m60 or m120}"
                          f"{'（以 60m 為準）' if m60 else '（以 120m 為準）'}")
     lines.append("之後走勢: " + (" · ".join(parts) if parts else "資料不足"))
+
+    fh = row.get("first_hit_result")
+    if fh in FIRST_HIT_ZH:
+        lines.append(f"先觸價判斷(±0.5%): {FIRST_HIT_ZH[fh]}（另一把尺，見說明）")
+
     lines.append("(研究對照 · 勿作交易依據)")
     return "\n".join(lines)
 
@@ -740,8 +768,9 @@ def reply_outcomes_tv() -> None:
     conn = get_db_conn()
     try:
         due = _q(conn, "SELECT id, received_ms, event, liquidity_side, "
-                       "hr_verdict, fwd_ret_30m, fwd_ret_60m, fwd_ret_120m, "
-                       "tg_message_id FROM tv_alert_events "
+                       "hr_verdict, first_hit_result, fwd_ret_30m, "
+                       "fwd_ret_60m, fwd_ret_120m, tg_message_id "
+                       "FROM tv_alert_events "
                        "WHERE outcome_done=1 AND outcome_replied=0 "
                        "AND tg_message_id IS NOT NULL AND tg_message_id > 0 "
                        "LIMIT 10")
