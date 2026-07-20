@@ -357,7 +357,17 @@ def render_zoom_png(recv_ms: int, window: int, level_px: float | None,
 
 
 def process_new(send: bool = True) -> int:
-    """Handle unprocessed alerts whose trigger minute has closed."""
+    """Handle unprocessed alerts whose trigger minute has closed.
+
+    2026-07-20 修復重複發送 bug：寫入順序改成「先標記 processed=1 完成，
+    DB 寫入成功才送 Telegram」。舊版先送訊息、最後才 UPDATE processed=1，
+    若那次 DB 寫入失敗（連線問題/逾時），下一輪 poll（每 60s）的 SELECT
+    WHERE processed=0 會再次撈到同一筆、重新送一次——理論上會一路重送到
+    MAX_AGE_MIN。已用 process_stage2 的同款 bug 實測證實過（tv_alert_events
+    某筆 stage2_done 從未寫成功，卡片卻在 16、21 分鐘各送一次）。寧可偶爾
+    因 send 失敗漏發一次，也不要無限重複轟炸。每列包 try/except，一列
+    出錯不影響同批其他列。
+    """
     now_ms = int(time.time() * 1000)
     closed_floor = (now_ms // 60_000) * 60_000     # current minute start
     conn = get_db_conn()
@@ -374,90 +384,108 @@ def process_new(send: bool = True) -> int:
 
     done = 0
     for _, r in rows.iterrows():
-        row = r.to_dict()
-        rid = int(row["id"])
-        recv_ms = int(row["received_ms"])
-        age_min = (now_ms - recv_ms) / 60_000
-        window = int(row["window_mins"] or 90)
-        result_state, card, win_feat = "no_data", None, None
-
-        if age_min > MAX_AGE_MIN:
-            result_state = "expired"
-        else:
-            df = load_frame(lookback_min=int(window + 90 + age_min))
-            if not df.empty:
-                feat = compute_features(df)
-                trig_min = recv_ms // 60_000
-                win = feat.loc[(feat.index > trig_min - window)
-                               & (feat.index <= trig_min)]
-                if not win.empty:
-                    win_feat = win
-                    states = [classify_state(x) for _, x in win.iterrows()]
-                    cur_state = states[-1]
-                    result_state = cur_state["state"]
-                    card = format_card(row, cur_state, win.iloc[-1],
-                                       state_distribution(states), len(win))
-            if result_state == "no_data" and age_min < NO_DATA_GRACE_MIN:
-                continue          # collector may just be lagging — retry
-
-        if card and send:
-            side = str(row.get("liquidity_side") or "").strip()
-            # 2026-07-18 使用者定版: 快訊價位即其標記的獵取位 → 無 side 但
-            # 有價格一律視為 sweep, 方向由「觸發價 vs 觸發前 mid」推斷,
-            # 存 buy?/sell?(與明示聲明可分層), 同走二段式+H-R 旗標
-            if (side not in ("buy", "sell") and row.get("price")
-                    and win_feat is not None
-                    and win_feat["mid"].notna().any()):
-                try:
-                    mids = win_feat["mid"].dropna()
-                    ref = float(mids.iloc[-6] if len(mids) >= 6
-                                else mids.iloc[0])
-                    side = ("buy" if float(row["price"]) >= ref
-                            else "sell") + "?"
-                    row["liquidity_side"] = side
-                    conn = get_db_conn()
-                    try:
-                        with conn.cursor() as cur2:
-                            cur2.execute("UPDATE tv_alert_events SET "
-                                         "liquidity_side=%s WHERE id=%s",
-                                         (side, rid))
-                        conn.commit()
-                    finally:
-                        conn.close()
-                except (TypeError, ValueError):
-                    side = ""
-            if side.rstrip("?") in ("buy", "sell"):
-                # sweep 二段式第 1 段: 只報事實+特寫圖, 無按鈕 —
-                # 行動鍵在第 2 段 (process_stage2, 塵埃落定後)
-                stage1 = format_stage1_card(row)
-                png = None
-                if win_feat is not None:
-                    try:
-                        px = float(row["price"]) if row.get("price") else None
-                    except (TypeError, ValueError):
-                        px = None
-                    png = render_zoom_png(recv_ms, window, px, win_feat)
-                sent_mid = _send_tg_photo(stage1, png) if png else None
-                if sent_mid is None:
-                    sent_mid = _send_tg(stage1)
-            else:
-                # 純關卡快訊: 單段卡 + 行動鍵
-                sent_mid = _send_tg(card, action_keyboard("tv", rid))
-        else:
-            sent_mid = None
-
-        conn = get_db_conn()
         try:
-            with conn.cursor() as cur2:
-                cur2.execute(
-                    "UPDATE tv_alert_events SET processed=1, state=%s, "
-                    "tg_message_id=COALESCE(%s, tg_message_id) "
-                    "WHERE id=%s",
-                    (result_state, sent_mid if sent_mid else None, rid))
-            conn.commit()
-        finally:
-            conn.close()
-        done += 1
+            row = r.to_dict()
+            rid = int(row["id"])
+            recv_ms = int(row["received_ms"])
+            age_min = (now_ms - recv_ms) / 60_000
+            window = int(row["window_mins"] or 90)
+            result_state, card, win_feat = "no_data", None, None
+
+            if age_min > MAX_AGE_MIN:
+                result_state = "expired"
+            else:
+                df = load_frame(lookback_min=int(window + 90 + age_min))
+                if not df.empty:
+                    feat = compute_features(df)
+                    trig_min = recv_ms // 60_000
+                    win = feat.loc[(feat.index > trig_min - window)
+                                   & (feat.index <= trig_min)]
+                    if not win.empty:
+                        win_feat = win
+                        states = [classify_state(x) for _, x in win.iterrows()]
+                        cur_state = states[-1]
+                        result_state = cur_state["state"]
+                        card = format_card(row, cur_state, win.iloc[-1],
+                                           state_distribution(states), len(win))
+                if result_state == "no_data" and age_min < NO_DATA_GRACE_MIN:
+                    continue      # collector may just be lagging — retry
+
+            side = str(row.get("liquidity_side") or "").strip()
+            stage1, png, is_sweep = None, None, False
+            if card and send:
+                # 2026-07-18 使用者定版: 快訊價位即其標記的獵取位 → 無 side 但
+                # 有價格一律視為 sweep, 方向由「觸發價 vs 觸發前 mid」推斷,
+                # 存 buy?/sell?(與明示聲明可分層), 同走二段式+H-R 旗標
+                if (side not in ("buy", "sell") and row.get("price")
+                        and win_feat is not None
+                        and win_feat["mid"].notna().any()):
+                    try:
+                        mids = win_feat["mid"].dropna()
+                        ref = float(mids.iloc[-6] if len(mids) >= 6
+                                    else mids.iloc[0])
+                        side = ("buy" if float(row["price"]) >= ref
+                                else "sell") + "?"
+                        row["liquidity_side"] = side
+                        conn2 = get_db_conn()
+                        try:
+                            with conn2.cursor() as cur2:
+                                cur2.execute("UPDATE tv_alert_events SET "
+                                             "liquidity_side=%s WHERE id=%s",
+                                             (side, rid))
+                            conn2.commit()
+                        finally:
+                            conn2.close()
+                    except (TypeError, ValueError):
+                        side = ""
+                if side.rstrip("?") in ("buy", "sell"):
+                    # sweep 二段式第 1 段: 只報事實+特寫圖, 無按鈕 —
+                    # 行動鍵在第 2 段 (process_stage2, 塵埃落定後)
+                    is_sweep = True
+                    stage1 = format_stage1_card(row)
+                    if win_feat is not None:
+                        try:
+                            px = (float(row["price"])
+                                  if row.get("price") else None)
+                        except (TypeError, ValueError):
+                            px = None
+                        png = render_zoom_png(recv_ms, window, px, win_feat)
+
+            # 先寫 DB 標記完成，寫入成功才送訊息（見上方 docstring）
+            conn3 = get_db_conn()
+            try:
+                with conn3.cursor() as cur3:
+                    cur3.execute(
+                        "UPDATE tv_alert_events SET processed=1, state=%s "
+                        "WHERE id=%s", (result_state, rid))
+                conn3.commit()
+            finally:
+                conn3.close()
+
+            if card and send:
+                if is_sweep:
+                    sent_mid = _send_tg_photo(stage1, png) if png else None
+                    if sent_mid is None:
+                        sent_mid = _send_tg(stage1)
+                else:
+                    # 純關卡快訊: 單段卡 + 行動鍵
+                    sent_mid = _send_tg(card, action_keyboard("tv", rid))
+                if sent_mid:
+                    conn4 = get_db_conn()
+                    try:
+                        with conn4.cursor() as cur4:
+                            cur4.execute(
+                                "UPDATE tv_alert_events SET "
+                                "tg_message_id=COALESCE(%s, tg_message_id) "
+                                "WHERE id=%s", (sent_mid, rid))
+                        conn4.commit()
+                    finally:
+                        conn4.close()
+            done += 1
+        except Exception:
+            logger.exception("process_new failed for one row (id=%s), "
+                             "will retry next cycle", row.get("id")
+                             if isinstance(row, dict) else "?")
     return done
 
 
@@ -479,67 +507,90 @@ def process_stage2(send: bool = True) -> int:
 
     done = 0
     for _, r in rows.iterrows():
-        row = r.to_dict()
-        rid = int(row["id"])
-        recv_ms = int(row["received_ms"])
-        age_min = (now_ms - recv_ms) / 60_000
-        mark_done, card, kb, png, flags = False, None, None, None, None
+        try:
+            row = r.to_dict()
+            rid = int(row["id"])
+            recv_ms = int(row["received_ms"])
+            age_min = (now_ms - recv_ms) / 60_000
+            mark_done, card, kb, png, flags = False, None, None, None, None
 
-        if age_min > STAGE2_MAX_AGE:
-            mark_done = True                      # missed window (downtime)
-        else:
-            df = load_frame(lookback_min=int(age_min + 150))
-            if not df.empty:
-                feat = compute_features(df)
-                trig_min = recv_ms // 60_000
-                seg = feat.loc[feat.index > trig_min]
-                if not seg.empty:
-                    last = seg.iloc[-1]
-                    calmed = (np.isfinite(last["shock"])
-                              and last["shock"] < GATE_SHOCK
-                              and (not np.isfinite(last["vshock"])
-                                   or last["vshock"] < 3.0))
-                    if calmed or age_min >= STAGE2_FORCE_AGE:
-                        flags = hr_flags(
-                            seg, str(row["liquidity_side"]).rstrip("?"))
-                        card = format_stage2_card(
-                            row, flags, classify_state(last), len(seg), age_min)
-                        kb = action_keyboard("tv", rid)
-                        if send:
-                            try:
-                                px = (float(row["price"])
-                                      if row.get("price") else None)
-                            except (TypeError, ValueError):
-                                px = None
-                            png = render_zoom_png(
-                                recv_ms, int(row["window_mins"] or 90), px, seg)
-                        mark_done = True
-            if not mark_done and age_min >= STAGE2_FORCE_AGE + 5:
-                mark_done = True                  # depth data missing — give up
+            if age_min > STAGE2_MAX_AGE:
+                mark_done = True                  # missed window (downtime)
+            else:
+                df = load_frame(lookback_min=int(age_min + 150))
+                if not df.empty:
+                    feat = compute_features(df)
+                    trig_min = recv_ms // 60_000
+                    seg = feat.loc[feat.index > trig_min]
+                    if not seg.empty:
+                        last = seg.iloc[-1]
+                        calmed = (np.isfinite(last["shock"])
+                                  and last["shock"] < GATE_SHOCK
+                                  and (not np.isfinite(last["vshock"])
+                                       or last["vshock"] < 3.0))
+                        if calmed or age_min >= STAGE2_FORCE_AGE:
+                            flags = hr_flags(
+                                seg, str(row["liquidity_side"]).rstrip("?"))
+                            card = format_stage2_card(
+                                row, flags, classify_state(last), len(seg),
+                                age_min)
+                            kb = action_keyboard("tv", rid)
+                            if send:
+                                try:
+                                    px = (float(row["price"])
+                                          if row.get("price") else None)
+                                except (TypeError, ValueError):
+                                    px = None
+                                png = render_zoom_png(
+                                    recv_ms, int(row["window_mins"] or 90),
+                                    px, seg)
+                            mark_done = True
+                if not mark_done and age_min >= STAGE2_FORCE_AGE + 5:
+                    mark_done = True              # depth data missing — give up
 
-        sent_mid = None
-        if card and send:
-            sent_mid = _send_tg_photo(card, png, kb) if png else None
-            if sent_mid is None:
-                sent_mid = _send_tg(card, kb)
-        if mark_done:
+            if not mark_done:
+                continue      # 還在等塵埃落定，下一輪再檢查，不寫 DB 不送訊息
+
+            # 2026-07-20 修復重複發送 bug：這裡原本的 UPDATE 是 3 個 %s
+            # 佔位符但只傳 2 個參數（漏了 hr_verdict）——pymysql 每次執行
+            # 必定拋例外，導致 stage2_done 從來沒寫成功過，下一輪 poll 又
+            # 撈到同一筆重送一次（實測：同一事件 16 分鐘、21 分鐘各送一次）。
+            # 順便把寫入順序也反過來：先寫 DB 標記完成，成功才送訊息——
+            # DB 若再出問題，寧可漏發一次也不要無限重複轟炸。
             hr_verdict = ("reversal" if flags is not None and flags["reversal"]
                           else ("continuation" if flags is not None else None))
-            conn = get_db_conn()
+            conn2 = get_db_conn()
             try:
-                with conn.cursor() as cur2:
-                    # 第2段卡的 message_id 覆蓋第1段 → 對答案 reply 錨最新卡
-                    # hr_verdict 存這張卡當初判的是反轉還是延續，供對答案引用
+                with conn2.cursor() as cur2:
                     cur2.execute(
                         "UPDATE tv_alert_events SET stage2_done=1, "
-                        "tg_message_id=COALESCE(%s, tg_message_id), "
-                        "hr_verdict=COALESCE(%s, hr_verdict) "
-                        "WHERE id=%s",
-                        (sent_mid if sent_mid else None, rid))
-                conn.commit()
+                        "hr_verdict=COALESCE(%s, hr_verdict) WHERE id=%s",
+                        (hr_verdict, rid))
+                conn2.commit()
             finally:
-                conn.close()
+                conn2.close()
+
+            if card and send:
+                sent_mid = _send_tg_photo(card, png, kb) if png else None
+                if sent_mid is None:
+                    sent_mid = _send_tg(card, kb)
+                if sent_mid:
+                    # 第2段卡的 message_id 覆蓋第1段 → 對答案 reply 錨最新卡
+                    conn3 = get_db_conn()
+                    try:
+                        with conn3.cursor() as cur3:
+                            cur3.execute(
+                                "UPDATE tv_alert_events SET "
+                                "tg_message_id=COALESCE(%s, tg_message_id) "
+                                "WHERE id=%s", (sent_mid, rid))
+                        conn3.commit()
+                    finally:
+                        conn3.close()
             done += 1
+        except Exception:
+            logger.exception("process_stage2 failed for one row (id=%s), "
+                             "will retry next cycle", row.get("id")
+                             if isinstance(row, dict) else "?")
     return done
 
 
