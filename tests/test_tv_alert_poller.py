@@ -6,7 +6,7 @@ from market_data.tasks.cancel_playbook_watcher import (
     action_keyboard, format_outcome_reply)
 from market_data.tasks.tv_alert_poller import (
     format_card, format_stage1_card, format_stage2_card,
-    format_tv_outcome_reply, hr_flags, state_distribution)
+    format_tv_outcome_reply, hr_call_direction, hr_flags, state_distribution)
 
 
 def feat_row(**kw) -> pd.Series:
@@ -133,8 +133,16 @@ class TestOutcomeReply:
                  fwd_ret_120m=0.0031, hit_60m=1)
         t = format_outcome_reply(e, (20, 0.45))
         assert "對答案" in t and "吸收" in t and "偏漲" in t
+        assert "（反轉）" in t                          # 2026-07-20: 判讀類型標籤
         assert "60m +0.42% ✅ 命中" in t and "120m +0.31%" in t
         assert "近 20 筆命中率 45%" in t and "勿作交易依據" in t
+
+    def test_playbook_call_tag_true_break_is_continuation(self):
+        e = dict(playbook="true_break", direction="DOWN", px=64333.0,
+                 minute_start_ms=1789000000000, fwd_ret_60m=0.0062,
+                 fwd_ret_120m=None, hit_60m=0)
+        t = format_outcome_reply(e, None)
+        assert "真破（順勢延續）" in t
 
     def test_playbook_miss_no_stats(self):
         e = dict(playbook="true_break", direction="DOWN", px=64333.0,
@@ -154,6 +162,40 @@ class TestOutcomeReply:
         row = dict(received_ms=1789000000000, event="",
                    fwd_ret_30m=None, fwd_ret_60m=None, fwd_ret_120m=None)
         assert "資料不足" in format_tv_outcome_reply(row)
+
+    def test_tv_reply_no_verdict_omits_call_line(self):
+        # 純關卡快訊(無 side)或尚未進 stage2 者 hr_verdict 為 None
+        row = dict(received_ms=1789000000000, event="H4_resistance",
+                   fwd_ret_30m=0.001, fwd_ret_60m=0.002, fwd_ret_120m=0.003)
+        t = format_tv_outcome_reply(row)
+        assert "原始判讀" not in t
+
+    def test_tv_reply_reversal_verdict_shows_call(self):
+        row = dict(received_ms=1789000000000, event="BSL_65058",
+                   liquidity_side="buy", hr_verdict="reversal",
+                   fwd_ret_30m=-0.002, fwd_ret_60m=-0.003, fwd_ret_120m=None)
+        t = format_tv_outcome_reply(row)
+        assert "原始判讀: 反轉（預期 偏跌 🔴）" in t
+
+    def test_tv_reply_continuation_verdict_shows_call(self):
+        row = dict(received_ms=1789000000000, event="SSL_63800",
+                   liquidity_side="sell", hr_verdict="continuation",
+                   fwd_ret_30m=-0.002, fwd_ret_60m=None, fwd_ret_120m=None)
+        t = format_tv_outcome_reply(row)
+        assert "原始判讀: 延續（預期 偏跌 🔴）" in t
+
+
+class TestHrCallDirection:
+    def test_buy_side_mirrors(self):
+        assert hr_call_direction("buy", "reversal") == "DOWN"
+        assert hr_call_direction("buy", "continuation") == "UP"
+
+    def test_sell_side_mirrors(self):
+        assert hr_call_direction("sell", "reversal") == "UP"
+        assert hr_call_direction("sell", "continuation") == "DOWN"
+
+    def test_inferred_side_suffix_stripped(self):
+        assert hr_call_direction("buy?", "reversal") == "DOWN"
 
 
 class TestStageCards:

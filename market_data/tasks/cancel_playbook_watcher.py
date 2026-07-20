@@ -71,6 +71,12 @@ ALERT_MIN_VSHOCK = 20.0    # replay-sim 2026-07-16: ≈4.4 alerts/day
 ALERT_MIN_NET = 0.30
 ZH = {"absorption": "吸收", "true_break": "真破", "vacuum": "真空",
       "two_sided": "雙側避險", "gate_only": "純爆量"}
+# 2026-07-20: 每個劇本的判讀類型（反轉 vs 順勢延續），供對答案 reply 引用
+# 「這張卡當初判的是什麼」。定義沿用 classify_minute 頂部的凍結註解——
+# 吸收=反轉（賣壓被接走預期彈UP/買壓被接走預期彈DOWN）、真破=順勢延續、
+# 真空=阻力真空順勢延續，非新定義。
+PLAYBOOK_CALL_ZH = {"absorption": "反轉", "true_break": "順勢延續",
+                    "vacuum": "順勢延續"}
 
 
 # ── schema ───────────────────────────────────────────────────────────────────
@@ -583,7 +589,9 @@ def format_outcome_reply(e: dict, stats: tuple[int, float] | None) -> str:
     t = (pd.Timestamp(int(e["minute_start_ms"]), unit="ms")
          + pd.Timedelta(hours=8)).strftime("%m-%d %H:%M")
     px = f"{e['px']:,.0f}" if e.get("px") else "?"
-    head = (f"↩️ 對答案: {ZH.get(e['playbook'], e['playbook'])}→"
+    call = PLAYBOOK_CALL_ZH.get(e["playbook"])
+    call_tag = f"（{call}）" if call else ""
+    head = (f"↩️ 對答案: {ZH.get(e['playbook'], e['playbook'])}{call_tag}→"
             f"{DIR_ZH.get(e['direction'], e['direction'])} @ {px}（{t}）")
     parts = []
     if e.get("fwd_ret_60m") is not None:

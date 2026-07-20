@@ -84,6 +84,10 @@ def ensure_schema() -> None:
                 "ADD COLUMN tg_message_id BIGINT NULL",
                 "ALTER TABLE tv_alert_events "
                 "ADD COLUMN outcome_replied TINYINT NOT NULL DEFAULT 0",
+                # 2026-07-20: 存 sweep 第2段的 H-R 判讀（反轉/延續），供
+                # 對答案 reply 引用「這張卡當初判的是什麼」
+                "ALTER TABLE tv_alert_events "
+                "ADD COLUMN hr_verdict VARCHAR(12) NULL",
             ):
                 try:
                     cur.execute(ddl)
@@ -479,7 +483,7 @@ def process_stage2(send: bool = True) -> int:
         rid = int(row["id"])
         recv_ms = int(row["received_ms"])
         age_min = (now_ms - recv_ms) / 60_000
-        mark_done, card, kb, png = False, None, None, None
+        mark_done, card, kb, png, flags = False, None, None, None, None
 
         if age_min > STAGE2_MAX_AGE:
             mark_done = True                      # missed window (downtime)
@@ -519,13 +523,17 @@ def process_stage2(send: bool = True) -> int:
             if sent_mid is None:
                 sent_mid = _send_tg(card, kb)
         if mark_done:
+            hr_verdict = ("reversal" if flags is not None and flags["reversal"]
+                          else ("continuation" if flags is not None else None))
             conn = get_db_conn()
             try:
                 with conn.cursor() as cur2:
                     # 第2段卡的 message_id 覆蓋第1段 → 對答案 reply 錨最新卡
+                    # hr_verdict 存這張卡當初判的是反轉還是延續，供對答案引用
                     cur2.execute(
                         "UPDATE tv_alert_events SET stage2_done=1, "
-                        "tg_message_id=COALESCE(%s, tg_message_id) "
+                        "tg_message_id=COALESCE(%s, tg_message_id), "
+                        "hr_verdict=COALESCE(%s, hr_verdict) "
                         "WHERE id=%s",
                         (sent_mid if sent_mid else None, rid))
                 conn.commit()
@@ -629,8 +637,19 @@ def backfill_outcomes_tv() -> None:
         conn.close()
 
 
+def hr_call_direction(side: str, verdict: str) -> str:
+    """side='buy'(BSL 向上掃)+verdict='reversal'→DOWN, 'continuation'→UP；
+    side='sell' 鏡像。與 hr_flags 的方向語意保持一致（單一來源）。"""
+    up_side = str(side).rstrip("?") == "buy"
+    if verdict == "reversal":
+        return "DOWN" if up_side else "UP"
+    return "UP" if up_side else "DOWN"
+
+
 def format_tv_outcome_reply(row: dict) -> str:
-    """TV 事件「對答案」reply 文字 (2026-07-20)。無方向宣告 → 只報走勢。"""
+    """TV 事件「對答案」reply 文字。若當初 sweep 第2段有判讀（反轉/延續），
+    先講「這張卡原本判什麼」，再報實際走勢——不然只報走勢，讓讀者自己回想
+    原本判讀是什麼太費力（2026-07-20 使用者反饋加上）。"""
     t = (pd.Timestamp(int(row["received_ms"]), unit="ms")
          + pd.Timedelta(hours=8)).strftime("%m-%d %H:%M")
     label = str(row.get("event") or "level")
@@ -639,11 +658,16 @@ def format_tv_outcome_reply(row: dict) -> str:
         v = row.get(f"fwd_ret_{h}m")
         if v is not None:
             parts.append(f"{h}m {float(v):+.2%}")
-    return "\n".join([
-        f"↩️ 對答案: 關卡 {label}（{t} 觸發）",
-        "之後走勢: " + (" · ".join(parts) if parts else "資料不足"),
-        "(研究對照 · 勿作交易依據)",
-    ])
+
+    lines = [f"↩️ 對答案: 關卡 {label}（{t} 觸發）"]
+    verdict = row.get("hr_verdict")
+    if verdict in ("reversal", "continuation"):
+        call_zh = "反轉" if verdict == "reversal" else "延續"
+        d = hr_call_direction(row.get("liquidity_side") or "", verdict)
+        lines.append(f"原始判讀: {call_zh}（預期 {DIR_ZH.get(d, d)}）")
+    lines.append("之後走勢: " + (" · ".join(parts) if parts else "資料不足"))
+    lines.append("(研究對照 · 勿作交易依據)")
+    return "\n".join(lines)
 
 
 def reply_outcomes_tv() -> None:
@@ -653,11 +677,12 @@ def reply_outcomes_tv() -> None:
         return
     conn = get_db_conn()
     try:
-        due = _q(conn, "SELECT id, received_ms, event, fwd_ret_30m, "
-                       "fwd_ret_60m, fwd_ret_120m, tg_message_id "
-                       "FROM tv_alert_events WHERE outcome_done=1 "
-                       "AND outcome_replied=0 AND tg_message_id IS NOT NULL "
-                       "AND tg_message_id > 0 LIMIT 10")
+        due = _q(conn, "SELECT id, received_ms, event, liquidity_side, "
+                       "hr_verdict, fwd_ret_30m, fwd_ret_60m, fwd_ret_120m, "
+                       "tg_message_id FROM tv_alert_events "
+                       "WHERE outcome_done=1 AND outcome_replied=0 "
+                       "AND tg_message_id IS NOT NULL AND tg_message_id > 0 "
+                       "LIMIT 10")
         if due.empty:
             return
         for _, r in due.iterrows():
