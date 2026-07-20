@@ -13,7 +13,7 @@ from flask import Flask, request
 from datetime import datetime, timedelta, timezone
 
 import outcome_tracker
-from market_data.query.flow_context import get_pre_sweep_context, get_event_flow_context, format_flow_context
+from market_data.query.flow_context import get_event_flow_context, format_flow_context
 from market_data.query.snapshot_query import (
     get_latest_snapshots, get_snapshots_by_uuid,
     get_latest_scores, get_event_history, get_pending_snapshot_count,
@@ -1649,40 +1649,15 @@ def tradingview_webhook():
             else:
                 current_event = new_event
 
-        # 合併成一則通知
-        msg_lines = [
-            "📩 收到 TradingView 快訊",
-            f"event: {event}",
-            f"liquidity_side: {liquidity_side} ({tracker['event_type']})",
-            f"price: {price}",
-            f"time: {tv_time}",
-            f"symbol: {symbol}",
-            "─" * 30,
-            f"[掃蕩追蹤] 已啟動 (±0.5%, 15m/1h)",
-            f"  上目標: {tracker['upper_target']:.2f}",
-            f"  下目標: {tracker['lower_target']:.2f}",
-            f"  UUID: {tracker['event_uuid'][:8]}",
-        ]
-
-        if event_skipped:
-            msg_lines.append("─" * 30)
-            msg_lines.append("[flow 追蹤] 略過（已有事件進行中）")
-        else:
-            msg_lines.append("─" * 30)
-            msg_lines.append(f"[flow 追蹤] 已啟動 (15m/1h/4h, first hit ±0.5%/±1.0%)")
-            msg_lines.append(f"  entry_price: {new_event['entry_price']:.2f}")
-            msg_lines.append(f"  session: {new_event['session']}")
-            msg_lines.append(f"  UUID: {new_event['event_uuid'][:8]}")
-
-        # Attach pre-sweep market flow context (OKX+Binance combined)
-        try:
-            pre_ctx = get_pre_sweep_context("BTC-USD", lookback_minutes=5)
-            msg_lines.append("─" * 30)
-            msg_lines.append(format_flow_context(pre_ctx, title="掃蕩前 5m 市場流"))
-        except Exception as flow_err:
-            logger.warning("Failed to get pre-sweep flow context: %s", flow_err)
-
-        send_message(CHAT_ID, "\n".join(msg_lines))
+        # 2026-07-20: 舊「收到 TradingView 快訊」Telegram 通知已移除（使用者
+        # 反饋它跟撤單流 bot 的事件卡重複、且誤導成「V7 bot 也在講這件事」）。
+        # 底層追蹤不受影響——create_event / outcome_tracker.register_event /
+        # snapshot_repository 都已在上面跑完，liquidity_events、
+        # sweep_outcomes 照常寫入（H-R 反轉檢定 + 互動圖表 ⚡ 標記的資料源）。
+        # 只是不再送這則會被誤認成「訊號」的重複訊息。log 保留可追蹤性。
+        logger.info(
+            "TV sweep tracker started uuid=%s side=%s px=%s skipped=%s",
+            tracker["event_uuid"][:8], liquidity_side, price, event_skipped)
 
         if event_skipped:
             return {"status": "partial", "reason": "sweep tracker started, delta event skipped"}, 200
