@@ -584,8 +584,19 @@ def backfill_outcomes() -> None:
         conn.close()
 
 
+def verdict_mark(direction: str, fwd_ret: float | None) -> str:
+    """單一時間點的對錯標記：direction(UP/DOWN) 對照 fwd_ret 正負。
+    無方向(NONE/未知)或無資料 → 空字串(不判斷，不硬掰對錯)。"""
+    if direction not in ("UP", "DOWN") or fwd_ret is None:
+        return ""
+    hit = (fwd_ret > 0) == (direction == "UP")
+    return "✅ 對了" if hit else "❌ 錯了"
+
+
 def format_outcome_reply(e: dict, stats: tuple[int, float] | None) -> str:
-    """「對答案」reply 文字 (2026-07-20)：事件結果 + 劇本滾動戰績。"""
+    """「對答案」reply 文字：事件結果 + 劇本滾動戰績。2026-07-21 加上
+    醒目的「判讀結果」標頭行(對/錯一眼可見)，不用再從數字旁的小 emoji
+    去找；120m 也補上對錯標記(之前只有 60m 有)。"""
     t = (pd.Timestamp(int(e["minute_start_ms"]), unit="ms")
          + pd.Timedelta(hours=8)).strftime("%m-%d %H:%M")
     px = f"{e['px']:,.0f}" if e.get("px") else "?"
@@ -593,15 +604,22 @@ def format_outcome_reply(e: dict, stats: tuple[int, float] | None) -> str:
     call_tag = f"（{call}）" if call else ""
     head = (f"↩️ 對答案: {ZH.get(e['playbook'], e['playbook'])}{call_tag}→"
             f"{DIR_ZH.get(e['direction'], e['direction'])} @ {px}（{t}）")
+
+    direction = e.get("direction")
+    m60 = verdict_mark(direction, e.get("fwd_ret_60m"))
+    m120 = verdict_mark(direction, e.get("fwd_ret_120m"))
+    lines = [head]
+    if m60 or m120:
+        lines.append(f"判讀結果: {m60 or m120}"
+                     f"{'（以 60m 為準）' if m60 else '（以 120m 為準）'}")
+
     parts = []
     if e.get("fwd_ret_60m") is not None:
-        hit = e.get("hit_60m")
-        mark = " ✅ 命中" if hit == 1 else (" ❌ 未中" if hit == 0 else "")
-        parts.append(f"60m {e['fwd_ret_60m']:+.2%}{mark}")
+        parts.append(f"60m {e['fwd_ret_60m']:+.2%}" + (f" {m60}" if m60 else ""))
     if e.get("fwd_ret_120m") is not None:
-        parts.append(f"120m {e['fwd_ret_120m']:+.2%}")
-    lines = [head,
-             "之後走勢: " + (" · ".join(parts) if parts else "資料不足")]
+        parts.append(f"120m {e['fwd_ret_120m']:+.2%}"
+                     + (f" {m120}" if m120 else ""))
+    lines.append("之後走勢: " + (" · ".join(parts) if parts else "資料不足"))
     if stats:
         n, wr = stats
         lines.append(f"{ZH.get(e['playbook'], e['playbook'])} "

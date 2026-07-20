@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 from market_data.tasks.cancel_playbook_watcher import (
-    action_keyboard, format_outcome_reply)
+    action_keyboard, format_outcome_reply, verdict_mark)
 from market_data.tasks.tv_alert_poller import (
     format_card, format_stage1_card, format_stage2_card,
     format_tv_outcome_reply, hr_call_direction, hr_flags, state_distribution)
@@ -134,7 +134,8 @@ class TestOutcomeReply:
         t = format_outcome_reply(e, (20, 0.45))
         assert "對答案" in t and "吸收" in t and "偏漲" in t
         assert "（反轉）" in t                          # 2026-07-20: 判讀類型標籤
-        assert "60m +0.42% ✅ 命中" in t and "120m +0.31%" in t
+        assert "判讀結果: ✅ 對了（以 60m 為準）" in t   # 2026-07-21: 醒目標頭行
+        assert "60m +0.42% ✅ 對了" in t and "120m +0.31% ✅ 對了" in t
         assert "近 20 筆命中率 45%" in t and "勿作交易依據" in t
 
     def test_playbook_call_tag_true_break_is_continuation(self):
@@ -149,7 +150,15 @@ class TestOutcomeReply:
                  minute_start_ms=1789000000000, fwd_ret_60m=0.0062,
                  fwd_ret_120m=None, hit_60m=0)
         t = format_outcome_reply(e, None)
-        assert "❌ 未中" in t and "120m" not in t and "命中率" not in t
+        assert "判讀結果: ❌ 錯了（以 60m 為準）" in t
+        assert "❌ 錯了" in t and "120m" not in t and "命中率" not in t
+
+    def test_verdict_mark_none_direction_or_missing_ret(self):
+        assert verdict_mark("NONE", 0.01) == ""
+        assert verdict_mark("UP", None) == ""
+        assert verdict_mark("UP", 0.01) == "✅ 對了"
+        assert verdict_mark("UP", -0.01) == "❌ 錯了"
+        assert verdict_mark("DOWN", -0.01) == "✅ 對了"
 
     def test_tv_reply_returns_only(self):
         row = dict(received_ms=1789000000000, event="H4_resistance",
@@ -183,6 +192,24 @@ class TestOutcomeReply:
                    fwd_ret_30m=-0.002, fwd_ret_60m=None, fwd_ret_120m=None)
         t = format_tv_outcome_reply(row)
         assert "原始判讀: 延續（預期 偏跌 🔴）" in t
+        assert "判讀結果" not in t          # 60m/120m 都缺資料，不硬判對錯
+
+    def test_tv_reply_reversal_with_60m_shows_verdict_line(self):
+        # side=buy(BSL) + reversal → 預期 DOWN；fwd_ret_60m=-0.003(跌了) → 對了
+        row = dict(received_ms=1789000000000, event="BSL_65058",
+                   liquidity_side="buy", hr_verdict="reversal",
+                   fwd_ret_30m=-0.001, fwd_ret_60m=-0.003, fwd_ret_120m=-0.004)
+        t = format_tv_outcome_reply(row)
+        assert "判讀結果: ✅ 對了（以 60m 為準）" in t
+        assert "60m -0.30% ✅ 對了" in t and "120m -0.40% ✅ 對了" in t
+
+    def test_tv_reply_continuation_wrong_direction(self):
+        # side=sell(SSL) + continuation → 預期 DOWN；fwd_ret_60m=+0.002(漲了) → 錯了
+        row = dict(received_ms=1789000000000, event="SSL_63800",
+                   liquidity_side="sell", hr_verdict="continuation",
+                   fwd_ret_30m=None, fwd_ret_60m=0.002, fwd_ret_120m=None)
+        t = format_tv_outcome_reply(row)
+        assert "判讀結果: ❌ 錯了（以 60m 為準）" in t
 
 
 class TestHrCallDirection:

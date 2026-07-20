@@ -36,7 +36,7 @@ from shared.db import get_db_conn
 from market_data.tasks.cancel_playbook_watcher import (
     DEF_VERSION, DIR_ZH, GATE_SHOCK, STATE_META, _tg_creds, action_keyboard,
     classify_state, compute_features, humanize_book, humanize_story,
-    load_frame, state_color)
+    load_frame, state_color, verdict_mark)
 
 logger = logging.getLogger(__name__)
 
@@ -699,23 +699,34 @@ def hr_call_direction(side: str, verdict: str) -> str:
 
 def format_tv_outcome_reply(row: dict) -> str:
     """TV 事件「對答案」reply 文字。若當初 sweep 第2段有判讀（反轉/延續），
-    先講「這張卡原本判什麼」，再報實際走勢——不然只報走勢，讓讀者自己回想
-    原本判讀是什麼太費力（2026-07-20 使用者反饋加上）。"""
+    先講「這張卡原本判什麼」，再報實際走勢（2026-07-20 使用者反饋加上）。
+    2026-07-21 補上醒目的「判讀結果」標頭行(對/錯一眼可見，以 60m 為主、
+    無 60m 才退 120m)——之前只丟走勢數字，讀者要自己心算比對方向。無
+    hr_verdict(純關卡快訊，沒有方向宣告)則不判對錯，維持只報走勢。"""
     t = (pd.Timestamp(int(row["received_ms"]), unit="ms")
          + pd.Timedelta(hours=8)).strftime("%m-%d %H:%M")
     label = str(row.get("event") or "level")
+
+    verdict = row.get("hr_verdict")
+    d = None
+    if verdict in ("reversal", "continuation"):
+        d = hr_call_direction(row.get("liquidity_side") or "", verdict)
+    m60 = verdict_mark(d, row.get("fwd_ret_60m")) if d else ""
+    m120 = verdict_mark(d, row.get("fwd_ret_120m")) if d else ""
+
     parts = []
-    for h in HORIZONS_MIN:
+    for h, m in ((30, ""), (60, m60), (120, m120)):
         v = row.get(f"fwd_ret_{h}m")
         if v is not None:
-            parts.append(f"{h}m {float(v):+.2%}")
+            parts.append(f"{h}m {float(v):+.2%}" + (f" {m}" if m else ""))
 
     lines = [f"↩️ 對答案: 關卡 {label}（{t} 觸發）"]
-    verdict = row.get("hr_verdict")
     if verdict in ("reversal", "continuation"):
         call_zh = "反轉" if verdict == "reversal" else "延續"
-        d = hr_call_direction(row.get("liquidity_side") or "", verdict)
         lines.append(f"原始判讀: {call_zh}（預期 {DIR_ZH.get(d, d)}）")
+        if m60 or m120:
+            lines.append(f"判讀結果: {m60 or m120}"
+                         f"{'（以 60m 為準）' if m60 else '（以 120m 為準）'}")
     lines.append("之後走勢: " + (" · ".join(parts) if parts else "資料不足"))
     lines.append("(研究對照 · 勿作交易依據)")
     return "\n".join(lines)
