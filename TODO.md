@@ -311,6 +311,16 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       depth_delta_collector 已參數化，起 ETH spot/perp 實例即開資料時鐘
       （越早越好，10 月 re-run 與 F1 家族未來可跨幣）；watcher/圖表後續跟進。
       紀律：BTC 凍結序列不動，ETH 為新增平行序列
+- [x] **first-hit-wins 平行診斷（2026-07-21，FROZEN v1）**：使用者質疑
+      固定時間點(60m/120m)判對錯會混淆「方向對但慢」跟「真的錯」→
+      `first_hit_verdict()`：逐分鐘掃，先碰目標價(±0.5%沿用
+      outcome_tracker.py既有門檻)算對、先碰反向價算錯，120m窗沿用既有
+      窗口。與固定時間點指標並行顯示，不取代(F1/F1b判決仍用固定時間點，
+      因為那才是防p-hacking的量法)。回填放寬 SELECT 讓舊事件自動追平。
+      **實測結果推翻直覺**：21:47-21:53 那組 120m 翻正 +1.0~1.5% 的案例，
+      用 first-hit-wins 重查後**除 21:53 外全部仍是 miss**——price 在反彈
+      之前先碰到 -0.5% 反向門檻，若真設停損會先出場；120m 翻正是巧合
+      時間點快照，不是訊號提早判對只是被切錯位置。58 測試綠。
 - [x] **色格短窗誠實檢查（2026-07-20，探索性非家族）**：使用者主觀回報
       「看綠後面漲、看紅後面跌，感覺有利可圖」→ `research/color_state_forward_check.py`
       用既有凍結 `classify_state` 零新定義跑全歷史（n=15,979 分鐘）。結果與
@@ -336,6 +346,17 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
 
 ### 5. 內容線
 - [ ] EP2 英文版發 LinkedIn；EP3 細修後發（Medium 英文版已備）
+- [x] **EP3「你的回測正在騙你」中英文皆完成（2026-07-20）**：原稿太術語
+      密（IC/fold/bootstrap/aggregate 堆疊），使用者反饋改成一般讀者能懂
+      的白話 + 比喻版（老師發答案卷／量錯尺／班級平均被學霸拉高），砍掉
+      4 條門檻條列式清單、拿掉結尾自介。三個陷阱骨架與 mistake 2026-04-13、
+      2026-06-02 素材不變。中文
+      `Desktop\linkedin_posts\quant_ep3_backtest-lying_v3_headings.docx`
+      （帶分段粗體小標題），英文改成 Medium 格式（去掉 LinkedIn 專用的
+      「Copy-paste ready post」框、hashtag 換成 Medium 站方標籤上限 5 個、
+      加 Cover image 提示）：
+      `Desktop\linkedin_posts\quant_ep3_backtest-lying_medium.docx`。
+      下一步：使用者最終審閱後可發布
 - [ ] EP12 素材「AI 當槓桿不當許願池」已入 roadmap（docs/linkedin_ep_series_roadmap.md）
 
 ### 6. ★ 徹底掌握自己的系統（面試就緒度 — 求職關鍵）
