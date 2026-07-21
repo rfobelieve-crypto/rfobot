@@ -390,6 +390,23 @@ ChatGPT for Claude」）確認真正的視覺語言，跟第一版描述（互�
 - [ ] 待評估：這個風格值不值得投入（Three.js/WebGL 對求職 demo 或未來
       產品頁的 ROI），還是先用更輕量的方案（如既有 dashboard/Artifact）
       驗證內容本身，之後才考慮視覺升級
+- [x] product-site 已上線精修：自架 email/password 登入（取代 Google OAuth，
+      `agent_user_accounts` 表 PBKDF2 雜湊）+ 3D K 線改玻璃質感
+      （RoundedBoxGeometry + meshPhysicalMaterial transmission/clearcoat/
+      iridescence，桌面/手機分級）。修過一個坑：`<Environment preset="night">`
+      抓遠端 CDN HDR，正式站首載卡 10+ 秒背景全空白——改用場景內
+      Lightformer 產生反光貼圖，零網路依賴（commit 7c67273）
+- [ ] **UI 組件 MCP 待授權（2026-07-21 登記）**：已裝 `@21st-dev/cli`（全局）+
+      註冊兩個 MCP server（`21st-dev` → https://21st.dev/mcp，
+      `originkit` → https://mcp.originkit.dev/mcp），皆卡在 OAuth 登入——
+      這一步需要真正互動式 terminal（本機 Bash 工具是非互動子行程，
+      stdin 不是 terminal 過不了 callback），只能使用者自己在提示列跑
+      `! claude mcp login 21st-dev` 和 `! claude mcp login originkit`。
+      跑完後續步驟：用 `claude mcp get <name>` 確認連線 → 搜尋兩邊组件庫
+      有沒有跟現有深色/玻璃美術風格搭的現成 React/Tailwind 組件
+      （表單、卡片、按鈕）可替換掉目前手刻的 LoginForm/RegisterForm 等，
+      非必然有收穫（要先看實際組件品質跟風格是否搭），此項只是「有了
+      這兩個工具，值不值得換」的探索，不是既定要做的重構
 
 ---
 
