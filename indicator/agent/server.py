@@ -25,9 +25,13 @@ Claude Desktop config (~/.../claude_desktop_config.json):
 """
 from __future__ import annotations
 
+import time
 from typing import Optional
 
+import anyio
 from mcp.server.fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from indicator.agent import queries
 
@@ -129,6 +133,42 @@ def get_verdict_stats() -> dict:
     script once samples accumulate.
     """
     return queries.agent_verdict_stats()
+
+
+# ── Public, unauthenticated feed for the product website ────────────────
+#
+# custom_route bypasses the AGENT_MCP_TOKEN path gate by design (see
+# FastMCP.custom_route docstring: "will not require authorization ...
+# intended to be public"). That's deliberate here — this is the one route
+# meant for an anonymous browser/Vercel fetch, not an MCP client.
+#
+# Scope is intentionally narrower than get_current_signal(): direction /
+# tier / confidence / regime only. top_drivers (SHAP feature names) and
+# model_version are dropped — those describe HOW the model thinks, one
+# step past the "direction + confidence" the site is scoped to show.
+_feed_cache: dict = {"data": None, "ts": 0.0}
+_FEED_CACHE_TTL_S = 30.0
+
+
+@mcp.custom_route("/public/signal-feed", methods=["GET"])
+async def public_signal_feed(request: Request) -> JSONResponse:
+    now = time.monotonic()
+    if _feed_cache["data"] is None or now - _feed_cache["ts"] > _FEED_CACHE_TTL_S:
+        full = await anyio.to_thread.run_sync(queries.latest_signal)
+        _feed_cache["data"] = {
+            "signal_time": full.get("signal_time"),
+            "direction": full.get("direction"),
+            "tier": full.get("tier"),
+            "confidence": full.get("confidence"),
+            "regime": full.get("regime"),
+            "entry_price": full.get("entry_price"),
+            "disclaimer": full.get("disclaimer"),
+        }
+        _feed_cache["ts"] = now
+    resp = JSONResponse(_feed_cache["data"])
+    resp.headers["Cache-Control"] = "public, max-age=30"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
 
 
 def main() -> None:
