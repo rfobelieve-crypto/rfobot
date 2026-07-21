@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -579,3 +580,48 @@ def agent_verdict_stats() -> dict:
                            "以 repo research script 執行",
         "disclaimer": DISCLAIMER,
     }
+
+
+# ── Public waitlist (product website, 2026-07-21) ──────────────────────
+# Writes ONLY to the agent's own namespace (agent_* — explicitly allowed
+# by agent-boundary.md), never to a quant table. Scope is "notify me about
+# write-ups / methodology updates", not "give me access to signals" — the
+# site's own stance is showcase, not a paid product (see mistake.md
+# 2026-07-10 OKX ASP hackathon PARK decision on not selling edge access).
+
+_WAITLIST_DDL = """
+CREATE TABLE IF NOT EXISTS agent_waitlist_signups (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(320) NOT NULL,
+    note VARCHAR(500) NULL,
+    source VARCHAR(32) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def submit_waitlist(email: str, note: str = "",
+                    source: Optional[str] = None) -> dict[str, Any]:
+    """Insert one waitlist signup. Validates shape only (no verification
+    email, no dedup beyond what a human reviewing the table would do by
+    eye) — this is a notify-me list, not an auth system."""
+    email = (email or "").strip().lower()
+    if not email or len(email) > 320 or not _EMAIL_RE.match(email):
+        return {"ok": False, "error": "invalid email"}
+    if _seed_mode():
+        return {"ok": True, "disclaimer": DISCLAIMER, "_source": "seed"}
+    from shared.db import get_db_conn
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_WAITLIST_DDL)
+            cur.execute(
+                "INSERT INTO agent_waitlist_signups (email, note, source) "
+                "VALUES (%s, %s, %s)",
+                (email, (note or "")[:500], (source or "")[:32]))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True, "disclaimer": DISCLAIMER}

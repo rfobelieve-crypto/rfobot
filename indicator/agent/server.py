@@ -191,6 +191,27 @@ async def public_track_record_route(request: Request) -> JSONResponse:
     return resp
 
 
+# Waitlist signup — the one WRITE this service does, and only into its
+# own agent_* namespace (see queries.submit_waitlist / agent-boundary.md).
+# Called server-to-server from the product site's Next.js API route, not
+# directly from a browser, so CORS is moot here — but the header's added
+# anyway for parity with the GET routes above.
+@mcp.custom_route("/public/waitlist", methods=["POST"])
+async def public_waitlist_route(request: Request) -> JSONResponse:
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid body"}, status_code=400)
+    email = body.get("email") if isinstance(body, dict) else None
+    note = body.get("note") if isinstance(body, dict) else None
+    result = await anyio.to_thread.run_sync(
+        queries.submit_waitlist, email, note or "", "product-site")
+    status = 200 if result.get("ok") else 400
+    resp = JSONResponse(result, status_code=status)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 def main() -> None:
     mcp.run()   # stdio transport by default
 
