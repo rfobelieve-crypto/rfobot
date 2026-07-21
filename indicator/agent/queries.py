@@ -234,35 +234,34 @@ def _wilson_ci(successes: int, n: int, z: float = 1.96) -> Optional[tuple[float,
             round(min(1.0, center + half) * 100, 1))
 
 
-# Capital base reset date — mirrors indicator/okx/report.py's
-# EXECUTOR_RESTART_SINCE (2026-07-14 top-up, see mistake.md 2026-07-13).
-# Reimplemented standalone rather than imported: the agent must not import
-# indicator.okx.report or anything else in that module tree.
-_MDD_SINCE = "2026-07-14"
-
-
-def _mdd_pct(since: str) -> Optional[float]:
-    """Same peak/trough algorithm as report.py's _get_equity_curve_stats,
-    reimplemented standalone (see agent-boundary.md — no cross-imports
-    into indicator.okx.*). Returns a percentage, never a dollar figure."""
+def _mdd_pct_from_trades() -> Optional[float]:
+    """MDD from a synthetic equity curve built by compounding CLOSED-trade
+    net_pct in order — deliberately NOT the raw account-balance snapshot
+    curve (v7_okx_balance_snapshots / report.py's _get_equity_curve_stats).
+    That curve is contaminated by operator deposits/withdrawals, which are
+    indistinguishable from trading losses in a raw balance series — see
+    mistake.md 2026-07-13 (a fund transfer alone tripped a -30% "loss"
+    kill switch). A synthetic curve built purely from trade returns is
+    immune to that: it only ever reflects what the strategy did."""
     conn = _conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT total_eq_usd FROM v7_okx_balance_snapshots "
-                "WHERE ts >= %s ORDER BY ts", (since,))
-            eqs = [float(r["total_eq_usd"]) for r in cur.fetchall()
-                   if r.get("total_eq_usd") is not None]
+                "SELECT net_pct FROM v7_okx_positions "
+                "WHERE status='CLOSED' AND net_pct IS NOT NULL "
+                "ORDER BY exit_time")
+            rets = [float(r["net_pct"]) for r in cur.fetchall()]
     except Exception:
         return None
     finally:
         conn.close()
-    if len(eqs) < 2:
+    if len(rets) < 2:
         return None
-    peak, mdd = eqs[0], 0.0
-    for v in eqs:
-        peak = max(peak, v)
-        mdd = min(mdd, (v - peak) / peak * 100)
+    equity, peak, mdd = 1.0, 1.0, 0.0
+    for r in rets:
+        equity *= (1 + r)
+        peak = max(peak, equity)
+        mdd = min(mdd, (equity - peak) / peak * 100)
     return round(mdd, 1)
 
 
@@ -314,7 +313,7 @@ def public_track_record() -> dict[str, Any]:
             "ci95": list(trd_ci) if trd_ci else None,
             "note": "closed live OKX trades, net of costs",
         },
-        "mdd_pct": _mdd_pct(_MDD_SINCE),
+        "mdd_pct": _mdd_pct_from_trades(),
         "caveat": "signal accuracy != trading profit after costs/stops",
         "disclaimer": DISCLAIMER,
         "_source": "live",
