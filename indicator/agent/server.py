@@ -212,6 +212,28 @@ async def public_waitlist_route(request: Request) -> JSONResponse:
     return resp
 
 
+# Signal history — the page that consumes this sits behind Google login
+# on the product site, but this endpoint itself is still a plain public
+# GET (same reasoning as the other public_* routes: the login is a UX
+# gate in Next.js, not a security boundary, and the payload carries the
+# same no-model-internals discipline as everything else here).
+_history_cache: dict = {"data": None, "ts": 0.0}
+_HISTORY_CACHE_TTL_S = 60.0
+
+
+@mcp.custom_route("/public/signal-history", methods=["GET"])
+async def public_signal_history_route(request: Request) -> JSONResponse:
+    now = time.monotonic()
+    if _history_cache["data"] is None or now - _history_cache["ts"] > _HISTORY_CACHE_TTL_S:
+        data = await anyio.to_thread.run_sync(queries.public_signal_history, 50)
+        _history_cache["data"] = data
+        _history_cache["ts"] = now
+    resp = JSONResponse(_history_cache["data"])
+    resp.headers["Cache-Control"] = "public, max-age=60"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 def main() -> None:
     mcp.run()   # stdio transport by default
 

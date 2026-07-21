@@ -625,3 +625,53 @@ def submit_waitlist(email: str, note: str = "",
     finally:
         conn.close()
     return {"ok": True, "disclaimer": DISCLAIMER}
+
+
+# ── Public signal history (behind Google login, product website) ───────
+#
+# The auth gate lives entirely in Next.js (see product-site/auth.ts) — it
+# is a UX distinction ("more detail for people who sign in"), not a
+# security boundary, so this function keeps the SAME agent-boundary.md
+# discipline as every other public_* function: no shap_top, no
+# model_version, no feature names. The only thing that's actually new
+# versus latest_signal() is (a) history instead of one row and (b) the
+# realized outcome (correct) once backfilled.
+
+def public_signal_history(limit: int = 50) -> dict[str, Any]:
+    limit = max(1, min(int(limit), 200))
+    if _seed_mode():
+        return {
+            "signals": [
+                {"signal_time": "2026-07-20T12:00:00", "direction": "UP",
+                 "tier": "Strong", "confidence": 82.1, "regime": "TRENDING_BULL",
+                 "correct": 1},
+                {"signal_time": "2026-07-20T08:00:00", "direction": "DOWN",
+                 "tier": "Moderate", "confidence": 68.4, "regime": "CHOPPY",
+                 "correct": 0},
+            ],
+            "disclaimer": DISCLAIMER,
+            "_source": "seed",
+        }
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT signal_time, direction, strength, confidence, "
+                "       regime, correct "
+                "FROM tracked_signals ORDER BY signal_time DESC LIMIT %s",
+                (limit,))
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return {
+        "signals": [{
+            "signal_time": r["signal_time"].isoformat() if r.get("signal_time") else None,
+            "direction": r.get("direction"),
+            "tier": r.get("strength"),
+            "confidence": _f(r.get("confidence")),
+            "regime": r.get("regime"),
+            "correct": (None if r.get("correct") is None else int(r["correct"])),
+        } for r in rows],
+        "disclaimer": DISCLAIMER,
+        "_source": "live",
+    }
