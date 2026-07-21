@@ -212,11 +212,12 @@ async def public_waitlist_route(request: Request) -> JSONResponse:
     return resp
 
 
-# Signal history — the page that consumes this sits behind Google login
-# on the product site, but this endpoint itself is still a plain public
-# GET (same reasoning as the other public_* routes: the login is a UX
-# gate in Next.js, not a security boundary, and the payload carries the
-# same no-model-internals discipline as everything else here).
+# Signal history — the page that consumes this sits behind the product
+# site's own login (see /public/register + /public/login below), but
+# this endpoint itself is still a plain public GET (same reasoning as the
+# other public_* routes: the login is a UX gate in Next.js, not a
+# security boundary, and the payload carries the same no-model-internals
+# discipline as everything else here).
 _history_cache: dict = {"data": None, "ts": 0.0}
 _HISTORY_CACHE_TTL_S = 60.0
 
@@ -230,6 +231,39 @@ async def public_signal_history_route(request: Request) -> JSONResponse:
         _history_cache["ts"] = now
     resp = JSONResponse(_history_cache["data"])
     resp.headers["Cache-Control"] = "public, max-age=60"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+# Self-hosted accounts — register + login. Same WRITE discipline as the
+# waitlist route: only agent_user_accounts (agent_* namespace), password
+# hashed server-side (see queries.py), never returned or logged.
+@mcp.custom_route("/public/register", methods=["POST"])
+async def public_register_route(request: Request) -> JSONResponse:
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid body"}, status_code=400)
+    email = body.get("email") if isinstance(body, dict) else None
+    password = body.get("password") if isinstance(body, dict) else None
+    result = await anyio.to_thread.run_sync(queries.register_user, email, password)
+    status = 200 if result.get("ok") else 400
+    resp = JSONResponse(result, status_code=status)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@mcp.custom_route("/public/login", methods=["POST"])
+async def public_login_route(request: Request) -> JSONResponse:
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid body"}, status_code=400)
+    email = body.get("email") if isinstance(body, dict) else None
+    password = body.get("password") if isinstance(body, dict) else None
+    result = await anyio.to_thread.run_sync(queries.verify_user, email, password)
+    status = 200 if result.get("ok") else 401
+    resp = JSONResponse(result, status_code=status)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 

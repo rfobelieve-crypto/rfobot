@@ -11,9 +11,12 @@ with zero infrastructure.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import re
+import secrets
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -675,3 +678,85 @@ def public_signal_history(limit: int = 50) -> dict[str, Any]:
         "disclaimer": DISCLAIMER,
         "_source": "live",
     }
+
+
+# ── Self-hosted accounts (product website, 2026-07-22) ──────────────────
+#
+# Replaces the earlier Google-OAuth plan — own email/password accounts,
+# own table. Same boundary as agent_waitlist_signups: writes ONLY into
+# the agent's own agent_* namespace, never a quant table. Passwords are
+# PBKDF2-HMAC-SHA256, random salt per user, stdlib-only (no new
+# dependency) — never stored or logged in plaintext.
+
+_USER_DDL = """
+CREATE TABLE IF NOT EXISTS agent_user_accounts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(320) NOT NULL UNIQUE,
+    password_hash VARCHAR(200) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""
+
+_PBKDF2_ITERATIONS = 260_000
+
+
+def _hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"),
+                             bytes.fromhex(salt), _PBKDF2_ITERATIONS)
+    return f"{salt}${dk.hex()}"
+
+
+def _verify_password(password: str, stored: str) -> bool:
+    try:
+        salt, hash_hex = stored.split("$", 1)
+    except ValueError:
+        return False
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"),
+                             bytes.fromhex(salt), _PBKDF2_ITERATIONS)
+    return hmac.compare_digest(dk.hex(), hash_hex)
+
+
+def register_user(email: str, password: str) -> dict[str, Any]:
+    email = (email or "").strip().lower()
+    if not email or len(email) > 320 or not _EMAIL_RE.match(email):
+        return {"ok": False, "error": "invalid email"}
+    if not password or len(password) < 8:
+        return {"ok": False, "error": "password must be at least 8 characters"}
+    if _seed_mode():
+        return {"ok": True, "_source": "seed"}
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_USER_DDL)
+            cur.execute("SELECT id FROM agent_user_accounts WHERE email=%s", (email,))
+            if cur.fetchone():
+                return {"ok": False, "error": "email already registered"}
+            cur.execute(
+                "INSERT INTO agent_user_accounts (email, password_hash) "
+                "VALUES (%s, %s)", (email, _hash_password(password)))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+def verify_user(email: str, password: str) -> dict[str, Any]:
+    email = (email or "").strip().lower()
+    if not email or not password:
+        return {"ok": False}
+    if _seed_mode():
+        return ({"ok": True, "email": email} if email == "demo@example.com"
+                else {"ok": False})
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_USER_DDL)
+            cur.execute(
+                "SELECT password_hash FROM agent_user_accounts WHERE email=%s",
+                (email,))
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if not row or not _verify_password(password, row["password_hash"]):
+        return {"ok": False}
+    return {"ok": True, "email": email}
