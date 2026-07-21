@@ -171,6 +171,26 @@ async def public_signal_feed(request: Request) -> JSONResponse:
     return resp
 
 
+# Same public/unauthenticated deal as above, heavier query (full-table
+# aggregates + a balance-snapshot scan for MDD) so it gets a longer cache.
+_track_record_cache: dict = {"data": None, "ts": 0.0}
+_TRACK_RECORD_CACHE_TTL_S = 120.0
+
+
+@mcp.custom_route("/public/track-record", methods=["GET"])
+async def public_track_record_route(request: Request) -> JSONResponse:
+    now = time.monotonic()
+    if (_track_record_cache["data"] is None
+            or now - _track_record_cache["ts"] > _TRACK_RECORD_CACHE_TTL_S):
+        data = await anyio.to_thread.run_sync(queries.public_track_record)
+        _track_record_cache["data"] = data
+        _track_record_cache["ts"] = now
+    resp = JSONResponse(_track_record_cache["data"])
+    resp.headers["Cache-Control"] = "public, max-age=120"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 def main() -> None:
     mcp.run()   # stdio transport by default
 

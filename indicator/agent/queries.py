@@ -210,6 +210,117 @@ def track_record(window_days: Optional[int] = None) -> dict[str, Any]:
     return out
 
 
+# ── Tool 3b: public track record (no $ amounts, adds win-rate CI) ──────
+#
+# Reshapes the same two queries as track_record() for an anonymous public
+# website rather than an MCP client the operator personally configured —
+# different threat model, narrower payload: no avg_net_bps (the site's own
+# rule is rigor over returns, see product-site README/Stats.tsx), no $
+# amounts anywhere, no driver/feature names. Adds a Wilson-score win-rate
+# CI, which track_record() doesn't compute in live mode.
+
+def _wilson_ci(successes: int, n: int, z: float = 1.96) -> Optional[tuple[float, float]]:
+    """Wilson score interval for a binomial proportion, in percentage
+    points. Same formula used throughout research/*.py (e.g.
+    research/strong_signal_perf.py) — reimplemented standalone here so
+    the agent imports nothing from research/ for this path."""
+    if n == 0:
+        return None
+    p = successes / n
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / denom
+    return (round(max(0.0, center - half) * 100, 1),
+            round(min(1.0, center + half) * 100, 1))
+
+
+# Capital base reset date — mirrors indicator/okx/report.py's
+# EXECUTOR_RESTART_SINCE (2026-07-14 top-up, see mistake.md 2026-07-13).
+# Reimplemented standalone rather than imported: the agent must not import
+# indicator.okx.report or anything else in that module tree.
+_MDD_SINCE = "2026-07-14"
+
+
+def _mdd_pct(since: str) -> Optional[float]:
+    """Same peak/trough algorithm as report.py's _get_equity_curve_stats,
+    reimplemented standalone (see agent-boundary.md — no cross-imports
+    into indicator.okx.*). Returns a percentage, never a dollar figure."""
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT total_eq_usd FROM v7_okx_balance_snapshots "
+                "WHERE ts >= %s ORDER BY ts", (since,))
+            eqs = [float(r["total_eq_usd"]) for r in cur.fetchall()
+                   if r.get("total_eq_usd") is not None]
+    except Exception:
+        return None
+    finally:
+        conn.close()
+    if len(eqs) < 2:
+        return None
+    peak, mdd = eqs[0], 0.0
+    for v in eqs:
+        peak = max(peak, v)
+        mdd = min(mdd, (v - peak) / peak * 100)
+    return round(mdd, 1)
+
+
+def public_track_record() -> dict[str, Any]:
+    if _seed_mode():
+        return {
+            "signal_layer": {"n": 739, "win_rate_pct": 59.5, "ci95": [56.0, 63.2],
+                             "note": "Strong-tier tracked signals, 4h outcome"},
+            "trade_layer": {"n_closed": 34, "win_rate_pct": 52.9,
+                            "ci95": [36.4, 68.7],
+                            "note": "closed live OKX trades, net of costs"},
+            "mdd_pct": -8.2,
+            "caveat": "signal accuracy != trading profit after costs/stops",
+            "disclaimer": DISCLAIMER,
+            "_source": "seed",
+        }
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) n, SUM(correct) wins FROM tracked_signals "
+                "WHERE strength='Strong' AND correct IS NOT NULL")
+            sig = cur.fetchone() or {}
+            cur.execute(
+                "SELECT COUNT(*) n, "
+                "  SUM(CASE WHEN net_pct>0 THEN 1 ELSE 0 END) wins "
+                "FROM v7_okx_positions WHERE status='CLOSED'")
+            trd = cur.fetchone() or {}
+    finally:
+        conn.close()
+
+    sig_n = int(sig.get("n") or 0)
+    sig_wins = int(sig.get("wins") or 0)
+    trd_n = int(trd.get("n") or 0)
+    trd_wins = int(trd.get("wins") or 0)
+    sig_ci = _wilson_ci(sig_wins, sig_n) if sig_n else None
+    trd_ci = _wilson_ci(trd_wins, trd_n) if trd_n else None
+
+    return {
+        "signal_layer": {
+            "n": sig_n,
+            "win_rate_pct": round(sig_wins / sig_n * 100, 1) if sig_n else None,
+            "ci95": list(sig_ci) if sig_ci else None,
+            "note": "Strong-tier tracked signals, 4h outcome",
+        },
+        "trade_layer": {
+            "n_closed": trd_n,
+            "win_rate_pct": round(trd_wins / trd_n * 100, 1) if trd_n else None,
+            "ci95": list(trd_ci) if trd_ci else None,
+            "note": "closed live OKX trades, net of costs",
+        },
+        "mdd_pct": _mdd_pct(_MDD_SINCE),
+        "caveat": "signal accuracy != trading profit after costs/stops",
+        "disclaimer": DISCLAIMER,
+        "_source": "live",
+    }
+
+
 # ── Tool 4: risk frame (pure computation) ──────────────────────────────
 
 # Edge profile constants (documented in CLAUDE.md §Leverage ladder).

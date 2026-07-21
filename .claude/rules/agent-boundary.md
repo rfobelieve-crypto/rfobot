@@ -23,7 +23,9 @@ Files under `indicator/agent/` MUST NOT import, at any depth:
 - Read-only SELECT via `shared/db.get_db_conn()` on existing tables:
   `tracked_signals`, `v7_okx_positions`, `orderbook_snapshots_1m`,
   `flow_bars_1m`, `indicator_history`, `depth_deltas_1m`,
-  `cancel_playbook_events` (research line, 2026-07-17)
+  `cancel_playbook_events` (research line, 2026-07-17),
+  `v7_okx_balance_snapshots` (public track-record MDD, 2026-07-21 —
+  only `ts`/`total_eq_usd` read, no dollar figures re-exposed downstream)
 - Pure-computation imports from `market_data.tasks.cancel_playbook_watcher`
   / `research.cancel_flow_analyze` (frozen feature definitions — read-only
   code path; the agent never calls their write/alert functions)
