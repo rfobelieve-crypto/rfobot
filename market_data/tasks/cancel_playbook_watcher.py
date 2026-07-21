@@ -229,7 +229,36 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
     out["vshock"] = out["vol"] / vbase.replace(0, np.nan)
     out["taker_ratio"] = out["dlt"] / out["vol"].replace(0, np.nan)
     out["ret_1m"] = out["mid"] / out["mid"].shift(1) - 1
+
+    # 2026-07-21: 撤單/加單機制拆解（display-only，additive，不影響上面
+    # 任何凍結欄位）。net15 只給淨值方向，看不出是「這側在撤」還是「對側
+    # 在加」造成的同一個淨值——對 ba/bc/aa/ac 四條原始序列各自算 trailing
+    # 60m shock（沿用既有 tot shock 手法），供 dominant_flow_action() 指出
+    # 這分鐘最反常的動作具體是誰做的。
+    for col in ("ba", "bc", "aa", "ac"):
+        cbase = out[col].rolling(60, min_periods=30).median()
+        out[f"{col}_shock"] = out[col] / cbase.replace(0, np.nan)
     return out
+
+
+FLOW_ACTION_ZH = {"ac": "賣方撤單", "bc": "買方撤單",
+                  "aa": "賣方加單", "ba": "買方加單"}
+
+
+def dominant_flow_action(r: pd.Series, min_shock: float = 2.0) -> str | None:
+    """FROZEN v1（2026-07-21）：ba/bc/aa/ac 四個 shock 裡最大的那個，就是
+    這分鐘最反常的具體動作（UX 層判讀輔助，門檻可調，不是分類定義——比照
+    ALERT_MIN_VSHOCK 的先例）。min_shock=2.0 比合計 shock 的 3.0 門檻寬鬆，
+    因為單一原始序列本來就比合計序列雜訊大。四個都不到門檻 → None
+    （沒有單一動作明顯主導，可能是雙邊同時在動或本來就平靜）。"""
+    vals = {c: r.get(f"{c}_shock") for c in ("ba", "bc", "aa", "ac")}
+    vals = {c: v for c, v in vals.items() if v is not None and np.isfinite(v)}
+    if not vals:
+        return None
+    top_c, top_v = max(vals.items(), key=lambda kv: kv[1])
+    if top_v < min_shock:
+        return None
+    return FLOW_ACTION_ZH[top_c]
 
 
 def classify_minute(r: pd.Series) -> tuple[str, str] | None:
@@ -390,8 +419,13 @@ def humanize_story(playbook: str, direction: str,
 
 
 def humanize_book(shock: float | None = None, skew15: float | None = None,
-                  net15: float | None = None) -> str:
-    """掛單面一句話：撤單鬧鐘倍數 + 抽單偏向 + 淨撤離方向（門檻沿用凍結 FLAT）。"""
+                  net15: float | None = None,
+                  dominant: str | None = None) -> str:
+    """掛單面一句話：撤單鬧鐘倍數 + 抽單偏向 + 淨撤離方向（門檻沿用凍結
+    FLAT）+ 主導動作（2026-07-21 加，見 dominant_flow_action）。net15/
+    skew15 只講「淨值往哪邊」，講不出這是哪一方造成的——同一個淨值可能是
+    「這側在撤」也可能是「對側在加」，兩種機制被含糊成同一句「撤離」，是
+    使用者 2026-07-21 指出的不準確處。dominant 為 None 時不強加結論。"""
     parts = []
     if shock is not None and np.isfinite(shock):
         parts.append(f"撤單量為平時的 {shock:.1f} 倍")
@@ -409,6 +443,8 @@ def humanize_book(shock: float | None = None, skew15: float | None = None,
             parts.append("下方掛單淨撤離明顯")
         else:
             parts.append("無明顯淨撤離")
+    if dominant:
+        parts.append(f"具體動作: {dominant}佔主導")
     return "；".join(parts) if parts else "掛單資料不足"
 
 
@@ -432,6 +468,9 @@ def scan(df_feat: pd.DataFrame, minutes: list[int]) -> list[dict]:
             "vshock": None if pd.isna(r["vshock"]) else float(r["vshock"]),
             "taker_ratio": None if pd.isna(r["taker_ratio"]) else float(r["taker_ratio"]),
             "ret_1m": None if pd.isna(r["ret_1m"]) else float(r["ret_1m"]),
+            # 2026-07-21: 不進 DB（insert_events 只認固定欄位），純供
+            # alert_events() 組文字用——見 dominant_flow_action 凍結定義
+            "dominant_action": dominant_flow_action(r),
         })
     return events
 
@@ -530,7 +569,8 @@ def alert_events(fresh: list[dict]) -> None:
                     e["playbook"], e["direction"],
                     e["vshock"], e["taker_ratio"]),
                 "掛單面: " + humanize_book(
-                    e["shock"], e["skew15"], e["net15"]),
+                    e["shock"], e["skew15"], e["net15"],
+                    e.get("dominant_action")),
                 f"原始值: shock {e['shock']:.1f}x 毛 {fmt(e['skew15'])} "
                 f"淨 {fmt(e['net15'])} 量 {fmt(e['vshock'], '.1f')}x "
                 f"taker {fmt(e['taker_ratio'], '+.0%')}",

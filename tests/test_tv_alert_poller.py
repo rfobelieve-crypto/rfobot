@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 
 from market_data.tasks.cancel_playbook_watcher import (
-    action_keyboard, first_hit_verdict, format_outcome_reply, verdict_mark)
+    action_keyboard, compute_features, first_hit_verdict, format_outcome_reply,
+    verdict_mark)
 from market_data.tasks.tv_alert_poller import (
     format_card, format_stage1_card, format_stage2_card,
     format_tv_outcome_reply, hr_call_direction, hr_flags, state_distribution)
@@ -107,6 +108,67 @@ class TestHumanize:
         flat = humanize_book(shock=1.0, skew15=0.01, net15=-0.02)
         assert "均衡" in flat and "無明顯淨撤離" in flat
         assert humanize_book() == "掛單資料不足"
+
+    def test_book_dominant_action_appended(self):
+        from market_data.tasks.cancel_playbook_watcher import humanize_book
+        t = humanize_book(shock=3.6, skew15=0.1, net15=0.05, dominant="賣方加單")
+        assert "具體動作: 賣方加單佔主導" in t
+        assert "具體動作" not in humanize_book(shock=3.6)   # dominant=None 不強加
+
+
+class TestDominantFlowAction:
+    """FROZEN v1 (2026-07-21)：撤單/加單機制拆解——net15 只給淨值方向，看
+    不出是「這側撤單」還是「對側加單」造成的同一個淨值；使用者指出這個
+    含糊處後加上。ba/bc/aa/ac 四個 shock 裡最大的那個就是主導動作。"""
+
+    def test_ask_cancel_dominant(self):
+        from market_data.tasks.cancel_playbook_watcher import dominant_flow_action
+        r = pd.Series(dict(ba_shock=1.0, bc_shock=1.2, aa_shock=0.9, ac_shock=4.5))
+        assert dominant_flow_action(r) == "賣方撤單"
+
+    def test_ask_add_dominant(self):
+        # 這正是使用者今天指出的情境：不是撤單造成不平衡，是賣方在加單
+        from market_data.tasks.cancel_playbook_watcher import dominant_flow_action
+        r = pd.Series(dict(ba_shock=1.1, bc_shock=1.0, aa_shock=5.2, ac_shock=1.3))
+        assert dominant_flow_action(r) == "賣方加單"
+
+    def test_bid_side_mirrors(self):
+        from market_data.tasks.cancel_playbook_watcher import dominant_flow_action
+        r = pd.Series(dict(ba_shock=1.0, bc_shock=3.8, aa_shock=1.0, ac_shock=1.0))
+        assert dominant_flow_action(r) == "買方撤單"
+        r2 = pd.Series(dict(ba_shock=6.0, bc_shock=1.0, aa_shock=1.0, ac_shock=1.0))
+        assert dominant_flow_action(r2) == "買方加單"
+
+    def test_below_threshold_is_none(self):
+        from market_data.tasks.cancel_playbook_watcher import dominant_flow_action
+        r = pd.Series(dict(ba_shock=1.1, bc_shock=1.3, aa_shock=1.0, ac_shock=1.4))
+        assert dominant_flow_action(r) is None
+
+    def test_missing_or_nan_values(self):
+        from market_data.tasks.cancel_playbook_watcher import dominant_flow_action
+        assert dominant_flow_action(pd.Series(dtype=float)) is None
+        r = pd.Series(dict(ba_shock=np.nan, bc_shock=np.nan,
+                           aa_shock=np.nan, ac_shock=np.nan))
+        assert dominant_flow_action(r) is None
+
+    def test_compute_features_produces_per_side_shock_columns(self):
+        # 整合測試：compute_features() 真的算出 *_shock，且最後一根(賣方
+        # 加單狂噴)能被 dominant_flow_action 正確抓到——不是只測孤立函數。
+        from market_data.tasks.cancel_playbook_watcher import dominant_flow_action
+        n = 90
+        df = pd.DataFrame({
+            "ba": [10.0] * n, "bc": [10.0] * n,
+            "aa": [10.0] * (n - 1) + [200.0],   # 最後一根賣方狂加單
+            "ac": [10.0] * n,
+            "vol": [100.0] * n, "dlt": [0.0] * n,
+            "mid": [64000.0] * n,
+        })
+        feat = compute_features(df)
+        for col in ("ba_shock", "bc_shock", "aa_shock", "ac_shock"):
+            assert col in feat.columns
+        last = feat.iloc[-1]
+        assert last["aa_shock"] > 10          # 遠高於基線
+        assert dominant_flow_action(last) == "賣方加單"
 
 
 class TestActionKeyboard:

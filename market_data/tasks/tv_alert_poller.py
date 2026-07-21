@@ -35,8 +35,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.db import get_db_conn
 from market_data.tasks.cancel_playbook_watcher import (
     DEF_VERSION, DIR_ZH, FIRST_HIT_ZH, GATE_SHOCK, STATE_META, _tg_creds,
-    action_keyboard, classify_state, compute_features, first_hit_verdict,
-    humanize_book, humanize_story, load_frame, state_color, verdict_mark)
+    action_keyboard, classify_state, compute_features, dominant_flow_action,
+    first_hit_verdict, humanize_book, humanize_story, load_frame,
+    state_color, verdict_mark)
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +246,8 @@ def format_card(row: dict, cur: dict, feat_last: pd.Series,
         f"當下狀態: {state_line}",
         "發生了什麼: " + humanize_story(cur["state"], cur["direction"],
                                    num("vshock"), num("taker_ratio")),
-        "掛單面: " + humanize_book(num("shock"), num("skew15"), num("net15")),
+        "掛單面: " + humanize_book(num("shock"), num("skew15"), num("net15"),
+                               dominant_flow_action(feat_last)),
         f"回看{n_lookback}m: {dist or '無資料'}",
         "接下來: 120 分鐘自動對答案；你的判讀請按下面按鈕",
         f"原始值: shock {g('shock', '.1f')}x 毛 {g('skew15', '+.2f')}"
