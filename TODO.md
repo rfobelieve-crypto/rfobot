@@ -373,15 +373,18 @@ rfobot_系統精通手冊.docx 含完整標準答案）。逐層攻破，每層�
 - [ ] 回 Claude 做面試官壓力測試（跨層追問）
 自測進度 2026-07-07：層 1 Q1 60分（漏 notional）、Q2/Q3 知識債 → 已補入手冊
 
-### 7. 產品化網站——3D/互動風格參考（2026-07-21 登記）
-使用者想把系統未來做成產品網站，參考風格：Instagram reel
-（jerrythewebdev, https://www.instagram.com/reel/DZ6RKjtxbvk/）。內容是
-「AI 生成素材 vs 人的判斷力」的論述短片（非技術教學）：AI 只產生可能性，
-拿掉什麼、動線走向、節奏對不對，是人在決定；配 hashtag #opus #fable5
-#mythos（用 Claude 系列模型輔助製作）。同串關聯貼文補了作法輪廓：
-Strategy → Visuals → Build → Launch 四階段；技術棧常見 React + Tailwind
-+ Three.js + GSAP + WebGL，做滑鼠互動漸層、捲動觸發的 3D 動效。
-- [ ] 定位：純風格/美學參考（互動 3D、刻意的節奏與留白），不是逐項規格；
+### 7. 產品化網站——3D/互動風格參考（2026-07-21 登記，同日補正）
+使用者想把系統未來做成產品網站。原先參考的 IG reel 靜態截圖只看到模糊
+漸層，經使用者上傳實機螢幕錄影（jerrythewebdev,「Websites after leaving
+ChatGPT for Claude」）確認真正的視覺語言，跟第一版描述（互動漸層）差
+很多，以錄影為準：
+- **深色電影感底**，極簡放大無襯線標題字
+- **玻璃質感 3D 浮動面板** + 全息/虹彩材質的有機造型 3D 物件飄浮在暗色空間
+- 破碎鏡面/玻璃碎片拼接面板，文字嵌在碎片裡，搭配潑彩煙霧色塊（藍紫粉）
+  點綴
+- 捲動觸發場景轉場（技術棧常見 React + Tailwind + Three.js + GSAP +
+  WebGL），配 hashtag #opus #fable5 #mythos（用 Claude 系列模型輔助製作）
+- [ ] 定位：視覺風格參考（深色、玻璃質感 3D、捲動轉場），不是逐項規格；
       跟 `project_productization_goal`（長期商業化目標，現階段先顧穩定+
       訊號品質，不做過早的 multi-tenant/auth/billing 抽象）放一起看
 - [ ] 待評估：這個風格值不值得投入（Three.js/WebGL 對求職 demo 或未來
