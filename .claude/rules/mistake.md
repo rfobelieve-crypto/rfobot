@@ -4,6 +4,196 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+# Product-Site（前端網站建置）
+
+跟下面量化系統本體的錯誤是不同類別——這裡記的是 `product-site`（Next.js
+行銷/產品網站，獨立 repo，Vercel 部署）建置過程踩的坑。2026-07-22 這天
+從「幫圖表接上網站」一路做到「首頁標題特效」，密度很高，獨立開一類。
+
+## 2026-07-22: Vercel 部署失敗——盲猜帳號登入 3 輪，真正原因是方案限制 + 舊接錯的 Git 整合
+
+**What happened:**
+幫 product-site 第一次連 GitHub + 部署到 Vercel，選了私有 repo。部署一直
+失敗，錯誤只寫「not a member of the team」。我第一直覺是 CLI 登入身分不對
+（`rfobelieve-crypto` vs `rfobelieve2@gmail.com`），來回試了 `vercel logout`
+/`vercel login --github`、重推 3 次，每次都失敗、每次都送一封失敗信。
+使用者截圖轉發 Vercel 網頁後台的實際錯誤畫面後才看到真正訊息：
+「Deployment Blocked — commit author 對這個 project 沒有 contributing
+access。The Hobby Plan does not support collaboration for private
+repositories.」——這個 project 掛在 team scope 底下，team 是免費 Hobby
+方案，Hobby 方案的規則就是**team scope + 私有 repo = 一律擋**，跟登入
+哪個帳號完全無關。
+
+同一個 session 稍後，flow_system（另一個完全不相關的 repo）一次
+正常 push 後，使用者的 Gmail 收到一封「product-site Build Failed，
+Command "npm run vercel-build" exited with 1」的信。查證後發現：這個
+Vercel project 的 Git 整合早就（在今天連 product-site 的 GitHub repo
+**之前**）連到了 `rfobelieve-crypto/rfobot`（flow_system 的 repo）
+main 分支——大概是 Vercel project 剛建立時 product-site 的 GitHub repo
+根本還不存在，順手接到了當時唯一能選的 repo。這條接錯的線一直沒人
+發現，直到今天 push flow_system 才第一次真正觸發。
+
+**Root cause:**
+1. 看到「not a member of the team」這種帳號權限風味的錯誤訊息，直覺
+   跳去查登入身分，但**沒有先去 Vercel 部署頁本身看完整錯誤內容**——
+   那頁一開始就寫著真正原因（方案限制），CLI 這邊的錯誤訊息是被
+   截斷/簡化過的版本。
+2. 從沒有主動查過這個 Vercel project 的 Git 整合實際指向哪個 repo——
+   一直假設「我剛連的那個就是唯一一個」，沒想過專案建立當下可能
+   已經連了別的東西。
+
+**Correct approach（已修）:**
+- 私有 repo + team scope 撞牆：查證這個帳號類型**沒有個人 scope 可切換**
+  （`personal_scope_not_allowed`）後，改把 GitHub repo 從私有改公開
+  （`gh repo edit --visibility public`）解決，不用花錢升級方案。
+- 接錯的 Git 整合：直接用 Vercel API（`GET /v9/projects/{id}`）查
+  `link` 欄位確認真正連到哪個 repo，找到後 `vercel git disconnect`
+  斷開，之後 flow_system push 不會再誤觸發假失敗信。
+
+**Rule:** 看到任何「權限/帳號」風味的部署錯誤，**第一步是去看該平台
+自己的部署詳情頁**（Vercel/Netlify/Railway 等都有），不是先猜身分
+重登入——CLI 回傳的錯誤訊息經常被截斷，網頁後台通常有完整原因跟
+解法連結。連結一個新 GitHub repo 到既有的付費平台 project 前，**先用
+API 或後台查證這個 project 現有的 Git 整合實際指向哪裡**，不要假設
+它是乾淨的——項目可能在很久以前就被接到別的地方，且这类误接不会
+主动报错，只在下次不相关的 push 命中时才现形。
+
+---
+
+## 2026-07-22: `next build` 跟 `next dev` 共用 `.next` 目錄互相打架，同一個坑踩了三次
+
+**What happened:**
+同一個 session 裡，我習慣在改完程式碼後跑 `npm run build` 做最終確認，
+但背景常常還留著一個更早開的 `npm run dev`（同一個專案目錄，共用
+`.next/`）。至少三次，`build` 跑完後，那個還活著的 `dev` server 就開始
+報 `Cannot find module './vendor-chunks/xxx.js'` 或
+`TypeError: __webpack_modules__[moduleId] is not a function`，
+截圖驗證因此撞見 Next.js 錯誤畫面而不是真正的頁面——一度誤以為是
+自己剛寫的程式碼壞了，浪費時間排查了根本沒问题的 component。
+
+另一個疊加的小狀況：每次 `rm -rf .next && npm run dev` 重開，只要
+port 3000 被前一輪沒清乾淨的孤兒 node 進程佔用，Next.js 會**靜默**
+改用 3001/3002/3003…，而我的 Playwright 測試腳本還在打舊 port，
+得到的 404/500 一開始也被誤讀成「程式碼壞了」。
+
+**Root cause:**
+`next dev` 的 webpack 模組編號跟 `next build` 產生的正式建置輸出
+不是同一套 module id 對照表；兩者同時寫入同一個 `.next/` 目錄，
+dev server 之後的熱重載會讀到跟自己內部狀態對不上的模組登記表。
+Port 假設錯誤則是純粹沒有去讀 `npm run dev` 自己印出來的實際 port
+就直接寫死在測試腳本裡。
+
+**Correct approach（已固定成習慣）:**
+- 需要跑 `next build` 驗證時，先確認/停掉背景的 `dev` server 再跑；
+  build 完之後如果還要繼續用瀏覽器驗證，`rm -rf .next` 乾淨重開一個
+  新的 `dev`。
+- 每次重開 dev server 後，**先讀它自己印出的 port**（可能因為前一個
+  沒清乾淨而跳號），再更新截圖腳本裡的 URL，不要沿用上一輪的 port。
+- 順手清掉確認是自己這個 session 產生的孤兒進程（`Stop-Process`），
+  避免下一輪又跳號。
+
+**Rule:** 同一個專案目錄下，`next dev` 跟 `next build` 不能同時活著
+共用 `.next/`——要嘛先關 dev 再 build，要嘛 build 完清快取重開 dev。
+看到 `__webpack_modules__ is not a function` 或
+`Cannot find module './vendor-chunks/...'` 這類錯誤，**先假設是
+dev/build 快取衝突**，重開乾淨的 dev server 再重新判斷，不要立刻
+懷疑自己剛寫的程式碼。每次起新 dev server 都要讀它實際印出的 port，
+不要沿用假設。
+
+---
+
+## 2026-07-22/23: 兩個移植的 Canvas 文字特效都踩到同一個坑——`ctx.font` 不吃 CSS variable
+
+**What happened:**
+從 21st.dev/originkit 移植了兩個外部 Canvas/WebGL 文字特效組件
+（PixelDrift 粒子字、後來換成的 MeshTextHover 網格扭曲字），兩次
+都把 `fontFamily="var(--font-display)"` 這樣的 CSS 變數字串直接傳給
+`ctx.font = "700 100px " + fontFamily`。第一次（PixelDrift）的症狀是
+中文標題渲染出來只剩零星幾個點、幾乎看不見，一度以為是取樣密度或
+中文筆劃太細的問題，花了一輪排查（包括另外寫一支腳本單獨畫「原始
+字形」出來看）才確認：**字型從頭到尾沒有真的套用**，Canvas 默默
+退回極小的預設字級，取樣自然抓不到什麼。修完 PixelDrift 之後，
+換成 MeshTextHover 時，同一行程式碼模式又原封不動地移植過去，
+同一個坑等於預先埋好等著再踩一次（這次在寫的當下就直接照搬第一次
+的修法補上了，但事後看，**如果一開始就把這個當成「移植任何 canvas
+文字效果都要檢查的固定步驟」，第二次根本不用重新推導一次）。
+
+**Root cause:**
+`CanvasRenderingContext2D.font` 是純字串屬性，瀏覽器用 CSS 字型
+簡寫語法解析它，但**不會**解析 CSS 自訂屬性（`var(--x)`）——不是
+報錯，是整段賦值被判定成不合法語法後**靜默不生效**，context 保留
+先前的字型設定（通常是極小的預設值）。這是 Canvas 2D API 眾所皆知
+但容易忘記的限制：CSS 的東西進 Canvas 之前，變數/計算式一律要先
+被瀏覽器解析成字面值。
+
+**Correct approach（兩次都用同一招，已驗證有效）:**
+把 `fontFamily` 同時當成一個真實 DOM 元素（外層 wrapper div）的
+inline style 設定上去，讓瀏覽器透過正常 CSS cascade 解析 `var()`；
+再用 `window.getComputedStyle(wrapper).fontFamily` 讀出解析後的
+**字面值字串**，這個才是真正安全餵給 `ctx.font` 的版本。
+
+**Rule:** 任何要把 CSS 變數（字型、顏色、間距皆同理）交給 Canvas 2D
+或 WebGL 的地方，**一律先透過一個真實掛載的 DOM 元素 + `getComputedStyle`
+解析成字面值**，絕不要把 `var(--x)` 字串直接傳給 canvas API。第一次
+修完這類坑之後，要馬上把它記成「移植任何 canvas 文字/繪圖組件」的
+標準檢查項，不要指望「這次應該不會忘記」——這次確實沒忘記，是因為
+剛好前一個組件才修過、記憶猶新，換一個更久之後的情境完全可能重演。
+
+---
+
+## 2026-07-22: 首頁標題特效——追著同一個技術路線調參數三輪，真正解法是換掉整個技術路線
+
+**What happened:**
+使用者要求把首頁標題換成 originkit 的「Pixel Drift」粒子字特效
+（英文 Latin 字體的展示 demo）。移植後中文標題渲染出來是一團幾乎
+看不出字形的雜訊點——追查發現原組件把取樣密度硬性上限鎖在
+`particleCount<=50`（換算最細只有 3px 取樣間距），這個上限是針對
+**英文粗體**設計的，對中文細密筆劃完全不夠。拿掉上限、把中文取樣
+密度開到最高後，桌面版清楚了，但手機寬度下（8 個中文字擠進
+~340px）密度開到最高還是不夠——這是取樣間距的物理極限撞到「字太小」
+的天花板，不是能再調參數解決的問題。第一個解法是手機版整個退回
+靜態文字（放棄特效），使用者拿起手機看到「怎麼沒動靜」才發現這個
+取捨沒有講清楚。討論後使用者自己點出真正解法：**改標題文案本身**，
+把長句拆成天然更短的行（後來又換成「會犯錯的AI交易」這個新標語），
+手機也能上特效。做完這輪，使用者又回報「畫質還是偏低」「顆粒感
+還是太重」——依序修了 dpr 上限（2→3）、粒子相對字體的比例
+（particleSize 依螢幕層級調整）、方形粒子改圓形——每次都有感改善，
+但每次都不是「解決問題」，只是「把同一個根本限制往後推一點」。
+最後使用者直接指名要換成 MeshTextHover（連續材質貼圖扭曲，不是
+離散粒子取樣）——這個技術路線從根本上沒有取樣密度/顆粒感這個
+問題，前面三輪的所有補丁（手機斷行、particleSize 補償、dpr、
+方圓形）全部一次作廢，因為問題的載體被整個換掉了。
+
+**Root cause:**
+特效效果分兩層：Latin demo 沒驗證過中文（正常，demo 作者根本
+不會想到這件事）；但更深一層是我自己**把每一輪「還是不夠好」的
+使用者回饋都當成「這個參數還沒調對」去處理**，而不是在第二、
+第三輪類似性質的回饋出現時停下來問「是不是這整個技術做法本身就有
+天花板」。離散粒子取樣文字，物理上必然有「取樣密度 vs 字體大小」
+的比值下限，低於這個下限不管怎麼調都會顆粒化——這是這個技術類別
+（sampling-based）內建的限制，不是這次實作特有的 bug，多花一輪
+去意識到這件事，就能提早問使用者「要不要考慮換一種完全不同的做法」
+而不是自己悶頭再調一輪參數。
+
+**Correct approach:**
+换到 MeshTextHover 之後（真實 Canvas2D 文字渲染貼到 WebGL 網格，
+只做幾何扭曲不做像素取樣），中文在任何螢幕寬度下都跟桌面版等
+清晰度——因為根本沒有「取樣密度不夠」这个概念存在。手機不用再
+特別拆短句，直接跟桌面共用同一份文案，只是 fontSize 依斷點調整。
+所有 PixelDrift 專屬的補丁程式碼（含元件本身）直接刪除，不留
+「以防萬一」的殘骸。
+
+**Rule:** 同一個視覺/渲染方向連續 2-3 輪收到「還是不夠好」的回饋時，
+**先問這是不是這個技術類別本身的天花板**，不要預設只是參數沒調對
+就急著調下一輪。移植任何為英文/Latin 內容設計的展示型 demo 元件
+（字體特效、動畫模板）時，**第一步就用實際要上線的語言內容
+（這裡是中文）測過一輪**，不要等使用者在真機上看到才發現——別的
+語言的視覺密度/筆劃複雜度可能跟示範用的完全不是一個量級。技術
+路線之間的取捨（離散取樣 vs 連續紋理）要主動列出來給使用者選，
+不要只沿著第一個選中的路線一路打補丁到底。
+
+---
+
 ## 2026-07-13: 資金調度觸發 CAP-4 DEMOTE——kill switch 分不出 operator transfer 和 strategy loss
 
 **What happened:**
