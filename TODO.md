@@ -405,6 +405,17 @@ ChatGPT for Claude」）確認真正的視覺語言，跟第一版描述（互�
       實際是 dev server 重啟後瀏覽器仍吃舊 JS bundle（非 `.next` cache 問題，
       硬性重新整理即解）——下次「明明改了看起來沒變」先試 hard reload
       再懷疑程式碼
+- [x] **中文切換上線（2026-07-22 完成，commit 4e475a7）**：next-intl 路由
+      分語言，`/zh` 前綴、英文維持原本無前綴網址不變（localePrefix:
+      as-needed，保住既有連結/SEO）。middleware 自動偵測瀏覽器語言；
+      全站 app/ 路由搬進 app/[locale]/...；messages/en.json +
+      messages/zh.json 兩份完整字典（177 key 逐一核對雙語對齊）；Nav
+      右上角加 EN/中切換鈕，切換時停在同一頁換語不跳轉首頁。本機
+      production build 驗證：兩語言全頁 SSG 成功、語言偵測+同頁切換+
+      真實 API 資料頁（Track Record）+ 表單頁（Register）全過，正式站
+      curl 7 條路由全 200。已知限制：Track Record/Signals 頁的
+      note/caveat/disclaimer 是後端 agent API 直接回傳的英文，不是靜態
+      UI 字串，這次沒雙語化
 - [ ] **UI 組件 MCP 待授權（2026-07-21 登記）**：已裝 `@21st-dev/cli`（全局）+
       註冊兩個 MCP server（`21st-dev` → https://21st.dev/mcp，
       `originkit` → https://mcp.originkit.dev/mcp），皆卡在 OAuth 登入——
