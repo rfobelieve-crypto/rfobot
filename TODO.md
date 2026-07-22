@@ -416,17 +416,15 @@ ChatGPT for Claude」）確認真正的視覺語言，跟第一版描述（互�
       curl 7 條路由全 200。已知限制：Track Record/Signals 頁的
       note/caveat/disclaimer 是後端 agent API 直接回傳的英文，不是靜態
       UI 字串，這次沒雙語化
-- [ ] **UI 組件 MCP 待授權（2026-07-21 登記）**：已裝 `@21st-dev/cli`（全局）+
-      註冊兩個 MCP server（`21st-dev` → https://21st.dev/mcp，
-      `originkit` → https://mcp.originkit.dev/mcp），皆卡在 OAuth 登入——
-      這一步需要真正互動式 terminal（本機 Bash 工具是非互動子行程，
-      stdin 不是 terminal 過不了 callback），只能使用者自己在提示列跑
-      `! claude mcp login 21st-dev` 和 `! claude mcp login originkit`。
-      跑完後續步驟：用 `claude mcp get <name>` 確認連線 → 搜尋兩邊组件庫
-      有沒有跟現有深色/玻璃美術風格搭的現成 React/Tailwind 組件
-      （表單、卡片、按鈕）可替換掉目前手刻的 LoginForm/RegisterForm 等，
-      非必然有收穫（要先看實際組件品質跟風格是否搭），此項只是「有了
-      這兩個工具，值不值得換」的探索，不是既定要做的重構
+- [x] **UI 組件 MCP 授權完成（2026-07-21 登記 → 2026-07-22 確認已授權）**：
+      `21st-dev`（https://21st.dev/mcp）與 `originkit`
+      （https://mcp.originkit.dev/mcp）OAuth 登入已完成，兩邊工具
+      （`mcp__21st-dev__*` / `mcp__originkit__*`）已出現在可用工具列表。
+- [ ] 下一步：搜尋兩邊組件庫有沒有跟現有深色/玻璃美術風格搭的現成
+      React/Tailwind 組件（表單、卡片、按鈕）可替換掉目前手刻的
+      LoginForm/RegisterForm 等，非必然有收穫（要先看實際組件品質跟
+      風格是否搭），此項只是「有了這兩個工具，值不值得換」的探索，
+      不是既定要做的重構
 
 ---
 
