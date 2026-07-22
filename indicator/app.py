@@ -42,6 +42,7 @@ HISTORY_PATH = ARTIFACT_DIR / "indicator_history.parquet"
 # ── State ────────────────────────────────────────────────────────────────────
 _state = {
     "chart_png": b"",
+    "chart_png_dark": b"",
     "last_update": None,
     "last_prediction": None,
     "status": "initializing",
@@ -513,12 +514,16 @@ def update_cycle() -> dict:
         # 6. Render chart (last 200 bars that have OHLC data)
         chart_df = indicator_df.dropna(subset=["open", "high", "low", "close"])
         png = render_chart(chart_df, last_n=200)
+        # dark variant for product-site (which is dark-themed) — same data,
+        # same call, additive cost of one extra matplotlib figure per cycle
+        png_dark = render_chart(chart_df, last_n=200, dark=True)
 
         # 6. Update state
         last_row = indicator_df.iloc[-1]
         with _lock:
             _state["indicator_df"] = indicator_df
             _state["chart_png"] = png
+            _state["chart_png_dark"] = png_dark
             _state["last_update"] = datetime.now(timezone.utc).isoformat()
             _state["last_prediction"] = {
                 "time": str(indicator_df.index[-1]),
@@ -898,6 +903,19 @@ def _admin_guard():
 def chart():
     with _lock:
         png = _state["chart_png"]
+    if not png:
+        return Response("Chart not ready yet. Please wait for first update cycle.",
+                        status=503)
+    return Response(png, mimetype="image/png")
+
+
+@app.route("/chart-dark")
+def chart_dark():
+    """Dark-background variant for product-site's agent-mcp /public/chart
+    proxy (see .claude/rules/agent-boundary.md — the agent relays these
+    bytes, it never renders). No auth, same posture as `/`."""
+    with _lock:
+        png = _state["chart_png_dark"]
     if not png:
         return Response("Chart not ready yet. Please wait for first update cycle.",
                         status=503)

@@ -28,10 +28,13 @@ from __future__ import annotations
 import time
 from typing import Optional
 
+import os
+
 import anyio
+import requests
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from indicator.agent import queries
 
@@ -266,6 +269,84 @@ async def public_login_route(request: Request) -> JSONResponse:
     resp = JSONResponse(result, status_code=status)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
+
+
+# ── Public chart images — pure HTTP relay, never a render ───────────────
+#
+# This service does not import chart_renderer.py or plot_cancel_flow.py.
+# Both PNGs are already computed on the indicator service's own hourly/
+# on-demand cycle; these routes just fetch and re-serve those bytes. That
+# keeps the change entirely outside agent-boundary.md's import allow-list
+# (an HTTP GET is not a Python import) and off tests/test_agent_boundary.py's
+# AST scan — see .claude/rules/agent-boundary.md "share DB, don't import
+# code" and its Change Rule.
+INDICATOR_BASE_URL = os.environ.get(
+    "INDICATOR_BASE_URL", "https://enchanting-emotion-production-4b4d.up.railway.app")
+INDICATOR_ADMIN_TOKEN = os.environ.get("INDICATOR_ADMIN_TOKEN", "")
+
+
+def _fetch_origin_png(url: str, token: str = "") -> bytes | None:
+    """Sync HTTP GET, run off the event loop via anyio.to_thread. `token` is
+    positional-or-keyword, not keyword-only — anyio.to_thread.run_sync only
+    forwards *args, not **kwargs, so the call site below passes it
+    positionally. Never raises — a failed/timed-out origin fetch degrades to
+    None, which the caller turns into "serve stale cache, else empty" (see
+    _proxy_png), mirroring product-site's own "null on failure, never
+    throw" rule for every other /public/* consumer (lib/signalFeed.ts and
+    siblings)."""
+    try:
+        headers = {"X-Admin-Token": token} if token else {}
+        r = requests.get(url, headers=headers, timeout=95)
+        if r.status_code == 200 and r.content:
+            return r.content
+    except Exception:
+        pass
+    return None
+
+
+async def _proxy_png(cache: dict, ttl_s: float, url: str, *, token: str = "") -> Response:
+    now = time.monotonic()
+    if cache["bytes"] is None or now - cache["ts"] > ttl_s:
+        fetched = await anyio.to_thread.run_sync(_fetch_origin_png, url, token)
+        if fetched is not None:
+            cache["bytes"] = fetched
+            cache["ts"] = now
+    if cache["bytes"] is None:
+        resp = Response(content=b"", status_code=503)
+    else:
+        resp = Response(content=cache["bytes"], media_type="image/png")
+        resp.headers["Cache-Control"] = f"public, max-age={int(ttl_s)}"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+# V7 chart re-serves the indicator service's in-memory PNG (dark variant,
+# see indicator/chart_renderer.py `dark=` param) — cheap on the origin, so
+# the cache here is just normal freshness control, not rate-limiting.
+_v7_chart_cache: dict = {"bytes": None, "ts": 0.0}
+_V7_CHART_CACHE_TTL_S = 300.0  # matches the ~hourly bar cadence with margin
+
+
+@mcp.custom_route("/public/chart", methods=["GET"])
+async def public_chart_route(request: Request) -> Response:
+    return await _proxy_png(
+        _v7_chart_cache, _V7_CHART_CACHE_TTL_S, f"{INDICATOR_BASE_URL}/chart-dark")
+
+
+# Cancel-flow chart's origin (/research/cancel-flow) RE-RENDERS from scratch
+# on every hit — a subprocess call, up to 90s (indicator/app.py). The cache
+# here is load-bearing, not cosmetic: without it, a public route would let
+# anyone repeatedly trigger 90s subprocess renders on the indicator service.
+# Do not lower this without also changing the origin route to cache itself.
+_cancel_chart_cache: dict = {"bytes": None, "ts": 0.0}
+_CANCEL_CHART_CACHE_TTL_S = 120.0
+
+
+@mcp.custom_route("/public/cancel-flow-chart", methods=["GET"])
+async def public_cancel_flow_chart_route(request: Request) -> Response:
+    return await _proxy_png(
+        _cancel_chart_cache, _CANCEL_CHART_CACHE_TTL_S,
+        f"{INDICATOR_BASE_URL}/research/cancel-flow", token=INDICATOR_ADMIN_TOKEN)
 
 
 def main() -> None:

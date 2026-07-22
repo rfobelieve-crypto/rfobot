@@ -32,15 +32,30 @@ REGIME_COLORS = {
     "WARMUP":        "#eeeeee",
 }
 
+# dark=True palette — hex values match research/plot_cancel_flow.py's BG/TXT/GRID
+# so the two chart types read as one consistent dark theme when placed together
+# on product-site.
+DARK_BG = "#0e1116"
+DARK_TXT = "#e3e3e3"
+DARK_GRID = "#2a2f38"
 
-def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
+
+def render_chart(ind: pd.DataFrame, last_n: int = 100, *, dark: bool = False) -> bytes:
     """
     Render indicator chart and return PNG bytes.
 
     ind must have: open, high, low, close, pred_direction, confidence_score,
                    strength_score, pred_return_4h, regime
     Optional: mag_pred
+
+    dark: additive — every existing call site defaults to the original white
+    theme (Telegram push, `/` dashboard route) unchanged. Only the product-site
+    proxy route requests dark=True.
     """
+    bg = DARK_BG if dark else "white"
+    txt = DARK_TXT if dark else "black"
+    grid_c = DARK_GRID if dark else None  # None → matplotlib's own default
+
     sig = ind.tail(last_n).copy()
     sig = sig.dropna(subset=["open", "high", "low", "close"])
 
@@ -70,13 +85,15 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
 
     n_panels = len(panels)
     fig_h = 9 + 2 * (n_panels - 2 - (1 if has_regime else 0))
-    fig = plt.figure(figsize=(20, fig_h), facecolor="white")
+    fig = plt.figure(figsize=(20, fig_h), facecolor=bg)
     gs = gridspec.GridSpec(n_panels, 1, height_ratios=panels, hspace=0.05)
 
     panel_idx = 0
 
     # ── Panel 1: Confidence heatmap ──────────────────────────────────────
     ax_conf = fig.add_subplot(gs[panel_idx]); panel_idx += 1
+    if dark:
+        ax_conf.set_facecolor(bg)
     conf = sig["confidence_score"].fillna(0).values
     conf_norm = np.clip(conf / 100.0, 0, 1)
 
@@ -90,10 +107,10 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     now_str = datetime.now(TZ_UTC8).strftime("%Y-%m-%d %H:%M UTC+8")
     ax_conf.set_title(
         f"BTC Market Intelligence Indicator  (4h prediction)  |  Updated: {now_str}",
-        fontsize=14, fontweight="bold", loc="left"
+        fontsize=14, fontweight="bold", loc="left", color=txt
     )
     ax_conf.text(n + 1, 0.5, "Confidence", fontsize=8, va="center",
-                 transform=ax_conf.transData)
+                 color=txt, transform=ax_conf.transData)
 
     # ── Panel 2: Regime strip ────────────────────────────────────────────
     # Thin horizontal band showing regime over time. Aligned with candlestick
@@ -102,6 +119,8 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     # diagnosing contra-trend signal clusters.
     if has_regime:
         ax_regime = fig.add_subplot(gs[panel_idx]); panel_idx += 1
+        if dark:
+            ax_regime.set_facecolor(bg)
         regimes = sig["regime"].fillna("CHOPPY").astype(str).values
         reg_colors = [REGIME_COLORS.get(r, REGIME_COLORS["CHOPPY"]) for r in regimes]
         ax_regime.bar(x, np.ones(n), width=1.0, color=reg_colors, edgecolor="none")
@@ -110,7 +129,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         ax_regime.set_yticks([])
         ax_regime.set_xticks([])
         ax_regime.text(n + 1, 0.5, "Regime", fontsize=8, va="center",
-                       transform=ax_regime.transData)
+                       color=txt, transform=ax_regime.transData)
         # Current regime as a small label at the right edge
         last_reg = regimes[-1]
         ax_regime.text(
@@ -122,6 +141,9 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
 
     # ── Panel 3: Candlestick + direction triangles ───────────────────────
     ax_price = fig.add_subplot(gs[panel_idx]); panel_idx += 1
+    if dark:
+        ax_price.set_facecolor(bg)
+        ax_price.tick_params(colors=txt)
 
     opens = sig["open"].values.astype(float)
     highs = sig["high"].values.astype(float)
@@ -236,8 +258,11 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     except Exception as exc:
         logger.warning("LIVE chart overlay failed (non-critical): %s", exc)
 
-    ax_price.set_ylabel("Price (USD)", fontsize=10)
-    ax_price.grid(True, alpha=0.15)
+    ax_price.set_ylabel("Price (USD)", fontsize=10, color=txt)
+    if dark:
+        ax_price.grid(True, alpha=0.15, color=grid_c)
+    else:
+        ax_price.grid(True, alpha=0.15)
     ax_price.set_xlim(-0.5, n - 0.5)
     # x-tick labels will be set on the bottom-most panel below (either
     # ax_mag if has_mag, or ax_price itself). Suppress here conditionally.
@@ -258,8 +283,13 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
                     linewidths=1.6, s=85, label="V7 entry"),
         plt.scatter([], [], marker="X", color="#26a69a", s=70, label="V7 exit"),
     ]
-    ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
-                    framealpha=0.8, ncol=3)
+    if dark:
+        ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
+                        framealpha=0.8, ncol=3, facecolor=bg, edgecolor=grid_c,
+                        labelcolor=txt)
+    else:
+        ax_price.legend(handles=legend_elements, loc="upper left", fontsize=7,
+                        framealpha=0.8, ncol=3)
 
     # Date labels — shared tick positions for all panels
     tick_pos = np.linspace(0, n - 1, min(12, n)).astype(int)
@@ -267,6 +297,8 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
     # ── Panel 3: Magnitude (predicted |return_4h|, signed by regression lean) ──
     if has_mag:
         ax_mag = fig.add_subplot(gs[panel_idx]); panel_idx += 1
+        if dark:
+            ax_mag.set_facecolor(bg)
         mag_raw = sig["mag_pred"].fillna(0).values.astype(float) * 100  # to %
         strength = sig["strength_score"].fillna("Weak").values
         # Magnitude bar colour encodes the regression lean sign (UP/DOWN/0).
@@ -340,7 +372,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
                 ax_mag.text(n - 0.5, y, f" {label}", fontsize=6,
                             color=color, va="center", ha="left")
 
-        ax_mag.set_ylabel("Magnitude\n(%)", fontsize=9)
+        ax_mag.set_ylabel("Magnitude\n(%)", fontsize=9, color=txt)
         ax_mag.set_xlim(-0.5, n - 0.5)
         # Scale: pure data-driven — max(mag) × 1.1.
         peak = float(np.nanmax(mag_signed)) if mag_signed.size else 0.0
@@ -356,15 +388,19 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
         else:
             fmt = lambda v, _: f"{v:.1f}"
         ax_mag.yaxis.set_major_formatter(FuncFormatter(fmt))
-        ax_mag.tick_params(axis="y", labelsize=7)
-        ax_mag.grid(True, alpha=0.2, axis="both", which="major")
+        if dark:
+            ax_mag.tick_params(axis="y", labelsize=7, colors=txt)
+            ax_mag.grid(True, alpha=0.2, axis="both", which="major", color=grid_c)
+        else:
+            ax_mag.tick_params(axis="y", labelsize=7)
+            ax_mag.grid(True, alpha=0.2, axis="both", which="major")
 
     # Date labels on the bottom-most existing panel.
     bottom_ax = ax_mag if has_mag else ax_price
     bottom_ax.set_xticks(tick_pos)
     bottom_ax.set_xticklabels(
         [dates[i].strftime("%m/%d %H:%M") for i in tick_pos],
-        fontsize=7, rotation=30, ha="right"
+        fontsize=7, rotation=30, ha="right", color=txt
     )
 
     # Watermark
@@ -375,7 +411,7 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100) -> bytes:
 
     # Save to bytes
     buf = io.BytesIO()
-    fig.savefig(buf, dpi=150, bbox_inches="tight", format="png")
+    fig.savefig(buf, dpi=150, bbox_inches="tight", format="png", facecolor=bg)
     plt.close(fig)
     buf.seek(0)
     png_bytes = buf.read()

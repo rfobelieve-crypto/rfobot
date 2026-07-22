@@ -425,6 +425,46 @@ ChatGPT for Claude」）確認真正的視覺語言，跟第一版描述（互�
       LoginForm/RegisterForm 等，非必然有收穫（要先看實際組件品質跟
       風格是否搭），此項只是「有了這兩個工具，值不值得換」的探索，
       不是既定要做的重構
+- [x] **首頁螺旋入場動畫 + K 線比例修正（2026-07-22 完成，commit
+      468629e/42efcbf）**：用 21st.dev 收藏的社群組件（xubohuah/
+      spiral-animation）移植成 `components/intro/`，session 一次性
+      （sessionStorage）。移植時修掉原始碼三個問題：星星陣列建兩次、
+      正方形畫布硬拉伸進非正方形視窗、每幀算的星星大小只餵給從未被
+      讀取的 lineWidth。K 線蕊寬度 0.26→0.17、圓角 0.16→0.06，影線
+      圓角 0.4→0.06（原本貼著 RoundedBoxGeometry 0.5 上限被撐成
+      膠囊）——使用者原本反應「像塑膠積木」，改窄改利落後待驗收。
+- [x] **product-site 首次連 GitHub + 上線 Vercel（2026-07-22）**：
+      repo `github.com/rfobelieve-crypto/product-site`（公開）。
+      過程踩到一個雷：這個 Vercel project 掛在 team scope
+      （`rfobelieve-cryptos-projects`），team 帳號**沒有個人 scope
+      可切換**（`personal_scope_not_allowed`）；team 又是免費 Hobby
+      方案，Hobby **不支援私有 repo 的協作部署**（commit author 對
+      repo 沒 contributing access 就整個 block，跟登入哪個帳號無關）。
+      連 GitHub 前若已知 Vercel project 是 team scope，應先查方案
+      等級再決定 repo 公開/私有，省掉三輪盲猜重推——已改公開解決，
+      正式站 `https://product-site-green.vercel.app`。
+- [x] **系統靜態圖 + 撤單流指標圖上網站 Phase 1 完成（2026-07-22，
+      使用者定調「這才是我系統的精髓」）**：product-site 新開獨立
+      `/charts` 頁（使用者選定，不塞進 system 頁也不進首頁）。架構走
+      **純代理，agent-mcp 不重新渲染**——`indicator/agent/server.py`
+      新增 `/public/chart`（V7）+ `/public/cancel-flow-chart`（撤單流）
+      兩個唯讀 route，直接轉發 `indicator` 服務已經算好的 PNG bytes
+      （V7 5 分鐘快取、撤單流 2 分鐘快取——撤單流原始 route 是每次
+      重跑 90 秒 subprocess，這層快取是防止公開端點變成任何人都能
+      觸發重運算的節流閥，不只是效能優化）。完全不碰
+      `agent-boundary.md` 白名單，`tests/test_agent_boundary.py` 5 過
+      1 skip（HTTP 轉發不是 Python import）。V7 靜態圖原本白底
+      （`chart_renderer.py` `facecolor="white"`）跟站上暗色玻璃風格
+      衝突，加 `dark=` 參數（新配色貼齊撤單流圖表既有的 `#0e1116`），
+      新增 `indicator/app.py` `/chart-dark` route，原本白底呼叫路徑
+      （Telegram 推送）完全不動。過程中靠獨立單元測試抓到一個真的
+      會炸的 bug：`token` 參數宣告 keyword-only，但
+      `anyio.to_thread.run_sync` 只轉發位置參數不轉 kwargs——先測試
+      再上線才抓到，5 個案例全過（成功抓取/token 轉發/TTL 快取命中/
+      來源失敗回 503/來源失敗吐舊快取）。剩一個手動步驟：Railway
+      `agent-mcp` 服務要設 `INDICATOR_ADMIN_TOKEN`（=`indicator` 服務
+      現有的 `ADMIN_HEAL_TOKEN`），撤單流圖表才會通。Phase 2（互動圖表
+      版）留待之後，範圍明顯更大（iframe 或整個用 React 重刻）
 
 ---
 
