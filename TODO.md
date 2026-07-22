@@ -396,6 +396,15 @@ ChatGPT for Claude」）確認真正的視覺語言，跟第一版描述（互�
       iridescence，桌面/手機分級）。修過一個坑：`<Environment preset="night">`
       抓遠端 CDN HDR，正式站首載卡 10+ 秒背景全空白——改用場景內
       Lightformer 產生反光貼圖，零網路依賴（commit 7c67273）
+- [x] **全站 2D 卡片跟上玻璃質感（2026-07-22 完成，commit 9ecda70）**：
+      Architecture/TrackRecord/EngineeringLog/Explore/LiveSignal/signals
+      頁的卡片原本是扁的霧面 blur 盒子，加共用 `.glass-panel` CSS
+      utility（漸層邊緣反光 + 角落柔光 + cyan/violet 環境光暈）疊上去；
+      FAQ 原本是純底線分隔手風琴、完全沒玻璃處理，改成同款玻璃卡片。
+      過程踩到一個雷：改完 CSS 在瀏覽器裡看不到效果，一度以為程式碼沒生效，
+      實際是 dev server 重啟後瀏覽器仍吃舊 JS bundle（非 `.next` cache 問題，
+      硬性重新整理即解）——下次「明明改了看起來沒變」先試 hard reload
+      再懷疑程式碼
 - [ ] **UI 組件 MCP 待授權（2026-07-21 登記）**：已裝 `@21st-dev/cli`（全局）+
       註冊兩個 MCP server（`21st-dev` → https://21st.dev/mcp，
       `originkit` → https://mcp.originkit.dev/mcp），皆卡在 OAuth 登入——
