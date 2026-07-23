@@ -349,6 +349,29 @@ async def public_cancel_flow_chart_route(request: Request) -> Response:
         f"{INDICATOR_BASE_URL}/research/cancel-flow", token=INDICATOR_ADMIN_TOKEN)
 
 
+# Per-coin cancel-flow KPI stats (2026-07-24) — direct SELECT over the
+# whitelisted depth_deltas_1m table (queries.public_cancel_flow_stats),
+# same TTL-cache-then-serve pattern as the other /public/* JSON routes
+# above (signal-feed / track-record / signal-history), not the PNG-proxy
+# pattern used by the chart routes.
+_cancel_stats_cache: dict = {"data": None, "ts": 0.0}
+_CANCEL_STATS_CACHE_TTL_S = 60.0
+
+
+@mcp.custom_route("/public/cancel-flow-stats", methods=["GET"])
+async def public_cancel_flow_stats_route(request: Request) -> JSONResponse:
+    now = time.monotonic()
+    if (_cancel_stats_cache["data"] is None
+            or now - _cancel_stats_cache["ts"] > _CANCEL_STATS_CACHE_TTL_S):
+        data = await anyio.to_thread.run_sync(queries.public_cancel_flow_stats, 120)
+        _cancel_stats_cache["data"] = data
+        _cancel_stats_cache["ts"] = now
+    resp = JSONResponse(_cancel_stats_cache["data"])
+    resp.headers["Cache-Control"] = "public, max-age=60"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 def main() -> None:
     mcp.run()   # stdio transport by default
 

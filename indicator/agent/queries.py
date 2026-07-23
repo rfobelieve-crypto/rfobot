@@ -429,6 +429,122 @@ def cancel_flow_analysis(minutes: int = 90, t_from: Optional[str] = None,
     return res
 
 
+# ── Cancel-flow multicoin stats (2026-07-24, KPI dashboard on product-site) ─
+#
+# Lightweight per-coin summary over depth_deltas_1m (whitelisted table,
+# agent-boundary.md) — NOT the forensic analyze_window() used by
+# cancel_flow_analysis above. This just answers "how much add/cancel
+# activity has each coin seen recently, and what's the cancel share" for a
+# dashboard stat card. Deliberately NOT a signal: no playbook/gate/lean
+# logic, no claim of predictive value — that's still pending the 2026-08-10
+# pre-registered verdict (F1/F2). Spot+perp combined per coin (a KPI card
+# reads "ETH cancel pressure", not two separate market rows); the raw
+# per-exchange split stays in `by_exchange` for anyone who wants it.
+
+def public_cancel_flow_stats(window_minutes: int = 120) -> dict[str, Any]:
+    window_minutes = max(5, min(int(window_minutes), 1440))
+    if _seed_mode():
+        return {
+            "window_minutes": 120,
+            "coins": [
+                {"symbol": "BTC-USD", "n_minutes": 20800, "cancel_ratio_pct": 54.2,
+                 "ask_bid_skew_pct": 3.1, "last_updated": _now_iso(),
+                 "by_exchange": {"binance": {"n_minutes": 8900, "cancel_ratio_pct": 53.8},
+                                 "binance_perp": {"n_minutes": 11900, "cancel_ratio_pct": 54.6}}},
+                {"symbol": "ETH-USD", "n_minutes": 400, "cancel_ratio_pct": 51.7,
+                 "ask_bid_skew_pct": -1.4, "last_updated": _now_iso(),
+                 "by_exchange": {"binance": {"n_minutes": 200, "cancel_ratio_pct": 50.9},
+                                 "binance_perp": {"n_minutes": 200, "cancel_ratio_pct": 52.5}}},
+            ],
+            "disclaimer": DISCLAIMER + " Raw order-book activity monitor, not a "
+                          "trading signal — cancel-flow edge is unverified "
+                          "pending the 2026-08-10 pre-registered test.",
+            "_source": "seed",
+        }
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT exchange, canonical_symbol, "
+                "       COUNT(*) AS n_minutes, "
+                "       MAX(minute_start_ms) AS last_min, "
+                "       SUM(bid_add_qty) AS bid_add, SUM(bid_cancel_qty) AS bid_cancel, "
+                "       SUM(ask_add_qty) AS ask_add, SUM(ask_cancel_qty) AS ask_cancel "
+                "FROM depth_deltas_1m "
+                "WHERE minute_start_ms >= "
+                "      (UNIX_TIMESTAMP(UTC_TIMESTAMP()) * 1000 - %s * 60000) "
+                "GROUP BY exchange, canonical_symbol",
+                (window_minutes,))
+            window_rows = cur.fetchall()
+
+            cur.execute(
+                "SELECT exchange, canonical_symbol, COUNT(*) AS n_minutes_total "
+                "FROM depth_deltas_1m GROUP BY exchange, canonical_symbol")
+            total_rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    totals_by_key = {(r["exchange"], r["canonical_symbol"]): int(r["n_minutes_total"])
+                     for r in total_rows}
+
+    rows_by_symbol: dict[str, list] = {}
+    for r in window_rows:
+        rows_by_symbol.setdefault(r["canonical_symbol"], []).append(r)
+
+    coins = []
+    for sym, rows in rows_by_symbol.items():
+        by_exchange = {}
+        bid_add_c = bid_cancel_c = ask_add_c = ask_cancel_c = 0.0
+        last_min_ms = 0
+        for r in rows:
+            bid_add = _f(r["bid_add"]) or 0.0
+            bid_cancel = _f(r["bid_cancel"]) or 0.0
+            ask_add = _f(r["ask_add"]) or 0.0
+            ask_cancel = _f(r["ask_cancel"]) or 0.0
+            bid_add_c += bid_add
+            bid_cancel_c += bid_cancel
+            ask_add_c += ask_add
+            ask_cancel_c += ask_cancel
+            row_denom = bid_add + bid_cancel + ask_add + ask_cancel
+            n_total = totals_by_key.get((r["exchange"], sym), int(r["n_minutes"]))
+            by_exchange[r["exchange"]] = {
+                "n_minutes": n_total,
+                "cancel_ratio_pct": (_pct((bid_cancel + ask_cancel) / row_denom)
+                                     if row_denom else None),
+            }
+            last_min_ms = max(last_min_ms, int(r["last_min"] or 0))
+
+        add_total = bid_add_c + ask_add_c
+        cancel_total = bid_cancel_c + ask_cancel_c
+        denom = add_total + cancel_total
+        cancel_ratio = _pct(cancel_total / denom) if denom else None
+        skew_denom = bid_cancel_c + ask_cancel_c
+        ask_bid_skew = (_pct((ask_cancel_c - bid_cancel_c) / skew_denom)
+                        if skew_denom else None)
+
+        coins.append({
+            "symbol": sym,
+            "n_minutes": sum(v["n_minutes"] for v in by_exchange.values()),
+            "cancel_ratio_pct": cancel_ratio,
+            "ask_bid_skew_pct": ask_bid_skew,
+            "last_updated": (datetime.fromtimestamp(
+                last_min_ms / 1000, tz=timezone.utc).isoformat(timespec="seconds")
+                             if last_min_ms else None),
+            "by_exchange": by_exchange,
+        })
+
+    coins.sort(key=lambda c: (-(c["n_minutes"] or 0), c["symbol"]))
+
+    return {
+        "window_minutes": window_minutes,
+        "coins": coins,
+        "disclaimer": DISCLAIMER + " Raw order-book activity monitor, not a "
+                      "trading signal — cancel-flow edge is unverified "
+                      "pending the 2026-08-10 pre-registered test.",
+        "_source": "live",
+    }
+
+
 # ── helpers ────────────────────────────────────────────────────────────
 
 def _f(x) -> Optional[float]:
