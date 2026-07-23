@@ -1,0 +1,1082 @@
+{
+ "BANK": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "HYPE": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "EMPTY",
+   0
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "ZEC": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "500 rows",
+   500
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "XRP": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "500 rows",
+   500
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "500 rows",
+   500
+  ]
+ },
+ "DEXE": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "DOGE": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "500 rows",
+   500
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "500 rows",
+   500
+  ]
+ },
+ "RE": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "RIF": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "AKE": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "EMPTY",
+   0
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "ADA": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "500 rows",
+   500
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "500 rows",
+   500
+  ]
+ },
+ "ERA": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "BNB": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "500 rows",
+   500
+  ]
+ },
+ "WLD": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "WLFI": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "ENA": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "LAB": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "EMPTY",
+   0
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "ONDO": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "1000PEPE": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ },
+ "SUI": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "500 rows",
+   500
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "500 rows",
+   500
+  ]
+ },
+ "ZAMA": {
+  "oi": [
+   "500 rows",
+   500
+  ],
+  "oi_agg": [
+   "500 rows",
+   500
+  ],
+  "liquidation": [
+   "500 rows",
+   500
+  ],
+  "long_short": [
+   "500 rows",
+   500
+  ],
+  "global_ls": [
+   "500 rows",
+   500
+  ],
+  "funding": [
+   "500 rows",
+   500
+  ],
+  "taker": [
+   "500 rows",
+   500
+  ],
+  "bitfinex_margin": [
+   "EMPTY",
+   0
+  ],
+  "top_ls_position": [
+   "500 rows",
+   500
+  ],
+  "futures_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "spot_cvd_agg": [
+   "500 rows",
+   500
+  ],
+  "liq_agg": [
+   "500 rows",
+   500
+  ],
+  "oi_coin_margin": [
+   "EMPTY",
+   0
+  ]
+ }
+}
