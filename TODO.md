@@ -157,9 +157,20 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
   模型開發，非移植）。資源回異源資料線（撤單流），該線**不受影響**——撤單流
   ETH 多幣化是獨立 track，已上線資料時鐘（見下方「撤單流多幣化」條目），照舊
   累積到 10 月 re-run。
+- [x] **Follow-up：超參數重調 + 淺覆蓋率欄位剔除（2026-07-23，仍 NO-GO）**——
+      使用者質疑是否因未針對 ETH 重調 BTC 超參數才失敗。跑 3 個有先驗理由的
+      變體（非網格搜尋——避免重演 2026-06-20 threshold-sweep 錯誤）：加強
+      正則化、剔除 4 個 75% NaN 的 oi_coin_margin 欄、兩者合併。用跟 BTC
+      特徵 A/B 完全同一套 4-condition sanity gate 判定，**三個變體全部
+      no significant lift**，絕對 AUC 全部在 0.5034~0.5073 之間打轉（跟
+      baseline 0.5057 本質同一數字，離 0.54 門檻一樣遠）。結論：不是超參數
+      移植不公平，是 136 特徵機制本身在 ETH 上不帶訊號。詳見
+      `research/multicoin/step2_eth_results.md` Follow-up 段落，可重跑腳本
+      `research/multicoin/eth_retune_ab.py`。
 - **2026-07-23 override 收尾**：第 5 次 informed override 授權提前跑 Step 2/3
-  （不等 BTC Gate A），Go/No-Go 判準本身未變——上面就是判準跑出來的結果。
-  詳細記錄見 CLAUDE.md「V7 多幣化提前啟動」。
+  （不等 BTC Gate A），Go/No-Go 判準本身未變——上面兩輪測試（原始移植+重調
+  follow-up）都是判準跑出來的結果，沒有留下「也許只是沒調好」的疑點。**V7
+  多幣化正式收尾**，詳細記錄見 CLAUDE.md「V7 多幣化提前啟動」。
 
 ### 4.5 基建完善（2026-07-10 審視——防「新基建靜默失敗」族）
 - [x] **depth_delta_collector freshness 監控**（2026-07-10 完成，a23d174）：APScheduler

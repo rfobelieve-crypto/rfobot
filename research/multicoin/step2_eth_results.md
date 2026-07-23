@@ -72,3 +72,36 @@ Step 2 本身已 FAIL（0.5057 << 0.54），且 halves 不同號顯示訊號不�
 - `research/multicoin/eth_direction_gate_a.py` — 可重跑腳本
 - `research/multicoin/.cache/eth_features_all.parquet` — ETH 特徵表快取
 - `research/results/multicoin/eth_direction_gate_a.json` — 結構化結果
+
+## 後續：超參數重調 + 淺覆蓋率欄位剔除（2026-07-23 同日，Follow-up）
+
+使用者質疑：「是不是因為直接照搬 BTC 調好的超參數，沒重調才失敗？主流幣跟
+小幣訂單流特徵本來就會差很多」。這是合理的質疑——`_per_fold_oos` 用的
+`BASE_PARAMS` 是針對 BTC 雜訊特性調的，加上 `oi_coin_margin` 家族 4 欄對 ETH
+覆蓋率只有 75%，兩者都可能是 unfair transfer 的來源。
+
+**測試設計**（刻意不做網格搜尋——那等於換個包裝重演 2026-06-20 threshold-sweep
+的錯誤；只測 3 個有先驗理由的變體，用跟 BTC 特徵 A/B 完全同一套 4-condition
+sanity gate 判定，見 `research/multicoin/eth_retune_ab.py`）：
+
+| 變體 | 改動 | pooled AUC | agg_lift | mean_fold_lift | frac_pos | boot_p≤0 | 4-cond 判定 |
+|---|---|---|---|---|---|---|---|
+| baseline | （同上，未調） | 0.5057 | — | — | — | — | — |
+| regularized | max_depth 4→3, min_child_weight 10→20, reg_lambda 1.0→2.0 | 0.5073 | +0.0016 | +0.0043 | 0.47 | 0.243 | **no significant lift** |
+| drop_thin_oi_cm | 剔除 4 個 75% NaN 的 oi_coin_margin 欄 | 0.5054 | -0.0004 | +0.0025 | 0.57 | 0.358 | **no significant lift** |
+| regularized+drop | 上述兩者合併 | 0.5034 | -0.0023 | -0.0018 | 0.53 | 0.622 | **no significant lift** |
+
+三個變體全部沒有通過 4-condition gate（agg_lift 沒有一個 > 0.005，bootstrap
+p 全部遠高於 0.05 顯著門檻），而且**沒有一個變體的絕對 AUC 靠近 0.54 門檻**
+（0.5034~0.5073 之間打轉，跟 baseline 0.5057 本質上是同一個數字）。
+
+**結論：不是超參數移植不公平、也不是淺覆蓋率欄位在扯後腿——是 136 特徵這套
+機制本身在 ETH 上就是不帶訊號。** 加碼調參/篩欄位不會把 0.505 變成 0.54，
+因為問題不在「校準」層次，是在「這些特徵跟 ETH 4h 方向根本沒有這套 BTC 特有
+的關聯結構」這個更根本的層次。要真的有機會，需要的是 ETH 專屬的全新特徵
+工程（不同的訂單流代理、不同的正規化窗口、可能需要處理 BTC-beta 稀釋問題），
+等同從 Step 4（特徵工程）重新開始，不是調參數/篩欄位這種小修小補能解決的。
+
+**這次 override（V7 多幣化提前推進）到此正式收尾**：Step 2 用了兩輪測試
+（原始移植 + 重調 follow-up）都確認 NO-GO，沒有留下「也許只是沒調好」的
+疑點。SOL 分支同理不建議投入。撤單流的 ETH 多幣化維持不受影響，繼續累積。
