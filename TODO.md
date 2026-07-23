@@ -311,10 +311,17 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       新 bot /start 出選單（覆盤圖/狀態/摘要按鈕）+ 三指令帶參數，回覆全走
       CANCEL_API；主 bot 移除三指令/help 文字/按鈕/callback。頻道分流非
       系統分家：handler 共用、edge 證明後撤單流仍進 V7 判斷層（overlay）
-- [ ] **撤單流多幣化（2026-07-19 登記）**：與 V7 多幣化（4.6）同方向——
-      depth_delta_collector 已參數化，起 ETH spot/perp 實例即開資料時鐘
-      （越早越好，10 月 re-run 與 F1 家族未來可跨幣）；watcher/圖表後續跟進。
-      紀律：BTC 凍結序列不動，ETH 為新增平行序列
+- [x] **撤單流多幣化 ETH 資料時鐘啟動（2026-07-19 登記，2026-07-23 上線 1b2e2ad）**：
+      與 V7 多幣化（4.6）同方向，第 5 次 informed override 的一部分。
+      `depth_delta_collector.py` 的 `canonical_symbol` 從硬編碼模組常數改成
+      建構子參數（BTC 預設值不變），`start_all.py` 新增 ETH spot/perp 兩條
+      平行 daemon thread。Railway market_data 已重部署，live 驗證：
+      `exchange=binance/canonical_symbol=ETH-USD` 與
+      `exchange=binance_perp/canonical_symbol=ETH-USD` 各自開始累積、
+      與 BTC 序列（20,409 spot / 11,556 perp 行）同分鐘同步、零污染。
+      紀律：BTC 凍結序列不動，ETH 為新增平行序列——**已達成**。
+      後續：watcher/圖表跟進非急迫（先讓資料鐘跑，10 月 re-run 前有 2.5 個月
+      累積）；ETH 版 F1/F1b 判準與門檻另訂，不沿用 BTC 的 n≥40,000 時程。
 - [x] **first-hit-wins 平行診斷（2026-07-21，FROZEN v1）**：使用者質疑
       固定時間點(60m/120m)判對錯會混淆「方向對但慢」跟「真的錯」→
       `first_hit_verdict()`：逐分鐘掃，先碰目標價(±0.5%沿用
