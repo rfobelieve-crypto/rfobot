@@ -1,0 +1,13 @@
+{
+  "symbol": "ETHUSDT",
+  "n_bars": 3999,
+  "n_folds": 77,
+  "n_features_available": 136,
+  "n_features_total": 136,
+  "missing_features": [],
+  "pooled_clean_auc": 0.5057,
+  "pooled_clean_ic": 0.0047,
+  "btc_benchmark_clean_auc": 0.5412,
+  "gate_pass": false,
+  "run_ts": "2026-07-23T10:00:58.143396+00:00"
+}

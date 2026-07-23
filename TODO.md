@@ -141,17 +141,25 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       ETH 特徵覆蓋 ~97%（只缺 coinbase premium 家族 3 個 + etf_aum）、SOL ~92%
       （再缺 DVOL 家族）。資料層不是瓶頸。陷阱：`/coinbase-premium-index` 無視
       symbol 參數（三幣回同值）→ 新增幣種端點必跑值差異化檢查（`verify_value_diff.py`）
-- [ ] Step 2 ETH 移植實驗：backfill ETH 歷史（13 端點）→ 建 ETH 特徵表 →
-      同一套乾淨 WF（purge+embargo、無 early-stop 洩漏），對照 BTC clean AUC 0.5412
-- [ ] Step 3 訊號重合率：ETH Strong vs BTC Strong 時間對齊統計
-- **Go/No-Go（預先登記，不因 override 而變）**：ETH clean AUC ≥ ~0.54 且重合率
-  <50% → 繼續（考慮 SOL、談 production 化）；任一不過 → 多幣化對 V7 無性價比，
-  資源回異源資料線。
-- **2026-07-23 override**：原紀律「BTC Gate A 先過關才開始 Step 2」被使用者
-  明確 override（理由：等待本身是成本磨損，研究不碰生產不衝突）——**改成
-  順序上不等，Step 2/3 現在就做**；但 Go/No-Go 判準、以及「production 化
-  討論仍須 BTC Gate A 過關」這條**沒有變**。詳細記錄見 CLAUDE.md
-  「V7 多幣化提前啟動」。
+- [x] **Step 2 ETH 移植實驗完成（2026-07-23，NO-GO）**——見
+      `research/multicoin/step2_eth_results.md`：backfill ETH 4000 根 1h bars
+      +12 端點（排除 symbol-ignoring 的 coinbase_premium）→ `build_live_features()`
+      逐字重用建 136/136 特徵 → 與 BTC 0.5412 完全同一套 harness
+      （`feature_search_ab._per_fold_oos(leaky=False)`，purge+embargo，77 folds）。
+      **ETH clean pooled sign-AUC = 0.5057**（vs BTC 0.5412），且 first/second
+      half IC 由 +0.048 翻負至 -0.035（halves 不同號，訊號不穩定，非邊緣案例）。
+      資料品質已排除（正確 ETH 價格區間、僅預期內的 cb_premium 全 NaN、
+      oi_coin_margin 75% NaN 但僅 4/136 特徵不足以解釋落差）。
+- [x] **Step 3 訊號重合率——跳過（Step 2 已 FAIL，AND gate 不需再測）**
+- **Go/No-Go 判定（2026-07-23）**：ETH clean AUC 0.5057 < 門檻 0.54 → **NO-GO**。
+  V7 用「搬 BTC 136 特徵+未調超參數」這條路對 ETH 不成立；SOL 分支（同路線）
+  不建議投入。若未來想再試，需要 ETH 專屬特徵工程/超參數（等於重做 Step 4-5
+  模型開發，非移植）。資源回異源資料線（撤單流），該線**不受影響**——撤單流
+  ETH 多幣化是獨立 track，已上線資料時鐘（見下方「撤單流多幣化」條目），照舊
+  累積到 10 月 re-run。
+- **2026-07-23 override 收尾**：第 5 次 informed override 授權提前跑 Step 2/3
+  （不等 BTC Gate A），Go/No-Go 判準本身未變——上面就是判準跑出來的結果。
+  詳細記錄見 CLAUDE.md「V7 多幣化提前啟動」。
 
 ### 4.5 基建完善（2026-07-10 審視——防「新基建靜默失敗」族）
 - [x] **depth_delta_collector freshness 監控**（2026-07-10 完成，a23d174）：APScheduler

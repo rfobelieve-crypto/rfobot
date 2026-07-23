@@ -1,0 +1,362 @@
+[
+ [
+  "oi",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "oi",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "oi",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "oi_agg",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "oi_agg",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "oi_agg",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "liquidation",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "liquidation",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "liquidation",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "long_short",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "long_short",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "long_short",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "global_ls",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "global_ls",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "global_ls",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "funding",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "funding",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "funding",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "taker",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "taker",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "taker",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "coinbase_premium",
+  "BTC",
+  "10 rows, ts=s"
+ ],
+ [
+  "coinbase_premium",
+  "ETH",
+  "N/A (no symbol param \u2014 BTC-only endpoint)"
+ ],
+ [
+  "coinbase_premium",
+  "SOL",
+  "N/A (no symbol param \u2014 BTC-only endpoint)"
+ ],
+ [
+  "bitfinex_margin",
+  "BTC",
+  "10 rows, ts=s"
+ ],
+ [
+  "bitfinex_margin",
+  "ETH",
+  "10 rows, ts=s"
+ ],
+ [
+  "bitfinex_margin",
+  "SOL",
+  "10 rows, ts=s"
+ ],
+ [
+  "top_ls_position",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "top_ls_position",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "top_ls_position",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "futures_cvd_agg",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "futures_cvd_agg",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "futures_cvd_agg",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "spot_cvd_agg",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "spot_cvd_agg",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "spot_cvd_agg",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "liq_agg",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "liq_agg",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "liq_agg",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "oi_coin_margin",
+  "BTC",
+  "10 rows, ts=ms"
+ ],
+ [
+  "oi_coin_margin",
+  "ETH",
+  "10 rows, ts=ms"
+ ],
+ [
+  "oi_coin_margin",
+  "SOL",
+  "10 rows, ts=ms"
+ ],
+ [
+  "opt_max_pain",
+  "BTC",
+  "11 rows, ts=?"
+ ],
+ [
+  "opt_info",
+  "BTC",
+  "6 rows, ts=?"
+ ],
+ [
+  "opt_fut_ratio",
+  "BTC",
+  "2206 rows, ts=?"
+ ],
+ [
+  "opt_max_pain",
+  "ETH",
+  "11 rows, ts=?"
+ ],
+ [
+  "opt_info",
+  "ETH",
+  "6 rows, ts=?"
+ ],
+ [
+  "opt_fut_ratio",
+  "ETH",
+  "2206 rows, ts=?"
+ ],
+ [
+  "opt_max_pain",
+  "SOL",
+  "7 rows, ts=?"
+ ],
+ [
+  "opt_info",
+  "SOL",
+  "4 rows, ts=?"
+ ],
+ [
+  "opt_fut_ratio",
+  "SOL",
+  "2206 rows, ts=?"
+ ],
+ [
+  "etf_flow",
+  "BTC",
+  "644 rows, ts=?"
+ ],
+ [
+  "etf_aum",
+  "BTC",
+  "913 rows, ts=ms"
+ ],
+ [
+  "etf_flow",
+  "ETH",
+  "506 rows, ts=?"
+ ],
+ [
+  "etf_aum",
+  "ETH",
+  "HTTP:404"
+ ],
+ [
+  "etf_flow",
+  "SOL",
+  "12 rows, ts=?"
+ ],
+ [
+  "etf_aum",
+  "SOL",
+  "HTTP:404"
+ ],
+ [
+  "futures_netflow",
+  "BTC",
+  "row present"
+ ],
+ [
+  "futures_netflow",
+  "ETH",
+  "row present"
+ ],
+ [
+  "futures_netflow",
+  "SOL",
+  "row present"
+ ],
+ [
+  "spot_netflow",
+  "BTC",
+  "row present"
+ ],
+ [
+  "spot_netflow",
+  "ETH",
+  "row present"
+ ],
+ [
+  "spot_netflow",
+  "SOL",
+  "row present"
+ ],
+ [
+  "hl_whale",
+  "BTC",
+  "282 positions in top-200"
+ ],
+ [
+  "hl_whale",
+  "ETH",
+  "184 positions in top-200"
+ ],
+ [
+  "hl_whale",
+  "SOL",
+  "62 positions in top-200"
+ ],
+ [
+  "fear_greed",
+  "BTC",
+  "SHARED (3065 rows)"
+ ],
+ [
+  "fear_greed",
+  "ETH",
+  "SHARED (3065 rows)"
+ ],
+ [
+  "fear_greed",
+  "SOL",
+  "SHARED (3065 rows)"
+ ],
+ [
+  "deribit_dvol",
+  "BTC",
+  "3 candles"
+ ],
+ [
+  "deribit_dvol",
+  "ETH",
+  "3 candles"
+ ],
+ [
+  "deribit_dvol",
+  "SOL",
+  "EMPTY"
+ ]
+]
