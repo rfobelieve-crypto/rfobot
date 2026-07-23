@@ -39,6 +39,8 @@ logger = logging.getLogger(__name__)
 
 WS_URL = "wss://stream.binance.com:9443/ws/btcusdt@depth@100ms"   # spot
 PERP_WS_URL = "wss://fstream.binance.com/ws/btcusdt@depth@100ms"  # USDT-M perp
+ETH_WS_URL = "wss://stream.binance.com:9443/ws/ethusdt@depth@100ms"   # spot
+ETH_PERP_WS_URL = "wss://fstream.binance.com/ws/ethusdt@depth@100ms"  # USDT-M perp
 CANONICAL = "BTC-USD"
 FLUSH_SEC = 10
 
@@ -71,15 +73,28 @@ def _ensure_schema() -> None:
 class DepthDeltaCollector:
     """Tracks per-level qty between diff messages, buckets add/cancel by minute.
 
-    Defaults preserve the original spot stream (exchange='binance') exactly —
-    the spot series must stay unbroken for the pre-registered cancel tests.
-    Pass ws_url=PERP_WS_URL, exchange='binance_perp' for the parallel
-    futures-book instance (2026-07-15).
+    Defaults preserve the original spot stream (exchange='binance',
+    canonical_symbol='BTC-USD') exactly — the BTC series must stay unbroken
+    for the pre-registered cancel tests. Pass ws_url=PERP_WS_URL,
+    exchange='binance_perp' for the parallel futures-book instance
+    (2026-07-15). `canonical_symbol` was, until 2026-07-23, a hardcoded
+    module constant used regardless of `ws_url` — pointing a second
+    instance at a different symbol's stream would have silently written
+    that symbol's deltas into rows labelled 'BTC-USD', corrupting the
+    frozen series. It's a constructor param now specifically so a new
+    coin (see ETH_WS_URL/ETH_PERP_WS_URL) writes to its own
+    canonical_symbol, never CANONICAL.
     """
 
-    def __init__(self, ws_url: str = WS_URL, exchange: str = "binance") -> None:
+    def __init__(
+        self,
+        ws_url: str = WS_URL,
+        exchange: str = "binance",
+        canonical_symbol: str = CANONICAL,
+    ) -> None:
         self._ws_url = ws_url
         self._exchange = exchange
+        self._canonical = canonical_symbol
         self._book: dict[str, dict[float, float]] = {"bid": {}, "ask": {}}
         self._buckets: dict[int, dict[str, float]] = {}
         self._lock = threading.Lock()
@@ -150,7 +165,7 @@ class DepthDeltaCollector:
                             ask_cancel_qty = ask_cancel_qty + VALUES(ask_cancel_qty),
                             update_count = update_count + VALUES(update_count)
                         """,
-                        (self._exchange, CANONICAL, m, v["bid_add"],
+                        (self._exchange, self._canonical, m, v["bid_add"],
                          v["bid_cancel"], v["ask_add"], v["ask_cancel"], v["n"]))
             conn.commit()
             logger.info("depth_delta_flush exchange=%s minutes=%d",

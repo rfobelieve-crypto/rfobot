@@ -134,7 +134,7 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
   訊號預測隨後擴張波」（squeeze 論的分鐘級版本）。re-run 最早 **2026-10-09**；
   家族=撤單 def v1 聚合+簿型既有欄（wall/spread/imb）+taker 對照，僅此一次
 
-### 4.6 V7 多幣化可行性研究（2026-07-15 啟動）
+### 4.6 V7 多幣化可行性研究（2026-07-15 啟動，2026-07-23 提前推進——第 5 次 informed override，見 CLAUDE.md）
 動機：核心瓶頸是樣本速度（~265 Strong/年、73% 被單槽擠掉），多幣化 = 同機制
 樣本產出 ×N，非找新 alpha。純 research track（`research/multicoin/`），不碰生產。
 - [x] **Step 1 資料審計完成**（見 `research/multicoin/audit_results.md`）：
@@ -144,10 +144,14 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
 - [ ] Step 2 ETH 移植實驗：backfill ETH 歷史（13 端點）→ 建 ETH 特徵表 →
       同一套乾淨 WF（purge+embargo、無 early-stop 洩漏），對照 BTC clean AUC 0.5412
 - [ ] Step 3 訊號重合率：ETH Strong vs BTC Strong 時間對齊統計
-- **Go/No-Go（預先登記）**：ETH clean AUC ≥ ~0.54 且重合率 <50% → 繼續（考慮 SOL、
-  談 production 化）；任一不過 → 多幣化對 V7 無性價比，資源回異源資料線。
-- 紀律：BTC Gate A 乾淨版仍未過門檻（57.6%/CI 下緣 51.5%）——多幣化是「乘以 N」，
-  乘的對象要先證明；production 化討論必須在 Gate A 重跑通過之後。
+- **Go/No-Go（預先登記，不因 override 而變）**：ETH clean AUC ≥ ~0.54 且重合率
+  <50% → 繼續（考慮 SOL、談 production 化）；任一不過 → 多幣化對 V7 無性價比，
+  資源回異源資料線。
+- **2026-07-23 override**：原紀律「BTC Gate A 先過關才開始 Step 2」被使用者
+  明確 override（理由：等待本身是成本磨損，研究不碰生產不衝突）——**改成
+  順序上不等，Step 2/3 現在就做**；但 Go/No-Go 判準、以及「production 化
+  討論仍須 BTC Gate A 過關」這條**沒有變**。詳細記錄見 CLAUDE.md
+  「V7 多幣化提前啟動」。
 
 ### 4.5 基建完善（2026-07-10 審視——防「新基建靜默失敗」族）
 - [x] **depth_delta_collector freshness 監控**（2026-07-10 完成，a23d174）：APScheduler

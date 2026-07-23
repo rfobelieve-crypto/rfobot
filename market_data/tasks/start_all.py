@@ -25,7 +25,7 @@ from market_data.tasks.run_trade_streams import main as start_streams
 from market_data.tasks.flush_flow_bars import flush_loop
 from market_data.tasks.cleanup import cleanup_once
 from market_data.adapters.depth_delta_collector import (
-    DepthDeltaCollector, PERP_WS_URL)
+    DepthDeltaCollector, PERP_WS_URL, ETH_WS_URL, ETH_PERP_WS_URL)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -85,6 +85,24 @@ def main():
                                    exchange="binance_perp").start,
         daemon=True, name="depth-delta-perp").start()
     logger.info("Depth-delta PERP collector started (exchange=binance_perp).")
+
+    # ETH parallel series (2026-07-23, V7/cancel-flow multicoin override —
+    # see CLAUDE.md "V7 多幣化提前啟動"): same decomposition, new coin, own
+    # canonical_symbol so it writes to rows the BTC cancel tests never touch.
+    # BTC's spot+perp threads above are byte-for-byte unchanged — this is
+    # purely additive, starting ETH's data clock in parallel per TODO.md
+    # "撤單流多幣化".
+    threading.Thread(
+        target=DepthDeltaCollector(ws_url=ETH_WS_URL, exchange="binance",
+                                   canonical_symbol="ETH-USD").start,
+        daemon=True, name="depth-delta-eth").start()
+    logger.info("Depth-delta ETH collector started (canonical_symbol=ETH-USD).")
+
+    threading.Thread(
+        target=DepthDeltaCollector(ws_url=ETH_PERP_WS_URL, exchange="binance_perp",
+                                   canonical_symbol="ETH-USD").start,
+        daemon=True, name="depth-delta-eth-perp").start()
+    logger.info("Depth-delta ETH PERP collector started (exchange=binance_perp, canonical_symbol=ETH-USD).")
 
     # Cancel-playbook watcher (2026-07-16): machine-prospective event logger
     # for the cancel-flow playbooks (frozen defs v1) + rate-limited TG alerts.
