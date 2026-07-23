@@ -167,10 +167,22 @@ direction/tier/confidence——使用者知情後選擇**先留公開**（保留
       移植不公平，是 136 特徵機制本身在 ETH 上不帶訊號。詳見
       `research/multicoin/step2_eth_results.md` Follow-up 段落，可重跑腳本
       `research/multicoin/eth_retune_ab.py`。
+- [x] **Follow-up 2：特徵刪減篩選（2026-07-23，仍 NO-GO）**——用嚴格
+      univariate IC(|IC|≥0.05)+跨fold同號一致性(≥0.65) 篩 136 特徵（門檻
+      刻意比 BTC 新特徵 A/B 篩選嚴，因 136 次篩選本身是多重比較），只用
+      WF test-fold bars 算避免篩選洩漏。**5/136 通過**，但其中 2 個是未
+      差分的原始水位值（非平穩序列易假性相關）、1 個只有 21/77 fold 有
+      資料（呼應 oi_coin_margin 覆蓋率缺口）。拿 5 個重訓：pooled AUC
+      0.5057→0.5267 看似進步，但 4-condition gate 判 **no significant
+      lift**（frac_pos=0.53 未過 0.55、bootstrap p=0.358 遠不顯著）——跟
+      2026-06-02 WQ101「aggregate 好看、per-fold 撐不住」同一種陷阱。詳見
+      `research/multicoin/step2_eth_results.md`，腳本
+      `research/multicoin/eth_feature_elimination.py`。
 - **2026-07-23 override 收尾**：第 5 次 informed override 授權提前跑 Step 2/3
-  （不等 BTC Gate A），Go/No-Go 判準本身未變——上面兩輪測試（原始移植+重調
-  follow-up）都是判準跑出來的結果，沒有留下「也許只是沒調好」的疑點。**V7
-  多幣化正式收尾**，詳細記錄見 CLAUDE.md「V7 多幣化提前啟動」。
+  （不等 BTC Gate A），Go/No-Go 判準本身未變——三輪測試（原始移植+重調+特徵
+  刪減 follow-up）全部指向同一結論，沒有留下「也許沒調好/沒篩對」的疑點。
+  **V7 多幣化正式收尾**；若要繼續唯一剩路是從頭替 ETH 設計新特徵（等同重啟
+  Step 4-5），非本次範疇。詳細記錄見 CLAUDE.md「V7 多幣化提前啟動」。
 
 ### 4.5 基建完善（2026-07-10 審視——防「新基建靜默失敗」族）
 - [x] **depth_delta_collector freshness 監控**（2026-07-10 完成，a23d174）：APScheduler
