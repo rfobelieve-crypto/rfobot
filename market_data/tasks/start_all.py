@@ -25,7 +25,11 @@ from market_data.tasks.run_trade_streams import main as start_streams
 from market_data.tasks.flush_flow_bars import flush_loop
 from market_data.tasks.cleanup import cleanup_once
 from market_data.adapters.depth_delta_collector import (
-    DepthDeltaCollector, PERP_WS_URL, ETH_WS_URL, ETH_PERP_WS_URL)
+    DepthDeltaCollector, PERP_WS_URL, ETH_WS_URL, ETH_PERP_WS_URL,
+    XRP_WS_URL, XRP_PERP_WS_URL, DOGE_WS_URL, DOGE_PERP_WS_URL,
+    ADA_WS_URL, ADA_PERP_WS_URL, SUI_WS_URL, SUI_PERP_WS_URL,
+    BNB_WS_URL, BNB_PERP_WS_URL, LINK_WS_URL, LINK_PERP_WS_URL,
+    UNI_WS_URL, UNI_PERP_WS_URL, AAVE_WS_URL, AAVE_PERP_WS_URL)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -103,6 +107,33 @@ def main():
                                    canonical_symbol="ETH-USD").start,
         daemon=True, name="depth-delta-eth-perp").start()
     logger.info("Depth-delta ETH PERP collector started (exchange=binance_perp, canonical_symbol=ETH-USD).")
+
+    # Batch 2 (2026-07-23/24, same override): liquidity-ranked real-crypto
+    # Binance USDT perpetuals — XRP/DOGE/ADA/SUI/BNB/LINK/UNI/AAVE. Identical
+    # spot+perp decomposition, own canonical_symbol per coin, byte-for-byte
+    # same pattern as the ETH threads above. BTC/ETH threads untouched.
+    _BATCH2 = [
+        ("XRP-USD", XRP_WS_URL, XRP_PERP_WS_URL),
+        ("DOGE-USD", DOGE_WS_URL, DOGE_PERP_WS_URL),
+        ("ADA-USD", ADA_WS_URL, ADA_PERP_WS_URL),
+        ("SUI-USD", SUI_WS_URL, SUI_PERP_WS_URL),
+        ("BNB-USD", BNB_WS_URL, BNB_PERP_WS_URL),
+        ("LINK-USD", LINK_WS_URL, LINK_PERP_WS_URL),
+        ("UNI-USD", UNI_WS_URL, UNI_PERP_WS_URL),
+        ("AAVE-USD", AAVE_WS_URL, AAVE_PERP_WS_URL),
+    ]
+    for _canon, _spot_url, _perp_url in _BATCH2:
+        _coin = _canon.split("-")[0].lower()
+        threading.Thread(
+            target=DepthDeltaCollector(ws_url=_spot_url, exchange="binance",
+                                       canonical_symbol=_canon).start,
+            daemon=True, name=f"depth-delta-{_coin}").start()
+        threading.Thread(
+            target=DepthDeltaCollector(ws_url=_perp_url, exchange="binance_perp",
+                                       canonical_symbol=_canon).start,
+            daemon=True, name=f"depth-delta-{_coin}-perp").start()
+        logger.info("Depth-delta %s spot+perp collectors started (canonical_symbol=%s).",
+                    _coin.upper(), _canon)
 
     # Cancel-playbook watcher (2026-07-16): machine-prospective event logger
     # for the cancel-flow playbooks (frozen defs v1) + rate-limited TG alerts.

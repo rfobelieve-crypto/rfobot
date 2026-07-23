@@ -41,6 +41,29 @@ WS_URL = "wss://stream.binance.com:9443/ws/btcusdt@depth@100ms"   # spot
 PERP_WS_URL = "wss://fstream.binance.com/ws/btcusdt@depth@100ms"  # USDT-M perp
 ETH_WS_URL = "wss://stream.binance.com:9443/ws/ethusdt@depth@100ms"   # spot
 ETH_PERP_WS_URL = "wss://fstream.binance.com/ws/ethusdt@depth@100ms"  # USDT-M perp
+
+# 2026-07-23 batch 2 (V7/cancel-flow multicoin override) — liquidity-ranked
+# real-crypto Binance USDT perpetuals (audited via /futures/supported-coins +
+# fapi exchangeInfo contractType=="PERPETUAL", excludes Binance's newer
+# TRADIFI_PERPETUAL tokenized-stock/commodity products). Spot+perp existence
+# on Binance verified directly before wiring these in.
+XRP_WS_URL = "wss://stream.binance.com:9443/ws/xrpusdt@depth@100ms"
+XRP_PERP_WS_URL = "wss://fstream.binance.com/ws/xrpusdt@depth@100ms"
+DOGE_WS_URL = "wss://stream.binance.com:9443/ws/dogeusdt@depth@100ms"
+DOGE_PERP_WS_URL = "wss://fstream.binance.com/ws/dogeusdt@depth@100ms"
+ADA_WS_URL = "wss://stream.binance.com:9443/ws/adausdt@depth@100ms"
+ADA_PERP_WS_URL = "wss://fstream.binance.com/ws/adausdt@depth@100ms"
+SUI_WS_URL = "wss://stream.binance.com:9443/ws/suiusdt@depth@100ms"
+SUI_PERP_WS_URL = "wss://fstream.binance.com/ws/suiusdt@depth@100ms"
+BNB_WS_URL = "wss://stream.binance.com:9443/ws/bnbusdt@depth@100ms"
+BNB_PERP_WS_URL = "wss://fstream.binance.com/ws/bnbusdt@depth@100ms"
+LINK_WS_URL = "wss://stream.binance.com:9443/ws/linkusdt@depth@100ms"
+LINK_PERP_WS_URL = "wss://fstream.binance.com/ws/linkusdt@depth@100ms"
+UNI_WS_URL = "wss://stream.binance.com:9443/ws/uniusdt@depth@100ms"
+UNI_PERP_WS_URL = "wss://fstream.binance.com/ws/uniusdt@depth@100ms"
+AAVE_WS_URL = "wss://stream.binance.com:9443/ws/aaveusdt@depth@100ms"
+AAVE_PERP_WS_URL = "wss://fstream.binance.com/ws/aaveusdt@depth@100ms"
+
 CANONICAL = "BTC-USD"
 FLUSH_SEC = 10
 
