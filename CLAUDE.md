@@ -208,6 +208,61 @@ Stage 4a 不准加碼（即使 $100 賺到 $200 也是 $100 keep）」。這次�
 硬上限 $200，**這是最後一次 Stage 3 內加碼**——再加就必須走 Gate A+B 通過後的
 正式放大（$300-500 一級），不准再用 informed override。
 
+## Stage 3 資本再加碼至 $1218.44（2026-07-24，第 6 次 informed override）
+
+**背景**：使用者在 §Stage 3 資本 top-up 至 $197.55（2026-07-14，第 4 次 override）
+明確寫下「這是最後一次 Stage 3 內加碼」之後，又存入更多資金，帳戶餘額查證為
+**$1218.44**（相對 $197.55 基準是 6.17 倍）。這次不是交易獲利（同期累計 net
+仍是 −1.64%），純粹是使用者主動存款。使用者決定直接把 $1218.44 訂為新的
+Stage 3 基準，並繼續維持現有 10x 帳戶槓桿設定（真實風險槓桿 2x，NOTIONAL_LEV_MULT
+不變）。
+
+**這條 override 違反的既有規則**：
+- §Stage 3 資本 top-up「這是最後一次 Stage 3 內加碼——再加就必須走 Gate A+B
+  通過後的正式放大（$300-500 一級），不准再用 informed override」——這次直接
+  跳過 $300-500 一級放大，也沒等 Gate A/B 通過。
+- 規模已經進入本檔案自訂的 **Stage 4a（$1k 等級）**資金範圍，但 Stage 4a 的
+  紀律明講「leverage 必須降回 1.0x」——這次選擇**不降槓桿**，維持 10x 帳戶
+  設定 / 2x 有效槓桿。
+
+**發現的技術性阻礙**：`indicator/okx/config.py` 的 `validate_okx_config()`
+原本寫死「live 模式 `initial_capital_usd > $200` 就 `raise RuntimeError`」
+——這不是文件層級的規則，是真的會讓 executor 啟動失敗的程式碼guard，專門
+設計來擋「沒走完 Gate A/B 就把 Stage 3 金額往上衝」這件事。要落地這次
+override，**必須先改這段程式碼本身**（不是只改 Railway 環境變數）：上限從
+$200 調高到 $1500（保留餘裕但仍是硬上限，不是無限制放行）。
+
+**執行的變更**：
+- `indicator/okx/config.py`：`initial_capital_usd` 預設 197.55→1218.44；
+  live guard 上限 $200→$1500；通用 sanity 上限 $1000→$1500。
+- Railway env `OKX_INITIAL_CAPITAL_USD` = 1218.44（清除 CAP-2 over-funding
+  HALT，該 HALT 是因為舊基準 $197 的 1.5x=$295.5 早就被 $1218 帳戶餘額
+  觸發，此前已連續 halt 多次）。
+- `indicator/okx/report.py` `EXECUTOR_RESTART_CAPITAL_USD` = 1218.44、
+  `EXECUTOR_RESTART_SINCE` = 2026-07-24（報表基準重置，排除這筆存款本身
+  對報酬率的污染）。
+- 槓桿設定**不變**：OKX 帳戶槓桿 10x（僅決定保證金鎖多少）、真實風險槓桿
+  仍是 NOTIONAL_LEV_MULT=2x。daily/total loss cap 百分比不變（−20%/−30%），
+  但絕對美金數字隨基準放大約 6.17 倍（daily −$243.7 / total −$365.5）。
+
+**代價自負**：
+- 單筆 stop-out 的美元損失也放大 ~6.17 倍，遠超 §Stage 3 top-up 段落
+  當時評估的「~1.9x」。
+- Gate A（訊號方向 edge）目前仍在門檻邊緣反覆（見 §Compressed Stage 4
+  Validation 的歷次重跑記錄），Gate B（執行驗證）樣本數也還沒到 30-50 筆
+  下限——這次放大**沒有等兩個 Gate 都過**，是純粹基於使用者對這筆存款的
+  資金調度決定，不是基於新的 edge 證據。
+- $1500 的程式碼上限本身也已經是「留了空間但仍是硬上限」——不是把guard
+  整個拔掉。未來若要再加碼超過 $1500，一樣要回來改這段程式碼並寫新的
+  override 記錄，不會因為這次改過一次就變得容易複製。
+
+**不受影響（ruin 保護，與這次金額調整無關）**：kill switch 機制本身（daily
+/total loss cap 百分比、CAP-2 over-funding 檢查邏輯、CAP-4 total-loss
+DEMOTE 邏輯）、max_position_count=1、leverage hard cap 10x。這次只動了
+「基準金額」這一個數字，防護機制的結構完全沒變。
+
+---
+
 ## V7 多幣化提前啟動（2026-07-23，第 5 次 informed override）
 
 **背景**：§V7 多幣化可行性研究（本檔案外，見 TODO.md §4.6）原本的紀律鎖是

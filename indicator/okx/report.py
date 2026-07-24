@@ -252,12 +252,14 @@ INITIAL_CAPITAL_USD = 155.0   # original Stage 3 deposit (2026-05-31, $154.86)
 # deposited 2026-06-07 → operator temporarily withdrew the whole balance
 # while FLAT (temporary cash need, NOT a loss — equity → $0.01 tripped
 # CAP-4 DEMOTE and broke the since-6/7 M2M curve), then re-deposited
-# $197.55 (informed capital top-up, user decision 2026-07-14 — see
-# CLAUDE.md §Stage 3 top-up). The headline % is measured from the latest
-# deposit so it starts clean and excludes operator fund movements.
-# Trade-count gates (Gate B / shadow) are NOT reset — they continue.
-EXECUTOR_RESTART_CAPITAL_USD = 197.55
-EXECUTOR_RESTART_SINCE = "2026-07-14"
+# $197.55 (informed capital top-up, user decision 2026-07-14), then
+# deposited further to $1218.44 (2026-07-24, 6th informed override — see
+# CLAUDE.md §Stage 3 資本再加碼至 $1218.44). The headline % is measured
+# from the latest deposit so it starts clean and excludes operator fund
+# movements. Trade-count gates (Gate B / shadow) are NOT reset — they
+# continue.
+EXECUTOR_RESTART_CAPITAL_USD = 1218.44
+EXECUTOR_RESTART_SINCE = "2026-07-24"
 
 
 def _get_equity_curve_stats(since: str) -> dict:
