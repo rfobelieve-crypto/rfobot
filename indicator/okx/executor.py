@@ -255,6 +255,7 @@ class V7OkxExecutor:
 
     def cycle(self, *, klines: pd.DataFrame, signal_direction: str,
               signal_strength: str,
+              pred_ret: float = 0.0,
               model_version: Optional[str] = None) -> CycleResult:
         """One cycle on the latest closed bar.
 
@@ -264,6 +265,15 @@ class V7OkxExecutor:
           3. Kill checks aggregate
           4. If open position: manage exit / amend trailing stop
           5. If flat + actionable signal: submit entry + algo stop
+
+        pred_ret: the model's raw continuous prediction (indicator/app.py's
+        last_row["pred_return_4h"]), NOT the tier-decoded signal_direction.
+        Drives the conviction-decay exit (research/conviction_decay_exit.py,
+        2026-07-24 validation) — see _manage_position. Defaults to 0.0 so
+        callers that don't pass it (tests, other cohorts) get NEUTRAL-like
+        behavior rather than a crash; 0.0 never satisfies either side's
+        decay condition (strictly < 0 or > 0), so omitting it is equivalent
+        to disabling conviction-decay, not silently misclassifying a side.
         """
         # 1. Status guard
         if self._status in (ExecutorStatus.INIT, ExecutorStatus.CONNECTING,
@@ -371,7 +381,8 @@ class V7OkxExecutor:
         pos = self._store.get_open_position()
         if pos:
             res = self._manage_position(pos, klines=klines,
-                                        signal_direction=signal_direction)
+                                        signal_direction=signal_direction,
+                                        pred_ret=pred_ret)
             # Flip on opposite-Strong (2026-07-10, strong_preempt_bt GO):
             # the opp_signal close used to end the cycle, catching the
             # reversal only if the NEXT bar still decoded Strong. When the
@@ -550,7 +561,8 @@ class V7OkxExecutor:
     # ── Cycle steps ────────────────────────────────────────────────────
 
     def _manage_position(self, pos: dict, *, klines: pd.DataFrame,
-                         signal_direction: str) -> CycleResult:
+                         signal_direction: str,
+                         pred_ret: float = 0.0) -> CycleResult:
         """Existing-position branch.
 
         Mirrors v7_paper_executor exit/trail logic, but the *intrabar
@@ -558,7 +570,7 @@ class V7OkxExecutor:
         entry).  We only need to:
           - ratchet the trailing extreme bar-by-bar + amend the algo
             stop trigger to the new level
-          - manually close on opposite signal (or time_cap if cfg enables it)
+          - manually close on opposite signal, time_cap, or conviction-decay
             (those are conditions OKX doesn't know about)
 
         Algo-stop fills arrive via WS `orders` event and reconciliation;
@@ -608,22 +620,47 @@ class V7OkxExecutor:
                            if prev_extreme > 0 else bar_low)
             new_stop = new_extreme + stop_dist
 
-        # Manual exits — OKX doesn't know about time_cap / opp_signal
-        # time_cap_hours=0 disables the cap (removed 2026-06-10) → exits come
-        # only from the trailing stop or an opposite signal.
+        # Manual exits — OKX doesn't know about time_cap / conviction_decay /
+        # opp_signal. time_cap_hours=0 disables the cap (removed 2026-06-10).
         exit_reason: Optional[str] = None
+        new_decay_streak: Optional[int] = None
         if (self._cfg.time_cap_hours > 0
                 and bars_held >= self._cfg.time_cap_hours):
             exit_reason = "time_cap"
-        elif side == "LONG" and signal_direction == "DOWN":
-            exit_reason = "opp_signal"
-        elif side == "SHORT" and signal_direction == "UP":
-            exit_reason = "opp_signal"
+        elif self._cfg.conviction_decay_bars > 0:
+            # research/conviction_decay_exit.py, 2026-07-24: exit once the
+            # SAME model that drove entry has disagreed with this position's
+            # side for N consecutive bars — strictly looser than opp_signal
+            # (full reclassification to the opposite Moderate/Strong tier),
+            # so this fires first when enabled. opp_signal stays below as a
+            # fallback (e.g. pred_ret exactly 0.0, an edge case this doesn't
+            # catch since disagreement requires a strict sign flip).
+            disagreeing = ((side == "LONG" and pred_ret < 0)
+                           or (side == "SHORT" and pred_ret > 0))
+            streak = int(pos.get("decay_streak_count") or 0)
+            new_decay_streak = streak + 1 if disagreeing else 0
+            if new_decay_streak >= self._cfg.conviction_decay_bars:
+                exit_reason = "conviction_decay"
+        if exit_reason is None:
+            if side == "LONG" and signal_direction == "DOWN":
+                exit_reason = "opp_signal"
+            elif side == "SHORT" and signal_direction == "UP":
+                exit_reason = "opp_signal"
 
         if exit_reason is not None:
             return self._close_position(pos, exit_price=last_close,
                                          exit_reason=exit_reason,
                                          bar_ts=bar_ts_naive)
+
+        # No exit this cycle — persist the (possibly incremented/reset)
+        # decay streak so it survives to the next cycle's DB reload.
+        if new_decay_streak is not None:
+            try:
+                self._store.update_decay_streak(
+                    position_id=int(pos["id"]), streak=new_decay_streak)
+            except Exception:
+                logger.exception("update_decay_streak_failed pos=%s",
+                                 pos.get("id"))
 
         # No exit — ratchet trail if extreme advanced
         if new_extreme != prev_extreme:

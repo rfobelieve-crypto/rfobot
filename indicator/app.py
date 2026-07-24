@@ -697,6 +697,7 @@ def update_cycle() -> dict:
                 okx_result = okx_executor.cycle(
                     klines=klines, signal_direction=direction,
                     signal_strength=strength,
+                    pred_ret=float(last_row.get("pred_return_4h", 0)),
                     model_version=get_current_model_version(),
                 )
                 logger.info("okx_cycle action=%s detail=%s",
@@ -717,6 +718,7 @@ def update_cycle() -> dict:
                     acct_result = acct_ex.cycle(
                         klines=klines, signal_direction=direction,
                         signal_strength=strength,
+                        pred_ret=float(last_row.get("pred_return_4h", 0)),
                         model_version=get_current_model_version(),
                     )
                     logger.info("okx_cycle[%s] action=%s detail=%s",

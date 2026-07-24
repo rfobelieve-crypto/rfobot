@@ -102,6 +102,24 @@ class OkxConfig:
     # cutting them short. Re-enable via OKX_TIME_CAP_HOURS=72 (no redeploy).
     time_cap_hours: int = 0
 
+    # Conviction-decay exit (2026-07-24, research/conviction_decay_exit.py).
+    # 0 = DISABLED (default — not yet shadow-mode verified against live data,
+    # per this project's "verify before touching real trades" discipline).
+    # When > 0: while in a position, if the model's raw continuous
+    # pred_return_4h has disagreed with the position's side for this many
+    # CONSECUTIVE bars, close manually (same "OKX doesn't know about this"
+    # category as time_cap/opp_signal below) — supersedes opp_signal since
+    # it's a strictly looser trigger (any sign disagreement, not a full
+    # reclassification to the opposite Moderate/Strong tier), so opp_signal
+    # would rarely fire once this is active; kept as a fallback regardless.
+    # Backtest (167-day WF-OOS, 2026-01-20 -> 2026-07-06): n=68 WR=76.5%
+    # CI=[66.2,86.8] vs baseline n=63 WR=65.1%; Sharpe 7.66 vs 6.47; MDD 2.6%
+    # vs 3.7%; all 4 quartiles WR>50%; bar-count 1-4 all in a stable plateau
+    # (not a cherry-picked spike). Enable live via OKX_CONVICTION_DECAY_BARS=2
+    # (no redeploy needed) — but see TODO.md for the shadow-mode step this
+    # is gated behind first.
+    conviction_decay_bars: int = 0
+
     # ── Risk caps (Stage 3 defaults; tightened for 10x leverage)
     # Default bumped 100→155 (2026-06-01, $154.86 deposit), then 155→197.55
     # (2026-07-14) after the flat withdrawal + $197.55 redeposit. CAP-2
@@ -192,6 +210,12 @@ def load_okx_config_from_env(stage: Literal["testnet", "live"] = "testnet") -> O
     if tch:
         try:
             kwargs["time_cap_hours"] = int(tch)
+        except ValueError:
+            pass
+    cdb = os.environ.get("OKX_CONVICTION_DECAY_BARS", "").strip()
+    if cdb:
+        try:
+            kwargs["conviction_decay_bars"] = int(cdb)
         except ValueError:
             pass
     return OkxConfig(**kwargs)

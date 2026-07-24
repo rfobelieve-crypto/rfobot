@@ -137,6 +137,26 @@ class OkxStateStore:
             finally:
                 conn.close()
 
+    def update_decay_streak(self, *, position_id: int, streak: int) -> None:
+        """Persist the conviction-decay consecutive-bar counter (migrations/
+        015_v7_okx_conviction_decay.sql). The live executor reloads `pos`
+        from this table every cycle, so unlike the backtest sim (one
+        in-process loop) this counter has nowhere else to survive between
+        cycles — see research/conviction_decay_exit.py."""
+        sql = (
+            f"UPDATE `{self._prefix}_positions` "
+            "SET decay_streak_count=%s "
+            "WHERE id=%s AND status='OPEN'"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (int(streak), int(position_id)))
+                conn.commit()
+            finally:
+                conn.close()
+
     def set_position_okx_ids(self, *, position_id: int,
                              entry_ord_id: Optional[str] = None,
                              stop_algo_id: Optional[str] = None) -> None:
