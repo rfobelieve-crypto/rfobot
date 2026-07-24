@@ -9,7 +9,7 @@ up here, not just in the standalone research script.
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
@@ -249,3 +249,64 @@ class TestShadowMode:
         result = exe._manage_position(pos, klines=klines, signal_direction="NEUTRAL",
                                       pred_ret=-0.001)
         assert result.action == "hold"  # did not raise despite shadow failure
+
+
+class TestFirstConvictionDecayLiveAlert:
+    """2026-07-25 go-live (0 shadow samples — see mistake.md): the first
+    real conviction_decay close gets a distinct banner so a human notices
+    immediately, without blocking/delaying the exit itself (unlike the
+    entry-side ApprovalGate, which CAN block since no capital is at risk
+    while pending)."""
+
+    def test_first_ever_close_gets_banner(self):
+        exe, client, store, _ = _mk_executor()
+        store.count_closed_by_exit_reason.return_value = 0
+        klines = _mk_klines()
+        bar_ts = klines.index[-1].tz_convert("UTC").tz_localize(None)
+        pos = _open_pos(side="LONG", entry_price=75000.0)
+        with patch("indicator.okx.executor.send_critical",
+                   return_value=True) as tg:
+            exe._close_position(pos, exit_price=76500.0,
+                                exit_reason="conviction_decay", bar_ts=bar_ts)
+        store.count_closed_by_exit_reason.assert_called_once_with("conviction_decay")
+        sent_msg = tg.call_args.args[1]
+        assert "FIRST LIVE conviction_decay EXIT" in sent_msg
+
+    def test_second_close_no_banner(self):
+        exe, client, store, _ = _mk_executor()
+        store.count_closed_by_exit_reason.return_value = 3
+        klines = _mk_klines()
+        bar_ts = klines.index[-1].tz_convert("UTC").tz_localize(None)
+        pos = _open_pos(side="LONG", entry_price=75000.0)
+        with patch("indicator.okx.executor.send_critical",
+                   return_value=True) as tg:
+            exe._close_position(pos, exit_price=76500.0,
+                                exit_reason="conviction_decay", bar_ts=bar_ts)
+        sent_msg = tg.call_args.args[1]
+        assert "FIRST LIVE" not in sent_msg
+
+    def test_non_conviction_decay_exit_never_checks(self):
+        """opp_signal/trail_stop/time_cap exits must not even query the
+        count — the banner is conviction_decay-specific."""
+        exe, client, store, _ = _mk_executor()
+        klines = _mk_klines()
+        bar_ts = klines.index[-1].tz_convert("UTC").tz_localize(None)
+        pos = _open_pos(side="LONG", entry_price=75000.0)
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            exe._close_position(pos, exit_price=76500.0,
+                                exit_reason="opp_signal", bar_ts=bar_ts)
+        store.count_closed_by_exit_reason.assert_not_called()
+
+    def test_db_failure_falls_back_to_plain_message(self):
+        exe, client, store, _ = _mk_executor()
+        store.count_closed_by_exit_reason.side_effect = Exception("db down")
+        klines = _mk_klines()
+        bar_ts = klines.index[-1].tz_convert("UTC").tz_localize(None)
+        pos = _open_pos(side="LONG", entry_price=75000.0)
+        with patch("indicator.okx.executor.send_critical",
+                   return_value=True) as tg:
+            result = exe._close_position(pos, exit_price=76500.0,
+                                         exit_reason="conviction_decay", bar_ts=bar_ts)
+        # Did not raise, still sent the (unbannered) alert.
+        assert result.action == "close"
+        tg.assert_called_once()

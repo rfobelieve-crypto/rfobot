@@ -115,9 +115,12 @@ class OkxConfig:
     # Backtest (167-day WF-OOS, 2026-01-20 -> 2026-07-06): n=68 WR=76.5%
     # CI=[66.2,86.8] vs baseline n=63 WR=65.1%; Sharpe 7.66 vs 6.47; MDD 2.6%
     # vs 3.7%; all 4 quartiles WR>50%; bar-count 1-4 all in a stable plateau
-    # (not a cherry-picked spike). Enable live via OKX_CONVICTION_DECAY_BARS=2
-    # (no redeploy needed) — but see TODO.md for the shadow-mode step this
-    # is gated behind first.
+    # (not a cherry-picked spike). Code default stays 0 (disabled) — live is
+    # activated via Railway OKX_CONVICTION_DECAY_BARS=2 (2026-07-25 go-live,
+    # user-approved with 0 shadow samples collected — see CLAUDE.md/
+    # mistake.md). executor.py's _maybe_flag_first_conviction_decay flags
+    # the first-ever real close with a distinct Telegram banner in lieu of
+    # a blocking approval gate (exits shouldn't be delayed pending a reply).
     conviction_decay_bars: int = 0
 
     # ── Risk caps (Stage 3 defaults; tightened for 10x leverage)

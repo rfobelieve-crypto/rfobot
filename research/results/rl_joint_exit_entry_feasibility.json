@@ -1,0 +1,57 @@
+{
+  "fold_results": [
+    {
+      "fold": 0,
+      "rl": {
+        "n": 10,
+        "wr_pct": 60.0,
+        "avg_net_bps": 36.2
+      },
+      "baseline": {
+        "n": 3,
+        "wr_pct": 66.7,
+        "avg_net_bps": 93.2
+      }
+    },
+    {
+      "fold": 1,
+      "rl": {
+        "n": 12,
+        "wr_pct": 50.0,
+        "avg_net_bps": -17.3
+      },
+      "baseline": {
+        "n": 11,
+        "wr_pct": 90.9,
+        "avg_net_bps": 156.1
+      }
+    },
+    {
+      "fold": 2,
+      "rl": {
+        "n": 10,
+        "wr_pct": 30.0,
+        "avg_net_bps": -49.1
+      },
+      "baseline": {
+        "n": 7,
+        "wr_pct": 57.1,
+        "avg_net_bps": 58.5
+      }
+    },
+    {
+      "fold": 3,
+      "rl": {
+        "n": 12,
+        "wr_pct": 41.7,
+        "avg_net_bps": 7.1
+      },
+      "baseline": {
+        "n": 5,
+        "wr_pct": 60.0,
+        "avg_net_bps": 117.8
+      }
+    }
+  ],
+  "run_ts": "2026-07-24T11:45:44.369950+00:00"
+}

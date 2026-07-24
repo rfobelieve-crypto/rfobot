@@ -263,6 +263,52 @@ DEMOTE 邏輯）、max_position_count=1、leverage hard cap 10x。這次只動�
 
 ---
 
+## conviction_decay 出場機制上線——0 shadow 樣本（2026-07-25）
+
+**背景**：conviction_decay（用進場模型連續原始輸出取代固定 3xATR 停損判斷出場，
+見 research/conviction_decay_exit.py）2026-07-24 完成 shadow-mode 部署，
+設計上要等真實 live 樣本累積夠了才轉正式（TODO.md 原始任務：「Shadow/dry-run
+模式驗證新出場邏輯」→「正式上線——沿用「第一批人工確認」的先例」，兩步驟
+分開，先觀察再啟用）。但 shadow-mode 部署後帳戶因為資金基準卡在 CAP-2
+HALT（見上一節），整段時間沒有任何真實倉位開過，累積樣本數 = **0**。
+使用者知情選擇跳過「等 shadow 樣本」直接正式上線，接受 0 樣本風險。
+
+**這違反的是專案自訂的驗證紀律（code comment 明講「not yet shadow-mode
+verified... per this project's 'verify before touching real trades'
+discipline」），不是某條寫死的 hard rule**——跟 leverage/capital 那幾次
+override 性質不同，這裡是跳過一個計畫中的驗證步驟，不是推翻一個數字上限。
+
+**風險特徵評估（決定用什麼保護機制）**：conviction_decay 只會在**已經開倉**
+的真實倉位上觸發出場，不會創造新的曝險——最壞情況是「在不理想的時機平倉一筆
+已存在的倉位」，不是「用全新資金開錯方向/錯部位大小的倉」。這跟原本
+entry-side 的 ApprovalGate（第一批人工確認）保護的風險類型不同：entry
+approval 擋的是部署新資本前的錯誤，可以安全地卡在 Telegram 等回覆（沒送出
+訂單 = 沒曝險）；exit 卻是風險已經存在、正在被降低的動作，如果也卡一個
+blocking 的人工核准流程，等於讓已經判定該出場的倉位多曝險等操作員回覆，
+反而更危險。
+
+**採用的保護機制（不是完整重建 entry 那套 approval round-trip）**：
+`indicator/okx/executor.py._maybe_flag_first_conviction_decay`——第一次
+真實觸發 conviction_decay 平倉時，在 Telegram 出場告警前面加一段醒目標記
+（「🔔 FIRST LIVE conviction_decay EXIT — verify this looks correct」），
+讓操作員第一時間看到結果並人工核對，但**不阻擋**平倉動作本身。用
+`OkxStateStore.count_closed_by_exit_reason("conviction_decay")` 查詢
+是否為第一次（DB 查詢失敗時 fail-open，照常送出不帶標記的告警，不讓
+這個輔助檢查變成一個新的單點故障）。4 個新單元測試涵蓋：第一次有標記、
+第二次以後沒有、非 conviction_decay 出場完全不查、DB 失敗不影響告警送出。
+
+**執行**：Railway `OKX_CONVICTION_DECAY_BARS=2`（executor.py 已支援此
+env var，`load_okx_config_from_env` 讀取，無需改程式碼即可切換）。
+
+**代價自負**：這條 call path（`pred_ret` 從 app.py 傳入 → executor 判斷
+streak → 觸發平倉）從沒被真實 OKX 帳戶執行過，第一次真實觸發就是真錢。
+Mitigation 是上面的第一次告警旗標，不是 blocking 驗證——如果第一次觸發
+的結果看起來不對（平倉時機/方向/金額異常），操作員要**立刻**回來檢查
+並視情況把 `OKX_CONVICTION_DECAY_BARS` 改回 0（Railway env var，無需
+改程式碼）。
+
+---
+
 ## V7 多幣化提前啟動（2026-07-23，第 5 次 informed override）
 
 **背景**：§V7 多幣化可行性研究（本檔案外，見 TODO.md §4.6）原本的紀律鎖是

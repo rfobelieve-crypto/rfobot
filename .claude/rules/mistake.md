@@ -194,6 +194,59 @@ inline style 設定上去，讓瀏覽器透過正常 CSS cascade 解析 `var()`�
 
 ---
 
+## 2026-07-24: 聯合進出場 offline RL——資料量級撐不起模型複雜度，4 折全輸 baseline
+
+**What happened:**
+使用者問「當初為什麼沒有把進場出場一起訓練」，我解釋這是刻意簡化（避免
+在小樣本上疊加自由度），並提出三個可能路線給使用者選：(a) 獨立訓練一個
+meta-labeling 風格的出場模型（風險最低，推薦）、(b) 進出場參數聯合網格
+搜索、(c) RL policy 把進場出場當一個完整決策序列一起學（技術上最貼近
+「聯合訓練」但這個專案的資料量級遠低於 RL 通常需要的量，overfit 風險
+最高）。使用者明確選了 (c)。
+
+依照使用者選擇建置：offline FQI（Fitted Q-Iteration，Q function 用
+XGBoost 近似，跟專案既有建模方式一致）、逐 bar MDP（不是逐筆交易，
+樣本數才夠）、state 用現有模型輸出（pred_ret/vol_regime/atr_pct）+
+持倉狀態（bars_held/unrealized/MFE/MAE/decay_streak）、exact
+counterfactual transition enumeration（利用「自己的交易不影響
+市場」這個性質，對每個 bar 精確算出所有動作的真實後續，不需要
+importance sampling）。套用專案既有的 walk_forward_splits
+（purge+embargo）+ 4 條驗證關卡（aggregate lift / per-fold mean /
+frac positive folds / bootstrap CI）。
+
+4 折結果：**per-fold mean lift −112.17 bps、0/4 折為正、bootstrap
+95% CI [−156.95, −70.42]（整段在零以下）**。RL policy 在每一折都
+輸給現有 baseline（trail_stop/opp_signal），而且輸得不小——不是
+邊緣性的「差一點沒過」，是方向一致的全面落敗。
+
+**Root cause:**
+每折訓練資料只有 1200-1900 根左右的 in_oos bar（3-4 個月），對一個
+9 維 state 空間的 Q function 來說太稀疏。更根本的技術原因：這版 FQI
+沒有加 offline RL 常見的保守正則化（例如 CQL 那類，用來壓制 Q
+function 對訓練資料沒怎麼見過的 state-action pair 產生過度樂觀的
+外推值）——這是 offline RL 的已知通病，樣本一少就特別明顯，會讓
+greedy policy 被 Q function 的雜訊帶偏。這不是實作 bug（4 折都乾淨
+跑完、沒有 crash、逐項核對過 state/action/reward 定義都正確），是
+方法本身的複雜度跟資料量級不匹配。
+
+**Correct approach:**
+選路線前已經用 AskUserQuestion 明確標註「RL 的資料量需求遠高於這個
+專案能提供的量級」這個風險，使用者知情選擇。結果驗證了這個顧慮不是
+保守，是準的。要繼續這條路線，需要先解決資料量問題（例如擴大到
+bar-level 的跨資產 pooling、或加 CQL 級別的正則化），但這些改動的
+預期報酬相對工程成本，現階段不划算——這個結論本身已經是研究產出。
+
+**Rule:** 資料量級和模型複雜度要先粗估匹配度再動工，不要因為「這是
+教科書上更完整/更先進的方法」就假設它一定更好——RL 需要的有效樣本數
+通常是幾萬到幾百萬個 transition，這個專案能提供的（幾千根 bar）差了
+1-2 個數量級，這個差距不會因為换更好的演算法或調參數而消失。使用者
+明確選擇某條高風險路線時，照做但要誠實跑完整套既有驗證紀律（per-fold
++ bootstrap CI，不只看 aggregate），讓資料自己說話而不是提前放棄或
+硬撐；4 折一致的方向性結果（不是邊緣性差異）代表這不是運氣，可以放心
+記為 NO-GO 收尾，不需要再多折驗證。
+
+---
+
 ## 2026-07-13: 資金調度觸發 CAP-4 DEMOTE——kill switch 分不出 operator transfer 和 strategy loss
 
 **What happened:**

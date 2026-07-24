@@ -563,3 +563,4 @@ ChatGPT for Claude」）確認真正的視覺語言，跟第一版描述（互�
 - [x] ~~liquidity proxy features (21)~~ — univariate IC 高但 ensemble 零提升
 - [x] ~~exit-variants sweep + 不對稱 cutoff Option C~~ — 雙 NO-GO（5d83da2）
 - [x] ~~taker/衍生品訂單流 × 傳統指標 context~~ — powered NULL（2026-07-09；壓縮/突破/關卡/高波動 4 context 無一把 taker IC 拉離 0；1h+ 已飽和；火花改押撤單訊號 or 次小時視野）
+- [x] ~~聯合進出場 offline RL (FQI)~~ — NO-GO（2026-07-24；4 折 walk-forward 全輸 baseline，per-fold mean −112bps、CI[-157,-70] 全負、0/4 折為正；根因是資料量（每折僅 1200-1900 in_oos bar）撐不起 9 維 state 的 Q function，非實作 bug；見 mistake.md）

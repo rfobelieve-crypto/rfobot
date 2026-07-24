@@ -807,6 +807,29 @@ class V7OkxExecutor:
                      else self._cfg.taker_fee_side_est)
         return gross_pct - entry_frac - exit_frac
 
+    def _maybe_flag_first_conviction_decay(self, msg: str) -> str:
+        """Prepend a distinct banner the first time conviction_decay ever
+        closes a REAL position (2026-07-25 go-live, 0 shadow samples —
+        see CLAUDE.md/mistake.md). Not a blocking approval gate: unlike
+        an entry (which deploys fresh capital), an exit only changes when
+        an ALREADY-OPEN position closes, so gating it on a Telegram
+        round-trip would leave the position needlessly exposed while
+        waiting for a reply — the risk-reducing action itself must not be
+        delayed. This is the exit-side equivalent of the "first batch
+        manual confirmation" precedent (ApprovalGate, entry-only): a human
+        gets eyes on the outcome immediately after, not a veto before.
+        Best-effort — a DB hiccup here must never block the real alert.
+        """
+        try:
+            prior = self._store.count_closed_by_exit_reason("conviction_decay")
+        except Exception:
+            logger.exception("first_conviction_decay_check_failed")
+            return msg
+        if prior == 0:
+            return ("🔔 *FIRST LIVE conviction_decay EXIT* — verify this "
+                    "looks correct (0 shadow samples before go-live)\n\n" + msg)
+        return msg
+
     def _close_position(self, pos: dict, *, exit_price: float,
                          exit_reason: str,
                          bar_ts) -> CycleResult:
@@ -995,6 +1018,8 @@ class V7OkxExecutor:
                 exit_price=exit_price, gross_pct=gross_pct,
                 net_pct=net_pct, equity_after=equity_after,
             )
+            if exit_reason == "conviction_decay":
+                msg = self._maybe_flag_first_conviction_decay(msg)
             send_critical(self._cfg.telegram_critical_chat_id, msg)
         except Exception:
             logger.exception("close_telegram_alert_failed")

@@ -177,6 +177,26 @@ class OkxStateStore:
             finally:
                 conn.close()
 
+    def count_closed_by_exit_reason(self, exit_reason: str) -> int:
+        """How many CLOSED positions carry this exit_reason so far.
+
+        Used to detect "this is the first-ever live occurrence of X" —
+        e.g. gating a one-time extra alert on conviction_decay's first
+        real trigger (2026-07-25, 0-shadow-sample go-live) without
+        needing a whole new approval-gate table."""
+        sql = (
+            f"SELECT COUNT(*) AS n FROM `{self._prefix}_positions` "
+            "WHERE status='CLOSED' AND exit_reason=%s"
+        )
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (exit_reason,))
+                row = cur.fetchone()
+                return int(row["n"]) if row else 0
+        finally:
+            conn.close()
+
     def set_position_okx_ids(self, *, position_id: int,
                              entry_ord_id: Optional[str] = None,
                              stop_algo_id: Optional[str] = None) -> None:

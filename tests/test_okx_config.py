@@ -155,16 +155,24 @@ class TestLiveModeGuards:
         with patch.dict(os.environ, {"STAGE": "live"}):
             validate_okx_config(cfg)  # must not raise
 
-    def test_live_capital_above_200_fails(self):
-        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=500.0)
+    def test_live_capital_above_1500_fails(self):
+        # Ceiling raised 200 -> 1500 (2026-07-25, 6th informed override —
+        # see CLAUDE.md / mistake.md — user deposited to $1218.44 without
+        # clearing Gate A/B first).
+        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=2000.0)
         with patch.dict(os.environ, {"STAGE": "live"}):
-            with pytest.raises(RuntimeError, match="\\$200"):
+            with pytest.raises(RuntimeError, match="\\$1500"):
                 validate_okx_config(cfg)
 
-    def test_live_capital_at_200_passes(self):
-        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=200.0)
+    def test_live_capital_at_1500_passes(self):
+        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=1500.0)
         with patch.dict(os.environ, {"STAGE": "live"}):
             validate_okx_config(cfg)
+
+    def test_live_capital_at_current_baseline_passes(self):
+        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=1218.44)
+        with patch.dict(os.environ, {"STAGE": "live"}):
+            validate_okx_config(cfg)  # must not raise
 
 
 # ── Capital sanity ───────────────────────────────────────────────────
@@ -179,10 +187,10 @@ class TestCapitalSanity:
         with pytest.raises(RuntimeError, match="capital"):
             validate_okx_config(_valid_cfg(initial_capital_usd=0.0))
 
-    def test_above_1000_capital_fails(self):
-        # Stage 2-3 hard ceiling: $1000
+    def test_above_1500_capital_fails(self):
+        # Stage 2-3 hard ceiling: $1500 (raised from $1000, 6th override)
         with pytest.raises(RuntimeError, match="capital"):
-            validate_okx_config(_valid_cfg(initial_capital_usd=1500.0))
+            validate_okx_config(_valid_cfg(initial_capital_usd=2000.0))
 
 
 # ── Loss cap sign ────────────────────────────────────────────────────
