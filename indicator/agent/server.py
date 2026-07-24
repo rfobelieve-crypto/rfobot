@@ -320,6 +320,32 @@ async def _proxy_png(cache: dict, ttl_s: float, url: str, *, token: str = "") ->
     return resp
 
 
+# Same shape as _proxy_png, `text/html` instead of `image/png` — reuses
+# _fetch_origin_png as-is (it's content-type-agnostic, just returns raw
+# `.content` bytes) for the two interactive Lightweight-Charts pages
+# (2026-07-24, "make every chart interactive" — see /public/live-chart and
+# /public/cancel-flow-chart-i below). Framed with X-Frame-Options: none so
+# product-site can iframe it — the origin service itself sets no
+# frame-blocking header, but being explicit here means this route stays
+# iframe-able even if the origin's own headers ever change.
+async def _proxy_html(cache: dict, ttl_s: float, url: str, *, token: str = "") -> Response:
+    now = time.monotonic()
+    if cache["bytes"] is None or now - cache["ts"] > ttl_s:
+        fetched = await anyio.to_thread.run_sync(_fetch_origin_png, url, token)
+        if fetched is not None:
+            cache["bytes"] = fetched
+            cache["ts"] = now
+    if cache["bytes"] is None:
+        resp = Response(
+            content=b"<h3>Chart temporarily unavailable</h3>",
+            status_code=503, media_type="text/html")
+    else:
+        resp = Response(content=cache["bytes"], media_type="text/html")
+        resp.headers["Cache-Control"] = f"public, max-age={int(ttl_s)}"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 # V7 chart re-serves the indicator service's in-memory PNG (dark variant,
 # see indicator/chart_renderer.py `dark=` param) — cheap on the origin, so
 # the cache here is just normal freshness control, not rate-limiting.
@@ -370,6 +396,41 @@ async def public_cancel_flow_stats_route(request: Request) -> JSONResponse:
     resp.headers["Cache-Control"] = "public, max-age=60"
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
+
+
+# ── Interactive (Lightweight-Charts) chart pages, 2026-07-24 ────────────
+# "Make every chart on the site interactive" — proxies indicator/app.py's
+# already-built interactive HTML pages (same lightweight-charts library,
+# same zoom/pan/crosshair sync, same live OKX markers) instead of the
+# static PNGs above. product-site iframes these directly.
+
+# /live-chart is an open route (not admin-guarded) that renders synchronously
+# from in-memory state — cheap, no subprocess — so a short TTL is fine.
+_v7_live_chart_cache: dict = {"bytes": None, "ts": 0.0}
+_V7_LIVE_CHART_CACHE_TTL_S = 60.0
+
+
+@mcp.custom_route("/public/live-chart", methods=["GET"])
+async def public_live_chart_route(request: Request) -> Response:
+    return await _proxy_html(
+        _v7_live_chart_cache, _V7_LIVE_CHART_CACHE_TTL_S,
+        f"{INDICATOR_BASE_URL}/live-chart")
+
+
+# /research/cancel-flow-i is the interactive twin of /research/cancel-flow:
+# same subprocess re-render cost (up to 100s), same admin-token guard, same
+# reasoning as _cancel_chart_cache above for why the cache here is
+# load-bearing, not cosmetic.
+_cancel_chart_i_cache: dict = {"bytes": None, "ts": 0.0}
+_CANCEL_CHART_I_CACHE_TTL_S = 120.0
+
+
+@mcp.custom_route("/public/cancel-flow-chart-i", methods=["GET"])
+async def public_cancel_flow_chart_i_route(request: Request) -> Response:
+    return await _proxy_html(
+        _cancel_chart_i_cache, _CANCEL_CHART_I_CACHE_TTL_S,
+        f"{INDICATOR_BASE_URL}/research/cancel-flow-i?hours=48",
+        token=INDICATOR_ADMIN_TOKEN)
 
 
 def main() -> None:
