@@ -57,6 +57,16 @@ TIME_CAP_HOURS = 72        # canonical re-enable value; live cap = cfg.time_cap_
 RISK_FRAC = 0.02            # 2% of equity per trade (legacy; unused by B sizing)
 MAX_LEVERAGE = 1.0
 
+# Shadow-mode conviction-decay threshold (2026-07-24) — the validated 2-bar
+# choice from research/conviction_decay_exit.py (Sharpe 7.66 vs baseline
+# 6.47, all 4 quartiles WR>50%). ALWAYS shadow-computed regardless of
+# cfg.conviction_decay_bars (the live-enable switch, default 0) so real
+# evidence accumulates before this can touch a real position. A separate
+# constant from cfg.conviction_decay_bars on purpose — shadow mode should
+# keep testing the validated value even if the live switch is later set to
+# something else for a real A/B.
+SHADOW_CONVICTION_DECAY_BARS = 2
+
 # ── Fixed-notional sizing "B" (2026-06-06) ────────────────────────────
 # Position notional = NOTIONAL_LEV_MULT × equity, rounded to OKX's 0.01-contract
 # lot step.  Replaces the old 2%-risk × leverage formula whose int()-floor to
@@ -661,6 +671,38 @@ class V7OkxExecutor:
             except Exception:
                 logger.exception("update_decay_streak_failed pos=%s",
                                  pos.get("id"))
+
+        # Shadow mode (2026-07-24, TODO.md step before conviction_decay_bars
+        # is ever turned on): ALWAYS compute the would-be streak against the
+        # validated 2-bar threshold, regardless of conviction_decay_bars —
+        # log-only, never sets exit_reason, never calls _close_position.
+        # Purpose: accumulate real live-data evidence (did it fire, and how
+        # would that compare to the actual eventual exit) before this can
+        # ever touch a real position. Wrapped so a bug here can only ever
+        # cost a log line, not a stuck cycle.
+        try:
+            shadow_disagreeing = ((side == "LONG" and pred_ret < 0)
+                                  or (side == "SHORT" and pred_ret > 0))
+            shadow_streak_prev = int(pos.get("shadow_decay_streak_count") or 0)
+            shadow_streak = shadow_streak_prev + 1 if shadow_disagreeing else 0
+            if shadow_streak != shadow_streak_prev:
+                self._store.update_shadow_decay_streak(
+                    position_id=int(pos["id"]), streak=shadow_streak)
+            if shadow_streak >= SHADOW_CONVICTION_DECAY_BARS:
+                entry_price = float(pos.get("entry_price") or 0)
+                unrealized_pct = (
+                    (last_close / entry_price - 1.0) if side == "LONG"
+                    else -(last_close / entry_price - 1.0)) if entry_price else 0.0
+                logger.warning(
+                    "shadow_conviction_decay_would_exit pos=%s side=%s "
+                    "bars_held=%d pred_ret=%.6f shadow_streak=%d "
+                    "would_exit_price=%.2f unrealized_pct=%.4f "
+                    "actual_status=still_open (log-only, no action taken)",
+                    pos.get("id"), side, bars_held, pred_ret, shadow_streak,
+                    last_close, unrealized_pct)
+        except Exception:
+            logger.exception("shadow_conviction_decay_failed pos=%s",
+                             pos.get("id"))
 
         # No exit — ratchet trail if extreme advanced
         if new_extreme != prev_extreme:

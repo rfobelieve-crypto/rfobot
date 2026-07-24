@@ -157,6 +157,26 @@ class OkxStateStore:
             finally:
                 conn.close()
 
+    def update_shadow_decay_streak(self, *, position_id: int, streak: int) -> None:
+        """Log-only twin of update_decay_streak (migrations/
+        016_v7_okx_shadow_decay.sql) — always written regardless of whether
+        conviction_decay_bars is enabled, so real live-data evidence
+        accumulates before the mechanism is ever allowed to touch a real
+        position."""
+        sql = (
+            f"UPDATE `{self._prefix}_positions` "
+            "SET shadow_decay_streak_count=%s "
+            "WHERE id=%s AND status='OPEN'"
+        )
+        with self._lock:
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (int(streak), int(position_id)))
+                conn.commit()
+            finally:
+                conn.close()
+
     def set_position_okx_ids(self, *, position_id: int,
                              entry_ord_id: Optional[str] = None,
                              stop_algo_id: Optional[str] = None) -> None:

@@ -71,8 +71,8 @@ def _mk_executor(cfg=None):
     return exe, client, store, recon
 
 
-def _open_pos(side="LONG", *, decay_streak_count=0, entry_price=75000.0,
-             stop_dist=150.0, trail_extreme=None):
+def _open_pos(side="LONG", *, decay_streak_count=0, shadow_decay_streak_count=0,
+             entry_price=75000.0, stop_dist=150.0, trail_extreme=None):
     from datetime import datetime
     return {
         "id": 1, "entry_time": datetime(2026, 5, 27, 0, 0, 0), "direction": side,
@@ -82,6 +82,7 @@ def _open_pos(side="LONG", *, decay_streak_count=0, entry_price=75000.0,
         "size_contracts": 5, "size_frac": 0.5, "notional_usd": 50.0,
         "equity_before": 100.0, "stop_algo_id": "okx-algo-1",
         "entry_cl_ord_id": "v7-abc", "decay_streak_count": decay_streak_count,
+        "shadow_decay_streak_count": shadow_decay_streak_count,
     }
 
 
@@ -184,3 +185,67 @@ class TestConvictionDecayDbFailureIsNonFatal:
         result = exe._manage_position(pos, klines=klines, signal_direction="NEUTRAL",
                                       pred_ret=-0.001)
         assert result.action == "hold"  # did not raise
+
+
+class TestShadowMode:
+    """Shadow computation must ALWAYS run (regardless of conviction_decay_bars,
+    including the default-disabled 0) and must NEVER be able to close a real
+    position — it only logs + persists shadow_decay_streak_count."""
+
+    def test_shadow_runs_even_when_feature_disabled(self):
+        exe, client, store, _ = _mk_executor()  # default: conviction_decay_bars=0
+        klines = _mk_klines()
+        klines.loc[klines.index[-1], "high"] = klines["close"].iloc[-1]
+        pos = _open_pos(side="LONG", shadow_decay_streak_count=0)
+        result = exe._manage_position(pos, klines=klines, signal_direction="NEUTRAL",
+                                      pred_ret=-0.001)  # disagreeing
+        assert result.action == "hold"
+        store.update_shadow_decay_streak.assert_called_once_with(position_id=1, streak=1)
+        # Real streak untouched — feature is off.
+        store.update_decay_streak.assert_not_called()
+
+    def test_shadow_reaching_threshold_does_not_close_position(self):
+        exe, client, store, _ = _mk_executor()  # disabled
+        klines = _mk_klines()
+        klines.loc[klines.index[-1], "high"] = klines["close"].iloc[-1]
+        # shadow_decay_streak_count=1 -> this disagreeing bar makes it 2,
+        # meeting SHADOW_CONVICTION_DECAY_BARS — must still just log, not close.
+        pos = _open_pos(side="LONG", shadow_decay_streak_count=1)
+        result = exe._manage_position(pos, klines=klines, signal_direction="NEUTRAL",
+                                      pred_ret=-0.001)
+        assert result.action == "hold"  # NEVER close from shadow alone
+        client.submit_market_order.assert_not_called()
+        store.update_shadow_decay_streak.assert_called_once_with(position_id=1, streak=2)
+
+    def test_shadow_resets_on_agreement(self):
+        exe, client, store, _ = _mk_executor()
+        klines = _mk_klines()
+        klines.loc[klines.index[-1], "high"] = klines["close"].iloc[-1]
+        pos = _open_pos(side="LONG", shadow_decay_streak_count=1)
+        result = exe._manage_position(pos, klines=klines, signal_direction="NEUTRAL",
+                                      pred_ret=+0.001)  # agreeing
+        assert result.action == "hold"
+        store.update_shadow_decay_streak.assert_called_once_with(position_id=1, streak=0)
+
+    def test_shadow_also_runs_when_real_feature_enabled(self):
+        """Shadow keeps testing the validated SHADOW_CONVICTION_DECAY_BARS=2
+        constant independently, even if the live switch is set to some other
+        value for a real A/B — the two are deliberately decoupled."""
+        exe, client, store, _ = _mk_executor(cfg=_mk_cfg(conviction_decay_bars=4))
+        klines = _mk_klines()
+        klines.loc[klines.index[-1], "high"] = klines["close"].iloc[-1]
+        pos = _open_pos(side="LONG", decay_streak_count=1, shadow_decay_streak_count=1)
+        result = exe._manage_position(pos, klines=klines, signal_direction="NEUTRAL",
+                                      pred_ret=-0.001)
+        assert result.action == "hold"  # real streak only at 2/4, no exit
+        store.update_decay_streak.assert_called_once_with(position_id=1, streak=2)
+        store.update_shadow_decay_streak.assert_called_once_with(position_id=1, streak=2)
+
+    def test_shadow_failure_does_not_crash_cycle(self):
+        exe, client, store, _ = _mk_executor()
+        store.update_shadow_decay_streak.side_effect = Exception("db hiccup")
+        klines = _mk_klines()
+        pos = _open_pos(side="LONG", shadow_decay_streak_count=0)
+        result = exe._manage_position(pos, klines=klines, signal_direction="NEUTRAL",
+                                      pred_ret=-0.001)
+        assert result.action == "hold"  # did not raise despite shadow failure
