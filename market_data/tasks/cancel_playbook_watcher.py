@@ -70,7 +70,8 @@ ALERTABLE = {"absorption", "true_break", "vacuum"}   # two_sided logs only
 ALERT_MIN_VSHOCK = 20.0    # replay-sim 2026-07-16: ≈4.4 alerts/day
 ALERT_MIN_NET = 0.30
 ZH = {"absorption": "吸收", "true_break": "真破", "vacuum": "真空",
-      "two_sided": "雙側避險", "gate_only": "純爆量"}
+      "two_sided": "雙側避險", "gate_only": "純爆量",
+      "vacuum_lead": "撤單先行"}
 # 2026-07-20: 每個劇本的判讀類型（反轉 vs 順勢延續），供對答案 reply 引用
 # 「這張卡當初判的是什麼」。定義沿用 classify_minute 頂部的凍結註解——
 # 吸收=反轉（賣壓被接走預期彈UP/買壓被接走預期彈DOWN）、真破=順勢延續、
@@ -285,6 +286,48 @@ def classify_minute(r: pd.Series) -> tuple[str, str] | None:
     return "gate_only", "NONE"
 
 
+# ── v2 'vacuum_lead' — PROVISIONAL, NOT frozen (2026-07-25) ───────────────────
+# Isolates the pure "one-sided withdrawal LEADS price" thesis that v1's
+# vacuum branch never captured (0 events / 8 days): gate on ASYMMETRY + the
+# WITHDRAWING side's own cancel-shock, NOT on total-cancel shock; require
+# volume still quiet (the "lead") and price not-yet-moved, so the forward
+# return genuinely tests whether the withdrawal led the move. Thresholds
+# were calibrated on FIRING RATE ONLY (scratchpad v2_vacuum_lead_calibration
+# .py — ~1.7 fires/day) and NEVER on outcomes (that overlap window = v1's
+# regime; the real test is prospective on fresh data). PROVISIONAL: these
+# thresholds may still be revised — any change requires bumping
+# DEF_VERSION_V2, and prior rows are never re-labelled. Log-only, never
+# alerts, never touches the executor. Env-gated for clean on/off.
+DEF_VERSION_V2 = "v2-2026-07-25"
+V2_NET_LEAD = 0.15         # sustained 15m net one-sided withdrawal (v1: 0.30, 0 fires)
+V2_SIDE_SHOCK = 2.5        # withdrawing side's OWN cancel series >= this x median
+V2_VOL_QUIET = 3.0         # vshock < this = volume hasn't arrived (the "lead")
+
+
+def classify_minute_v2(r: pd.Series) -> tuple[str, str] | None:
+    """(playbook, direction) for the provisional v2 vacuum_lead, or None."""
+    net, vs, ret = r["net15"], r["vshock"], r["ret_1m"]
+    acs, bcs = r.get("ac_shock"), r.get("bc_shock")
+    if not np.isfinite(net):
+        return None
+    if np.isfinite(vs) and vs >= V2_VOL_QUIET:        # volume already here → not a lead
+        return None
+    if not np.isfinite(ret) or abs(ret) > RET_FLAT:    # price already moved (or unknown)
+        return None
+    if net >= V2_NET_LEAD and np.isfinite(acs) and acs >= V2_SIDE_SHOCK:
+        return "vacuum_lead", "UP"                      # ask withdrawn → resistance gone → UP
+    if net <= -V2_NET_LEAD and np.isfinite(bcs) and bcs >= V2_SIDE_SHOCK:
+        return "vacuum_lead", "DOWN"                     # bid withdrawn → support gone → DOWN
+    return None
+
+
+def _v2_enabled() -> bool:
+    """v2 logging is env-gated (default OFF) so it's trivially reversible
+    and can't accidentally start the prospective clock on a redeploy."""
+    return os.environ.get("CANCEL_V2_ENABLED", "").strip().lower() \
+        in ("1", "true", "yes", "on")
+
+
 # ── Display state machine (2026-07-17, additive) ─────────────────────────────
 # Single state function shared by every display outlet (TG /cancelstate, the
 # review-chart ribbon, event cards). It is a 1:1 relabelling of the frozen v1
@@ -448,13 +491,14 @@ def humanize_book(shock: float | None = None, skew15: float | None = None,
     return "；".join(parts) if parts else "掛單資料不足"
 
 
-def scan(df_feat: pd.DataFrame, minutes: list[int]) -> list[dict]:
+def scan(df_feat: pd.DataFrame, minutes: list[int],
+         classify_fn=classify_minute) -> list[dict]:
     events = []
     for m in minutes:
         if m not in df_feat.index:
             continue
         r = df_feat.loc[m]
-        hit = classify_minute(r)
+        hit = classify_fn(r)
         if hit is None:
             continue
         playbook, direction = hit
@@ -477,8 +521,13 @@ def scan(df_feat: pd.DataFrame, minutes: list[int]) -> list[dict]:
 
 # ── persistence + alerts ─────────────────────────────────────────────────────
 
-def insert_events(events: list[dict]) -> list[dict]:
-    """INSERT IGNORE; returns the subset that was newly inserted."""
+def insert_events(events: list[dict],
+                  def_version: str = DEF_VERSION) -> list[dict]:
+    """INSERT IGNORE; returns the subset that was newly inserted.
+
+    def_version defaults to v1; the v2 pass passes DEF_VERSION_V2 so its
+    rows coexist under the (def_version, minute_start_ms, playbook) UNIQUE
+    key without colliding with or re-labelling v1 rows."""
     if not events:
         return []
     fresh = []
@@ -491,7 +540,7 @@ def insert_events(events: list[dict]) -> list[dict]:
                     "(def_version, minute_start_ms, playbook, direction, px, "
                     " shock, skew15, net15, vshock, taker_ratio, ret_1m) "
                     "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                    (DEF_VERSION, e["minute_start_ms"], e["playbook"],
+                    (def_version, e["minute_start_ms"], e["playbook"],
                      e["direction"], e["px"], e["shock"], e["skew15"],
                      e["net15"], e["vshock"], e["taker_ratio"], e["ret_1m"]))
                 if cur.rowcount > 0:
@@ -805,6 +854,11 @@ def watch_loop() -> None:
                 minutes = minutes[-5:]                # catch-up cap
                 fresh = insert_events(scan(feat, minutes))
                 alert_events(fresh)
+                # v2 vacuum_lead — parallel, log-only, NO alerts (provisional
+                # family; env-gated so it can't start on a bare redeploy).
+                if _v2_enabled():
+                    insert_events(scan(feat, minutes, classify_minute_v2),
+                                  def_version=DEF_VERSION_V2)
                 if minutes:
                     last_seen = max(minutes)
             backfill_outcomes()
