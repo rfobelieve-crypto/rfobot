@@ -114,6 +114,56 @@ def _overlay_signals(ax, df: pd.DataFrame) -> None:
         print(f"(signal overlay skipped: {e})")
 
 
+# Machine-detected playbook events (cancel_playbook_watcher) — the events the
+# WATCHER pushed on its own, as opposed to _overlay_signals' v7 Strong entries.
+# Marker = playbook, fill = direction, white ring = actually alerted to
+# Telegram (vs silently logged). No-direction playbooks (gate_only /
+# two_sided) are deliberately NOT drawn: ~50% of rows, no directional claim,
+# they'd just bury the readable ones. Read-only + best-effort, same as above:
+# a failure here must never take the chart down.
+_PB_MARKER = {"true_break": "^", "absorption": "D", "vacuum": "*",
+              "vacuum_lead": "P"}
+
+
+def _overlay_playbooks(ax, df: pd.DataFrame) -> None:
+    try:
+        conn = get_db_conn()
+        try:
+            ev = _q(conn,
+                "SELECT minute_start_ms ms, playbook, direction, alerted, "
+                "def_version FROM cancel_playbook_events "
+                "WHERE direction IN ('UP','DOWN') "
+                "AND minute_start_ms BETWEEN %s AND %s",
+                params=(int(df.index.min().timestamp() * 1000),
+                        int(df.index.max().timestamp() * 1000)))
+        finally:
+            conn.close()
+        if ev.empty:
+            return
+        ev["ts"] = pd.to_datetime(pd.to_numeric(ev["ms"]) // 1000, unit="s")
+        ev["alerted"] = pd.to_numeric(ev["alerted"]).fillna(0).astype(int)
+        px = df["mid"].reindex(
+            df.index[df.index.searchsorted(ev["ts"]).clip(0, len(df) - 1)]).values
+        for pb, mk in _PB_MARKER.items():
+            for alerted in (0, 1):
+                m = ((ev["playbook"] == pb) & (ev["alerted"] == alerted)).values
+                if not m.any():
+                    continue
+                up = (ev["direction"].values == "UP") & m
+                dn = (ev["direction"].values == "DOWN") & m
+                # alerted → white ring + opaque; silent → no edge, faded
+                kw = (dict(edgecolor="white", lw=1.1, alpha=0.95, s=64)
+                      if alerted else dict(lw=0, alpha=0.45, s=40))
+                if up.any():
+                    ax.scatter(ev["ts"][up], px[up], marker=mk,
+                               color=GREEN, zorder=5, **kw)
+                if dn.any():
+                    ax.scatter(ev["ts"][dn], px[dn], marker=mk,
+                               color=RED, zorder=5, **kw)
+    except Exception as e:
+        print(f"(playbook overlay skipped: {e})")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     # 24h window / 15m smooth: info half-life ≤60m means only the right edge
@@ -200,9 +250,15 @@ def main() -> int:
         a1.bar(cc, h, bottom=bot, width=body_w, color=col,
                edgecolor=col, lw=0.4, zorder=4)
     a1.set_ylabel(f"價格 ({c_min}m K · mid)", color=TXT, fontsize=10)
+    _overlay_playbooks(a1, df)   # 機器自推劇本(先畫,壓在 v7 訊號底下)
     _overlay_signals(a1, df)
     a1.text(0.006, 0.93, "▲UP ▼DOWN = v7 Strong 信號   綠帶=賣側被抽 紅帶=買側被抽",
             transform=a1.transAxes, color=SUB, fontsize=9)
+    # 第二行圖例:機器劇本(與 v7 訊號分開講,免得覆盤時混為一談)
+    a1.text(0.006, 0.875,
+            "機器劇本(非我方進場): ^真破  ◆吸收  +撤單先行   "
+            "白框=有推播 / 淡色=僅記錄   綠=看漲 紅=看跌",
+            transform=a1.transAxes, color=SUB, fontsize=8.5)
 
     # B: cancel skew(只留平滑填色,無散點)
     a2.axhline(0, color=SUB, lw=0.8)

@@ -128,6 +128,48 @@ def load_strong_signals(start_ms: int, end_ms: int) -> list[dict]:
     return sorted(out, key=lambda m: m["time"])
 
 
+_PB_TEXT = {"true_break": "破", "absorption": "吸", "vacuum": "空",
+            "vacuum_lead": "先"}
+
+
+def load_playbook_events(start_ms: int, end_ms: int) -> list[dict]:
+    """Machine-detected playbook events (cancel_playbook_watcher) as markers.
+
+    Mirrors the static monitor's _overlay_playbooks so both charts tell the
+    same story (CLAUDE.md 圖表同步規則). These are the WATCHER's own calls —
+    distinct from load_strong_signals' "S" markers, which are our v7 entries.
+    Alerted rows get a ★ so a review can tell "pushed to my phone" from
+    "silently logged". Directionless playbooks (gate_only / two_sided) are
+    skipped: ~50% of rows, no directional claim, pure clutter."""
+    try:
+        conn = get_db_conn()
+        try:
+            ev = _q(conn,
+                "SELECT minute_start_ms ms, playbook, direction, alerted "
+                "FROM cancel_playbook_events WHERE direction IN ('UP','DOWN') "
+                "AND minute_start_ms BETWEEN %s AND %s",
+                params=(start_ms, end_ms))
+        finally:
+            conn.close()
+    except Exception as e:  # noqa: BLE001
+        print(f"(playbook overlay skipped: {e})")
+        return []
+    out = []
+    for _, r in ev.iterrows():
+        ts = int(pd.to_numeric(r["ms"]) // 1000) + TZ_OFFSET_S
+        up = r["direction"] == "UP"
+        alerted = int(pd.to_numeric(r["alerted"]) or 0) == 1
+        label = _PB_TEXT.get(r["playbook"], "?")
+        out.append({"time": ts,
+                    # opposite side from the v7 "S" arrows so they don't stack
+                    "position": "aboveBar" if up else "belowBar",
+                    "shape": "circle",
+                    "color": ("#26a269" if up else "#e01b24") if alerted
+                             else ("#1f6b4d" if up else "#8f2b33"),
+                    "text": (label + "★") if alerted else label})
+    return sorted(out, key=lambda m: m["time"])
+
+
 def build_state_strip(start_ms: int, end_ms: int) -> list[dict]:
     """A2-1 (2026-07-18): per-minute display state under each candle.
 
@@ -290,6 +332,12 @@ def main() -> int:
     if args.shock_dots:
         markers = sorted(markers + shock_bars, key=lambda m: m["time"])
         print(f"{len(shock_bars)} shock(>=3x) markers overlaid")
+
+    pb_markers = load_playbook_events(start_ms, end_ms)
+    if pb_markers:
+        markers = sorted(markers + pb_markers, key=lambda m: m["time"])
+        print(f"playbook: {len(pb_markers)} markers "
+              f"({sum(1 for m in pb_markers if '★' in m['text'])} alerted)")
 
     state_strip = build_state_strip(start_ms, end_ms)
     hunt_markers, level_lines = load_hunt_events(start_ms, end_ms)
