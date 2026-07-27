@@ -115,23 +115,22 @@ def _overlay_signals(ax, df: pd.DataFrame) -> None:
 
 
 # Machine-detected playbook events (cancel_playbook_watcher) — the events the
-# WATCHER pushed on its own, as opposed to _overlay_signals' v7 Strong entries.
-# Marker = playbook, fill = direction, white ring = actually alerted to
-# Telegram (vs silently logged). No-direction playbooks (gate_only /
-# two_sided) are deliberately NOT drawn: ~50% of rows, no directional claim,
-# they'd just bury the readable ones. Read-only + best-effort, same as above:
-# a failure here must never take the chart down.
-_PB_MARKER = {"true_break": "^", "absorption": "D", "vacuum": "*",
-              "vacuum_lead": "P"}
-
-
+# WATCHER called on its own, as opposed to _overlay_signals' v7 Strong entries.
+# Deliberately minimal (user: 簡單一點): every playbook draws the same dot;
+# only DIRECTION is encoded — green dot under the bar = bullish call, red dot
+# over the bar = bearish — the standard entry-marker convention, and it keeps
+# a busy 72h chart readable. Alerted rows keep a white ring (pushed to phone
+# vs silently logged) since that costs no extra clutter. No-direction
+# playbooks (gate_only / two_sided) are NOT drawn: ~50% of rows, no
+# directional claim. Read-only + best-effort — a failure here must never take
+# the chart down.
 def _overlay_playbooks(ax, df: pd.DataFrame) -> None:
     try:
         conn = get_db_conn()
         try:
             ev = _q(conn,
-                "SELECT minute_start_ms ms, playbook, direction, alerted, "
-                "def_version FROM cancel_playbook_events "
+                "SELECT minute_start_ms ms, direction, alerted "
+                "FROM cancel_playbook_events "
                 "WHERE direction IN ('UP','DOWN') "
                 "AND minute_start_ms BETWEEN %s AND %s",
                 params=(int(df.index.min().timestamp() * 1000),
@@ -144,22 +143,22 @@ def _overlay_playbooks(ax, df: pd.DataFrame) -> None:
         ev["alerted"] = pd.to_numeric(ev["alerted"]).fillna(0).astype(int)
         px = df["mid"].reindex(
             df.index[df.index.searchsorted(ev["ts"]).clip(0, len(df) - 1)]).values
-        for pb, mk in _PB_MARKER.items():
-            for alerted in (0, 1):
-                m = ((ev["playbook"] == pb) & (ev["alerted"] == alerted)).values
-                if not m.any():
-                    continue
-                up = (ev["direction"].values == "UP") & m
-                dn = (ev["direction"].values == "DOWN") & m
-                # alerted → white ring + opaque; silent → no edge, faded
-                kw = (dict(edgecolor="white", lw=1.1, alpha=0.95, s=64)
-                      if alerted else dict(lw=0, alpha=0.45, s=40))
-                if up.any():
-                    ax.scatter(ev["ts"][up], px[up], marker=mk,
-                               color=GREEN, zorder=5, **kw)
-                if dn.any():
-                    ax.scatter(ev["ts"][dn], px[dn], marker=mk,
-                               color=RED, zorder=5, **kw)
+        # offset off the bar so the dot never sits on the candle body
+        off = (df["mid"].max() - df["mid"].min()) * 0.02
+        for alerted in (0, 1):
+            a = (ev["alerted"] == alerted).values
+            if not a.any():
+                continue
+            kw = (dict(edgecolor="white", lw=1.0, alpha=0.95, s=54)
+                  if alerted else dict(lw=0, alpha=0.5, s=32))
+            up = (ev["direction"].values == "UP") & a
+            dn = (ev["direction"].values == "DOWN") & a
+            if up.any():          # 看漲 → K 線下方
+                ax.scatter(ev["ts"][up], px[up] - off, marker="o",
+                           color=GREEN, zorder=5, **kw)
+            if dn.any():          # 看跌 → K 線上方
+                ax.scatter(ev["ts"][dn], px[dn] + off, marker="o",
+                           color=RED, zorder=5, **kw)
     except Exception as e:
         print(f"(playbook overlay skipped: {e})")
 
@@ -256,8 +255,8 @@ def main() -> int:
             transform=a1.transAxes, color=SUB, fontsize=9)
     # 第二行圖例:機器劇本(與 v7 訊號分開講,免得覆盤時混為一談)
     a1.text(0.006, 0.875,
-            "機器劇本(非我方進場): ^真破  ◆吸收  +撤單先行   "
-            "白框=有推播 / 淡色=僅記錄   綠=看漲 紅=看跌",
+            "● 機器劇本(非我方進場): 綠點在下=看漲  紅點在上=看跌   "
+            "白框=有推播 / 淡色=僅記錄",
             transform=a1.transAxes, color=SUB, fontsize=8.5)
 
     # B: cancel skew(只留平滑填色,無散點)
