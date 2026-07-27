@@ -134,19 +134,19 @@ def load_playbook_events(start_ms: int, end_ms: int) -> list[dict]:
     Mirrors the static monitor's _overlay_playbooks so both charts tell the
     same story (CLAUDE.md 圖表同步規則). These are the WATCHER's own calls —
     distinct from load_strong_signals' "S" markers, which are our v7 entries.
-    Deliberately minimal (user: 簡單一點): one dot shape for every playbook,
-    only direction encoded — green under the bar = bullish, red over the bar
-    = bearish. Alerted rows use the full-strength colour (pushed to phone);
-    silently-logged ones are dimmed. Directionless playbooks (gate_only /
-    two_sided) are skipped: ~50% of rows, no directional claim, pure
-    clutter."""
+    ONLY alerted=1 rows are drawn (user, 2026-07-27): the chart mirrors what
+    actually reached Telegram, so a review can ask "that push I got — what
+    did price do next?". Silently-logged rows stay in the DB for statistics
+    but off the chart. Deliberately minimal (user: 簡單一點): one dot for
+    every playbook, only direction encoded — green under the bar = bullish,
+    red over the bar = bearish."""
     try:
         conn = get_db_conn()
         try:
             ev = _q(conn,
-                "SELECT minute_start_ms ms, direction, alerted "
+                "SELECT minute_start_ms ms, direction "
                 "FROM cancel_playbook_events WHERE direction IN ('UP','DOWN') "
-                "AND minute_start_ms BETWEEN %s AND %s",
+                "AND alerted=1 AND minute_start_ms BETWEEN %s AND %s",
                 params=(start_ms, end_ms))
         finally:
             conn.close()
@@ -157,12 +157,10 @@ def load_playbook_events(start_ms: int, end_ms: int) -> list[dict]:
     for _, r in ev.iterrows():
         ts = int(pd.to_numeric(r["ms"]) // 1000) + TZ_OFFSET_S
         up = r["direction"] == "UP"
-        alerted = int(pd.to_numeric(r["alerted"]) or 0) == 1
         out.append({"time": ts,
                     "position": "belowBar" if up else "aboveBar",
                     "shape": "circle",
-                    "color": ("#26a269" if up else "#e01b24") if alerted
-                             else ("#1f6b4d" if up else "#8f2b33"),
+                    "color": "#26a269" if up else "#e01b24",
                     "text": ""})
     return sorted(out, key=lambda m: m["time"])
 
@@ -333,10 +331,7 @@ def main() -> int:
     pb_markers = load_playbook_events(start_ms, end_ms)
     if pb_markers:
         markers = sorted(markers + pb_markers, key=lambda m: m["time"])
-        # alerted 用「滿色 vs 暗色」表示(不再有 ★ 文字),故以顏色判斷
-        _ALERT_HEX = ("#26a269", "#e01b24")
-        print(f"playbook: {len(pb_markers)} markers "
-              f"({sum(1 for m in pb_markers if m['color'] in _ALERT_HEX)} alerted)")
+        print(f"playbook: {len(pb_markers)} alerted markers")
 
     state_strip = build_state_strip(start_ms, end_ms)
     hunt_markers, level_lines = load_hunt_events(start_ms, end_ms)

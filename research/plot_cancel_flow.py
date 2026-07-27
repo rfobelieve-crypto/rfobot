@@ -116,22 +116,23 @@ def _overlay_signals(ax, df: pd.DataFrame) -> None:
 
 # Machine-detected playbook events (cancel_playbook_watcher) — the events the
 # WATCHER called on its own, as opposed to _overlay_signals' v7 Strong entries.
+# ONLY alerted=1 rows are drawn (user, 2026-07-27): the chart should mirror
+# exactly what actually reached Telegram, so a review can ask "that push I
+# got — what did price do next?". Silently-logged rows stay out of the
+# picture (they're still in the DB for the statistics).
 # Deliberately minimal (user: 簡單一點): every playbook draws the same dot;
 # only DIRECTION is encoded — green dot under the bar = bullish call, red dot
-# over the bar = bearish — the standard entry-marker convention, and it keeps
-# a busy 72h chart readable. Alerted rows keep a white ring (pushed to phone
-# vs silently logged) since that costs no extra clutter. No-direction
-# playbooks (gate_only / two_sided) are NOT drawn: ~50% of rows, no
-# directional claim. Read-only + best-effort — a failure here must never take
-# the chart down.
+# over the bar = bearish (standard entry-marker convention). No-direction
+# playbooks (gate_only / two_sided) never alert, so they're excluded anyway.
+# Read-only + best-effort — a failure here must never take the chart down.
 def _overlay_playbooks(ax, df: pd.DataFrame) -> None:
     try:
         conn = get_db_conn()
         try:
             ev = _q(conn,
-                "SELECT minute_start_ms ms, direction, alerted "
+                "SELECT minute_start_ms ms, direction "
                 "FROM cancel_playbook_events "
-                "WHERE direction IN ('UP','DOWN') "
+                "WHERE direction IN ('UP','DOWN') AND alerted=1 "
                 "AND minute_start_ms BETWEEN %s AND %s",
                 params=(int(df.index.min().timestamp() * 1000),
                         int(df.index.max().timestamp() * 1000)))
@@ -140,25 +141,17 @@ def _overlay_playbooks(ax, df: pd.DataFrame) -> None:
         if ev.empty:
             return
         ev["ts"] = pd.to_datetime(pd.to_numeric(ev["ms"]) // 1000, unit="s")
-        ev["alerted"] = pd.to_numeric(ev["alerted"]).fillna(0).astype(int)
         px = df["mid"].reindex(
             df.index[df.index.searchsorted(ev["ts"]).clip(0, len(df) - 1)]).values
         # offset off the bar so the dot never sits on the candle body
         off = (df["mid"].max() - df["mid"].min()) * 0.02
-        for alerted in (0, 1):
-            a = (ev["alerted"] == alerted).values
-            if not a.any():
-                continue
-            kw = (dict(edgecolor="white", lw=1.0, alpha=0.95, s=54)
-                  if alerted else dict(lw=0, alpha=0.5, s=32))
-            up = (ev["direction"].values == "UP") & a
-            dn = (ev["direction"].values == "DOWN") & a
-            if up.any():          # 看漲 → K 線下方
-                ax.scatter(ev["ts"][up], px[up] - off, marker="o",
-                           color=GREEN, zorder=5, **kw)
-            if dn.any():          # 看跌 → K 線上方
-                ax.scatter(ev["ts"][dn], px[dn] + off, marker="o",
-                           color=RED, zorder=5, **kw)
+        up = ev["direction"].values == "UP"
+        if up.any():              # 看漲 → K 線下方
+            ax.scatter(ev["ts"][up], px[up] - off, marker="o", color=GREEN,
+                       edgecolor="white", lw=1.0, alpha=0.95, s=54, zorder=5)
+        if (~up).any():           # 看跌 → K 線上方
+            ax.scatter(ev["ts"][~up], px[~up] + off, marker="o", color=RED,
+                       edgecolor="white", lw=1.0, alpha=0.95, s=54, zorder=5)
     except Exception as e:
         print(f"(playbook overlay skipped: {e})")
 
@@ -255,8 +248,7 @@ def main() -> int:
             transform=a1.transAxes, color=SUB, fontsize=9)
     # 第二行圖例:機器劇本(與 v7 訊號分開講,免得覆盤時混為一談)
     a1.text(0.006, 0.875,
-            "● 機器劇本(非我方進場): 綠點在下=看漲  紅點在上=看跌   "
-            "白框=有推播 / 淡色=僅記錄",
+            "● 撤單劇本推播(非我方進場): 綠點在下=看漲  紅點在上=看跌",
             transform=a1.transAxes, color=SUB, fontsize=8.5)
 
     # B: cancel skew(只留平滑填色,無散點)
