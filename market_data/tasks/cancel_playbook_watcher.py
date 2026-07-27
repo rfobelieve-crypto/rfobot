@@ -286,46 +286,68 @@ def classify_minute(r: pd.Series) -> tuple[str, str] | None:
     return "gate_only", "NONE"
 
 
-# ── v2 'vacuum_lead' — PROVISIONAL, NOT frozen (2026-07-25) ───────────────────
-# Isolates the pure "one-sided withdrawal LEADS price" thesis that v1's
-# vacuum branch never captured (0 events / 8 days): gate on ASYMMETRY + the
-# WITHDRAWING side's own cancel-shock, NOT on total-cancel shock; require
-# volume still quiet (the "lead") and price not-yet-moved, so the forward
-# return genuinely tests whether the withdrawal led the move. Thresholds
-# were calibrated on FIRING RATE ONLY (scratchpad v2_vacuum_lead_calibration
-# .py — ~1.7 fires/day) and NEVER on outcomes (that overlap window = v1's
-# regime; the real test is prospective on fresh data). PROVISIONAL: these
-# thresholds may still be revised — any change requires bumping
-# DEF_VERSION_V2, and prior rows are never re-labelled. Log-only, never
+# ── 'vacuum_lead' v3 — PROVISIONAL, NOT frozen (2026-07-27) ───────────────────
+# Isolates the pure "one-sided withdrawal LEADS price" thesis that v1's vacuum
+# branch never captured (0 events).
+#
+# v2 (2026-07-25) was BROKEN BY CONSTRUCTION and logged 0 rows in ~36h live:
+# it ANDed net15 (a PROPORTION — that side's share of total cancels) with
+# ac_shock (an ABSOLUTE multiple vs that side's own 60m median). Those two
+# pull against each other — a high one-sided *share* usually means the OTHER
+# side cancelled little (small denominator), not that this side spiked.
+# Measured over 72h: when net15>=0.15, ac_shock's median was 0.89 and it
+# NEVER reached 2.5, so the AND could not fire. (v2 logged nothing, so no
+# rows are being re-labelled by this replacement.)
+#
+# v3 keeps both conditions in the SAME unit (shock multiples):
+#   A) the withdrawing side genuinely spiked : side_shock >= LEAD_SIDE_SHOCK
+#   B) it clearly dominates the other side   : side_shock >= LEAD_SIDE_RATIO
+#                                              * other_shock
+# plus the unchanged "lead" requirements: volume still quiet (vshock < 3) and
+# price not yet moved (|ret_1m| <= 5bps), so the forward return genuinely
+# tests whether the withdrawal LED the move rather than trailed it.
+#
+# Calibrated on FIRING RATE ONLY, never on outcomes. The v2 post-mortem also
+# fixed the calibration process itself: a config is now additionally required
+# to fire on >= half the days and to not depend on one freak day (v2 was
+# signed off on a 30-day TOTAL without checking WHEN). Chosen 3.0/2.0 →
+# 1.91/day, active 10/18 days, biggest single day 21% of all fires, and still
+# firing in the most recent days. PROVISIONAL: any threshold change requires
+# bumping DEF_VERSION_LEAD; prior rows are never re-labelled. Log-only, never
 # alerts, never touches the executor. Env-gated for clean on/off.
-DEF_VERSION_V2 = "v2-2026-07-25"
-V2_NET_LEAD = 0.15         # sustained 15m net one-sided withdrawal (v1: 0.30, 0 fires)
-V2_SIDE_SHOCK = 2.5        # withdrawing side's OWN cancel series >= this x median
-V2_VOL_QUIET = 3.0         # vshock < this = volume hasn't arrived (the "lead")
+DEF_VERSION_LEAD = "v3-2026-07-27"
+LEAD_SIDE_SHOCK = 3.0      # withdrawing side vs its OWN trailing-60m median
+LEAD_SIDE_RATIO = 2.0      # ... and vs the other side's shock
+LEAD_VOL_QUIET = 3.0       # vshock < this = volume hasn't arrived (the "lead")
 
 
-def classify_minute_v2(r: pd.Series) -> tuple[str, str] | None:
-    """(playbook, direction) for the provisional v2 vacuum_lead, or None."""
-    net, vs, ret = r["net15"], r["vshock"], r["ret_1m"]
+def classify_minute_lead(r: pd.Series) -> tuple[str, str] | None:
+    """(playbook, direction) for the provisional vacuum_lead, or None."""
+    vs, ret = r["vshock"], r["ret_1m"]
     acs, bcs = r.get("ac_shock"), r.get("bc_shock")
-    if not np.isfinite(net):
+    if acs is None or bcs is None or not (np.isfinite(acs) and np.isfinite(bcs)):
         return None
-    if np.isfinite(vs) and vs >= V2_VOL_QUIET:        # volume already here → not a lead
+    if not np.isfinite(ret) or abs(ret) > RET_FLAT:   # price already moved (or unknown)
         return None
-    if not np.isfinite(ret) or abs(ret) > RET_FLAT:    # price already moved (or unknown)
+    if np.isfinite(vs) and vs >= LEAD_VOL_QUIET:      # volume already here → not a lead
         return None
-    if net >= V2_NET_LEAD and np.isfinite(acs) and acs >= V2_SIDE_SHOCK:
-        return "vacuum_lead", "UP"                      # ask withdrawn → resistance gone → UP
-    if net <= -V2_NET_LEAD and np.isfinite(bcs) and bcs >= V2_SIDE_SHOCK:
-        return "vacuum_lead", "DOWN"                     # bid withdrawn → support gone → DOWN
+    if acs >= LEAD_SIDE_SHOCK and acs >= LEAD_SIDE_RATIO * bcs:
+        return "vacuum_lead", "UP"                     # ask withdrawn → resistance gone
+    if bcs >= LEAD_SIDE_SHOCK and bcs >= LEAD_SIDE_RATIO * acs:
+        return "vacuum_lead", "DOWN"                   # bid withdrawn → support gone
     return None
 
 
-def _v2_enabled() -> bool:
-    """v2 logging is env-gated (default OFF) so it's trivially reversible
-    and can't accidentally start the prospective clock on a redeploy."""
-    return os.environ.get("CANCEL_V2_ENABLED", "").strip().lower() \
-        in ("1", "true", "yes", "on")
+def _lead_enabled() -> bool:
+    """Env-gated (default OFF) so it's trivially reversible and can't start
+    the prospective clock on a bare redeploy. CANCEL_V2_ENABLED is honoured
+    as a legacy alias — it is already set in the market_data service, and
+    the switch means the same thing ("the experimental lead family is on")
+    even though the definition behind it is now v3."""
+    for key in ("CANCEL_LEAD_ENABLED", "CANCEL_V2_ENABLED"):
+        if os.environ.get(key, "").strip().lower() in ("1", "true", "yes", "on"):
+            return True
+    return False
 
 
 # ── Display state machine (2026-07-17, additive) ─────────────────────────────
@@ -854,11 +876,11 @@ def watch_loop() -> None:
                 minutes = minutes[-5:]                # catch-up cap
                 fresh = insert_events(scan(feat, minutes))
                 alert_events(fresh)
-                # v2 vacuum_lead — parallel, log-only, NO alerts (provisional
+                # vacuum_lead — parallel, log-only, NO alerts (provisional
                 # family; env-gated so it can't start on a bare redeploy).
-                if _v2_enabled():
-                    insert_events(scan(feat, minutes, classify_minute_v2),
-                                  def_version=DEF_VERSION_V2)
+                if _lead_enabled():
+                    insert_events(scan(feat, minutes, classify_minute_lead),
+                                  def_version=DEF_VERSION_LEAD)
                 if minutes:
                     last_seen = max(minutes)
             backfill_outcomes()
