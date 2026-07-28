@@ -194,6 +194,84 @@ inline style 設定上去，讓瀏覽器透過正常 CSS cascade 解析 `var()`�
 
 ---
 
+## 2026-07-28: sweep-failure 回測的滑價符號寫反——「含成本 t=8.27」實質是零成本；修正後 t=3.35
+
+**What happened:**
+啟動策略 #3（sweep-failure）forward 驗證前審計引擎，發現 `sweep_core.py`
+進場滑價 `entry = lvl - d*SLIP*A` 是**對我們有利**的方向（註解卻寫著
+"slippage against us"），與出場的不利滑價在時間出場路徑**精確抵銷**。
+證明方法：SLIP=0.05 跑分（pool +0.0616R）**優於** SLIP=0（+0.0603R）——
+「含成本」比零成本還賺 = 成本模型必壞。README 頭條（PF 1.29 / t=+8.27 /
+9/9 幣正、宣稱含 0.05 ATR/邊）實質是零成本數字。修正符號 + 改用逐幣
+真實 bps 費用重算：目標執行情境 pool +0.0255R / t=+3.35 / PF 1.11，
+全 taker 情境 t=+2.29；逐幣 t 多在 0.2-1.2，前半段 5/9 幣為負。edge
+從「肥」變「薄而依賴執行」——仍是最佳候選（n 大），但天花板完全不同。
+
+**Root cause:**
+一個符號 typo 讓兩條成本腿互相抵銷，而「跑出來有扣成本的樣子」（SLIP
+參數在、README 寫了成本）讓所有人（含遷入時的審查）以為成本已計。
+統一 ATR 單位的滑價還會**奉承低波動幣**（BTC taker 5bps = 0.079 ATR，
+是 DOGE 的近 2 倍），進一步高估籃子可行性。
+
+**Rule:** 任何**宣稱含成本**的回測，收工前必跑一次 **cost=0 對照**：
+含成本結果 ≥ 零成本結果 = 成本模型壞了（符號/抵銷/漏腿），這個檢查
+5 秒鐘，能擋掉整類錯誤。費用一律用**逐標的真實 bps** 換算，不用統一
+ATR 單位（低波動標的的相對成本會被統一單位低估一半以上）。同日第二次
+應驗「分析輸出之前先審儀器」——一天內 shadow harness（時間錨）與
+sweep-failure（成本符號）兩個獨立 harness 都在輸出層看起來完全正常。
+
+---
+
+## 2026-07-28: shadow 執行研究把窗口錨在 bar 標籤——重播的是訊號誕生前的一小時，兩個 cohort（n=52+14）全部作廢
+
+**What happened:**
+`research/shadow_exec_window.py`（07-10 預註冊的執行層 A/B：R1 流擇時 vs
+R2 maker 掛單）用 `entry_time`/`signal_time` 當重播窗口起點。但這兩個欄位
+是 **bar 開盤標籤**：訊號實際在 label+1h 的 bar 收盤後才誕生、executor 在
+label+1h+2.5min 成交（5 筆 live 全部 `created_at` = entry_time+1h02m28s，
+成交價與 created_at 時刻的 1m 價格吻合、與標籤時刻差 60-140 bps）。於是
+harness 重播的「60 分鐘執行窗口」= **訊號自己的形成 bar，訊號還不存在的
+那一小時** = 純 look-ahead。兩個 cohort 的所有數字都是假象：live-R1 的
++16.7 bps =「動能 bar 裡任何早於收盤的分鐘都贏收盤價」；signals-R2 的
+3 筆 −76 bps「未成交」= bar 收在極值上的形狀，不是逆選擇。我在發現前
+已經拿這些數字對使用者下過兩輪結論（先 R2 FAIL、再據此修正 maker 評估）
+——**兩輪都要撤回**。
+
+連帶的第二個坑：我先用 parquet 裡的 s3912 價格（60105.6，開盤標籤價）
+對比 live 成交（60799.9），得出「live 進場平均劣化 +25~40 bps」的重大
+發現——**也是假的**，那是訊號 bar 自己的漲跌，不是執行成本。查 DB 才
+發現 tracked_signals 的 entry_price 本來就記的是開火時刻價格，跟 live
+成交價一致到 0.1；是 harness 自己丟掉它、用窗口第一筆快照重算了 baseline。
+
+**Root cause:**
+專案裡兩種時間慣例並存：研究層 bar 以**開盤時刻為標籤**（label T 的 bar
+在 T+1h 才完整，intrabar_volume_ic.py 有做 400/400 對齊驗證），DB 事件列
+（tracked_signals/v7_okx_positions 的 created_at）是**牆鐘時間**。任何把
+label 索引的列 join 到牆鐘資料（1m 快照、成交）的程式，必須先把 label
+轉成開火時刻——harness 沒轉，而且它的 docstring 寫著「window from actual
+entry」，作者（先前 session）以為 entry_time 就是成交時刻。放大因素：我
+**兩次分析它的輸出之後才審它的時間對齊**——「先看結果再查測試設計」
+（2026-04-13 calibration 教訓）的重播版。
+
+**Correct approach（已修，同日）:**
+1. 窗口錨點改 `created_at`（帶守門：不在 label+[55,75]min 內就 fallback
+   到 label+65min，防 backfill 列的 created_at 失真）。
+2. signals cohort 的 baseline 改用 tracked_signals.entry_price（開火價，
+   已對 live 成交驗證）。
+3. 每列輸出 `anchor_gap_bps`（baseline vs 錨點後第一筆 mid）——spread 量級
+   = 錨對了，bar 量級 = 錨錯了。這個 sanity 讓同類錯誤下次自己現形。
+4. 預註冊的 R1/R2 規則與切換門檻（n≥30 + CI 低緣>0）不動；證據從 0 重新累積。
+
+**Rule:** 任何把 bar 標籤列 join 到牆鐘資料的研究，動手前先做**價格對齊
+證明**：拿列上記錄的事件價 vs 宣稱錨點時刻的 1m 價，差超過 ~5 bps = 錨錯
+了。`v7_okx_positions.entry_time` 和 `tracked_signals.signal_time` 是 bar
+標籤不是事件時刻；事件牆鐘時間一律看 `created_at`。**分析任何 harness 的
+輸出之前，先審它的時間對齊**——輸出層面的「發現」（不管多驚人）在對齊
+未證明前一律當 artifact 處理。發現一個「重大成本/重大 edge」時，第一步
+是找一筆能獨立交叉驗證的紀錄（這次是 DB 的 entry_price），不是往下推論。
+
+---
+
 ## 2026-07-28: meta-labeling 出場模型 NO-GO——出場決策在這份資料上「學不到」，不是「學得到但不賺」
 
 **What happened:**

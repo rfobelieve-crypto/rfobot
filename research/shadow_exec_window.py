@@ -36,6 +36,23 @@ categorical, no tuned thresholds — mistake.md 2026-06-20 discipline):
   conservative-ish but imperfect); depth_deltas only exists from 2026-07-09
   so earlier trades use the imbalance-only R1 variant (flagged per row).
 
+CORRECTION (2026-07-28): `entry_time` / `signal_time` are bar-OPEN labels —
+the signal actually fires (and the live order fills) at label+1h+~2.5min
+(= `created_at`; verified: all v7_okx_positions rows have created_at =
+entry_time + 1h02m28s, and the recorded fill price matches the 1m price at
+created_at, NOT at the label). The original implementation anchored the
+window at the LABEL, replaying the signal's own formation bar — pure
+lookahead. Live-R1's +16.7 bias (any pre-close minute beats the close of a
+momentum bar) and signals-R2's -76bps "misses" (bars closing on their
+extreme) were artifacts of that. Every parquet produced before this date is
+void. The window now anchors at created_at (guarded: if created_at is
+missing or not within label+[55,75]min, fall back to label+65min), the
+signals baseline uses tracked_signals.entry_price (the fire-time price),
+and each row carries `anchor_gap_bps` (baseline vs first post-anchor mid —
+spread-scale means the anchor is right, bar-scale means it is wrong).
+Pre-registered R1/R2 rules and the switch gate are UNCHANGED; evidence
+accumulation restarts 2026-07-28.
+
 Usage:  python research/shadow_exec_window.py [--window-min 60]
 """
 from __future__ import annotations
@@ -71,12 +88,27 @@ def _fetch(sql: str, args: tuple = ()) -> list[dict]:
         conn.close()
 
 
+def _anchor(label, created) -> pd.Timestamp:
+    """Fire/fill wall time for a bar-open label. created_at when sane,
+    else label+65min (bar close + typical cycle latency)."""
+    lab = pd.Timestamp(label)
+    if created is not None:
+        gap_min = (pd.Timestamp(created) - lab).total_seconds() / 60.0
+        if 55.0 <= gap_min <= 75.0:
+            return pd.Timestamp(created)
+    return lab + pd.Timedelta(minutes=65)
+
+
 def load_entries() -> list[dict]:
-    return _fetch(
-        "SELECT id, entry_time, direction, entry_price FROM v7_okx_positions "
+    rows = _fetch(
+        "SELECT id, entry_time, created_at, direction, entry_price "
+        "FROM v7_okx_positions "
         "WHERE entry_time >= '2026-06-07' "
         "  AND (model_version IS NULL OR model_version NOT LIKE 'manual_test%%') "
         "ORDER BY entry_time")
+    for r in rows:
+        r["anchor_time"] = _anchor(r["entry_time"], r.get("created_at"))
+    return rows
 
 
 def load_window(t0_ms: int, t1_ms: int) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -95,7 +127,9 @@ def load_window(t0_ms: int, t1_ms: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def shadow_one(ev: dict, window_min: int) -> dict | None:
     d = 1 if ev["direction"] == "LONG" else -1
-    t0 = int(pd.Timestamp(ev["entry_time"]).value // 1_000_000)
+    # Anchor at FIRE time (created_at), never the bar-open label — see the
+    # 2026-07-28 CORRECTION in the module docstring.
+    t0 = int(pd.Timestamp(ev["anchor_time"]).value // 1_000_000)
     t1 = t0 + window_min * 60_000
     book, dd = load_window(t0, t1)
     if len(book) < 5:
@@ -108,6 +142,10 @@ def shadow_one(ev: dict, window_min: int) -> dict | None:
     if px0 <= 0:
         first = book.iloc[0]
         px0 = float(first["ask_l1_price"] if d == 1 else first["bid_l1_price"])
+    # Anchor sanity: baseline should sit spread-distance from the first
+    # post-anchor mid. Bar-scale gaps mean the anchor is wrong.
+    first_mid = float(book.iloc[0]["mid_price"])
+    anchor_gap_bps = abs(px0 - first_mid) / first_mid * 1e4
 
     skew_by_min: dict[int, float] = {}
     if len(dd):
@@ -152,6 +190,7 @@ def shadow_one(ev: dict, window_min: int) -> dict | None:
 
     return {
         "id": ev["id"], "entry_time": ev["entry_time"],
+        "anchor_time": ev["anchor_time"], "anchor_gap_bps": anchor_gap_bps,
         "direction": ev["direction"], "entry_price": px0,
         "book_minutes": len(book), "skew_minutes": len(skew_by_min),
         "r1_px": r1_px, "r1_edge_bps": edge(r1_px, TAKER_BPS),
@@ -174,12 +213,16 @@ def load_signal_entries() -> list[dict]:
     accelerate confidence — the pre-registered switch gate stays on live
     entries (n >= 30, CI-low > 0)."""
     rows = _fetch(
-        "SELECT id, signal_time, direction FROM tracked_signals "
+        "SELECT id, signal_time, created_at, direction, entry_price "
+        "FROM tracked_signals "
         "WHERE strength='Strong' AND direction IN ('UP','DOWN') "
         "  AND signal_time >= '2026-05-11' ORDER BY signal_time")
     return [{"id": f"s{r['id']}", "entry_time": r["signal_time"],
+             "anchor_time": _anchor(r["signal_time"], r.get("created_at")),
              "direction": "LONG" if r["direction"] == "UP" else "SHORT",
-             "entry_price": None} for r in rows]
+             # fire-time price recorded by the indicator (verified against
+             # live fills to the tick) — the honest baseline
+             "entry_price": r["entry_price"]} for r in rows]
 
 
 def main() -> int:
@@ -206,9 +249,13 @@ def main() -> int:
             continue
         rows.append(r)
     df = pd.DataFrame(rows)
-    print(f"{len(df)} with book coverage, {skipped} skipped\n")
+    print(f"{len(df)} with book coverage, {skipped} skipped")
     if df.empty:
         return 1
+    print(f"anchor sanity: |baseline - first mid| mean "
+          f"{df['anchor_gap_bps'].mean():.1f} bps, max "
+          f"{df['anchor_gap_bps'].max():.1f} bps "
+          f"(spread-scale = anchored right; bar-scale = anchored wrong)\n")
 
     pd.set_option("display.width", 160)
     cols = ["id", "direction", "entry_price", "r1_edge_bps", "r1_fallback",
