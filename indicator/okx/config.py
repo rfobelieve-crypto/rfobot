@@ -126,12 +126,16 @@ class OkxConfig:
     # ── Risk caps (Stage 3 defaults; tightened for 10x leverage)
     # Default bumped 100→155 (2026-06-01, $154.86 deposit), then 155→197.55
     # (2026-07-14) after the flat withdrawal + $197.55 redeposit, then
-    # 197.55→1218.44 (2026-07-24, 6th informed override — user deposited
-    # further without clearing Gate A/B; see CLAUDE.md). CAP-2 (equity >
+    # 197.55→1218.44 (2026-07-24, 6th informed override), then 1218.44→274
+    # (2026-07-28). The last move is a REDUCTION and needs no override: on
+    # 2026-07-27 manual trading in this same account (a 37.11-contract LONG
+    # the executor never opened — caught as orphan_exchange) took equity
+    # 1218 → $16.62, and a redeposit brought it to $274. The executor traded
+    # nothing throughout; see CLAUDE.md and mistake.md. CAP-2 (equity >
     # 1.5×initial → HALT) and the loss-cap bases key off this, so it MUST
     # match the real deposit. Railway OKX_INITIAL_CAPITAL_USD env overrides
     # this default — keep them in sync.
-    initial_capital_usd: float = 1218.44
+    initial_capital_usd: float = 274.0
     risk_frac: float = 0.02
     max_position_count: int = 1
     # Tightened on 2026-05-28 for 10x leverage.  At 10x, a 2% BTC move
@@ -270,19 +274,21 @@ def validate_okx_config(cfg: OkxConfig) -> None:
             raise RuntimeError(
                 "is_simulated=0 requires STAGE=live env var to prevent accidents"
             )
-        # Ceiling raised 200 -> 1500 (2026-07-24, 6th informed override): user
-        # deposited beyond the $197.55 Stage-3 baseline to $1218.44 without
-        # first clearing Gate A/B. See CLAUDE.md Stage-3 top-up-to-$1218.44
-        # section for the full reasoning; leverage stays unchanged (10x
-        # account / 2x effective notional per NOTIONAL_LEV_MULT).
-        if cfg.initial_capital_usd > 1500:
+        # 200 -> 1500 on 2026-07-24 (6th informed override) to admit a $1218.44
+        # deposit; back to 500 on 2026-07-28 once the baseline returned to $274.
+        # The ceiling is meant to block capital creep that skips Gate A/B, so it
+        # belongs one documented expansion step above the live baseline — CLAUDE.md
+        # sizes that step at $300-500 — not parked at the high-water mark of a
+        # deposit that is no longer there. Raising it again requires the same
+        # override ritual, which is the point.
+        if cfg.initial_capital_usd > 500:
             raise RuntimeError(
-                f"Stage 3 live capital max $1500, got ${cfg.initial_capital_usd}"
+                f"Stage 3 live capital max $500, got ${cfg.initial_capital_usd}"
             )
     # capital sanity
-    if not (0 < cfg.initial_capital_usd <= 1500):
+    if not (0 < cfg.initial_capital_usd <= 500):
         raise RuntimeError(
-            f"Stage 2-3 capital must be in (0, 1500], got ${cfg.initial_capital_usd}"
+            f"Stage 2-3 capital must be in (0, 500], got ${cfg.initial_capital_usd}"
         )
     # loss caps must be negative
     if cfg.daily_loss_cap_pct >= 0:

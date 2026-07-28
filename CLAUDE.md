@@ -208,6 +208,49 @@ Stage 4a 不准加碼（即使 $100 賺到 $200 也是 $100 keep）」。這次�
 硬上限 $200，**這是最後一次 Stage 3 內加碼**——再加就必須走 Gate A+B 通過後的
 正式放大（$300-500 一級），不准再用 informed override。
 
+## Stage 3 基準回落至 $274（2026-07-28，第二次手動爆倉後；非 override）
+
+**背景**：2026-07-27 12:00 起，這個帳戶出現一連串 executor 從未下過的手動
+交易——13:02 對帳抓到 `orphan_exchange`：**37.11 張 LONG @ 65050**（≈
+$24,140 名目，對當時 $1218 權益約 20x）。executor 開的倉一向是 0.31-0.61
+張，這筆是它的 60-120 倍。權益從 $1218 一路擺盪到 **$16.62**（−98.6%），
+之後入金回到 $274。
+
+**executor 全程沒有下任何單**：最後一筆成交是 id=20（2026-07-16），之後
+一直卡在 CAP-2 HALT。kill log 只有 CAP-2 over-funding，沒有任何虧損型
+trigger。所以這不是策略虧損、不是 edge 失敗，**也因此不觸發「hit kill
+trigger → 降階重驗」**——性質與 [[2026-06-05 手動爆倉]] 完全相同，只是
+規模大 6 倍。
+
+**這不是 informed override**：金額是**往下**調整。加碼才需要 override
+儀式，減碼一律允許（風險變小）。
+
+**執行的變更**：
+- `indicator/okx/config.py`：`initial_capital_usd` 1218.44 → **274.0**
+- `indicator/okx/config.py`：live guard 上限 **1500 → 500**。上限的用意是
+  擋「沒過 Gate A/B 就把金額往上衝」，它應該待在**現行基準之上一個記錄
+  在案的放大級距**（本檔案定為 $300-500），而不是停在一筆已經不存在的
+  存款的高水位。要再調高一樣要走 override 儀式。
+- `indicator/okx/report.py`：`EXECUTOR_RESTART_CAPITAL_USD` = 274.0、
+  `EXECUTOR_RESTART_SINCE` = 2026-07-28（報表基準重置，排除 executor
+  沒有參與的那段活動）。**Gate B / shadow 的筆數不重置**，繼續累積。
+- Railway env `OKX_INITIAL_CAPITAL_USD` = 274（不改的話 CAP-4 會拿舊基準
+  $1218 去比 $274 的權益，開機即 DEMOTE）。
+- 測試同步更新並新增 `test_previous_1218_baseline_now_rejected`——釘住舊
+  基準，避免一個沒清乾淨的 Railway 環境變數把舊規模悄悄復活。
+
+**新基準下的絕對數字**：daily cap −20% = **−$54.80**／total cap −30% =
+**−$82.20**／CAP-2 over-funding 上限 = 1.5 × 274 = **$411**。
+
+**未解的結構性問題（第二次了）**：2026-06-05 那次的結論白紙黑字寫著
+「hard kill switch 只保護 executor、擋不了手動單 → **必須帳戶隔離**
+（executor 專屬子帳戶，操作者永不手動碰）」。**這條至今沒做**，所以同一
+個向量隔 7 週重演。kill switch 看得到權益，但攔不住不是它下的單——在隔離
+完成之前，$274 的量化倉位在下一次手動事件裡一樣沒有任何保護。這不是
+executor 的缺陷，是它的作用範圍問題，只能用帳戶邊界解決。
+
+---
+
 ## Stage 3 資本再加碼至 $1218.44（2026-07-24，第 6 次 informed override）
 
 **背景**：使用者在 §Stage 3 資本 top-up 至 $197.55（2026-07-14，第 4 次 override）

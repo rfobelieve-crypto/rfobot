@@ -254,12 +254,17 @@ INITIAL_CAPITAL_USD = 155.0   # original Stage 3 deposit (2026-05-31, $154.86)
 # CAP-4 DEMOTE and broke the since-6/7 M2M curve), then re-deposited
 # $197.55 (informed capital top-up, user decision 2026-07-14), then
 # deposited further to $1218.44 (2026-07-24, 6th informed override — see
-# CLAUDE.md §Stage 3 資本再加碼至 $1218.44). The headline % is measured
-# from the latest deposit so it starts clean and excludes operator fund
-# movements. Trade-count gates (Gate B / shadow) are NOT reset — they
-# continue.
-EXECUTOR_RESTART_CAPITAL_USD = 1218.44
-EXECUTOR_RESTART_SINCE = "2026-07-24"
+# CLAUDE.md §Stage 3 資本再加碼至 $1218.44), then a SECOND manual blow-up
+# on 2026-07-27 (a 37.11-contract LONG the executor never opened; equity
+# 1218 → $16.62 over ~10 hours) followed by a redeposit to $274.
+#
+# The executor placed no orders in that window — its last fill was id=20 on
+# 2026-07-16 and it sat HALTed on CAP-2 throughout — so resetting the
+# headline baseline here is not laundering strategy losses; it is excluding
+# activity the strategy did not perform. Trade-count gates (Gate B / shadow)
+# are NOT reset — they continue.
+EXECUTOR_RESTART_CAPITAL_USD = 274.0
+EXECUTOR_RESTART_SINCE = "2026-07-28"
 
 
 def _get_equity_curve_stats(since: str) -> dict:

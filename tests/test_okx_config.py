@@ -155,24 +155,34 @@ class TestLiveModeGuards:
         with patch.dict(os.environ, {"STAGE": "live"}):
             validate_okx_config(cfg)  # must not raise
 
-    def test_live_capital_above_1500_fails(self):
-        # Ceiling raised 200 -> 1500 (2026-07-25, 6th informed override —
-        # see CLAUDE.md / mistake.md — user deposited to $1218.44 without
-        # clearing Gate A/B first).
-        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=2000.0)
+    def test_live_capital_above_500_fails(self):
+        # Ceiling: 200 -> 1500 (2026-07-24, 6th informed override, $1218.44
+        # deposit) -> 500 (2026-07-28, baseline back to $274 after the second
+        # manual blow-up). It sits one documented expansion step above the
+        # live baseline so capital creep still has to pass Gate A/B.
+        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=600.0)
         with patch.dict(os.environ, {"STAGE": "live"}):
-            with pytest.raises(RuntimeError, match="\\$1500"):
+            with pytest.raises(RuntimeError, match="\\$500"):
                 validate_okx_config(cfg)
 
-    def test_live_capital_at_1500_passes(self):
-        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=1500.0)
+    def test_live_capital_at_500_passes(self):
+        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=500.0)
         with patch.dict(os.environ, {"STAGE": "live"}):
             validate_okx_config(cfg)
 
     def test_live_capital_at_current_baseline_passes(self):
-        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=1218.44)
+        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=274.0)
         with patch.dict(os.environ, {"STAGE": "live"}):
             validate_okx_config(cfg)  # must not raise
+
+    def test_previous_1218_baseline_now_rejected(self):
+        # The $1218.44 baseline was live until 2026-07-28. Pinning it here
+        # means a stale Railway OKX_INITIAL_CAPITAL_USD cannot quietly
+        # resurrect the old size — the executor refuses to start instead.
+        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=1218.44)
+        with patch.dict(os.environ, {"STAGE": "live"}):
+            with pytest.raises(RuntimeError, match="\\$500"):
+                validate_okx_config(cfg)
 
 
 # ── Capital sanity ───────────────────────────────────────────────────
@@ -187,10 +197,10 @@ class TestCapitalSanity:
         with pytest.raises(RuntimeError, match="capital"):
             validate_okx_config(_valid_cfg(initial_capital_usd=0.0))
 
-    def test_above_1500_capital_fails(self):
-        # Stage 2-3 hard ceiling: $1500 (raised from $1000, 6th override)
+    def test_above_500_capital_fails(self):
+        # Stage 2-3 hard ceiling: $500 (1500 -> 500 on 2026-07-28)
         with pytest.raises(RuntimeError, match="capital"):
-            validate_okx_config(_valid_cfg(initial_capital_usd=2000.0))
+            validate_okx_config(_valid_cfg(initial_capital_usd=600.0))
 
 
 # ── Loss cap sign ────────────────────────────────────────────────────
