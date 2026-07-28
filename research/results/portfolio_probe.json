@@ -1,0 +1,13 @@
+{
+  "overlap_days": 91,
+  "rho_pearson": 0.07823528484270646,
+  "rho_spearman": 0.055159977918466066,
+  "sharpe_v7": 5.019646399590118,
+  "sharpe_s3": 0.8705181780189819,
+  "sharpe_combined": 4.0110277059885036,
+  "sharpe_predicted": 4.011027705988504,
+  "util_v7": 0.6373626373626373,
+  "util_s3": 1.0,
+  "joint_idle": 0.0,
+  "tail_both_neg": 1
+}
