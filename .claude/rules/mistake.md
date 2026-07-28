@@ -194,6 +194,55 @@ inline style 設定上去，讓瀏覽器透過正常 CSS cascade 解析 `var()`�
 
 ---
 
+## 2026-07-28: 收緊 config guard 卻沒查各服務現有的 env 值——把 executor 弄停 50 分鐘
+
+**What happened:**
+把 Stage 3 資金基準從 $1218.44 改成 $274 時，順手把 `config.py` 的 live
+capital 上限從 1500 收回 500（理由正當：上限該待在現行基準之上一級，不該
+停在一筆已不存在的存款的高水位）。改完、408 個測試綠、push。
+
+**executor 從此停了 50 分鐘。** `validate_okx_config` 對 1218.44 拋
+RuntimeError → `runner.get_executor()` 的 except 設 `_INIT_FAILED=True`
+→ 永久回傳 None → WS 不連 → 權益快照從 00:25:30 全斷、01:02 的
+update_cycle 沒有任何 OKX 動作。
+
+而且我一開始找錯地方：這個專案有 5 個 Railway 服務，我假設 OKX executor
+在 `rfobot`（名字最像主服務），在那裡查到 `OKX_INITIAL_CAPITAL_USD=89`
+就當成「找到根源」。實際上 `Dockerfile.indicator` 跑
+`gunicorn indicator.wsgi:app`，交易 cycle 在 `indicator/app.py:694`
+呼叫 `get_executor()`——**executor 在「輸出圖表」服務**。rfobot 的 89 只是
+Telegram admin 指令用的陳舊副本，對交易路徑毫無影響。「輸出圖表」的值是
+1218.44，正是被我新 guard 擋下的那個。
+
+**Root cause:**
+收緊一個 guard = 讓一組先前合法的值變成非法。**改 guard 之前沒有列舉「所有
+會載入這份 config 的部署環境現在實際帶什麼值」**，等於在製造啟動失敗。本機
+測試完全測不到這件事：測試餵的是測試自己構造的 cfg，不是 Railway 的 env。
+
+放大因素跟同日上一條同源：**一個符合預期的答案讓我停止搜尋**。看到 rfobot
+的 89（「果然是陳舊值！」）就沒有再問「這個服務真的是跑 executor 的那個
+嗎」。同一天寫下這條教訓，同一天又犯。
+
+**Correct approach:**
+1. 任何**收緊**型的 config 變更（上限調低、增加必填、縮小允許集合），push
+   前先把**每個**會載入它的服務的相關 env 值列出來對照。Railway 的
+   Raw Editor 一次看得到整組，比逐列點快也不易看漏。
+2. 不確定哪個服務跑哪支程式時，**看 Dockerfile 的 CMD**，不要用服務名字猜。
+   `grep -rn "get_executor()" --include=*.py .` 三秒就能定位真正的呼叫端。
+3. fail-closed 的 init（`_INIT_FAILED=True` 後永不重試）配上「Railway 顯示
+   Online」= 典型 silent failure。**判斷 executor 活著的訊號是
+   `v7_okx_balance_snapshots` 的新鮮度**（WS 活著每 ~5 秒一筆），不是服務
+   的綠燈，也不是 `v7_okx_executor_status`（那張表在行程內 DEMOTE 時不會
+   更新）。
+
+**Rule:** 收緊任何 guard 前，先枚舉所有部署環境的現值——本機測試對
+production env 是瞎的。服務職責一律以 Dockerfile CMD 與 callgraph 為準，
+不以服務名稱推測；這個 repo 的 5 個服務共用同一份程式碼，同名 env 在不同
+服務可以完全不同值（89 vs 1218.44 就這樣共存了兩週）。判斷交易系統死活，
+永遠看**資料的新鮮度**，不看平台的健康燈。
+
+---
+
 ## 2026-07-28: 用「有沒有對應的 trade」判斷資金階躍成因——這個檢查對孤兒倉是瞎的
 
 **What happened:**
