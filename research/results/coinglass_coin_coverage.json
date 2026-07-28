@@ -1,0 +1,940 @@
+{
+  "grid": {
+    "oi": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "oi_agg": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "oi_coin_margin": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "funding": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "liquidation": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "liq_agg": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "top_ls_account": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "top_ls_position": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "global_ls": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "taker": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "futures_cvd_agg": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "spot_cvd_agg": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "bitfinex_margin": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": false,
+        "detail": "empty"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": false,
+        "detail": "empty"
+      }
+    },
+    "coinbase_premium": {
+      "BTC": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "5rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "5rows"
+      }
+    },
+    "opt_vs_fut_oi": {
+      "BTC": {
+        "ok": true,
+        "detail": "2219rows"
+      },
+      "ETH": {
+        "ok": true,
+        "detail": "2219rows"
+      },
+      "SOL": {
+        "ok": true,
+        "detail": "2219rows"
+      },
+      "XRP": {
+        "ok": true,
+        "detail": "2219rows"
+      },
+      "DOGE": {
+        "ok": true,
+        "detail": "2219rows"
+      },
+      "ADA": {
+        "ok": true,
+        "detail": "2219rows"
+      },
+      "BNB": {
+        "ok": true,
+        "detail": "2219rows"
+      },
+      "LINK": {
+        "ok": true,
+        "detail": "2219rows"
+      },
+      "SUI": {
+        "ok": true,
+        "detail": "2219rows"
+      },
+      "UNI": {
+        "ok": true,
+        "detail": "2219rows"
+      },
+      "AAVE": {
+        "ok": true,
+        "detail": "2219rows"
+      }
+    }
+  },
+  "summary": {
+    "BTC": {
+      "n_ok": 15,
+      "weighted_pct": 61.6,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "bitfinex_margin",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": []
+    },
+    "ETH": {
+      "n_ok": 15,
+      "weighted_pct": 61.6,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "bitfinex_margin",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": []
+    },
+    "SOL": {
+      "n_ok": 15,
+      "weighted_pct": 61.6,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "bitfinex_margin",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": []
+    },
+    "XRP": {
+      "n_ok": 15,
+      "weighted_pct": 61.6,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "bitfinex_margin",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": []
+    },
+    "DOGE": {
+      "n_ok": 15,
+      "weighted_pct": 61.6,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "bitfinex_margin",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": []
+    },
+    "ADA": {
+      "n_ok": 15,
+      "weighted_pct": 61.6,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "bitfinex_margin",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": []
+    },
+    "BNB": {
+      "n_ok": 14,
+      "weighted_pct": 54.3,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": [
+        "bitfinex_margin"
+      ]
+    },
+    "LINK": {
+      "n_ok": 15,
+      "weighted_pct": 61.6,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "bitfinex_margin",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": []
+    },
+    "SUI": {
+      "n_ok": 15,
+      "weighted_pct": 61.6,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "bitfinex_margin",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": []
+    },
+    "UNI": {
+      "n_ok": 15,
+      "weighted_pct": 61.6,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "bitfinex_margin",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": []
+    },
+    "AAVE": {
+      "n_ok": 14,
+      "weighted_pct": 54.3,
+      "have": [
+        "oi",
+        "oi_agg",
+        "oi_coin_margin",
+        "funding",
+        "liquidation",
+        "liq_agg",
+        "top_ls_account",
+        "top_ls_position",
+        "global_ls",
+        "taker",
+        "futures_cvd_agg",
+        "spot_cvd_agg",
+        "coinbase_premium",
+        "opt_vs_fut_oi"
+      ],
+      "missing": [
+        "bitfinex_margin"
+      ]
+    }
+  }
+}
