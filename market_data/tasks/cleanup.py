@@ -36,7 +36,27 @@ RETENTION = {
     # (report/dashboard SINCE=07-14 基準; snapshot_builder 回看數小時)
     "v7_okx_balance_snapshots": 180,   # 84 萬行 @ ~11 rows/min
     "oi_snapshots": 90,                # 62 萬行 @ ~4 rows/min
+    # 2026-07-28: 這是全庫最大的一張 (330 MB / 19 萬列 ≈ 1.7 KB/列，存 L20
+    # 全深度)，而且原本沒有任何保留策略。同日把追蹤標的從 2 檔擴到 11 檔，
+    # 成長率變 5.5 倍 (~23 MB/日)，不封頂會在數月內吃掉整個 Railway 配額。
+    # 120 天對齊 flow_bars_1m，兩張表是撤單流分析的成對輸入。
+    "orderbook_snapshots_1m": 120,
+    # depth_deltas_1m 同為撤單流輸入，同樣對齊；11 檔 × 1440 列/日。
+    "depth_deltas_1m": 120,
 }
+
+
+# Every table named in RETENTION must actually be deleted from somewhere in
+# cleanup_once. Adding a key without adding its DELETE is a silent no-op —
+# the policy looks configured, the table grows forever, and nothing complains.
+# This list is the machine-checked inventory of what cleanup_once handles.
+_HANDLED = {"normalized_trades", "flow_bars_1m", "v7_okx_balance_snapshots",
+            "oi_snapshots", "orderbook_snapshots_1m", "depth_deltas_1m"}
+_UNHANDLED = set(RETENTION) - _HANDLED
+if _UNHANDLED:
+    raise RuntimeError(
+        f"RETENTION names tables with no DELETE in cleanup_once: "
+        f"{sorted(_UNHANDLED)} — add the delete or drop the key")
 
 
 def cleanup_once():
@@ -73,6 +93,18 @@ def cleanup_once():
                 cur.execute(
                     f"DELETE FROM {tbl} WHERE {col} < NOW() - INTERVAL %s DAY",
                     (RETENTION[tbl],))
+                if cur.rowcount:
+                    extra_deleted += cur.rowcount
+                    logger.info("Cleaned %s: deleted %d rows (older than %d days)",
+                                tbl, cur.rowcount, RETENTION[tbl])
+
+            # Millisecond-keyed tables (2026-07-28, added with the 2 -> 11
+            # instrument expansion). Separate loop from the DATETIME one
+            # because the cutoff has to be computed in epoch ms, not SQL time.
+            for tbl, col in (("orderbook_snapshots_1m", "ts_ms"),
+                             ("depth_deltas_1m", "minute_start_ms")):
+                cut = int((time.time() - RETENTION[tbl] * 86400) * 1000)
+                cur.execute(f"DELETE FROM {tbl} WHERE {col} < %s", (cut,))
                 if cur.rowcount:
                     extra_deleted += cur.rowcount
                     logger.info("Cleaned %s: deleted %d rows (older than %d days)",

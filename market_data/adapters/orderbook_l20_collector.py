@@ -31,9 +31,24 @@ logger = logging.getLogger(__name__)
 COLLECT_INTERVAL = 60  # seconds
 
 # (exchange, api_symbol, canonical_symbol)
+# 2026-07-28: extended from BTC+ETH to 11 instruments so the cancel-flow
+# playbooks can run per coin (they need mid -> ret_1m from this table).
+# Cost check before adding: fapi depth?limit=20 is weight 2, so 11 symbols
+# every 60s is 22 weight/min against a 2400/min budget — not close.
+# The real cost is storage: this is the largest table in the DB (~1.7 KB per
+# row), so migration 018 gives it a 120-day retention to match flow_bars_1m.
 TRACKED = [
     ("binance", "BTCUSDT", "BTC-USD"),
     ("binance", "ETHUSDT", "ETH-USD"),
+    ("binance", "SOLUSDT", "SOL-USD"),
+    ("binance", "XRPUSDT", "XRP-USD"),
+    ("binance", "DOGEUSDT", "DOGE-USD"),
+    ("binance", "ADAUSDT", "ADA-USD"),
+    ("binance", "BNBUSDT", "BNB-USD"),
+    ("binance", "LINKUSDT", "LINK-USD"),
+    ("binance", "SUIUSDT", "SUI-USD"),
+    ("binance", "UNIUSDT", "UNI-USD"),
+    ("binance", "AAVEUSDT", "AAVE-USD"),
 ]
 
 DEPTH_LIMIT = 20  # L20
