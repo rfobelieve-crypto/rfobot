@@ -392,6 +392,9 @@ def main() -> int:
         # it because the ⚡ markers come from the same query.
         states=json.dumps(state_strip),
         span_h=f"{span_h:.0f}", n=len(dd), smooth=SMOOTH_MIN, sym=SYMBOL)
+    # live-watch add-on injected OUTSIDE .format() — keeps the JS free of
+    # brace-escaping and the template untouched for review mode
+    html = html.replace("</body></html>", LIVE_SCRIPT + "</body></html>")
     out = out_path(SYMBOL)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
@@ -566,6 +569,53 @@ window.addEventListener('resize', layout);
 layout();
 c1.timeScale().fitContent();
 </script></body></html>
+"""
+
+
+# ── Live-watch mode (2026-07-29, additive) ───────────────────────────────────
+# The page is a baked snapshot; for 盯盤 the SAME rendered HTML self-refreshes
+# when opened with ?live=<seconds> (min 30, e.g. &live=60&hours=6). Design:
+#   · runtime URL param — one artifact serves both review and live use
+#   · fetch-then-document.write, NOT location.reload(): a failed re-render
+#     keeps the old page alive and shows a STALE badge instead of killing
+#     the loop with an error JSON page
+#   · pauses while the tab is hidden; clears the previous generation's timer
+#     (document.open() reuses the same Window, timers would stack otherwise)
+# Chart-sync rule note: no chart LOGIC changed (panels/colors/filters
+# untouched) — this is delivery behaviour of the interactive chart only.
+LIVE_SCRIPT = """
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var raw = q.get('live');
+  if (raw === null) return;                       // review mode: no-op
+  var SEC = Math.max(30, parseInt(raw, 10) || 60);
+  var hdr = document.getElementById('hdr');
+  var badge = document.createElement('span');
+  badge.style.cssText = 'margin-left:8px;padding:1px 8px;border-radius:6px;' +
+    'background:#14321f;color:#4ade80;font-size:12px;';
+  badge.textContent = 'LIVE ' + SEC + 's';
+  if (hdr) hdr.appendChild(badge);
+  var stale = 0;
+  function tick() {
+    if (document.hidden) return;                  // background tab: pause
+    fetch(location.href, {cache: 'no-store'}).then(function (r) {
+      return r.text().then(function (t) {
+        if (r.ok && t.indexOf('id="c1"') !== -1) {
+          document.open(); document.write(t); document.close();
+        } else { throw new Error('bad render'); }
+      });
+    }).catch(function () {
+      stale += 1;
+      badge.style.background = '#3a2323';
+      badge.style.color = '#f87171';
+      badge.textContent = 'STALE x' + stale + ' (retry ' + SEC + 's)';
+    });
+  }
+  if (window.__liveTimer) clearInterval(window.__liveTimer);
+  window.__liveTimer = setInterval(tick, SEC * 1000);
+})();
+</script>
 """
 
 
