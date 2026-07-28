@@ -1529,7 +1529,9 @@ def research_cancel_flow_interactive_api():
     for phone-browser links).
 
     Query params:
-      hours=<int>   lookback window, 0 = full depth era (default 48)
+      hours=<int>    lookback window, 0 = full depth era (default 48)
+      symbol=<sym>   canonical symbol (default BTC-USD). Only instruments with
+                     all three source tables render; see CANCEL_CHART_SYMBOLS.
     """
     from flask import request as _rq, jsonify as _js, send_file as _sf
     import subprocess as _sp
@@ -1538,13 +1540,24 @@ def research_cancel_flow_interactive_api():
 
     root = Path(__file__).resolve().parent.parent
     script = root / "research" / "cancel_flow_interactive.py"
-    out = root / "research" / "results" / "cancel_flow_review.html"
     if not script.exists():
         return _js({"error": "research/ not present in this image — "
                              "needs the Dockerfile.indicator that COPYs research/"}), 501
+    # Allow-list rather than free text: the symbol is interpolated into a
+    # subprocess argv and into SQL downstream, and only these have the
+    # depth_deltas + flow_bars + orderbook trio the chart needs.
+    allowed = {"BTC-USD", "ETH-USD"}
+    symbol = (_rq.args.get("symbol", "") or "BTC-USD").strip().upper()
+    if symbol not in allowed:
+        return _js({"error": f"symbol not renderable: {symbol}",
+                    "allowed": sorted(allowed)}), 400
+    stem = ("cancel_flow_review" if symbol == "BTC-USD"
+            else f"cancel_flow_review_{symbol.split('-')[0].lower()}")
+    out = root / "research" / "results" / f"{stem}.html"
     hours = _rq.args.get("hours", "").strip()
     cmd = [_sys.executable, str(script),
-           "--hours", hours if hours.isdigit() else "48"]
+           "--hours", hours if hours.isdigit() else "48",
+           "--symbol", symbol]
     try:
         # stale-output guard: the script exits 0 without saving when depth
         # data is too young — never serve a leftover HTML as if it were fresh

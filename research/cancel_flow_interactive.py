@@ -44,6 +44,14 @@ SMOOTH_MIN = 15
 MAX_LEVEL_LINES = 12
 CALM_HEX = "#232936"    # 平靜底格色 — 帶子連續可見但不搶戲
 TZ_OFFSET_S = 8 * 3600  # display as UTC+8, same convention as chart_interactive
+# Per-symbol output: the Flask route renders on demand, so two concurrent
+# requests for different coins would otherwise race on one filename and
+# serve each other's chart.
+def out_path(symbol: str) -> Path:
+    stem = "cancel_flow_review" if symbol == "BTC-USD" else            f"cancel_flow_review_{symbol.split('-')[0].lower()}"
+    return PROJECT_ROOT / "research" / "results" / f"{stem}.html"
+
+
 OUT = PROJECT_ROOT / "research" / "results" / "cancel_flow_review.html"
 
 
@@ -57,14 +65,26 @@ def _q(conn, sql: str, params=None) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+# Instrument for this render. Set once from --symbol in main(); every loader
+# reads it rather than taking a parameter, because they are also called from
+# the Flask route and from ad-hoc scripts where threading an argument through
+# every call site would be more error-prone than one explicit module state.
+SYMBOL = "BTC-USD"
+
+
+def _binance_symbol() -> str:
+    """BTC-USD -> BTCUSDT."""
+    return SYMBOL.split("-")[0] + "USDT"
+
+
 def load_depth(hours: int | None) -> pd.DataFrame:
     conn = get_db_conn()
     try:
         dd = _q(conn,
             "SELECT minute_start_ms ms, bid_add_qty, bid_cancel_qty, "
             "ask_add_qty, ask_cancel_qty FROM depth_deltas_1m "
-            "WHERE canonical_symbol='BTC-USD' AND exchange='binance' "
-            "ORDER BY minute_start_ms")
+            "WHERE canonical_symbol=%s AND exchange='binance' "
+            "ORDER BY minute_start_ms", (SYMBOL,))
     finally:
         conn.close()
     if dd.empty:
@@ -84,7 +104,7 @@ def fetch_klines_1m(start_ms: int, end_ms: int) -> pd.DataFrame:
     cur = start_ms
     while cur < end_ms:
         resp = requests.get("https://api.binance.com/api/v3/klines", params={
-            "symbol": "BTCUSDT", "interval": "1m",
+            "symbol": _binance_symbol(), "interval": "1m",
             "startTime": cur, "endTime": end_ms, "limit": 1000,
         }, timeout=30)
         resp.raise_for_status()
@@ -103,6 +123,10 @@ def fetch_klines_1m(start_ms: int, end_ms: int) -> pd.DataFrame:
 
 
 def load_strong_signals(start_ms: int, end_ms: int) -> list[dict]:
+    # tracked_signals is the V7 direction model, which only runs on BTC.
+    # Drawing BTC's entries on an ETH chart would be actively misleading.
+    if SYMBOL != "BTC-USD":
+        return []
     try:
         conn = get_db_conn()
         try:
@@ -146,8 +170,9 @@ def load_playbook_events(start_ms: int, end_ms: int) -> list[dict]:
             ev = _q(conn,
                 "SELECT minute_start_ms ms, direction "
                 "FROM cancel_playbook_events WHERE direction IN ('UP','DOWN') "
-                "AND alerted=1 AND minute_start_ms BETWEEN %s AND %s",
-                params=(start_ms, end_ms))
+                "AND alerted=1 AND canonical_symbol=%s "
+                "AND minute_start_ms BETWEEN %s AND %s",
+                params=(SYMBOL, start_ms, end_ms))
         finally:
             conn.close()
     except Exception as e:  # noqa: BLE001
@@ -175,7 +200,7 @@ def build_state_strip(start_ms: int, end_ms: int) -> list[dict]:
     try:
         now_ms = int(time.time() * 1000)
         lookback = int((now_ms - start_ms) / 60_000) + 120
-        wf = load_frame(lookback_min=lookback)
+        wf = load_frame(lookback_min=lookback, symbol=SYMBOL)
         if wf.empty:
             return []
         feat = compute_features(wf)
@@ -201,6 +226,8 @@ def load_hunt_events(start_ms: int, end_ms: int) -> tuple[list[dict], list[dict]
     empty until TV alerts are wired — defensive by design.
     Returns (markers ⚡, level price lines)."""
     markers, levels = [], []
+    if SYMBOL != "BTC-USD":
+        return [], []          # tv_alert_events / liquidity_events are BTC-only
     try:
         conn = get_db_conn()
         try:
@@ -252,10 +279,16 @@ def load_hunt_events(start_ms: int, end_ms: int) -> tuple[list[dict], list[dict]
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--hours", type=int, default=0, help="0 = full depth era")
+    ap.add_argument("--symbol", default="BTC-USD",
+                    help="canonical symbol, e.g. BTC-USD / ETH-USD. Needs all "
+                         "three source tables — depth_deltas_1m, flow_bars_1m "
+                         "and orderbook_snapshots_1m — for that instrument.")
     ap.add_argument("--shock-dots", action="store_true",
                     help="overlay amber dots on candles where cancel volume "
                          ">= 3x trailing-60m median (off by default)")
     args = ap.parse_args()
+    global SYMBOL
+    SYMBOL = args.symbol.strip().upper()
 
     dd = load_depth(args.hours or None)
     if dd.empty or len(dd) < 30:
@@ -348,7 +381,7 @@ def main() -> int:
     span_h = (end_ms - start_ms) / 3600_000
 
     html = HTML_TEMPLATE.format(
-        title=f"撤單流覆盤 BTC-USD ({span_h:.0f}h)",
+        title=f"撤單流覆盤 {SYMBOL} ({span_h:.0f}h)",
         candles=json.dumps(candles), volume=json.dumps(vol_bars),
         skew=json.dumps(skew_bars), netskew=json.dumps(net_bars),
         intensity=json.dumps(int_bars),
@@ -358,10 +391,11 @@ def main() -> int:
         # dropped 2026-07-19 (too cluttered). load_hunt_events still returns
         # it because the ⚡ markers come from the same query.
         states=json.dumps(state_strip),
-        span_h=f"{span_h:.0f}", n=len(dd), smooth=SMOOTH_MIN)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(html, encoding="utf-8")
-    print(f"saved -> {OUT}")
+        span_h=f"{span_h:.0f}", n=len(dd), smooth=SMOOTH_MIN, sym=SYMBOL)
+    out = out_path(SYMBOL)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html, encoding="utf-8")
+    print(f"saved -> {out}")
     return 0
 
 
@@ -383,7 +417,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .lbl {{ position:absolute; top:6px; left:10px; z-index:5;
           font-size:12px; color:#9aa0a6; pointer-events:none; }}
 </style></head><body>
-<div id="hdr"><b>撤單流覆盤 BTC-USD</b> · {span_h}h ·
+<div id="hdr"><b>撤單流覆盤 {sym}</b> · {span_h}h ·
  <b>看 K 線腳下色格</b>: 🟢讓路看漲 · 🔴抽梯看跌 · 亮灰=有事不判方向 · 深灰=平靜
  · <b>圈點=撤單流劇本進場</b>(綠在K下=看漲 / 紅在K上=看跌，僅推過 TG 的)
  <button id="btnx" onclick="toggleExpert()">🔬 專家面板</button>
