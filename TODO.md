@@ -20,6 +20,22 @@
   Python≥3.10 env，本機 l30d 3.12 已裝 mcp）③ TG `/cancelanalyze [mins]`
   → 進入實盤驗證階段：事件自動累積中，等 n≥30/劇本 + 8/10 判決
 
+### 0.5 掃單失敗反轉（策略 #3）— Gate F forward 累積中（2026-07-28 凍結）
+價格結構事件系，與 v7(ML)/擠壓(撤單) 正交。**2026-07-28 成本審計**：遷入版
+滑價符號寫反 → README 頭條 t=8.27 實質零成本；修正後（逐幣真實 bps 費用）
+目標執行情境 pool **+0.0255R / t=+3.35 / PF 1.11 / 9/9 正**、全 taker
+t=+2.29（見 research/sweep_failure/README.md CORRECTION 塊 + mistake.md）。
+edge 薄而依賴執行，但 n 大（~230 筆/月 pooled）= 全 repo 最快能自證的候選。
+- [ ] **每月 5 號**（併月度復驗 ritual）：`python research/sweep_failure/fetch_klines.py
+      && python research/sweep_failure/sweep_forward.py` → 記 Gate F 進度
+- [ ] Gate F（預註冊 2026-07-28，凍在 sweep_forward.py docstring）：forward
+      pooled n≥1400 且 CI95 低緣>0 且 ≥6/9 幣正 → 才談 tiny live（複用 OKX
+      executor/kill switch/$100 劇本）；中途 checkpoint 只做方向參考，禁提前放行
+- [ ] 若 3 個月後 quasi-forward（07-11 起）+ forward 合計 meanR 顯著為負 → 直接收攤，
+      不等 n=1400（提前止損條款，同樣預先寫死）
+- 紀律：規則（PIVOT/W/HOLD/DIS）已凍結於 2026-07-28 commit；禁任何參數再調；
+      成本模型（bps 情境 A/B）已定，禁看結果後改
+
 ### 1. 擠壓指標 × 訂單流系統結合（策略 #2 候選）★ 最優先
 流動性真空假說：壓縮後價格往阻力小的一側走，撤單領先成交洩露方向。
 工具鏈全部完成（已 merge 進 main）：`squeeze_events{,_cli}.py`、`squeeze_flow_join.py`、
