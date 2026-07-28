@@ -73,7 +73,20 @@ class OkxConfig:
     # 2026-07-14: reset from 2026-06-07 after the flat withdrawal ($0.01) +
     # $197.55 redeposit — earlier peaks belong to the withdrawn account and
     # would fake a -100% drawdown.
-    dd_peak_since_utc: str = "2026-07-14"
+    # 2026-07-28: reset again after the second manual blow-up. The 07-14 window
+    # contains the $1,435 intraday peak of that episode; measuring the $274
+    # baseline against it reports a -81% drawdown and fires an instant, false
+    # BREACH. This date MUST move with initial_capital_usd — the two together
+    # define "the current capital era".
+    dd_peak_since_utc: str = "2026-07-28"
+
+    # Cap-proximity warning (2026-07-28). Alert-only: fires when the loss is
+    # this fraction of the way to a kill cap, so the operator hears about it
+    # before CAP-3 halts or CAP-4 demotes. At the $274 baseline that is
+    # -14% (-$38) daily and -21% (-$58) total. It exists because the caps key
+    # off ACCOUNT equity, which manual trading also moves (account isolation
+    # was declined 2026-07-28) — advance notice is the only lever left.
+    cap_warn_frac: float = 0.70
 
     # Strong-only entry gate (2026-06-09, reversible; default OFF = no change).
     # When True, only Strong-tier signals open a position; Moderate signals are
@@ -298,6 +311,10 @@ def validate_okx_config(cfg: OkxConfig) -> None:
     # drawdown alert thresholds: warn fires first, breach is deeper
     if cfg.dd_warn_pct >= 0 or cfg.dd_breach_pct >= 0:
         raise RuntimeError("dd_warn_pct / dd_breach_pct must be negative")
+    if not (0.0 < cfg.cap_warn_frac < 1.0):
+        raise RuntimeError(
+            f"cap_warn_frac must be in (0, 1), got {cfg.cap_warn_frac}"
+        )
     if cfg.dd_breach_pct > cfg.dd_warn_pct:
         raise RuntimeError(
             f"dd_breach_pct ({cfg.dd_breach_pct}) must be <= dd_warn_pct "

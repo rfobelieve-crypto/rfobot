@@ -135,6 +135,9 @@ class V7OkxExecutor:
         # In-memory only — a redeploy while still in drawdown re-alerts once,
         # which is acceptable for an info-level alert.
         self._dd_alert_level: Optional[str] = None
+        # Cap-proximity warnings, one latch per cap so each alerts once and
+        # re-arms only after the loss recovers clear of its warn line.
+        self._cap_warned: dict[str, bool] = {"daily": False, "total": False}
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
@@ -348,6 +351,12 @@ class V7OkxExecutor:
             self._check_trailing_drawdown(equity_usd)
         except Exception:
             logger.exception("dd_alert_check_failed")
+
+        # Advance notice before a loss cap fires (alert-only, see method).
+        try:
+            self._check_cap_proximity(equity_usd, day_start_equity)
+        except Exception:
+            logger.exception("cap_proximity_check_failed")
 
         # Periodic NTP probe (rate-limited inside _probe_ntp).
         # If the probe itself failed we skip the NTP check this cycle.
@@ -788,6 +797,62 @@ class V7OkxExecutor:
             logger.exception("dd_alert_send_failed")
         logger.warning("okx_dd_alert level=%s dd=%.1f%% equity=%.2f peak=%.2f",
                        level, dd_pct, equity_usd, peak)
+
+    def _check_cap_proximity(self, equity_usd: float,
+                             day_start_equity: float) -> None:
+        """Warn before a loss cap fires. Alert-only — nothing here can halt.
+
+        The caps read ACCOUNT equity, and this account is shared with the
+        operator's manual trading (isolation declined 2026-07-28), so equity
+        can be walked toward CAP-3 (halt) or CAP-4 (terminal demote) by
+        activity the executor never performed. It cannot prevent that; the
+        one useful thing left is to say so before the cap lands, since
+        recovering from a DEMOTE costs a manual intervention.
+
+        Each cap latches after alerting and re-arms once the loss recovers to
+        half its warn line, so a position oscillating around the threshold
+        does not spam.
+        """
+        frac = self._cfg.cap_warn_frac
+        checks = []
+        if day_start_equity > 0:
+            checks.append((
+                "daily",
+                (equity_usd / day_start_equity - 1.0) * 100.0,
+                self._cfg.daily_loss_cap_pct,
+                "CAP-3 會 HALT（明天可恢復）",
+            ))
+        if self._cfg.initial_capital_usd > 0:
+            checks.append((
+                "total",
+                (equity_usd / self._cfg.initial_capital_usd - 1.0) * 100.0,
+                self._cfg.total_loss_cap_pct,
+                "CAP-4 會 DEMOTE（終態，需人工介入）",
+            ))
+
+        for key, pct, cap_pct, consequence in checks:
+            warn_at = cap_pct * frac
+            if pct > warn_at * 0.5:          # comfortably clear → re-arm
+                self._cap_warned[key] = False
+                continue
+            if pct > warn_at or self._cap_warned[key]:
+                continue
+            self._cap_warned[key] = True
+            cap_usd = self._cfg.initial_capital_usd * cap_pct / 100.0
+            try:
+                send_critical(
+                    self._cfg.telegram_critical_chat_id,
+                    f"🟠 *接近 {key} loss cap*\n"
+                    f"目前 {pct:+.1f}%（cap {cap_pct:.0f}% ≈ "
+                    f"${cap_usd:.2f}）\n"
+                    f"equity ${equity_usd:.2f}\n"
+                    f"再往下觸及就是 {consequence}。\n"
+                    f"提醒：cap 看的是帳戶總權益，手動交易也會推動它。",
+                )
+            except Exception:
+                logger.exception("cap_proximity_alert_send_failed")
+            logger.warning("okx_cap_proximity key=%s pct=%.1f cap=%.1f "
+                           "equity=%.2f", key, pct, cap_pct, equity_usd)
 
     def _net_pct_with_fees(self, *, gross_pct: float, notional: float,
                            entry_fees_usd: float,

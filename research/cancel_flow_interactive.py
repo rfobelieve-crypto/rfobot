@@ -323,31 +323,41 @@ def main() -> int:
                                "shape": "circle", "color": "#f2b544",
                                "text": "", "size": 1})
 
-    markers = load_strong_signals(start_ms, end_ms)
-    if args.shock_dots:
-        markers = sorted(markers + shock_bars, key=lambda m: m["time"])
-        print(f"{len(shock_bars)} shock(>=3x) markers overlaid")
+    # Marker layering (2026-07-28 使用者定版): the default view carries ONLY
+    # the system's own cancel-flow playbook entries — the thing this chart
+    # exists to review. Everything else (V7 entry signals, ⚡ liquidity-hunt
+    # events, shock dots) is context, not the subject, and four overlapping
+    # layers made the read impossible. Context moves behind 專家面板 rather
+    # than being deleted, so a review can still pull it up in one click.
+    core_markers = load_playbook_events(start_ms, end_ms)
+    print(f"playbook (主圖): {len(core_markers)} alerted markers")
 
-    pb_markers = load_playbook_events(start_ms, end_ms)
-    if pb_markers:
-        markers = sorted(markers + pb_markers, key=lambda m: m["time"])
-        print(f"playbook: {len(pb_markers)} alerted markers")
+    expert_markers = load_strong_signals(start_ms, end_ms)
+    if args.shock_dots:
+        expert_markers += shock_bars
+        print(f"{len(shock_bars)} shock(>=3x) markers -> 專家面板")
 
     state_strip = build_state_strip(start_ms, end_ms)
     hunt_markers, level_lines = load_hunt_events(start_ms, end_ms)
-    if hunt_markers:
-        markers = sorted(markers + hunt_markers, key=lambda m: m["time"])
+    expert_markers = sorted(expert_markers + hunt_markers,
+                            key=lambda m: m["time"])
     n_coloured = sum(1 for s in state_strip if s["color"] != CALM_HEX)
     print(f"state strip: {len(state_strip)} minutes ({n_coloured} coloured); "
-          f"hunt: {len(hunt_markers)} markers / {len(level_lines)} level lines")
+          f"hunt: {len(hunt_markers)} markers -> 專家面板 "
+          f"(專家層共 {len(expert_markers)})")
     span_h = (end_ms - start_ms) / 3600_000
 
     html = HTML_TEMPLATE.format(
         title=f"撤單流覆盤 BTC-USD ({span_h:.0f}h)",
         candles=json.dumps(candles), volume=json.dumps(vol_bars),
         skew=json.dumps(skew_bars), netskew=json.dumps(net_bars),
-        intensity=json.dumps(int_bars), markers=json.dumps(markers),
-        states=json.dumps(state_strip), levels=json.dumps(level_lines),
+        intensity=json.dumps(int_bars),
+        markers_core=json.dumps(core_markers),
+        markers_expert=json.dumps(expert_markers),
+        # level_lines is intentionally not passed: the price-line layer was
+        # dropped 2026-07-19 (too cluttered). load_hunt_events still returns
+        # it because the ⚡ markers come from the same query.
+        states=json.dumps(state_strip),
         span_h=f"{span_h:.0f}", n=len(dd), smooth=SMOOTH_MIN)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(html, encoding="utf-8")
@@ -375,8 +385,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </style></head><body>
 <div id="hdr"><b>撤單流覆盤 BTC-USD</b> · {span_h}h ·
  <b>看 K 線腳下色格</b>: 🟢讓路看漲 · 🔴抽梯看跌 · 亮灰=有事不判方向 · 深灰=平靜
- · ⚡=獵取事件 · ▲▼=V7 訊號
+ · <b>圈點=撤單流劇本進場</b>(綠在K下=看漲 / 紅在K上=看跌，僅推過 TG 的)
  <button id="btnx" onclick="toggleExpert()">🔬 專家面板</button>
+ <span class="muted">(專家面板另疊 ⚡獵取事件 · ▲▼V7 訊號)</span>
  <span class="muted">研究非信號 · edge 待 8/10 · n={n}m · {smooth}m 平滑</span></div>
 <div class="pane"><div class="lbl">價格 1m K棒 + 狀態色格</div><div id="c1"></div></div>
 <div class="pane"><div class="lbl">成交量 (綠=買方主動 / 紅=賣方主動)</div><div id="cv"></div></div>
@@ -424,6 +435,7 @@ function toggleExpert() {{
   expertOn = !expertOn;
   document.getElementById('expert').style.display = expertOn ? 'block' : 'none';
   document.getElementById('btnx').textContent = expertOn ? '收起專家面板' : '🔬 專家面板';
+  candle.setMarkers(expertOn ? MK_ALL : MK_CORE);
   layout();
   if (expertOn) {{
     const r = c1.timeScale().getVisibleLogicalRange();
@@ -437,11 +449,17 @@ const SKEW = {skew};
 const NETSKEW = {netskew};
 const INTEN = {intensity};
 
+// 主圖只掛系統自己偵測的撤單流劇本進場點；V7 訊號與 ⚡ 獵取事件屬於背景
+// 脈絡，收在專家面板裡，開啟時才疊回來（不是刪掉，覆盤要看隨時叫得出來）。
+const MK_CORE = {markers_core};
+const MK_EXPERT = {markers_expert};
+const MK_ALL = MK_CORE.concat(MK_EXPERT).sort((a, b) => a.time - b.time);
+
 const candle = c1.addCandlestickSeries({{
   upColor:'#26a269', downColor:'#e01b24',
   wickUpColor:'#26a269', wickDownColor:'#e01b24', borderVisible:false }});
 candle.setData(CANDLES);
-candle.setMarkers({markers});
+candle.setMarkers(MK_CORE);
 
 // A2-1 狀態色格 — 貼在價格 pane 底部 6% 的 overlay histogram
 const STATES = {states};

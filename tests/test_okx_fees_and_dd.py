@@ -250,6 +250,83 @@ class TestEntryFeeWiring:
         store.set_entry_fees.assert_not_called()
 
 
+# ── cap-proximity warning ────────────────────────────────────────────
+#
+# Alert-only advance notice before CAP-3 (halt) / CAP-4 (terminal demote).
+# It matters because the caps read ACCOUNT equity and this account is shared
+# with manual trading (isolation declined 2026-07-28), so the operator can
+# walk equity into a cap without the executor doing anything.
+
+
+class TestCapProximityWarning:
+    # initial 100, daily cap -20%, total cap -30%, warn at 70% of each
+    # => daily warns at -14%, total warns at -21%.
+    def _exe(self):
+        return _mk_executor(_mk_cfg(initial_capital_usd=100.0,
+                                    daily_loss_cap_pct=-20.0,
+                                    total_loss_cap_pct=-30.0,
+                                    cap_warn_frac=0.70))[0]
+
+    def test_silent_while_clear_of_both(self):
+        exe = self._exe()
+        with patch("indicator.okx.executor.send_critical") as tg:
+            exe._check_cap_proximity(95.0, 100.0)     # -5%
+        tg.assert_not_called()
+
+    def test_daily_warns_once_and_dedups(self):
+        exe = self._exe()
+        with patch("indicator.okx.executor.send_critical",
+                   return_value=True) as tg:
+            exe._check_cap_proximity(85.0, 100.0)     # -15% ≤ -14% → daily
+            exe._check_cap_proximity(84.0, 100.0)     # deeper, already warned
+        assert tg.call_count == 1
+        assert "daily" in tg.call_args_list[0].args[1]
+
+    def test_total_warns_separately_from_daily(self):
+        exe = self._exe()
+        # day started at 100 but equity is 78: -22% today AND -22% overall,
+        # so both caps are in warning range and each must speak once.
+        with patch("indicator.okx.executor.send_critical",
+                   return_value=True) as tg:
+            exe._check_cap_proximity(78.0, 100.0)
+        bodies = [c.args[1] for c in tg.call_args_list]
+        assert len(bodies) == 2
+        assert any("daily" in b for b in bodies)
+        assert any("total" in b for b in bodies)
+        assert any("DEMOTE" in b for b in bodies)
+
+    def test_rearms_after_recovering_clear(self):
+        exe = self._exe()
+        with patch("indicator.okx.executor.send_critical",
+                   return_value=True) as tg:
+            exe._check_cap_proximity(85.0, 100.0)     # -15% → warn (1)
+            exe._check_cap_proximity(94.0, 100.0)     # -6%, above half warn
+            exe._check_cap_proximity(85.0, 100.0)     # → warn again (2)
+        assert tg.call_count == 2
+
+    def test_never_halts_or_demotes(self):
+        """The whole point is that this path cannot touch executor state."""
+        exe = self._exe()
+        before = exe.get_status()
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            exe._check_cap_proximity(70.0, 100.0)     # past BOTH warn lines
+        assert exe.get_status() == before
+
+    def test_telegram_failure_is_swallowed(self):
+        exe = self._exe()
+        with patch("indicator.okx.executor.send_critical",
+                   side_effect=RuntimeError("tg down")):
+            exe._check_cap_proximity(78.0, 100.0)     # must not raise
+
+    def test_zero_day_start_skips_daily_only(self):
+        exe = self._exe()
+        with patch("indicator.okx.executor.send_critical",
+                   return_value=True) as tg:
+            exe._check_cap_proximity(78.0, 0.0)
+        bodies = [c.args[1] for c in tg.call_args_list]
+        assert len(bodies) == 1 and "total" in bodies[0]
+
+
 # ── trailing-peak drawdown alert ─────────────────────────────────────
 
 
