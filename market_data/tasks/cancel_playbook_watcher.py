@@ -56,6 +56,30 @@ from shared.db import get_db_conn
 logger = logging.getLogger(__name__)
 
 DEF_VERSION = "v1-2026-07-16"
+
+# ── instruments (2026-07-28) ────────────────────────────────────────────────
+# A coin is scannable only if it has ALL THREE source tables: depth_deltas_1m
+# (skew/net), flow_bars_1m (vshock, taker_ratio) and orderbook_snapshots_1m
+# (mid -> ret_1m, px). Every frozen playbook gates on vshock, so depth alone
+# is not enough. Measured 2026-07-28: BTC-USD and ETH-USD have all three;
+# the 8 alts already streaming into depth_deltas (ADA/AAVE/BNB/DOGE/LINK/
+# SUI/UNI/XRP) have depth ONLY — they need symbol_mapper.SYMBOL_MAP and
+# orderbook_l20_collector.TRACKED extended, then time to accumulate, before
+# they can be added here.
+DEFAULT_SYMBOL = "BTC-USD"
+# Extra instruments are opt-in via env so a bare redeploy cannot silently
+# double the Telegram alert volume (same gate style as _lead_enabled).
+EXTRA_SYMBOLS = ("ETH-USD",)
+
+
+def watch_symbols() -> tuple[str, ...]:
+    """BTC always; extras only when CANCEL_WATCH_SYMBOLS names them."""
+    raw = os.environ.get("CANCEL_WATCH_SYMBOLS", "").strip()
+    if not raw:
+        return (DEFAULT_SYMBOL,)
+    want = {s.strip().upper() for s in raw.split(",") if s.strip()}
+    return (DEFAULT_SYMBOL,) + tuple(s for s in EXTRA_SYMBOLS if s in want)
+
 GATE_SHOCK = 3.0
 DEEP = 0.30
 FLAT = 0.10
@@ -169,23 +193,29 @@ def _q(conn, sql: str, params=None) -> pd.DataFrame:
         return pd.DataFrame(cur.fetchall() or [])
 
 
-def load_frame(lookback_min: int) -> pd.DataFrame:
-    """Minute-indexed frame joining spot depth deltas, flow bars and mid."""
+def load_frame(lookback_min: int, symbol: str = DEFAULT_SYMBOL) -> pd.DataFrame:
+    """Minute-indexed frame joining spot depth deltas, flow bars and mid.
+
+    `symbol` defaults to BTC-USD so every existing call site keeps its exact
+    behaviour. All three tables must carry the symbol — every frozen playbook
+    gates on vshock (flow_bars) and most need ret_1m (orderbook mid), so a
+    coin with depth_deltas alone cannot be scanned. See WATCH_SYMBOLS.
+    """
     t0 = int(time.time() * 1000) - lookback_min * 60_000
     conn = get_db_conn()
     try:
         dd = _q(conn, "SELECT minute_start_ms ms, bid_add_qty ba, "
                       "bid_cancel_qty bc, ask_add_qty aa, ask_cancel_qty ac "
-                      "FROM depth_deltas_1m WHERE canonical_symbol='BTC-USD' "
+                      "FROM depth_deltas_1m WHERE canonical_symbol=%s "
                       "AND exchange='binance' AND minute_start_ms >= %s "
-                      "ORDER BY minute_start_ms", (t0,))
+                      "ORDER BY minute_start_ms", (symbol, t0))
         fb = _q(conn, "SELECT window_start ms, volume_usd vol, delta_usd dlt "
-                      "FROM flow_bars_1m WHERE canonical_symbol='BTC-USD' "
+                      "FROM flow_bars_1m WHERE canonical_symbol=%s "
                       "AND exchange_scope='all' AND window_start >= %s "
-                      "ORDER BY window_start", (t0,))
+                      "ORDER BY window_start", (symbol, t0))
         ob = _q(conn, "SELECT ts_ms, mid_price mid FROM orderbook_snapshots_1m "
-                      "WHERE canonical_symbol='BTC-USD' AND ts_ms >= %s "
-                      "ORDER BY ts_ms", (t0,))
+                      "WHERE canonical_symbol=%s AND ts_ms >= %s "
+                      "ORDER BY ts_ms", (symbol, t0))
     finally:
         conn.close()
     if dd.empty:
@@ -544,12 +574,16 @@ def scan(df_feat: pd.DataFrame, minutes: list[int],
 # ── persistence + alerts ─────────────────────────────────────────────────────
 
 def insert_events(events: list[dict],
-                  def_version: str = DEF_VERSION) -> list[dict]:
+                  def_version: str = DEF_VERSION,
+                  symbol: str = DEFAULT_SYMBOL) -> list[dict]:
     """INSERT IGNORE; returns the subset that was newly inserted.
 
     def_version defaults to v1; the v2 pass passes DEF_VERSION_V2 so its
-    rows coexist under the (def_version, minute_start_ms, playbook) UNIQUE
-    key without colliding with or re-labelling v1 rows."""
+    rows coexist under the UNIQUE key without colliding with or re-labelling
+    v1 rows. Since migration 017 that key is
+    (def_version, canonical_symbol, minute_start_ms, playbook) — without the
+    symbol in it, two coins firing the same playbook in the same minute would
+    silently drop one row."""
     if not events:
         return []
     fresh = []
@@ -557,12 +591,14 @@ def insert_events(events: list[dict],
     try:
         with conn.cursor() as cur:
             for e in events:
+                e.setdefault("symbol", symbol)
                 cur.execute(
                     "INSERT IGNORE INTO cancel_playbook_events "
-                    "(def_version, minute_start_ms, playbook, direction, px, "
+                    "(def_version, canonical_symbol, minute_start_ms, "
+                    " playbook, direction, px, "
                     " shock, skew15, net15, vshock, taker_ratio, ret_1m) "
-                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                    (def_version, e["minute_start_ms"], e["playbook"],
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (def_version, symbol, e["minute_start_ms"], e["playbook"],
                      e["direction"], e["px"], e["shock"], e["skew15"],
                      e["net15"], e["vshock"], e["taker_ratio"], e["ret_1m"]))
                 if cur.rowcount > 0:
@@ -602,13 +638,20 @@ def _alert_worthy(e: dict) -> bool:
             or (nt is not None and abs(nt) >= ALERT_MIN_NET))
 
 
-def _cooldown_ok(conn, minute_ms: int) -> bool:
-    """Global cooldown — at most one alert per COOLDOWN_MIN, any playbook."""
+def _cooldown_ok(conn, minute_ms: int,
+                 symbol: str = DEFAULT_SYMBOL) -> bool:
+    """Cooldown — at most one alert per COOLDOWN_MIN, any playbook, PER COIN.
+
+    Scoped per symbol rather than globally: a BTC alert should not mute an
+    ETH one, they are independent observations. The flip side is that alert
+    volume scales with the number of watched coins, which is why extras are
+    env-gated (see watch_symbols)."""
     with conn.cursor() as cur:
         cur.execute(
             "SELECT COUNT(*) n FROM cancel_playbook_events "
-            "WHERE def_version=%s AND alerted=1 AND minute_start_ms > %s",
-            (DEF_VERSION, minute_ms - COOLDOWN_MIN * 60_000))
+            "WHERE def_version=%s AND canonical_symbol=%s AND alerted=1 "
+            "AND minute_start_ms > %s",
+            (DEF_VERSION, symbol, minute_ms - COOLDOWN_MIN * 60_000))
         return int(cur.fetchone()["n"]) == 0
 
 
@@ -672,12 +715,16 @@ def alert_events(fresh: list[dict]) -> None:
             if ok:
                 with conn.cursor() as cur:
                     cur.execute(
+                        # symbol is part of the key since migration 017 —
+                        # without it, marking a BTC alert also flips the ETH
+                        # row that fired the same playbook in the same minute.
                         "UPDATE cancel_playbook_events SET alerted=1, "
                         "tg_message_id=COALESCE(%s, tg_message_id) "
-                        "WHERE def_version=%s AND minute_start_ms=%s "
-                        "AND playbook=%s",
-                        (msg_id, DEF_VERSION, e["minute_start_ms"],
-                         e["playbook"]))
+                        "WHERE def_version=%s AND canonical_symbol=%s "
+                        "AND minute_start_ms=%s AND playbook=%s",
+                        (msg_id, DEF_VERSION,
+                         e.get("symbol", DEFAULT_SYMBOL),
+                         e["minute_start_ms"], e["playbook"]))
                 conn.commit()
     finally:
         conn.close()
@@ -692,8 +739,8 @@ def backfill_outcomes() -> None:
     now_ms = int(time.time() * 1000)
     conn = get_db_conn()
     try:
-        due = _q(conn, "SELECT id, minute_start_ms ms, px, direction "
-                       "FROM cancel_playbook_events "
+        due = _q(conn, "SELECT id, minute_start_ms ms, px, direction, "
+                       "canonical_symbol sym FROM cancel_playbook_events "
                        "WHERE (fwd_ret_120m IS NULL OR first_hit_result IS NULL) "
                        "AND px IS NOT NULL AND minute_start_ms <= %s",
                  (now_ms - 31 * 60_000,))
@@ -703,16 +750,27 @@ def backfill_outcomes() -> None:
         due["px"] = pd.to_numeric(due["px"])
         lo = int(due["ms"].min())
         hi = int(due["ms"].max()) + (HORIZONS_MIN[-1] + 2) * 60_000
-        ob = _q(conn, "SELECT ts_ms, mid_price mid FROM orderbook_snapshots_1m "
-                      "WHERE canonical_symbol='BTC-USD' "
-                      "AND ts_ms BETWEEN %s AND %s ORDER BY ts_ms", (lo, hi))
-        if ob.empty:
+        # One mid series PER SYMBOL — scoring an ETH event against BTC mids
+        # would silently produce plausible-looking but meaningless returns.
+        mids_by_sym: dict[str, pd.Series] = {}
+        for sym in sorted(due["sym"].dropna().unique()):
+            ob = _q(conn, "SELECT ts_ms, mid_price mid "
+                          "FROM orderbook_snapshots_1m "
+                          "WHERE canonical_symbol=%s "
+                          "AND ts_ms BETWEEN %s AND %s ORDER BY ts_ms",
+                    (sym, lo, hi))
+            if ob.empty:
+                continue
+            ob["ts_ms"] = pd.to_numeric(ob["ts_ms"])
+            ob["mid"] = pd.to_numeric(ob["mid"])
+            mids_by_sym[sym] = ob.groupby(ob["ts_ms"] // 60_000)["mid"].last()
+        if not mids_by_sym:
             return
-        ob["ts_ms"] = pd.to_numeric(ob["ts_ms"])
-        ob["mid"] = pd.to_numeric(ob["mid"])
-        mids = ob.groupby(ob["ts_ms"] // 60_000)["mid"].last()
         with conn.cursor() as cur:
             for _, r in due.iterrows():
+                mids = mids_by_sym.get(r.get("sym") or DEFAULT_SYMBOL)
+                if mids is None:
+                    continue
                 m0 = int(r["ms"]) // 60_000
                 sets, vals = [], []
                 fwd60 = None
@@ -863,30 +921,40 @@ def reply_outcomes() -> None:
 
 def watch_loop() -> None:
     ensure_schema()
-    logger.info("cancel-playbook watcher started (def=%s)", DEF_VERSION)
-    last_seen = 0
+    syms = watch_symbols()
+    logger.info("cancel-playbook watcher started (def=%s symbols=%s)",
+                DEF_VERSION, ",".join(syms))
+    # last_seen is per symbol: coins have independent data availability, and
+    # one coin stalling must not advance another's cursor past unscanned bars.
+    last_seen: dict[str, int] = {s: 0 for s in syms}
     while True:
-        try:
-            df = load_frame(lookback_min=100)
-            if not df.empty:
+        for sym in syms:
+            try:
+                df = load_frame(lookback_min=100, symbol=sym)
+                if df.empty:
+                    continue
                 feat = compute_features(df)
                 closed = int(time.time() // 60) - 1   # last fully closed minute
                 minutes = [m for m in feat.index
-                           if last_seen < m <= closed]
+                           if last_seen[sym] < m <= closed]
                 minutes = minutes[-5:]                # catch-up cap
-                fresh = insert_events(scan(feat, minutes))
+                fresh = insert_events(scan(feat, minutes), symbol=sym)
                 alert_events(fresh)
                 # vacuum_lead — parallel, log-only, NO alerts (provisional
                 # family; env-gated so it can't start on a bare redeploy).
                 if _lead_enabled():
                     insert_events(scan(feat, minutes, classify_minute_lead),
-                                  def_version=DEF_VERSION_LEAD)
+                                  def_version=DEF_VERSION_LEAD, symbol=sym)
                 if minutes:
-                    last_seen = max(minutes)
+                    last_seen[sym] = max(minutes)
+            except Exception:
+                # per-symbol isolation: a bad coin must not stop the others
+                logger.exception("playbook watcher cycle failed sym=%s", sym)
+        try:
             backfill_outcomes()
             reply_outcomes()
         except Exception:
-            logger.exception("playbook watcher cycle failed")
+            logger.exception("playbook outcome pass failed")
         time.sleep(60)
 
 
