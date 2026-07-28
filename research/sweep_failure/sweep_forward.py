@@ -28,11 +28,17 @@ Forward gate — Gate F (pre-registered 2026-07-28, do not move):
   the proof). Trades with fill_ts >= FREEZE are forward. PASS requires, on
   POOLED forward trades under scenario A:
       n >= 1400
-      AND bootstrap 95%% CI-low of mean R_net > 0
+      AND DAY-CLUSTERED bootstrap 95% CI-low of mean R_net > 0
       AND >= 6/9 symbols with positive forward sum
-  (n=1400 from the corrected history: mu~=0.033R, sd~=0.63R ->
-  (1.96*sd/mu)^2 ~= 1400; ~6 months at the historical ~230 pooled trades/mo.)
-  Checkpoints before n=1400 are directional only — no early pass.
+  AMENDED 2026-07-28 (same day, BEFORE any forward trade accrued — a
+  tightening, never to be loosened): cluster_stats.py measured VIF=2.95 on
+  the pooled mean (nine correlated symbols take the same shock), so the iid
+  CI overstates precision ~sqrt(3)x; the gate now uses the day-clustered CI.
+  Honest runway at the historical mean (+0.0255R, clustered se): ~5-7k
+  forward trades (~2 years) unless forward runs hotter. The counterweight is
+  the pre-registered early-stop: if after 3 months the combined
+  quasi-forward+forward mean is significantly NEGATIVE, kill the line
+  without waiting. Checkpoints before the gate are directional only.
   The 2026-07-11 sandbox freeze (per README, git-unprovable) is reported as
   "quasi-forward", labeled separately, never merged into the gate.
 
@@ -107,6 +113,31 @@ def boot_ci(rs, nb=4000, seed=7):
     return means[int(0.025 * nb)], means[int(0.975 * nb)]
 
 
+def boot_ci_clustered(pairs, nb=4000, seed=7):
+    """Day-clustered bootstrap CI of mean R. pairs = [(fill_ts, r)].
+    Gate F's CI (2026-07-28 amendment): resample calendar days, not trades —
+    nine correlated symbols share the same market shock within a day."""
+    from collections import defaultdict
+    from datetime import datetime, timezone
+    byd = defaultdict(list)
+    for ts, r in pairs:
+        byd[datetime.fromtimestamp(ts, tz=timezone.utc).date()].append(r)
+    days = list(byd.values())
+    if not days:
+        return (float("nan"),) * 2
+    rng = random.Random(seed)
+    means = []
+    for _ in range(nb):
+        acc, cnt = 0.0, 0
+        for _ in range(len(days)):
+            g = days[rng.randrange(len(days))]
+            acc += sum(g)
+            cnt += len(g)
+        means.append(acc / cnt)
+    means.sort()
+    return means[int(0.025 * nb)], means[int(0.975 * nb)]
+
+
 def main() -> int:
     per_sym = {}
     for s in SYMS:
@@ -149,24 +180,27 @@ def main() -> int:
         print(f"  {label}")
         print("=" * 78)
         pool = []
+        pairs = []
         pos = 0
         for s in SYMS:
-            rs = [r for ts, r in rescore(per_sym[s], "A") if ts >= ts0]
+            sp = [(ts, r) for ts, r in rescore(per_sym[s], "A") if ts >= ts0]
+            rs = [r for _, r in sp]
             if rs and sum(rs) > 0:
                 pos += 1
             pool += rs
+            pairs += sp
             if rs:
                 print(f"  {s:<6} n={len(rs):>4}  sumR={sum(rs):+8.3f}  meanR={sum(rs)/len(rs):+8.4f}")
         st = stats(pool)
         if st is None:
             print("  (no trades yet)")
             continue
-        lo, hi = boot_ci(pool)
+        lo, hi = boot_ci_clustered(pairs)
         print(f"  pool   n={st['n']:>4}  meanR={st['mean']:+8.4f}  WR={st['wr']:.0f}%  "
-              f"CI95[{lo:+.4f},{hi:+.4f}]  positive {pos}/9")
+              f"clustered-CI95[{lo:+.4f},{hi:+.4f}]  positive {pos}/9")
         if ts0 == FREEZE_TS:
             print(f"\n  Gate F progress: n={st['n']}/{GATE_N}"
-                  f"  |  CI-low>0: {'YES' if lo > 0 else 'no'}"
+                  f"  |  clustered CI-low>0: {'YES' if lo > 0 else 'no'}"
                   f"  |  >=6/9 positive: {'YES' if pos >= 6 else 'no'}"
                   f"  ->  {'PASS' if (st['n'] >= GATE_N and lo > 0 and pos >= 6) else 'accumulating'}")
     return 0

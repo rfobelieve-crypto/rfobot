@@ -25,12 +25,16 @@
 滑價符號寫反 → README 頭條 t=8.27 實質零成本；修正後（逐幣真實 bps 費用）
 目標執行情境 pool **+0.0255R / t=+3.35 / PF 1.11 / 9/9 正**、全 taker
 t=+2.29（見 research/sweep_failure/README.md CORRECTION 塊 + mistake.md）。
-edge 薄而依賴執行，但 n 大（~230 筆/月 pooled）= 全 repo 最快能自證的候選。
+edge 薄而依賴執行。同日頑健性量測（cluster_stats.py）：月度 18/31 正
+（t=+2.03）、**日分群 bootstrap VIF=2.95 → 有效 t=+1.95**（9 幣連動灌水已
+量化）、0.5%/筆組合 ~+40%/年 / MDD 22.8%。定位 = **2σ 候選（帶翻號折扣）**，
+「幾個月自證」賣點不成立，改為零成本被動追蹤。
 - [ ] **每月 5 號**（併月度復驗 ritual）：`python research/sweep_failure/fetch_klines.py
       && python research/sweep_failure/sweep_forward.py` → 記 Gate F 進度
-- [ ] Gate F（預註冊 2026-07-28，凍在 sweep_forward.py docstring）：forward
-      pooled n≥1400 且 CI95 低緣>0 且 ≥6/9 幣正 → 才談 tiny live（複用 OKX
-      executor/kill switch/$100 劇本）；中途 checkpoint 只做方向參考，禁提前放行
+- [ ] Gate F（預註冊 2026-07-28；同日收緊為 **day-clustered CI**，資料未累積
+      前收緊、之後不准鬆）：forward pooled n≥1400 且 clustered CI95 低緣>0
+      且 ≥6/9 幣正 → 才談 tiny live（複用 OKX executor/kill switch/$100 劇本）；
+      誠實 runway ~2 年除非 forward 跑得比歷史熱；中途 checkpoint 禁提前放行
 - [ ] 若 3 個月後 quasi-forward（07-11 起）+ forward 合計 meanR 顯著為負 → 直接收攤，
       不等 n=1400（提前止損條款，同樣預先寫死）
 - 紀律：規則（PIVOT/W/HOLD/DIS）已凍結於 2026-07-28 commit；禁任何參數再調；
