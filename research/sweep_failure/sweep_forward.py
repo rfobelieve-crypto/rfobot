@@ -61,10 +61,41 @@ VARIANT B — shallow-pierce filter (pre-registered 2026-07-29, threshold
   (shallow pokes are idiosyncratic; deep pierces are market-wide shocks),
   which takes the deflated-Sharpe MinTRL from ~7900 effective observations
   (unreachable) to ~300 (already exceeded).
-  IT IS STILL IN-SAMPLE. Variant A (the frozen unfiltered rules) remains
-  THE Gate F track, unchanged and unretrofitted. Variant B accrues its own
-  forward record from 2026-07-29 under the same gate arithmetic, and only a
-  forward pass promotes it.
+  AMENDED the same day, hours after registration, with 8 forward signals
+  accrued (i.e. before any meaningful forward evidence): the liquidity SOURCE
+  widens from swing pivots alone to all four pool types — swing, session
+  extremes (Asia/London/NY), PDH/PDL, PWH/PWL. Prompted by the user's
+  critique that defining liquidity by swing pivot alone is one arbitrary
+  choice among several, and tested in level_types.py:
+      swing    +0.0320 all / +0.0786 shallow (n 22222 / 8053)
+      pdh_pdl  +0.0368       / +0.0829       (n 26224 / 10041)
+      pwh_pwl  +0.0413       / +0.0953       (n  4580 /  1334)
+      session  +0.0212       / +0.0533       (n 46253 / 20373)
+  All four were tested and all four are reported; none was dropped (session
+  is the weakest and is kept). Time-defined levels cannot leak the outcome
+  the way a pivot's NEIGHBOURHOOD can — which is exactly how the equal-levels
+  idea died the same afternoon (see below). The pierce filter roughly doubling
+  the mean on every level type INDEPENDENTLY is the reason to trust the
+  widening: it generalises rather than fitting swing pivots.
+  Combined and filtered: n=39801, mean +0.0673, VIF 7.70, 1327 trades/month;
+  core9 +0.0719 vs added20 +0.0653, halves +0.0667 / +0.0680, 11/11 quarters
+  positive (worst +0.0351). The clustered CI clears zero at n~2488, i.e.
+  ~1.9 months rather than ~8.
+  This does NOT loosen the statistical bar — the gate arithmetic is untouched;
+  it broadens the test surface.
+
+  RETRACTED the same day: an "equal levels" density filter (count of same-side
+  pivots within a tolerance) appeared to add a large independent effect, but
+  the count was taken over ALL pivots including ones confirmed AFTER the
+  sweep. Recomputed causally it adds nothing (+0.0292 alone, BELOW the
+  +0.0320 baseline). Levels that price kept respecting accumulate pivots, and
+  "price came back" is the label — so the non-causal count was reading the
+  outcome. Not registered, not used.
+
+  IT IS STILL IN-SAMPLE. Variant A (the frozen unfiltered rules on swing
+  pivots) remains THE Gate F track, unchanged and unretrofitted. Variant B
+  accrues its own forward record from 2026-07-29 under the same gate
+  arithmetic, and only a forward pass promotes it.
 
 Usage:
     python research/sweep_failure/fetch_klines.py   # refresh data first

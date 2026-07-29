@@ -47,6 +47,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 os.environ["SLIP"] = "0"          # gross engine; bps costs applied here
 import sweep_core as SC            # noqa: E402
+import level_types as LT           # noqa: E402  (same trade fn = no drift)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -71,10 +72,20 @@ ADDED20 = ["TRX", "DOT", "LTC", "UNI", "ATOM", "ETC", "NEAR", "APT", "FIL",
 # t-peak, and not load-bearing: the whole 0.10-1.00 ATR sweep is positive
 # and decays smoothly to the unfiltered mean, so there is no cliff to sit on.
 PIERCE_MAX_B = 0.25
+# AMENDED 2026-07-29, hours after registration and with 8 forward signals
+# accrued (i.e. before any meaningful forward evidence): the liquidity SOURCE
+# widens from swing pivots alone to all four pool types the LMSR map draws —
+# swing, session extremes, PDH/PDL, PWH/PWL. Every type was tested and every
+# type is reported; none were dropped (session is the weakest and is kept).
+# This does not loosen the statistical bar — the gate arithmetic is untouched.
+# It broadens the test surface, which takes the forward answer from ~8 months
+# to ~2 (1327 filtered trades/month vs 245). The pierce filter generalising
+# across all four independently is the reason to trust the widening at all.
+LEVEL_KINDS = ("swing", "session", "pdh_pdl", "pwh_pwl")
 
-FIELDS = ["symbol", "universe", "first_seen_utc", "fill_ts", "fill_utc",
-          "entry_px", "atr", "pierce_atr", "variant_b", "status", "exit_ts",
-          "exit_utc", "stopped", "gross_r", "net_r"]
+FIELDS = ["symbol", "universe", "level_kind", "first_seen_utc", "fill_ts",
+          "fill_utc", "entry_px", "atr", "pierce_atr", "variant_b", "status",
+          "exit_ts", "exit_utc", "stopped", "gross_r", "net_r"]
 
 
 def refresh(sym: str) -> Path | None:
@@ -113,12 +124,13 @@ def net_r(r: float, lvl: float, atr: float, stopped: bool) -> float:
     return r - legs / 1e4 * lvl / (SC.DIS * atr)
 
 
-def read_log() -> dict[tuple[str, int], dict]:
+def read_log() -> dict[tuple[str, str, int], dict]:
     out = {}
     if LOG.exists():
         with LOG.open(newline="", encoding="utf-8") as f:
             for row in csv.DictReader(f):
-                out[(row["symbol"], int(row["fill_ts"]))] = row
+                out[(row["symbol"], row.get("level_kind", "swing"),
+                     int(row["fill_ts"]))] = row
     return out
 
 
@@ -127,7 +139,7 @@ def write_log(log: dict[tuple[str, int], dict]) -> None:
     with LOG.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=FIELDS)
         w.writeheader()
-        for k in sorted(log, key=lambda x: (x[1], x[0])):
+        for k in sorted(log, key=lambda x: (x[2], x[0], x[1])):
             w.writerow({c: log[k].get(c, "") for c in FIELDS})
 
 
@@ -137,12 +149,15 @@ def summary(log: dict) -> None:
         print("  (empty log)")
         return
     print(f"  logged rows: {len(rows)}")
-    for uni in ("core9", "added20", "B:core9", "B:added20"):
-        if uni.startswith("B:"):
-            sub = [r for r in rows if r["universe"] == uni[2:]
-                   and r.get("variant_b") == "1"]
-        else:
-            sub = [r for r in rows if r["universe"] == uni]
+    # freshly-built rows hold int 1; rows read back from CSV hold "1"
+    def _isb(r):
+        return str(r.get("variant_b", "")) == "1"
+    groups = [("ALL", lambda r: True), ("B (pierce)", _isb)]
+    groups += [(f"B:{k}", (lambda k_: lambda r: _isb(r)
+                           and r.get("level_kind") == k_)(k))
+               for k in LEVEL_KINDS]
+    for uni, pred in groups:
+        sub = [r for r in rows if pred(r)]
         closed = [r for r in sub if r["status"] == "CLOSED"]
         if not sub:
             continue
@@ -185,16 +200,33 @@ def main() -> int:
                 continue
             bars = SC.load_csv(str(p))
             last_ts = bars[-1][0]
-            for (fill_ts, exit_ts, r, lvl, atr, stopped,
-                 pierce) in SC.backtest_symbol(bars):
+            # one source of truth per kind: the frozen engine for swing, the
+            # shared level engine for the time-defined pools
+            # one source of truth per kind: the frozen engine for swing,
+            # the shared level engine for the time-defined pools. Tuples carry
+            # (kind, fill_ts, exit_ts, gross, net, pierce, lvl, atr, stopped);
+            # swing yields gross R (bps model applied here), LT.trade_levels
+            # already returns net, so both are carried explicitly rather than
+            # re-derived.
+            evts: list[tuple] = [
+                ("swing", t[0], t[1], t[2],
+                 net_r(t[2], t[3], t[4], t[5]), t[6], t[3], t[4], t[5])
+                for t in SC.backtest_symbol(bars)]
+            lv = LT.build_levels(bars)
+            for kind in ("session", "pdh_pdl", "pwh_pwl"):
+                for (f_ts, x_ts, netr, pc, lvl, atr, st_) in LT.trade_levels(
+                        bars, lv.get(kind, [])):
+                    evts.append((kind, f_ts, x_ts, None, netr, pc, lvl, atr, st_))
+
+            for (kind, fill_ts, exit_ts, gross, netv, pierce, lvl, atr,
+                 stopped) in evts:
                 if fill_ts < FREEZE_TS:
                     continue
-                key = (sym, fill_ts)
-                # complete only once the whole HOLD window exists in data
+                key = (sym, kind, fill_ts)
                 done = fill_ts + SC.HOLD * 3600 <= last_ts
                 row = log.get(key)
                 if row is None:
-                    row = {"symbol": sym, "universe": uni,
+                    row = {"symbol": sym, "universe": uni, "level_kind": kind,
                            "first_seen_utc": stamp, "fill_ts": fill_ts,
                            "fill_utc": f"{datetime.fromtimestamp(fill_ts, timezone.utc):%Y-%m-%d %H:%M}",
                            "entry_px": f"{lvl:.6f}", "atr": f"{atr:.6f}",
@@ -208,8 +240,8 @@ def main() -> int:
                     "exit_utc": (f"{datetime.fromtimestamp(exit_ts, timezone.utc):%Y-%m-%d %H:%M}"
                                  if done else ""),
                     "stopped": int(bool(stopped)) if done else "",
-                    "gross_r": f"{r:.6f}" if done else "",
-                    "net_r": f"{net_r(r, lvl, atr, stopped):.6f}" if done else "",
+                    "gross_r": f"{gross:.6f}" if (done and gross is not None) else "",
+                    "net_r": f"{netv:.6f}" if done else "",
                 })
     write_log(log)
     print(f"shadow run {stamp}  new signals: {new}")
