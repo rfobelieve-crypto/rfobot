@@ -75,3 +75,4 @@ promo_video/public/audio/*.mp3
 research/results/portfolio_clocks_state.json
 research/results/portfolio_clocks.log
 research/sweep_failure/.cache/
+research/results/sweep_shadow_run.log
