@@ -46,12 +46,15 @@ edge 薄而依賴執行。同日頑健性量測（cluster_stats.py）：月度 1
 （t=+2.03）、**日分群 bootstrap VIF=2.95 → 有效 t=+1.95**（9 幣連動灌水已
 量化）、0.5%/筆組合 ~+40%/年 / MDD 22.8%。定位 = **2σ 候選（帶翻號折扣）**，
 「幾個月自證」賣點不成立，改為零成本被動追蹤。
-- [ ] **每月 5 號**（併月度復驗 ritual）：`python research/sweep_failure/fetch_klines.py
-      && python research/sweep_failure/sweep_forward.py` → 記 Gate F 進度；
-      另跑 `python research/sweep_failure/cross_asset_probe.py` → 記跨資產
-      forward cohort（informational，不進 Gate F；為未來非 crypto sleeve
-      免費累積 out-of-sample 成績單——接入條件 = crypto Gate F 過 + 資本
-      $5k+ + 屆時 venue 自己的成本審計，見 2026-07-29 討論）
+- [x] ~~每月 5 號手動跑~~ → **2026-07-29 已自動化**：Windows 排程任務
+      `PortfolioClocks`（每週一 09:30，`research/portfolio_clocks.bat` →
+      `portfolio_clocks.py`），四合一 TG 週報：① Gate B 計數（n≥30 推
+      SHORT-tilt 解鎖告警）② 月度視窗（5-11 號）自動 fetch+sweep_forward
+      （Gate F 進度，帶 STALE-DATA guard）+cross_asset_probe（跨資產
+      forward cohort）③ depth_deltas 天數（≥90d 推 subhourly 復活告警）
+      ④ 2026-08-10 起自動跑 cancel_lead_ic/cancel_shock_ic 判決並推結果。
+      送出層 = send_critical 6×60s 重試 + plain fallback；失敗留痕
+      portfolio_clocks.log。**週一沒收到報告本身就是告警**（heartbeat）
 - [ ] Gate F（預註冊 2026-07-28；同日收緊為 **day-clustered CI**，資料未累積
       前收緊、之後不准鬆）：forward pooled n≥1400 且 clustered CI95 低緣>0
       且 ≥6/9 幣正 → 才談 tiny live（複用 OKX executor/kill switch/$100 劇本）；
