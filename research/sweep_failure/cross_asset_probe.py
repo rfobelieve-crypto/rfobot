@@ -122,7 +122,33 @@ def main() -> int:
     if "mean" in pm:
         print(f"\n  POOL(non-crypto, net@flat)  n={pm['n']}  mean {pm['mean']:+.4f}"
               f"  t={pm['t']:+.2f}  WR {pm['wr']:.0f}%  "
-              f"halves {pm['h1']:+.3f}/{pm['h2']:+.3f}")
+              f"halves(symbol-ordered, do not cite) {pm['h1']:+.3f}/{pm['h2']:+.3f}")
+
+    # ── forward cohort (informational, NOT part of Gate F) ────────────
+    # Same freeze date as the crypto rules commit (2026-07-28). Purpose:
+    # let the cross-asset sleeve accumulate a forward track record at zero
+    # cost, so that IF crypto Gate F passes and capital reaches futures
+    # scale, the sleeve arrives with a year of out-of-sample evidence
+    # instead of starting cold. Monthly re-run alongside sweep_forward.
+    from datetime import datetime, timezone
+    FREEZE = int(datetime(2026, 7, 28, tzinfo=timezone.utc).timestamp())
+    fwd_pool = []
+    print("\n  FORWARD cohort (freeze 2026-07-28, informational only):")
+    for row in rows:
+        name = row["sym"]
+        bps_side = SYMS[name][1]
+        p = CACHE / f"{name}_1h.csv"
+        trades = SC.backtest_symbol(SC.load_csv(str(p)))
+        rs = [t[2] - (2 * bps_side) / 1e4 * t[3] / (SC.DIS * t[4])
+              for t in trades if t[0] >= FREEZE]
+        fwd_pool += rs
+        if rs:
+            print(f"    {name:<7} n={len(rs):>3}  sumR={sum(rs):+7.3f}")
+    if fwd_pool:
+        m = sum(fwd_pool) / len(fwd_pool)
+        print(f"    pool    n={len(fwd_pool):>3}  meanR={m:+.4f}")
+    else:
+        print("    (no forward trades yet)")
     print("\n  caveats: Yahoo continuous-contract roll gaps can fabricate "
           "sweeps (ES/NQ quarterly, GC ~monthly; EURUSD none); session "
           "breaks make W/HOLD trading-bars not wall-clock; correlated "

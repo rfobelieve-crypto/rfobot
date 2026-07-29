@@ -47,7 +47,11 @@ edge 薄而依賴執行。同日頑健性量測（cluster_stats.py）：月度 1
 量化）、0.5%/筆組合 ~+40%/年 / MDD 22.8%。定位 = **2σ 候選（帶翻號折扣）**，
 「幾個月自證」賣點不成立，改為零成本被動追蹤。
 - [ ] **每月 5 號**（併月度復驗 ritual）：`python research/sweep_failure/fetch_klines.py
-      && python research/sweep_failure/sweep_forward.py` → 記 Gate F 進度
+      && python research/sweep_failure/sweep_forward.py` → 記 Gate F 進度；
+      另跑 `python research/sweep_failure/cross_asset_probe.py` → 記跨資產
+      forward cohort（informational，不進 Gate F；為未來非 crypto sleeve
+      免費累積 out-of-sample 成績單——接入條件 = crypto Gate F 過 + 資本
+      $5k+ + 屆時 venue 自己的成本審計，見 2026-07-29 討論）
 - [ ] Gate F（預註冊 2026-07-28；同日收緊為 **day-clustered CI**，資料未累積
       前收緊、之後不准鬆）：forward pooled n≥1400 且 clustered CI95 低緣>0
       且 ≥6/9 幣正 → 才談 tiny live（複用 OKX executor/kill switch/$100 劇本）；
