@@ -74,3 +74,4 @@ promo_video/public/audio/*.mp3
 外部技術借鑑/
 research/results/portfolio_clocks_state.json
 research/results/portfolio_clocks.log
+research/sweep_failure/.cache/
