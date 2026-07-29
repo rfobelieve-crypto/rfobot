@@ -43,11 +43,28 @@ import yfinance as yf                         # noqa: E402
 OUT = Path(__file__).resolve().parents[2] / "research/results/sweep_cross_asset.json"
 CACHE = HERE / ".cache" / "xasset"
 
+# Declared mechanically before running (2026-07-29 expansion): the liquid
+# CME/ICE futures across every major asset class plus the majors in FX. ALL
+# are reported — the point of widening is that replication in markets the
+# rule never saw is the one evidence type the Deflated Sharpe framework
+# cannot see, and cherry-picking would destroy exactly that property.
 SYMS = {                                      # name -> (yahoo ticker, per-side bps)
-    "NQ":     ("NQ=F", 1.5),
-    "ES":     ("ES=F", 1.5),
+    "NQ":     ("NQ=F", 1.5),        # Nasdaq 100
+    "ES":     ("ES=F", 1.5),        # S&P 500
+    "YM":     ("YM=F", 1.5),        # Dow
+    "RTY":    ("RTY=F", 1.5),       # Russell 2000
+    "NIKKEI": ("NKD=F", 2.0),       # Nikkei (CME)
     "GOLD":   ("GC=F", 1.5),
+    "SILVER": ("SI=F", 2.0),
+    "COPPER": ("HG=F", 2.0),
+    "CRUDE":  ("CL=F", 1.5),
+    "NATGAS": ("NG=F", 2.0),
+    "UST10Y": ("ZN=F", 1.0),        # 10y note
+    "UST30Y": ("ZB=F", 1.0),
     "EURUSD": ("EURUSD=X", 1.0),
+    "USDJPY": ("JPY=X", 1.0),
+    "GBPUSD": ("GBPUSD=X", 1.0),
+    "AUDUSD": ("AUDUSD=X", 1.0),
 }
 SCEN_A = {"entry": 7.0, "texit": 3.0, "sexit": 10.0}   # crypto stress line
 
