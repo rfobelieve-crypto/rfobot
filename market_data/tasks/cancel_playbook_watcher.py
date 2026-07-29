@@ -474,6 +474,9 @@ def classify_state(r: pd.Series) -> dict:
 # （watcher 告警 + tv_alert_poller 三種卡），改文案只動這裡。
 
 DIR_ZH = {"UP": "偏漲 🟢", "DOWN": "偏跌 🔴", "NONE": "方向未定 ⚪"}
+# 2026-07-29: forward-direction claim falsified — label the observed side of
+# the book instead of forecasting. DIR_ZH kept for legacy call sites.
+SIDE_ZH = {"UP": "賣側收縮 🟢", "DOWN": "買側收縮 🔴", "NONE": "雙側 ⚪"}
 
 
 def humanize_story(playbook: str, direction: str,
@@ -487,25 +490,25 @@ def humanize_story(playbook: str, direction: str,
     if playbook == "absorption":
         if direction == "UP":
             return (f"成交量爆到平時的 {v}、賣方主動砸盤（{tr}），但價格守住沒跌"
-                    "——賣壓被整批接走（吸收），此劇本預期反轉向上")
+                    "——賣壓被整批接走（吸收）")
         return (f"成交量爆到平時的 {v}、買方主動追價（{tr}），但價格推不上去"
-                "——買盤被倒貨吸收，此劇本預期反轉向下")
+                "——買盤被倒貨吸收")
     if playbook in ("true_break", "cascade"):
         if direction == "UP":
             return (f"成交量爆到平時的 {v}、買方主動追價（{tr}）且價格同步上移"
-                    "——攻擊性突破（真破），此劇本預期順勢向上")
+                    "——攻擊性突破（真破）")
         if direction == "DOWN":
             return (f"成交量爆到平時的 {v}、賣方主動砸盤（{tr}）且價格同步下移"
-                    "——攻擊性跌破（真破），此劇本預期順勢向下")
+                    "——攻擊性跌破（真破）")
         return f"成交量爆到平時的 {v}、價量激戰中——瀑布瞬間先不判方向"
     if playbook in ("vacuum", "vacuum_up", "vacuum_down"):
         d = direction if direction in ("UP", "DOWN") else (
             "UP" if playbook == "vacuum_up" else "DOWN")
         if d == "UP":
             return ("成交清淡，但上方賣單正在大量淨撤離——阻力自己讓開"
-                    "（向上真空），價格容易被吸上去")
+                    "（向上真空）")
         return ("成交清淡，但下方買單正在大量淨撤離——支撐自己抽走"
-                "（向下真空），價格容易向下墜")
+                "（向下真空）")
     if playbook in ("two_sided", "rotation"):
         return "兩側掛單同時大量換防、淨方向不明——常見於波動放大之前"
     if playbook in ("gate_only", "surge"):
@@ -675,9 +678,14 @@ def alert_events(fresh: list[dict]) -> None:
             px = f"{e['px']:,.0f}" if e["px"] else "?"
             def fmt(v, p="+.2f"):
                 return format(v, p) if v is not None else "?"
+            # 2026-07-29: the forward-direction claim was falsified (hit_60m
+            # 41-48% on all four playbooks, n=206; path/MFE-MAE agreed) — the
+            # header states the OBSERVED event, never a prediction. The
+            # direction field survives as a factual label of which side was
+            # withdrawn/absorbed, not as a forecast.
             lines = [
-                f"🧲 撤單劇本: {ZH[e['playbook']]} → 未來 2 小時"
-                f"{DIR_ZH.get(e['direction'], e['direction'])}",
+                f"🧲 撤單事件: {ZH[e['playbook']]} · "
+                f"{SIDE_ZH.get(e['direction'], e['direction'])}（觀察記錄）",
                 f"{t} TPE @ {px}",
                 "發生了什麼: " + humanize_story(
                     e["playbook"], e["direction"],
@@ -692,6 +700,8 @@ def alert_events(fresh: list[dict]) -> None:
             if chart:
                 lines.append(chart)
             lines.append("深入: /cancelanalyze 90 (五步摘要) 或問 agent")
+            lines.append("方向預期已於 2026-07-29 證偽 (hit_60m 41-48%, n=206;"
+                         " 路徑 MFE/MAE 同結論) — 以上僅為事件描述")
             lines.append(f"def {DEF_VERSION} · 研究非信號 · edge 未驗證"
                          " · 勿作交易依據")
             payload = {"chat_id": chat, "text": "\n".join(lines)}

@@ -421,8 +421,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           font-size:12px; color:#9aa0a6; pointer-events:none; }}
 </style></head><body>
 <div id="hdr"><b>撤單流覆盤 {sym}</b> · {span_h}h ·
- <b>看 K 線腳下色格</b>: 🟢讓路看漲 · 🔴抽梯看跌 · 亮灰=有事不判方向 · 深灰=平靜
- · <b>圈點=撤單流劇本進場</b>(綠在K下=看漲 / 紅在K上=看跌，僅推過 TG 的)
+ <b>看 K 線腳下色格</b>: 🟢賣側收縮 · 🔴買側收縮 · 亮灰=有事不判方向 · 深灰=平靜
+ · <b>圈點=撤單事件</b>(綠=賣側收縮 / 紅=買側收縮，僅推過 TG 的；方向預期已於 2026-07-29 證偽，圈點僅標事件不預測)
  <button id="btnx" onclick="toggleExpert()">🔬 專家面板</button>
  <span class="muted">(專家面板另疊 ⚡獵取事件 · ▲▼V7 訊號)</span>
  <span class="muted">研究非信號 · edge 待 8/10 · n={n}m · {smooth}m 平滑</span></div>

@@ -248,7 +248,7 @@ def main() -> int:
             transform=a1.transAxes, color=SUB, fontsize=9)
     # 第二行圖例:機器劇本(與 v7 訊號分開講,免得覆盤時混為一談)
     a1.text(0.006, 0.875,
-            "● 撤單劇本推播(非我方進場): 綠點在下=看漲  紅點在上=看跌",
+            "● 撤單事件推播: 綠=賣側收縮 紅=買側收縮 (方向預期 2026-07-29 證偽)",
             transform=a1.transAxes, color=SUB, fontsize=8.5)
 
     # B: cancel skew(只留平滑填色,無散點)
