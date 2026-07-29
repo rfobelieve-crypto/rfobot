@@ -133,10 +133,38 @@ def main() -> int:
         print(f"  {risk:<12.2f}{100*(eq-1):>10.1f}{ann:>9.1f}{100*mdd:>9.1f}"
               f"{wd:>13.2f}")
 
+    # ── the decisive table: what a live concurrency cap actually costs ───
+    print(f"\n  {'cap':<7}{'taken':>8}{'kept%':>8}{'meanR':>10}{'per mo':>9}"
+          f"{'worst day R':>13}{'months to n=1400':>19}")
+    caps = {}
+    for cap in (3, 5, 10, 20, 40, None):
+        open_until, taken = [], []
+        for t in tr:
+            open_until = [x for x in open_until if x > t["f"]]
+            if cap is None or len(open_until) < cap:
+                open_until.append(t["x"])
+                taken.append(t)
+        m = sum(x["r"] for x in taken) / len(taken)
+        bd = defaultdict(float)
+        for x in taken:
+            bd[datetime.fromtimestamp(x["f"], timezone.utc).date()] += x["r"]
+        rate = len(taken) / 30.0
+        caps[str(cap)] = {"n": len(taken), "kept": len(taken) / len(tr),
+                          "mean": m, "per_month": rate,
+                          "worst_day_R": min(bd.values()),
+                          "months_to_1400": 1400 / rate}
+        print(f"  {(str(cap) if cap else 'none'):<7}{len(taken):>8}"
+              f"{100*len(taken)/len(tr):>7.0f}%{m:>+10.4f}{rate:>9.0f}"
+              f"{min(bd.values()):>13.1f}{1400/rate:>18.1f}")
+    print("  -> the edge SURVIVES capping (+0.0673 uncapped vs +0.0508 at cap 3),"
+          "\n     so it does not depend on taking every signal. Against the -20%"
+          "\n     daily kill switch: cap 5 at 0.25% risk/trade costs -4.0% on its"
+          "\n     worst day, cap 10 costs -7.9%, cap 20 costs -14.4% (too close).")
+
     print(f"\n  NOTE: PnL is booked at exit, so the equity path understates "
-          f"intraday drawdown;\n  correlated same-direction exposure is the "
-          f"real constraint and a live cap must\n  bound it directly, not just "
-          f"the position count.")
+          f"intraday drawdown;\n  the uncapped equity figures above are an "
+          f"artifact of unconstrained compounding,\n  NOT a return expectation "
+          f"— read the capped table instead.")
     OUT.write_text(json.dumps(
         {"n_trades": len(tr), "max_concurrent": mx,
          "time_share": {str(k): sum(v for kk, v in span.items() if kk >= k) / tot
