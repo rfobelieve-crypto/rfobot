@@ -194,6 +194,31 @@ inline style 設定上去，讓瀏覽器透過正常 CSS cascade 解析 `var()`�
 
 ---
 
+## 2026-07-29: 未釘版的 mcp 在上游發 2.0 當天炸掉 agent-mcp——跟 commit 內容無關的部署崩潰
+
+**What happened:**
+推了三個純研究 commit（沒碰 indicator/agent/ 一行），agent-mcp 服務卻
+「Deploy Crashed」。root cause：`requirements.indicator.txt` 的 `mcp`
+**沒釘版本**，而 `http_server.py` import 了 `mcp.server.transport_security`
+這種深路徑模組。PyPI 前一晚剛發 **mcp 2.0.0 大版本**——每次 push 都是
+全新 build、`pip install mcp` 抓當下最新 → 2.0.0 的破壞性改動讓容器
+啟動即死。昨天以前的 build 抓到 1.x 所以一直沒事。**同一份 requirements
+21 個套件全部未釘版**，mcp 只是第一顆爆的（xgboost/numpy 若哪天跳大版，
+炸的就是模型服務）。
+
+**Fix:** `mcp==1.28.1`（本機 l30d 驗證過的版本）。全面釘版另列 hygiene
+任務——不能盲釘：production 各服務現跑的版本未知，拿本機版本亂釘反而
+可能改變 production 行為（xgboost 版本與模型 artifacts 的相容性尤其）。
+
+**Rule:** 服務在「沒動到它的 push」之後崩潰，第一嫌疑是**全新 build 拉到
+上游新版**——先查 requirements 有沒有未釘版的套件 + PyPI 最近有沒有
+大版本發布（`pip index versions X` 十秒）。凡是 import **深路徑**
+（`pkg.sub.module`）的相依套件必須釘版，深路徑在 minor 版就常被移動。
+Railway 信裡的「Restart Deployment」按鈕只會重啟**同一個壞掉的 image**，
+對 build 期錯誤無效——修法永遠是改 requirements 後重新 push。
+
+---
+
 ## 2026-07-28: sweep-failure 回測的滑價符號寫反——「含成本 t=8.27」實質是零成本；修正後 t=3.35
 
 **What happened:**

@@ -18,4 +18,7 @@ shap
 anthropic
 websocket-client
 cryptography
-mcp
+# pinned 2026-07-29: unpinned mcp pulled the brand-new 2.0.0 major on a
+# routine rebuild and killed agent-mcp at import (transport_security path).
+# 1.28.1 = the locally verified version (l30d env). See mistake.md.
+mcp==1.28.1
