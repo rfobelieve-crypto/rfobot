@@ -180,12 +180,59 @@ def summary(log: dict) -> None:
     print(f"  genuinely prospective (first_seen < exit): {pro}")
 
 
+GATE_N = 1400          # same floor as Variant A's Gate F
+
+
+def gate_progress(log: dict) -> str:
+    """One line of Variant B gate progress, for the weekly report.
+
+    Same arithmetic as Gate F: day-clustered bootstrap CI on net R plus the
+    n>=1400 floor. Without this the shadow log accumulates unwatched — a
+    two-month clock nobody reads is a clock that does not exist.
+    """
+    import random
+    from collections import defaultdict
+    rows = [r for r in log.values()
+            if str(r.get("variant_b", "")) == "1" and r["status"] == "CLOSED"
+            and r["net_r"] != ""]
+    if not rows:
+        return "Variant B: 0/%d (no closed signals yet)" % GATE_N
+    byd = defaultdict(list)
+    for r in rows:
+        d = datetime.fromtimestamp(int(r["fill_ts"]), timezone.utc).date()
+        byd[d].append(float(r["net_r"]))
+    days = list(byd.values())
+    rs = [float(r["net_r"]) for r in rows]
+    n = len(rs)
+    mean = sum(rs) / n
+    rng = random.Random(7)
+    means = []
+    for _ in range(2000):
+        acc = cnt = 0.0
+        for _ in range(len(days)):
+            g = days[rng.randrange(len(days))]
+            acc += sum(g)
+            cnt += len(g)
+        means.append(acc / cnt)
+    means.sort()
+    lo = means[50]
+    ok = n >= GATE_N and lo > 0
+    return (f"Variant B: n={n}/{GATE_N} meanR={mean:+.4f} "
+            f"clustered-CI-low={lo:+.4f} -> "
+            f"{'PASS' if ok else 'accumulating'}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--summary", action="store_true",
                     help="print the log summary without refreshing data")
+    ap.add_argument("--gate", action="store_true",
+                    help="one-line Variant B gate progress (for the weekly report)")
     args = ap.parse_args()
     log = read_log()
+    if args.gate:
+        print(gate_progress(log))
+        return 0
     if args.summary:
         summary(log)
         return 0
@@ -246,6 +293,7 @@ def main() -> int:
     write_log(log)
     print(f"shadow run {stamp}  new signals: {new}")
     summary(log)
+    print("  " + gate_progress(log))
     return 0
 
 

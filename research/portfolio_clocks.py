@@ -171,6 +171,12 @@ def main() -> int:
     else:
         lines.append("monthly: next window day 5-11")
 
+    # 2b ── Variant B gate progress (weekly; reads the shadow CSV, no fetch) ──
+    rcb, outb = run(["research/sweep_failure/shadow_engine.py", "--gate"], 120)
+    lines.append(grep_tail(outb, "Variant B:", f"variant-B check failed rc={rcb}"))
+    if rcb != 0:
+        errors.append(f"variant_b rc={rcb}")
+
     # 3 ── depth_deltas span (subhourly revival due?) ────────────────────
     try:
         r = q1("SELECT (MAX(minute_start_ms)-MIN(minute_start_ms))/86400000.0 d "
