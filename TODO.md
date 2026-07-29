@@ -25,11 +25,12 @@
 #3 價格結構／撤單微結構…）跑在同一個風控框架下，用組合概念控風險。
 **時序紀律：現在只做設計、不動 live 代碼**——重構觸發點 = 第二條策略通過
 自己的 gate（#3 Gate F 或撤單線判決）。在那之前 V7 executor 一行不動。
-- [ ] 寫 docs/PORTFOLIO_RISK_FRAMEWORK.md 設計稿：兩層 kill（策略層 halt／
-      帳戶層 DEMOTE，現只有帳戶層）、每策略風險預算（% equity at risk，
-      取代 max_position_count）、中央曝險帳本（跨策略淨曝險上限——反向
-      訊號自然對沖=淨額下降）、相關性預算（同日同向並發風險上限，#3 的
-      9 幣教訓）、策略=adapter 只產 intent 不碰交易所（風控層審批定尺寸）
+- [ ] 寫 docs/PORTFOLIO_RISK_FRAMEWORK.md 設計稿。核心只有一條：**風險在
+      組合層看待，策略是元件**。候選機制（設計時取捨，非承諾）：兩層 kill
+      （策略層 halt／帳戶層 DEMOTE）、每策略風險預算、中央曝險帳本、
+      並發相關性上限（#3 的 9 幣教訓）、策略=adapter 只產 intent。
+      對沖是概念不是需求（2026-07-29 使用者澄清）——具體用哪些機制落地
+      由設計稿討論後定
 - [ ] 統一 trade ledger schema（V7 與未來策略寫同構紀錄→組合 Sharpe/MDD/
       歸因可算，兼作各策略 Gate B 式驗證的資料底）
 - 誠實註記：全 crypto 策略共享 beta，正交性有天花板；真分散最終要跨資產
@@ -590,6 +591,11 @@ ChatGPT for Claude」）確認真正的視覺語言，跟第一版描述（互�
 - [x] 撤單收集器 `depth_delta_collector` 上線 Service 2（2026-07-09，`depth_deltas_1m` 開始累積）
 
 ## 回測失敗（已排除，勿重跑）
+- [x] ~~BTC 資金費率 carry（delta中性收費）~~ — 2026-07-29 篩選：9.3 個月
+      毛年化僅 +2.6%（median 0.003%/8h，遠低於 0.01% 經典基線）、28% 結算
+      為負、2-4 月連三月負；扣雙腿成本+現貨腿佔倍資本後 ≈ 1%/yr 量級
+      → 當前 regime 不值一個組合槽（research/funding_carry_screen.py）。
+      **復活觸發：trailing 90d 年化 > 8-10% 時重看**（腳本留檔可重跑）
 - [x] ~~流動性獵取反轉~~ — 4h 週期上 IC ≈ 0
 - [x] ~~K 線 delta 背離~~ — IC = 0.01
 - [x] ~~consolidation_score~~ — IC ≈ 0
