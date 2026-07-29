@@ -152,7 +152,13 @@ def backtest_symbol(bars):
             R = d * (ex - entry) / risk
         # 2026-07-28 additive fields (lvl, A, stopped) so downstream can
         # re-score with per-symbol bps costs; rules unchanged.
-        trades.append((bars[fill][0], bars[exitbar][0], R, lvl, A, stopped))
+        # 2026-07-29 additive: pierce_atr = how far the sweep bar went past the
+        # level, in ATR. Known at the sweep bar, i.e. strictly before the fill —
+        # it enables the pre-registered shallow-pierce variant without touching
+        # the frozen entry/exit rules.
+        pierce = (h[j] - lvl if kd == 1 else lvl - l[j]) / A
+        trades.append((bars[fill][0], bars[exitbar][0], R, lvl, A, stopped,
+                       pierce))
         last_exit = exitbar
     return trades
 

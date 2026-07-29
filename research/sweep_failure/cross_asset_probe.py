@@ -120,7 +120,7 @@ def main() -> int:
         trades = SC.backtest_symbol(bars)
         gross = [t[2] for t in trades]
         net_flat, net_cryA = [], []
-        for _, _, r, lvl, atr, stopped in trades:
+        for _, _, r, lvl, atr, stopped, _p in trades:
             net_flat.append(r - (2 * bps_side) / 1e4 * lvl / (SC.DIS * atr))
             legs = SCEN_A["entry"] + (SCEN_A["sexit"] if stopped else SCEN_A["texit"])
             net_cryA.append(r - legs / 1e4 * lvl / (SC.DIS * atr))

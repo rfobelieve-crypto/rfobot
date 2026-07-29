@@ -149,7 +149,7 @@ def conf_seq_radius(t: int, sigma: float, rho: float, alpha: float) -> float:
 def main() -> int:
     trades = []
     for s in CORE9:
-        for fill_ts, _, r, lvl, atr, stopped in SC.backtest_symbol(
+        for fill_ts, _, r, lvl, atr, stopped, _pierce in SC.backtest_symbol(
                 SC.load_csv(str(CACHE / f"{s}USDT_1h.csv"))):
             legs = SCEN_A["entry"] + (SCEN_A["sexit"] if stopped else SCEN_A["texit"])
             trades.append((fill_ts, r - legs / 1e4 * lvl / (SC.DIS * atr)))

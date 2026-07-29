@@ -84,7 +84,7 @@ def s3_daily() -> tuple[pd.Series, pd.Series, int]:
     n = 0
     lo = hi = None
     for s in SYMS:
-        for fill_ts, exit_ts, r, lvl, atr, stopped in SC.backtest_symbol(
+        for fill_ts, exit_ts, r, lvl, atr, stopped, _pierce in SC.backtest_symbol(
                 SC.load_csv(str(CACHE / f"{s}USDT_1h.csv"))):
             legs = SCEN["A"]["entry"] + (SCEN["A"]["sexit"] if stopped
                                          else SCEN["A"]["texit"])

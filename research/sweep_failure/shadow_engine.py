@@ -64,9 +64,17 @@ ADDED20 = ["TRX", "DOT", "LTC", "UNI", "ATOM", "ETC", "NEAR", "APT", "FIL",
            "ARB", "OP", "INJ", "SUI", "AAVE", "ICP", "ALGO", "VET", "HBAR",
            "SAND", "AXS"]
 
+# Variant B (pre-registered 2026-07-29, threshold fixed BEFORE any forward
+# trade): take the signal ONLY when the sweep bar pierced the level by
+# <= 0.25 ATR. Chosen as the round number nearest the 0.23 tercile boundary
+# from the pre-declared tercile bucketing in winner_anatomy.py — not the
+# t-peak, and not load-bearing: the whole 0.10-1.00 ATR sweep is positive
+# and decays smoothly to the unfiltered mean, so there is no cliff to sit on.
+PIERCE_MAX_B = 0.25
+
 FIELDS = ["symbol", "universe", "first_seen_utc", "fill_ts", "fill_utc",
-          "entry_px", "atr", "status", "exit_ts", "exit_utc", "stopped",
-          "gross_r", "net_r"]
+          "entry_px", "atr", "pierce_atr", "variant_b", "status", "exit_ts",
+          "exit_utc", "stopped", "gross_r", "net_r"]
 
 
 def refresh(sym: str) -> Path | None:
@@ -129,8 +137,12 @@ def summary(log: dict) -> None:
         print("  (empty log)")
         return
     print(f"  logged rows: {len(rows)}")
-    for uni in ("core9", "added20"):
-        sub = [r for r in rows if r["universe"] == uni]
+    for uni in ("core9", "added20", "B:core9", "B:added20"):
+        if uni.startswith("B:"):
+            sub = [r for r in rows if r["universe"] == uni[2:]
+                   and r.get("variant_b") == "1"]
+        else:
+            sub = [r for r in rows if r["universe"] == uni]
         closed = [r for r in sub if r["status"] == "CLOSED"]
         if not sub:
             continue
@@ -173,7 +185,8 @@ def main() -> int:
                 continue
             bars = SC.load_csv(str(p))
             last_ts = bars[-1][0]
-            for fill_ts, exit_ts, r, lvl, atr, stopped in SC.backtest_symbol(bars):
+            for (fill_ts, exit_ts, r, lvl, atr, stopped,
+                 pierce) in SC.backtest_symbol(bars):
                 if fill_ts < FREEZE_TS:
                     continue
                 key = (sym, fill_ts)
@@ -184,7 +197,9 @@ def main() -> int:
                     row = {"symbol": sym, "universe": uni,
                            "first_seen_utc": stamp, "fill_ts": fill_ts,
                            "fill_utc": f"{datetime.fromtimestamp(fill_ts, timezone.utc):%Y-%m-%d %H:%M}",
-                           "entry_px": f"{lvl:.6f}", "atr": f"{atr:.6f}"}
+                           "entry_px": f"{lvl:.6f}", "atr": f"{atr:.6f}",
+                           "pierce_atr": f"{pierce:.4f}",
+                           "variant_b": int(pierce <= PIERCE_MAX_B)}
                     log[key] = row
                     new += 1
                 row.update({

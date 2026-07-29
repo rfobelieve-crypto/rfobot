@@ -42,6 +42,30 @@ Forward gate — Gate F (pre-registered 2026-07-28, do not move):
   The 2026-07-11 sandbox freeze (per README, git-unprovable) is reported as
   "quasi-forward", labeled separately, never merged into the gate.
 
+VARIANT B — shallow-pierce filter (pre-registered 2026-07-29, threshold
+  fixed BEFORE any forward trade of its own accrued):
+      take the signal ONLY when the sweep bar pierced the level by
+      <= 0.25 ATR (pierce_atr, computed at the sweep bar, strictly before
+      the fill).
+  Discovered in-sample by winner_anatomy.py, which asked why the top 1% of
+  trades carry ~69% of total R. It survived every robustness check that was
+  run: monotonic across pre-declared terciles (+0.079 / +0.021 / -0.006),
+  consistent in core9 AND added20 separately, first half AND second half
+  separately, 11/11 quarters positive, no cliff at the threshold (the whole
+  0.10-1.00 ATR sweep is positive and decays smoothly to the unfiltered
+  mean), and NOT a mechanical stop-distance artifact (terciles cut at
+  0.23/0.53 ATR against a 3.5 ATR stop; only 0.1% of trades pierce past the
+  stop; ATR% is identical across buckets; the stop-rate gap explains <half
+  the effect). In-sample it holds 84% of total profit in 33% of the trades,
+  raising SR/trade 0.050 -> 0.128 while cross-coin VIF FALLS 6.85 -> 2.69
+  (shallow pokes are idiosyncratic; deep pierces are market-wide shocks),
+  which takes the deflated-Sharpe MinTRL from ~7900 effective observations
+  (unreachable) to ~300 (already exceeded).
+  IT IS STILL IN-SAMPLE. Variant A (the frozen unfiltered rules) remains
+  THE Gate F track, unchanged and unretrofitted. Variant B accrues its own
+  forward record from 2026-07-29 under the same gate arithmetic, and only a
+  forward pass promotes it.
+
 Usage:
     python research/sweep_failure/fetch_klines.py   # refresh data first
     python research/sweep_failure/sweep_forward.py
@@ -81,7 +105,7 @@ def rescore(trades, scen):
     """gross (fill_ts, exit_ts, R, lvl, A, stopped) -> net R list (same order)."""
     s = SCEN[scen]
     out = []
-    for fill_ts, exit_ts, r, lvl, atr, stopped in trades:
+    for fill_ts, exit_ts, r, lvl, atr, stopped, _pierce in trades:
         legs = s["entry"] + (s["sexit"] if stopped else s["texit"])
         cost_r = legs / 1e4 * lvl / (SC.DIS * atr)
         out.append((fill_ts, r - cost_r))

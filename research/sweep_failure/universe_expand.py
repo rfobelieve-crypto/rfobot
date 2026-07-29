@@ -97,7 +97,7 @@ def fetch(sym: str, days: int = 900) -> Path | None:
 def net_trades(sym: str) -> list[tuple[int, float]]:
     p = CACHE / f"{sym}USDT_1h.csv"
     out = []
-    for fill_ts, _, r, lvl, atr, stopped in SC.backtest_symbol(SC.load_csv(str(p))):
+    for fill_ts, _, r, lvl, atr, stopped, _p in SC.backtest_symbol(SC.load_csv(str(p))):
         legs = SCEN_A["entry"] + (SCEN_A["sexit"] if stopped else SCEN_A["texit"])
         out.append((fill_ts, r - legs / 1e4 * lvl / (SC.DIS * atr)))
     return out
