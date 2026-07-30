@@ -433,6 +433,83 @@ async def public_cancel_flow_chart_i_route(request: Request) -> Response:
         token=INDICATOR_ADMIN_TOKEN)
 
 
+# ── Strategy #2 (sweep-failure) shadow surfaces, 2026-07-30 ─────────────
+# product-site's multi-strategy upgrade. Same patterns as above:
+#   liquidity-map  — HTML proxy of the indicator's shadow-review page. The
+#                    origin re-renders via subprocess (up to 110s), so the
+#                    cache here is load-bearing exactly like the cancel-flow
+#                    routes. Symbol is pinned to BTC on purpose: a symbol
+#                    passthrough would give the public 29 distinct cache
+#                    keys = 29 ways to trigger origin subprocess renders.
+#   sweep-status   — JSON gate progress read from the shadow CSV shipped in
+#                    this image (research/results/sweep_shadow_log.csv,
+#                    fresh as of the last deploy — the hourly recorder runs
+#                    on the operator machine, so `asof` is surfaced for
+#                    honesty). Lazy import of the research module: pure
+#                    computation + CSV read, no banned trading-path imports
+#                    (tests/test_agent_boundary.py stays the referee).
+_liq_map_cache: dict = {"bytes": None, "ts": 0.0}
+_LIQ_MAP_CACHE_TTL_S = 300.0
+
+
+@mcp.custom_route("/public/liquidity-map", methods=["GET"])
+async def public_liquidity_map_route(request: Request) -> Response:
+    return await _proxy_html(
+        _liq_map_cache, _LIQ_MAP_CACHE_TTL_S,
+        f"{INDICATOR_BASE_URL}/research/shadow-review?symbol=BTC&hours=72",
+        token=INDICATOR_ADMIN_TOKEN)
+
+
+_sweep_status_cache: dict = {"data": None, "ts": 0.0}
+_SWEEP_STATUS_CACHE_TTL_S = 300.0
+
+
+def _sweep_status_payload() -> dict:
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    sf = root / "research" / "sweep_failure"
+    if not sf.exists():
+        return {"error": "research/ not present in this image"}
+    for p in (str(root), str(root / "research"), str(sf)):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+    import shadow_engine as SE  # noqa: PLC0415  (lazy: research is optional)
+    log = SE.read_log()
+    gate = SE.gate_stats(log)
+    closed = sorted(
+        (r for r in log.values() if r["status"] == "CLOSED" and r["net_r"] != ""),
+        key=lambda r: int(r["fill_ts"]), reverse=True)
+    recent = [{
+        "symbol": r["symbol"], "kind": r.get("level_kind", "swing"),
+        "fill_utc": r["fill_utc"], "variant_b": r.get("variant_b") == "1",
+        "net_r": round(float(r["net_r"]), 3),
+    } for r in closed[:6]]
+    asof = max((r.get("first_seen_utc") or "" for r in log.values()), default="")
+    return {"gate": gate, "recent": recent, "asof_utc": asof,
+            "mode": "shadow", "disclaimer":
+            "Forward shadow validation in progress — not a live strategy, "
+            "not financial advice."}
+
+
+@mcp.custom_route("/public/sweep-status", methods=["GET"])
+async def public_sweep_status_route(request: Request) -> JSONResponse:
+    now = time.monotonic()
+    if (_sweep_status_cache["data"] is None
+            or now - _sweep_status_cache["ts"] > _SWEEP_STATUS_CACHE_TTL_S):
+        try:
+            data = await anyio.to_thread.run_sync(_sweep_status_payload)
+        except Exception as e:  # noqa: BLE001 — degrade to 503, never crash
+            data = {"error": f"sweep status unavailable: {type(e).__name__}"}
+        _sweep_status_cache["data"] = data
+        _sweep_status_cache["ts"] = now
+    payload = _sweep_status_cache["data"]
+    resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 def main() -> None:
     mcp.run()   # stdio transport by default
 

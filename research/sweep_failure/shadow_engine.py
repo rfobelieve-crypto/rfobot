@@ -196,20 +196,23 @@ def summary(log: dict) -> None:
 GATE_N = 1400          # same floor as Variant A's Gate F
 
 
-def gate_progress(log: dict) -> str:
-    """One line of Variant B gate progress, for the weekly report.
-
-    Same arithmetic as Gate F: day-clustered bootstrap CI on net R plus the
-    n>=1400 floor. Without this the shadow log accumulates unwatched — a
-    two-month clock nobody reads is a clock that does not exist.
-    """
+def gate_stats(log: dict) -> dict:
+    """Structured Variant B gate progress — same arithmetic as Gate F:
+    day-clustered bootstrap CI on net R plus the n>=1400 floor. Consumed by
+    gate_progress (weekly report string) and the agent's /public/sweep-status
+    JSON route (product-site strategy board). Without this the shadow log
+    accumulates unwatched — a two-month clock nobody reads is a clock that
+    does not exist."""
     import random
     from collections import defaultdict
     rows = [r for r in log.values()
             if str(r.get("variant_b", "")) == "1" and r["status"] == "CLOSED"
             and r["net_r"] != ""]
+    n_open = sum(1 for r in log.values()
+                 if str(r.get("variant_b", "")) == "1" and r["status"] == "OPEN")
     if not rows:
-        return "Variant B: 0/%d (no closed signals yet)" % GATE_N
+        return {"n_closed": 0, "n_open": n_open, "floor": GATE_N,
+                "mean_r": None, "ci_low": None, "wr_pct": None, "status": "empty"}
     byd = defaultdict(list)
     for r in rows:
         d = datetime.fromtimestamp(int(r["fill_ts"]), timezone.utc).date()
@@ -230,9 +233,20 @@ def gate_progress(log: dict) -> str:
     means.sort()
     lo = means[50]
     ok = n >= GATE_N and lo > 0
-    return (f"Variant B: n={n}/{GATE_N} meanR={mean:+.4f} "
-            f"clustered-CI-low={lo:+.4f} -> "
-            f"{'PASS' if ok else 'accumulating'}")
+    return {"n_closed": n, "n_open": n_open, "floor": GATE_N,
+            "mean_r": round(mean, 4), "ci_low": round(lo, 4),
+            "wr_pct": round(100 * sum(1 for x in rs if x > 0) / n, 1),
+            "status": "PASS" if ok else "accumulating"}
+
+
+def gate_progress(log: dict) -> str:
+    """One line of Variant B gate progress, for the weekly report."""
+    s = gate_stats(log)
+    if s["n_closed"] == 0:
+        return "Variant B: 0/%d (no closed signals yet)" % GATE_N
+    return (f"Variant B: n={s['n_closed']}/{s['floor']} meanR={s['mean_r']:+.4f} "
+            f"clustered-CI-low={s['ci_low']:+.4f} -> "
+            f"{'PASS' if s['status'] == 'PASS' else 'accumulating'}")
 
 
 def main() -> int:
