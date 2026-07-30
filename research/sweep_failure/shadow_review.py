@@ -358,39 +358,61 @@ def story(sym: str, t: dict, fl: dict | None = None) -> str:
 
 HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>shadow map {sym}</title>
+<title>{sym}USDT · 流動性地圖</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-<style>body{{margin:0;background:#0e1116;color:#e3e3e3;font-family:'Microsoft JhengHei',monospace}}
-#hdr{{padding:8px 14px;font-size:13px;line-height:1.75}} #c{{height:58vh}}
-.lg span{{margin-right:14px;white-space:nowrap}}
-table{{border-collapse:collapse;font-size:12px;margin:8px 14px}}
-td,th{{border:1px solid #2a2f38;padding:3px 8px;text-align:right}}
-th{{background:#1a1f27}} td:first-child,th:first-child{{text-align:left}}
-.b{{color:#4ade80}} .win{{color:#4ade80}} .loss{{color:#f87171}} .open{{color:#facc15}}
-.dim{{color:#8a919c}}</style></head><body>
-<div id="hdr"><b>Shadow 流動性地圖 — {sym}</b> (UTC+8 · 最近{hours}h · &hours=N 可調 12-2160) · {check}<br>
-<span class="lg">
-<span style="color:#e01b24">━ 紅=買側流動性(高點上方,掃了做空)</span>
-<span style="color:#26a269">━ 綠=賣側流動性(低點下方,掃了做多)</span>
-<span class="dim">┄ 虛線=尚未被掃(延伸至最右=眼前的目標)</span>
-<span>─ 實線=已被掃(截於掃單棒)</span>
-<span style="color:#facc15">⏳=已掃,等回踩中(8根內)</span>
-</span><br><span class="lg">
-<span>▲▼=進場(亮色=變體B 淺穿越≤0.25ATR / 灰=僅記錄)</span>
-<span>●=出場(綠賺/紅虧)</span>
-<span style="color:#7d6a52">┄ 淡色=形成中: 樞紐未滿10根確認 / 當日當週極值未收盤 — 眼睛看得到、引擎還不能交易的價位</span>
-<span class="dim">線起點=造出該價位的針尖 K 棒</span>
-<span class="dim">網址加 &live=60 自動更新(盯盤)</span>
-</span>
-<div style="margin-top:6px;padding:6px 10px;background:#141922;border-radius:6px">{perf}</div></div>
+<style>
+:root{{--bg:#0b0e11;--panel:#12161c;--border:#1e242d;--text:#eaecef;--muted:#848e9c;--up:#0ecb81;--down:#f6465d;--accent:#f0b90b}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 Inter,-apple-system,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif}}
+#hdr{{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 16px;border-bottom:1px solid var(--border)}}
+#hdr b{{font-size:16px;letter-spacing:.02em}}
+.tag{{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 8px;white-space:nowrap}}
+.check{{margin-left:auto;font-size:11px;color:var(--muted)}}
+.chips{{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px 2px}}
+.chip{{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:6px 12px;min-width:96px}}
+.chip .l{{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}}
+.chip .v{{font-size:15px;margin-top:2px;font-variant-numeric:tabular-nums;white-space:nowrap}}
+.sub{{padding:4px 16px 8px;font-size:11px;color:var(--muted)}}
+.legend{{display:flex;flex-wrap:wrap;gap:4px 16px;padding:7px 16px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}}
+.legend span{{white-space:nowrap}}
+.dot{{display:inline-block;width:10px;height:3px;border-radius:1px;margin:0 5px 2px 0;vertical-align:middle}}
+#c{{height:62vh}}
+.pane-t{{padding:8px 16px 2px;font-size:11px;color:var(--muted);border-top:1px solid var(--border)}}
+#eq{{height:15vh}}
+.twrap{{overflow-x:auto;border-top:1px solid var(--border)}}
+table{{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}}
+th,td{{padding:7px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}}
+th{{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;background:var(--panel)}}
+tr:hover td{{background:#151a21}}
+th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5),th:nth-child(8),td:nth-child(8),th:nth-child(9),td:nth-child(9),th:nth-child(11),td:nth-child(11){{text-align:right}}
+.b{{color:var(--up)}} .win{{color:var(--up)}} .loss{{color:var(--down)}} .open{{color:var(--accent)}} .dim{{color:var(--muted)}}
+details{{padding:8px 16px 14px;font-size:11px;color:var(--muted);line-height:1.8}}
+summary{{cursor:pointer;user-select:none}}
+</style></head><body>
+<div id="hdr"><b>{sym}USDT</b><span class="tag">永續 1H · Shadow 流動性地圖</span><span class="tag">{hours}h</span><span class="tag">UTC+8</span><span class="check">{check}</span></div>
+{perf}
+<div class="legend">
+<span><span class="dot" style="background:var(--down)"></span>買側流動性(高點上方→掃了做空)</span>
+<span><span class="dot" style="background:var(--up)"></span>賣側流動性(低點下方→掃了做多)</span>
+<span>┄ 未被掃</span>
+<span>─ 已被掃</span>
+<span style="color:var(--accent)">⏳ 已掃·等回踩(8根內)</span>
+<span>▲▼ 進場(亮=變體B/灰=僅記錄)</span>
+<span>● 出場(綠賺紅虧)</span>
+<span>淡色┄ 形成中(引擎尚不可交易)</span>
+</div>
 <div id="c"></div>
-<div id="eqt" class="dim" style="padding:2px 14px;font-size:12px">累積 netR（凍結後已平倉 · 灰=全部 / 綠=變體B）</div>
-<div id="eq" style="height:18vh"></div>
-<table><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>B</th><th>收回</th><th>攻擊</th><th>量能</th><th>狀態</th><th>netR</th></tr>{rows}</table>
-<div style="padding:2px 14px 10px;font-size:11px" class="dim">流特徵（前瞻記錄, 不參與 gate）: 收回=獵取小時內 1m 收回價位內側 · 攻擊=突破價位的分鐘數 · 量能=攻擊分鐘量/24h 中位分鐘量。反轉配方候選 = 收回✓+量能高（10 月預註冊驗）。</div>
+<div class="pane-t" id="eqt">累積 netR（凍結後已平倉 · <span class="dim">─ 全部</span> · <span style="color:var(--up)">─ 變體B</span>）</div>
+<div id="eq"></div>
+<div class="twrap"><table><thead><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>B</th><th>收回</th><th>攻擊</th><th>量能</th><th>狀態</th><th>netR</th></tr></thead><tbody>{rows}</tbody></table></div>
+<details><summary>圖例與定義</summary>
+線起點=造出該價位的針尖K棒 · 變體B=掃單穿越≤0.25 ATR（已註冊濾網） · 形成中=樞紐未滿10根確認／當日當週極值未收盤<br>
+流特徵（前瞻記錄，不參與 gate）：收回=獵取小時內 1m 收回價位內側 · 攻擊=突破價位的分鐘數 · 量能=攻擊分鐘量／24h 中位分鐘量 · 反轉配方候選=收回✓+量能高（10 月預註冊驗）<br>
+成本=情境A（進場7／時間出場3／停損10 bps） · 網址參數：&hours=12-2160 · &live=60 自動更新
+</details>
 <script>
-const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0e1116'}},textColor:'#9aa0a6'}},grid:{{vertLines:{{color:'#1c2129'}},horzLines:{{color:'#1c2129'}}}},timeScale:{{timeVisible:true,secondsVisible:false,rightOffset:3}}}});
-const cs=chart.addCandlestickSeries({{upColor:'#26a269',downColor:'#e01b24',borderVisible:false,wickUpColor:'#26a269',wickDownColor:'#e01b24'}});
+const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0b0e11'}},textColor:'#848e9c',fontSize:11}},grid:{{vertLines:{{color:'#151a21'}},horzLines:{{color:'#151a21'}}}},rightPriceScale:{{borderColor:'#1e242d'}},timeScale:{{timeVisible:true,secondsVisible:false,rightOffset:3,borderColor:'#1e242d'}},watermark:{{visible:true,text:'{sym}USDT · shadow',color:'rgba(234,236,239,0.045)',fontSize:42}}}});
+const cs=chart.addCandlestickSeries({{upColor:'#0ecb81',downColor:'#f6465d',borderVisible:false,wickUpColor:'#0ecb81',wickDownColor:'#f6465d'}});
 cs.setData({candles});
 cs.setMarkers({markers});
 for(const g of {levels}){{
@@ -400,9 +422,9 @@ for(const g of {levels}){{
 chart.timeScale().fitContent();
 const eqa={eq_all}, eqb={eq_b};
 if(eqa.length>1){{
-  const ec=LightweightCharts.createChart(document.getElementById('eq'),{{layout:{{background:{{color:'#0e1116'}},textColor:'#9aa0a6'}},grid:{{vertLines:{{color:'#1c2129'}},horzLines:{{color:'#1c2129'}}}},timeScale:{{timeVisible:true,secondsVisible:false}}}});
-  ec.addLineSeries({{color:'#9aa0a6',lineWidth:1,lastValueVisible:true,priceLineVisible:false}}).setData(eqa);
-  if(eqb.length>1)ec.addLineSeries({{color:'#4ade80',lineWidth:2,lastValueVisible:true,priceLineVisible:false}}).setData(eqb);
+  const ec=LightweightCharts.createChart(document.getElementById('eq'),{{layout:{{background:{{color:'#0b0e11'}},textColor:'#848e9c',fontSize:10}},grid:{{vertLines:{{color:'#151a21'}},horzLines:{{color:'#151a21'}}}},rightPriceScale:{{borderColor:'#1e242d'}},timeScale:{{timeVisible:true,secondsVisible:false,borderColor:'#1e242d'}}}});
+  ec.addLineSeries({{color:'#848e9c',lineWidth:1,lastValueVisible:true,priceLineVisible:false}}).setData(eqa);
+  if(eqb.length>1)ec.addLineSeries({{color:'#0ecb81',lineWidth:2,lastValueVisible:true,priceLineVisible:false}}).setData(eqb);
   ec.timeScale().fitContent();
 }}else{{document.getElementById('eq').style.display='none';document.getElementById('eqt').style.display='none';}}
 </script>
@@ -471,32 +493,55 @@ def main() -> int:
     bsub = [t for t in fwd if t["b"]]
     bclosed = [t for t in closed if t["b"]]
 
-    def _pstat(ts_all, ts_closed):
-        if not ts_closed:
-            return f"n={len(ts_all)} (open {len(ts_all)}) · 尚無平倉"
-        s = sum(t["net"] for t in ts_closed)
-        wr = 100 * sum(1 for t in ts_closed if t["net"] > 0) / len(ts_closed)
-        return (f"n={len(ts_all)} (open {len(ts_all) - len(ts_closed)}) · "
-                f"closed {len(ts_closed)} · WR {wr:.0f}% · "
-                f"ΣnetR {s:+.2f} · 每筆均 {s / len(ts_closed):+.3f}")
+    def chip(label, val, cls=""):
+        return (f"<div class='chip'><div class='l'>{label}</div>"
+                f"<div class='v{(' ' + cls) if cls else ''}'>{val}</div></div>")
 
+    def _wr(ts):
+        return (100 * sum(1 for t in ts if t["net"] > 0) / len(ts)) if ts else None
+
+    def _sgn(x):
+        return "win" if x > 0 else "loss" if x < 0 else ""
+
+    s_all = sum(t["net"] for t in closed)
+    s_b = sum(t["net"] for t in bclosed)
+    wr_all, wr_b = _wr(closed), _wr(bclosed)
+    chips = [
+        chip("本幣 平倉/持倉", f"{len(closed)} / {len(fwd) - len(closed)}"),
+        chip("本幣 勝率", f"{wr_all:.0f}%" if wr_all is not None else "—"),
+        chip("本幣 ΣnetR", f"{s_all:+.2f}", _sgn(s_all)),
+        chip("變體B 平倉/持倉", f"{len(bclosed)} / {len(bsub) - len(bclosed)}"),
+        chip("變體B 勝率", f"{wr_b:.0f}%" if wr_b is not None else "—"),
+        chip("變體B ΣnetR", f"{s_b:+.2f}", _sgn(s_b)),
+    ]
+    gate_line = "全籃進度: 見每週一 09:30 PortfolioClocks 報告"
+    asof = ""
+    try:
+        slog = SE.read_log()
+        gs = SE.gate_stats(slog)
+        asof = max((r.get("first_seen_utc") or "" for r in slog.values()),
+                   default="")
+        if gs["n_closed"]:
+            chips += [
+                chip("全籃29幣 B進度", f"{gs['n_closed']} / {gs['floor']}"),
+                chip("全籃 均netR", f"{gs['mean_r']:+.3f}", _sgn(gs["mean_r"])),
+                chip("CI低緣·日聚類", f"{gs['ci_low']:+.3f}", _sgn(gs["ci_low"])),
+                chip("GATE 狀態", "累積中" if gs["status"] == "accumulating"
+                     else gs["status"]),
+            ]
+        gate_line = ("全籃(29幣) " + SE.gate_progress(slog)
+                     + (f" · log截至 {asof} UTC" if asof else ""))
+    except Exception:
+        pass
     kind_bits = []
     for k in ("swing", "session", "pdh_pdl", "pwh_pwl"):
         kc = [t for t in closed if t["kind"] == k]
         kind_bits.append(f"{KIND_ZH[k]} {len(kc)}筆"
                          + (f" Σ{sum(t['net'] for t in kc):+.2f}" if kc else ""))
-    try:
-        slog = SE.read_log()
-        asof = max((r.get("first_seen_utc") or "" for r in slog.values()),
-                   default="")
-        gate_line = ("全籃(29幣) " + SE.gate_progress(slog)
-                     + (f" · log截至 {asof} UTC" if asof else ""))
-    except Exception:
-        gate_line = "全籃進度: 見每週一 09:30 PortfolioClocks 報告"
-    perf = (f"<b>本幣績效 (凍結後 forward · 情境A成本):</b> {_pstat(fwd, closed)}<br>"
-            f"<b>變體B (穿越≤0.25 ATR):</b> {_pstat(bsub, bclosed)}<br>"
-            f"<span class='dim'>{' | '.join(kind_bits)}</span><br>"
-            f"<span class='dim'>{gate_line}</span>")
+    perf = ("<div class='chips'>" + "".join(chips) + "</div>"
+            + "<div class='sub'>凍結後 forward · 情境A成本 · "
+            + " · ".join(kind_bits)
+            + (f" · log截至 {asof} UTC" if asof else "") + "</div>")
     print(gate_line)
 
     def _dedup(pts):
@@ -525,7 +570,7 @@ def main() -> int:
         return max(ts, t0)
 
     markers, levels, rows = [], [], []
-    RED, GREEN, GREY, AMBER = "#e01b24", "#26a269", "#5b6472", "#facc15"
+    RED, GREEN, GREY, AMBER = "#f6465d", "#0ecb81", "#5b6472", "#f0b90b"
 
     # ── pools: the map layer ─────────────────────────────────────────────
     # resting pools capped by DISTANCE TO PRICE (not recency): the map's job
@@ -560,7 +605,7 @@ def main() -> int:
 
     # forming layer (faded): what the eye sees but the engine cannot trade yet
     drawn = {round(p["lvl"], 10) for p in resting + waiting}
-    F_RED, F_GREEN = "#7d4a4f", "#3f6e57"
+    F_RED, F_GREEN = "#5c3a40", "#2c4f43"
     forming = [p for p in forming_levels(bars)
                if round(p["lvl"], 10) not in drawn]
     forming = sorted(forming, key=lambda p: abs(p["lvl"] - last_close))[:8]
@@ -591,7 +636,7 @@ def main() -> int:
             win = (t["net"] or 0) > 0
             markers.append({"time": t["exit_ts"] + TZ, "position": "inBar",
                             "shape": "circle",
-                            "color": "#4ade80" if win else "#f87171", "text": ""})
+                            "color": "#0ecb81" if win else "#f6465d", "text": ""})
         f8 = datetime.fromtimestamp(t["fill_ts"] + TZ, timezone.utc)
         stat = ("OPEN" if not t["exit_ts"]
                 else ("win" if (t["net"] or 0) > 0 else "loss"))
