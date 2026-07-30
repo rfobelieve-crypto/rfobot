@@ -28,6 +28,15 @@ Verification kept from v1: an independent re-derivation of every forward
 trade is cross-checked against the shadow CSV, and the bar-by-bar story
 prints in the thesis's own vocabulary.
 
+v2.1 (2026-07-30, operator request "把績效都放在裡面"):
+  - costs now scenario A (Gate F spec) instead of LT's flat taker — review
+    numbers are identical to the shadow log, and the crosscheck now compares
+    net_r too (guards the cost model, the drift class found today);
+  - performance panel in the header: this symbol's forward stats (all vs
+    variant B), per-pool-kind totals, and the global 29-coin Variant B gate
+    progress line from the shadow CSV;
+  - cumulative netR equity pane under the price chart (grey=all, green=B).
+
 Usage:
     python research/sweep_failure/shadow_review.py --symbol BNB [--days 6]
 Out: research/results/shadow_review_{sym}.html
@@ -47,6 +56,7 @@ sys.path.insert(0, str(HERE))
 os.environ["SLIP"] = "0"
 import sweep_core as SC  # noqa: E402
 import level_types as LT  # noqa: E402
+import shadow_engine as SE  # noqa: E402  (scenario-A cost + gate progress)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -231,7 +241,9 @@ def rederive(sym: str):
                     "exit_ts": bars[xb][0] if done else None,
                     "side": "SHORT" if d == -1 else "LONG",
                     "lvl": lvl, "atr": A, "stop": stop, "pierce": pierce,
-                    "net": LT.net(R, lvl, A) if done else None,
+                    # scenario-A costs (Gate F spec), NOT LT's flat taker —
+                    # keeps every displayed number identical to the shadow log
+                    "net": SE.net_r(R, lvl, A, R <= -1.0) if done else None,
                     "b": pierce <= PIERCE_MAX_B})
         for p in live:                     # never pierced = resting
             pool_rows.append({**p, "kind": kind, "sweep": None,
@@ -256,8 +268,17 @@ def crosscheck(sym: str, trades) -> str:
               if (r := logged.get((t["kind"], t["fill_ts"])))
               and abs(float(r["entry_px"]) - t["lvl"]) < 1e-6)
     miss = len(fwd) - hit
+    # net_r alignment guards the COST model (the exact drift class found
+    # 2026-07-30: engine scenario-A vs review flat-taker)
+    pairs = [(t, logged.get((t["kind"], t["fill_ts"])))
+             for t in fwd if t["net"] is not None]
+    nm_tot = sum(1 for _t, r in pairs if r and r.get("net_r"))
+    nm_ok = sum(1 for t, r in pairs if r and r.get("net_r")
+                and abs(float(r["net_r"]) - t["net"]) < 5e-4)
+    nm = f", netR 對齊 {nm_ok}/{nm_tot}" if nm_tot else ""
     return (f"對帳: 重演算 {len(fwd)} 筆 forward, {hit} 筆與 shadow log 一致"
-            + (f", {miss} 筆不一致 ← 檢查!" if miss else " ✓"))
+            + (f", {miss} 筆不一致 ← 檢查!" if miss else "")
+            + nm + ("" if miss or (nm_tot and nm_ok < nm_tot) else " ✓"))
 
 
 def story(sym: str, t: dict) -> str:
@@ -304,8 +325,11 @@ th{{background:#1a1f27}} td:first-child,th:first-child{{text-align:left}}
 <span>●=出場(綠賺/紅虧)</span>
 <span class="dim">線起點=造出該價位的針尖 K 棒</span>
 <span class="dim">網址加 &live=60 自動更新(盯盤)</span>
-</span></div>
+</span>
+<div style="margin-top:6px;padding:6px 10px;background:#141922;border-radius:6px">{perf}</div></div>
 <div id="c"></div>
+<div id="eqt" class="dim" style="padding:2px 14px;font-size:12px">累積 netR（凍結後已平倉 · 灰=全部 / 綠=變體B）</div>
+<div id="eq" style="height:18vh"></div>
 <table><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>B</th><th>狀態</th><th>netR</th></tr>{rows}</table>
 <script>
 const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0e1116'}},textColor:'#9aa0a6'}},grid:{{vertLines:{{color:'#1c2129'}},horzLines:{{color:'#1c2129'}}}},timeScale:{{timeVisible:true,secondsVisible:false,rightOffset:6}}}});
@@ -317,6 +341,13 @@ for(const g of {levels}){{
   ls.setData(g.pts);
 }}
 chart.timeScale().fitContent();
+const eqa={eq_all}, eqb={eq_b};
+if(eqa.length>1){{
+  const ec=LightweightCharts.createChart(document.getElementById('eq'),{{layout:{{background:{{color:'#0e1116'}},textColor:'#9aa0a6'}},grid:{{vertLines:{{color:'#1c2129'}},horzLines:{{color:'#1c2129'}}}},timeScale:{{timeVisible:true,secondsVisible:false}}}});
+  ec.addLineSeries({{color:'#9aa0a6',lineWidth:1,lastValueVisible:true,priceLineVisible:false}}).setData(eqa);
+  if(eqb.length>1)ec.addLineSeries({{color:'#4ade80',lineWidth:2,lastValueVisible:true,priceLineVisible:false}}).setData(eqb);
+  ec.timeScale().fitContent();
+}}else{{document.getElementById('eq').style.display='none';document.getElementById('eqt').style.display='none';}}
 </script>
 <script>
 (function () {{
@@ -366,6 +397,54 @@ def main() -> int:
     for t in fwd[-3:]:
         print(story(sym, t))
         print()
+
+    # ── performance panel (the point of watching a shadow at all) ────────
+    closed = [t for t in fwd if t["net"] is not None]
+    bsub = [t for t in fwd if t["b"]]
+    bclosed = [t for t in closed if t["b"]]
+
+    def _pstat(ts_all, ts_closed):
+        if not ts_closed:
+            return f"n={len(ts_all)} (open {len(ts_all)}) · 尚無平倉"
+        s = sum(t["net"] for t in ts_closed)
+        wr = 100 * sum(1 for t in ts_closed if t["net"] > 0) / len(ts_closed)
+        return (f"n={len(ts_all)} (open {len(ts_all) - len(ts_closed)}) · "
+                f"closed {len(ts_closed)} · WR {wr:.0f}% · "
+                f"ΣnetR {s:+.2f} · 每筆均 {s / len(ts_closed):+.3f}")
+
+    kind_bits = []
+    for k in ("swing", "session", "pdh_pdl", "pwh_pwl"):
+        kc = [t for t in closed if t["kind"] == k]
+        kind_bits.append(f"{KIND_ZH[k]} {len(kc)}筆"
+                         + (f" Σ{sum(t['net'] for t in kc):+.2f}" if kc else ""))
+    try:
+        slog = SE.read_log()
+        asof = max((r.get("first_seen_utc") or "" for r in slog.values()),
+                   default="")
+        gate_line = ("全籃(29幣) " + SE.gate_progress(slog)
+                     + (f" · log截至 {asof} UTC" if asof else ""))
+    except Exception:
+        gate_line = "全籃進度: 見每週一 09:30 PortfolioClocks 報告"
+    perf = (f"<b>本幣績效 (凍結後 forward · 情境A成本):</b> {_pstat(fwd, closed)}<br>"
+            f"<b>變體B (穿越≤0.25 ATR):</b> {_pstat(bsub, bclosed)}<br>"
+            f"<span class='dim'>{' | '.join(kind_bits)}</span><br>"
+            f"<span class='dim'>{gate_line}</span>")
+    print(gate_line)
+
+    def _dedup(pts):
+        d = {}
+        for p in pts:
+            d[p["time"]] = p["value"]
+        return [{"time": k, "value": v} for k, v in sorted(d.items())]
+
+    eq_all, eq_b, acc, accb = [], [], 0.0, 0.0
+    for t in sorted(closed, key=lambda x: x["exit_ts"]):
+        acc += t["net"]
+        eq_all.append({"time": t["exit_ts"] + TZ, "value": round(acc, 4)})
+        if t["b"]:
+            accb += t["net"]
+            eq_b.append({"time": t["exit_ts"] + TZ, "value": round(accb, 4)})
+    eq_all, eq_b = _dedup(eq_all), _dedup(eq_b)
 
     t0 = FREEZE_TS - args.days * 86400
     candles = [{"time": b[0] + TZ, "open": b[1], "high": b[2],
@@ -436,6 +515,7 @@ def main() -> int:
     out.write_text(HTML.format(
         sym=sym, check=check, candles=json.dumps(candles),
         markers=json.dumps(markers), levels=json.dumps(levels),
+        perf=perf, eq_all=json.dumps(eq_all), eq_b=json.dumps(eq_b),
         rows="".join(reversed(rows))), encoding="utf-8")
     print(f"chart -> {out}")
     return 0

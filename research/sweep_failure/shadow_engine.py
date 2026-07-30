@@ -124,6 +124,19 @@ def net_r(r: float, lvl: float, atr: float, stopped: bool) -> float:
     return r - legs / 1e4 * lvl / (SC.DIS * atr)
 
 
+def lt_to_scen_a(netr: float, lvl: float, atr: float, stopped: bool) -> tuple:
+    """(gross, scenario-A net) recovered from an LT.trade_levels row.
+
+    LT.net charges a flat 2 x 5 bps taker regardless of exit type; the Gate F
+    cost spec (scenario A) charges 7 entry + 3 time-exit / 10 stop-exit. The
+    two agree on time exits (10 = 10) but under-cost stop-outs by 7 bps.
+    Found 2026-07-30 — until then the shadow log mixed the two models across
+    level kinds. Un-net LT's flat cost exactly, then apply scenario A.
+    """
+    gross = netr + 2 * LT.TAKER / 1e4 * lvl / (SC.DIS * atr)
+    return gross, net_r(gross, lvl, atr, stopped)
+
+
 def read_log() -> dict[tuple[str, str, int], dict]:
     out = {}
     if LOG.exists():
@@ -247,14 +260,11 @@ def main() -> int:
                 continue
             bars = SC.load_csv(str(p))
             last_ts = bars[-1][0]
-            # one source of truth per kind: the frozen engine for swing, the
-            # shared level engine for the time-defined pools
             # one source of truth per kind: the frozen engine for swing,
             # the shared level engine for the time-defined pools. Tuples carry
             # (kind, fill_ts, exit_ts, gross, net, pierce, lvl, atr, stopped);
-            # swing yields gross R (bps model applied here), LT.trade_levels
-            # already returns net, so both are carried explicitly rather than
-            # re-derived.
+            # both paths are costed under scenario A (lt_to_scen_a un-nets
+            # LT's flat taker model first).
             evts: list[tuple] = [
                 ("swing", t[0], t[1], t[2],
                  net_r(t[2], t[3], t[4], t[5]), t[6], t[3], t[4], t[5])
@@ -263,7 +273,8 @@ def main() -> int:
             for kind in ("session", "pdh_pdl", "pwh_pwl"):
                 for (f_ts, x_ts, netr, pc, lvl, atr, st_) in LT.trade_levels(
                         bars, lv.get(kind, [])):
-                    evts.append((kind, f_ts, x_ts, None, netr, pc, lvl, atr, st_))
+                    gross, neta = lt_to_scen_a(netr, lvl, atr, st_)
+                    evts.append((kind, f_ts, x_ts, gross, neta, pc, lvl, atr, st_))
 
             for (kind, fill_ts, exit_ts, gross, netv, pierce, lvl, atr,
                  stopped) in evts:
