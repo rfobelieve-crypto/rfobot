@@ -37,8 +37,20 @@ v2.1 (2026-07-30, operator request "把績效都放在裡面"):
     progress line from the shadow CSV;
   - cumulative netR equity pane under the price chart (grey=all, green=B).
 
+v2.2 (2026-07-30, operator feedback "48hr 資訊 + 明顯低點沒被標到"):
+  - window anchored to NOW: default last 48h of candles (--hours / &hours=N),
+    not a fixed span from the freeze date;
+  - resting pools capped by DISTANCE TO PRICE (nearest 16 above + 16 below),
+    not by origin recency — a far-but-obvious low can no longer be crowded
+    out by newer session levels;
+  - dim "forming" layer: pivot extremes still inside their 10-bar
+    confirmation window and the running day/week extremes — the two
+    mechanical reasons an obvious low has no pool yet. Drawn faded so the
+    map admits they exist while being honest that the engine cannot trade
+    them yet.
+
 Usage:
-    python research/sweep_failure/shadow_review.py --symbol BNB [--days 6]
+    python research/sweep_failure/shadow_review.py --symbol BNB [--hours 48]
 Out: research/results/shadow_review_{sym}.html
 """
 from __future__ import annotations
@@ -69,7 +81,7 @@ FREEZE_TS = int(datetime(2026, 7, 28, tzinfo=timezone.utc).timestamp())
 PIERCE_MAX_B = 0.25
 TZ = 8 * 3600
 FETCH_DAYS = 900
-MAX_RESTING = 30            # newest resting pools kept on the map (clutter cap)
+MAX_RESTING = 32            # nearest-to-price resting pools (16 up + 16 down)
 KIND_ZH = {"swing": "波段", "session": "時段", "pdh_pdl": "昨日", "pwh_pwl": "上週"}
 SESSIONS = LT.SESSIONS
 
@@ -179,6 +191,45 @@ def build_pools_with_origin(bars) -> dict[str, list[dict]]:
                 if lo[i] < lo_:
                     lo_, lo_i = lo[i], i
     return out
+
+
+def forming_levels(bars) -> list[dict]:
+    """Levels the OPERATOR's eye sees but the engine cannot trade YET — the
+    two mechanical reasons an obvious low/high has no pool line (feedback
+    2026-07-30):
+      pivot-pending   an extreme inside the last PIVOT bars; it becomes a
+                      swing pool only after PIVOT more bars confirm it
+      period-running  today's / this ISO-week's high-low so far; they become
+                      PDH/PDL / PWH/PWL only when the period closes
+    Drawn faded on the map so they stop looking like missed marks."""
+    H, L = SC.H, SC.L
+    n = len(bars)
+    h = [b[H] for b in bars]
+    lo = [b[L] for b in bars]
+    P = SC.PIVOT
+    out = []
+    for i in range(max(P, n - P), n):
+        oth_h = [h[k] for k in range(i - P, n) if k != i]
+        oth_l = [lo[k] for k in range(i - P, n) if k != i]
+        if oth_h and h[i] >= max(oth_h):
+            out.append({"origin": i, "lvl": h[i], "side": 1})
+        if oth_l and lo[i] <= min(oth_l):
+            out.append({"origin": i, "lvl": lo[i], "side": -1})
+    dts = [datetime.fromtimestamp(b[0], tz=timezone.utc) for b in bars]
+    for keyfn in (lambda d: d.date(), lambda d: d.isocalendar()[:2]):
+        curk = keyfn(dts[-1])
+        idxs = [i for i in range(n) if keyfn(dts[i]) == curk]
+        hi_i = max(idxs, key=lambda i: h[i])
+        lo_i = min(idxs, key=lambda i: lo[i])
+        out.append({"origin": hi_i, "lvl": h[hi_i], "side": 1})
+        out.append({"origin": lo_i, "lvl": lo[lo_i], "side": -1})
+    seen, ded = set(), []
+    for p in out:
+        k = (p["side"], round(p["lvl"], 10))
+        if k not in seen:
+            seen.add(k)
+            ded.append(p)
+    return ded
 
 
 def rederive(sym: str):
@@ -313,7 +364,7 @@ td,th{{border:1px solid #2a2f38;padding:3px 8px;text-align:right}}
 th{{background:#1a1f27}} td:first-child,th:first-child{{text-align:left}}
 .b{{color:#4ade80}} .win{{color:#4ade80}} .loss{{color:#f87171}} .open{{color:#facc15}}
 .dim{{color:#8a919c}}</style></head><body>
-<div id="hdr"><b>Shadow 流動性地圖 — {sym}</b> (UTC+8 · 凍結後 forward) · {check}<br>
+<div id="hdr"><b>Shadow 流動性地圖 — {sym}</b> (UTC+8 · 最近{hours}h · &hours=N 可調 12-720) · {check}<br>
 <span class="lg">
 <span style="color:#e01b24">━ 紅=買側流動性(高點上方,掃了做空)</span>
 <span style="color:#26a269">━ 綠=賣側流動性(低點下方,掃了做多)</span>
@@ -323,6 +374,7 @@ th{{background:#1a1f27}} td:first-child,th:first-child{{text-align:left}}
 </span><br><span class="lg">
 <span>▲▼=進場(亮色=變體B 淺穿越≤0.25ATR / 灰=僅記錄)</span>
 <span>●=出場(綠賺/紅虧)</span>
+<span style="color:#7d6a52">┄ 淡色=形成中: 樞紐未滿10根確認 / 當日當週極值未收盤 — 眼睛看得到、引擎還不能交易的價位</span>
 <span class="dim">線起點=造出該價位的針尖 K 棒</span>
 <span class="dim">網址加 &live=60 自動更新(盯盤)</span>
 </span>
@@ -385,9 +437,11 @@ if(eqa.length>1){{
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--symbol", default="BTC")
-    ap.add_argument("--days", type=int, default=6)
+    ap.add_argument("--hours", type=int, default=48,
+                    help="candle window: last N hours (12-720)")
     args = ap.parse_args()
     sym = args.symbol.upper()
+    hours = max(12, min(720, args.hours))
 
     bars, trades, pool_rows = rederive(sym)
     check = crosscheck(sym, trades)
@@ -446,12 +500,12 @@ def main() -> int:
             eq_b.append({"time": t["exit_ts"] + TZ, "value": round(accb, 4)})
     eq_all, eq_b = _dedup(eq_all), _dedup(eq_b)
 
-    t0 = FREEZE_TS - args.days * 86400
+    now_ts = bars[-1][0]
+    t0 = now_ts - hours * 3600           # window anchored to NOW, not freeze
     candles = [{"time": b[0] + TZ, "open": b[1], "high": b[2],
                 "low": b[3], "close": b[4]} for b in bars if b[0] >= t0]
-    now_ts = bars[-1][0]
-    ts_of = {b[0]: b[0] for b in bars}
     bar_ts = [b[0] for b in bars]
+    last_close = bars[-1][SC.C]
 
     def clamp(ts):
         return max(ts, t0)
@@ -460,8 +514,15 @@ def main() -> int:
     RED, GREEN, GREY, AMBER = "#e01b24", "#26a269", "#5b6472", "#facc15"
 
     # ── pools: the map layer ─────────────────────────────────────────────
-    resting = sorted([p for p in pool_rows if p["state"] == "resting"],
-                     key=lambda p: -p["origin"])[:MAX_RESTING]
+    # resting pools capped by DISTANCE TO PRICE (not recency): the map's job
+    # is "targets in front of price", and recency let fast-churning session
+    # levels crowd out far-but-obvious extremes (feedback 2026-07-30)
+    rest_all = [p for p in pool_rows if p["state"] == "resting"]
+    above = sorted([p for p in rest_all if p["lvl"] >= last_close],
+                   key=lambda p: p["lvl"] - last_close)[:MAX_RESTING // 2]
+    below = sorted([p for p in rest_all if p["lvl"] < last_close],
+                   key=lambda p: last_close - p["lvl"])[:MAX_RESTING // 2]
+    resting = above + below
     waiting = [p for p in pool_rows if p["state"] == "swept_waiting"]
     for p in resting:
         o_ts = bar_ts[p["origin"]]
@@ -478,23 +539,41 @@ def main() -> int:
         levels.append({"c": col, "w": 2, "st": 0,
                        "pts": [{"time": o_ts + TZ, "value": p["lvl"]},
                                {"time": now_ts + TZ, "value": p["lvl"]}]})
-        markers.append({"time": s_ts + TZ, "position": "aboveBar" if p["side"] == 1 else "belowBar",
-                        "shape": "circle", "color": AMBER, "text": "⏳"})
+        if s_ts >= t0:
+            markers.append({"time": s_ts + TZ,
+                            "position": "aboveBar" if p["side"] == 1 else "belowBar",
+                            "shape": "circle", "color": AMBER, "text": "⏳"})
 
-    # ── forward trades: replay layer ─────────────────────────────────────
+    # forming layer (faded): what the eye sees but the engine cannot trade yet
+    drawn = {round(p["lvl"], 10) for p in resting + waiting}
+    F_RED, F_GREEN = "#7d4a4f", "#3f6e57"
+    forming = [p for p in forming_levels(bars)
+               if round(p["lvl"], 10) not in drawn]
+    forming = sorted(forming, key=lambda p: abs(p["lvl"] - last_close))[:8]
+    for p in forming:
+        col = F_RED if p["side"] == 1 else F_GREEN
+        levels.append({"c": col, "w": 1, "st": 2,
+                       "pts": [{"time": clamp(bar_ts[p["origin"]]) + TZ,
+                                "value": p["lvl"]},
+                               {"time": now_ts + TZ, "value": p["lvl"]}]})
+
+    # ── forward trades: replay layer (chart shows the window; the table
+    #    below always lists every forward trade since freeze) ──────────────
     for t in fwd:
         col = (GREEN if t["side"] == "LONG" else RED) if t["b"] else GREY
-        o_ts = clamp(t["origin_ts"])
         end = (t["exit_ts"] or now_ts)
-        levels.append({"c": col, "w": 2 if t["b"] else 1, "st": 0,
-                       "pts": [{"time": o_ts + TZ, "value": t["lvl"]},
-                               {"time": end + TZ, "value": t["lvl"]}]})
-        markers.append({"time": t["fill_ts"] + TZ,
-                        "position": "belowBar" if t["side"] == "LONG" else "aboveBar",
-                        "shape": "arrowUp" if t["side"] == "LONG" else "arrowDown",
-                        "color": col,
-                        "text": ("B " if t["b"] else "") + KIND_ZH[t["kind"]]})
-        if t["exit_ts"]:
+        if end >= t0:                      # off-window lines would stretch
+            o_ts = clamp(t["origin_ts"])   # fitContent past the 48h view
+            levels.append({"c": col, "w": 2 if t["b"] else 1, "st": 0,
+                           "pts": [{"time": o_ts + TZ, "value": t["lvl"]},
+                                   {"time": end + TZ, "value": t["lvl"]}]})
+        if t["fill_ts"] >= t0:
+            markers.append({"time": t["fill_ts"] + TZ,
+                            "position": "belowBar" if t["side"] == "LONG" else "aboveBar",
+                            "shape": "arrowUp" if t["side"] == "LONG" else "arrowDown",
+                            "color": col,
+                            "text": ("B " if t["b"] else "") + KIND_ZH[t["kind"]]})
+        if t["exit_ts"] and t["exit_ts"] >= t0:
             win = (t["net"] or 0) > 0
             markers.append({"time": t["exit_ts"] + TZ, "position": "inBar",
                             "shape": "circle",
@@ -513,7 +592,7 @@ def main() -> int:
     markers.sort(key=lambda m: m["time"])
     out = RESULTS / f"shadow_review_{sym.lower()}.html"
     out.write_text(HTML.format(
-        sym=sym, check=check, candles=json.dumps(candles),
+        sym=sym, hours=hours, check=check, candles=json.dumps(candles),
         markers=json.dumps(markers), levels=json.dumps(levels),
         perf=perf, eq_all=json.dumps(eq_all), eq_b=json.dumps(eq_b),
         rows="".join(reversed(rows))), encoding="utf-8")
