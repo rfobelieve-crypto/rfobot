@@ -364,7 +364,7 @@ td,th{{border:1px solid #2a2f38;padding:3px 8px;text-align:right}}
 th{{background:#1a1f27}} td:first-child,th:first-child{{text-align:left}}
 .b{{color:#4ade80}} .win{{color:#4ade80}} .loss{{color:#f87171}} .open{{color:#facc15}}
 .dim{{color:#8a919c}}</style></head><body>
-<div id="hdr"><b>Shadow 流動性地圖 — {sym}</b> (UTC+8 · 最近{hours}h · &hours=N 可調 12-720) · {check}<br>
+<div id="hdr"><b>Shadow 流動性地圖 — {sym}</b> (UTC+8 · 最近{hours}h · &hours=N 可調 12-2160) · {check}<br>
 <span class="lg">
 <span style="color:#e01b24">━ 紅=買側流動性(高點上方,掃了做空)</span>
 <span style="color:#26a269">━ 綠=賣側流動性(低點下方,掃了做多)</span>
@@ -438,10 +438,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--symbol", default="BTC")
     ap.add_argument("--hours", type=int, default=48,
-                    help="candle window: last N hours (12-720)")
+                    help="candle window: last N hours (12-2160; cache holds "
+                         "~900 days if you ever need more)")
     args = ap.parse_args()
     sym = args.symbol.upper()
-    hours = max(12, min(720, args.hours))
+    hours = max(12, min(2160, args.hours))
 
     bars, trades, pool_rows = rederive(sym)
     check = crosscheck(sym, trades)

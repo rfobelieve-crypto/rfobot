@@ -1598,7 +1598,7 @@ def research_shadow_review_api():
     Admin-guarded via the /research/ prefix (?token= works for phone links).
 
     Query params:  symbol=<BASE>  e.g. BTC, ETH, BNB (default BTC)
-                   hours=<N>      candle window, last N hours (12-720, default 48)
+                   hours=<N>      candle window, last N hours (12-2160, default 48)
     """
     from flask import request as _rq, jsonify as _js, send_file as _sf
     import subprocess as _sp
@@ -1618,7 +1618,7 @@ def research_shadow_review_api():
         return _js({"error": f"symbol not in universe: {symbol}",
                     "allowed": sorted(allowed)}), 400
     try:
-        hours = max(12, min(720, int(_rq.args.get("hours", "48"))))
+        hours = max(12, min(2160, int(_rq.args.get("hours", "48"))))
     except ValueError:
         hours = 48
     out = root / "research" / "results" / f"shadow_review_{symbol.lower()}.html"
