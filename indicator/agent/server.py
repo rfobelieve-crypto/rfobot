@@ -510,6 +510,31 @@ async def public_sweep_status_route(request: Request) -> JSONResponse:
     return resp
 
 
+_live_status_cache: dict = {"data": None, "ts": 0.0}
+_LIVE_STATUS_CACHE_TTL_S = 60.0
+
+
+@mcp.custom_route("/public/live-status", methods=["GET"])
+async def public_live_status_route(request: Request) -> JSONResponse:
+    """V7/OKX execution surface for the site dashboard — percentages,
+    directions and timing only (queries.public_live_status keeps sizes and
+    dollar equity out of the public layer)."""
+    now = time.monotonic()
+    if (_live_status_cache["data"] is None
+            or now - _live_status_cache["ts"] > _LIVE_STATUS_CACHE_TTL_S):
+        try:
+            data = await anyio.to_thread.run_sync(queries.public_live_status)
+        except Exception as e:  # noqa: BLE001
+            data = {"error": f"live status unavailable: {type(e).__name__}"}
+        _live_status_cache["data"] = data
+        _live_status_cache["ts"] = now
+    payload = _live_status_cache["data"]
+    resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    resp.headers["Cache-Control"] = "public, max-age=60"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 def main() -> None:
     mcp.run()   # stdio transport by default
 

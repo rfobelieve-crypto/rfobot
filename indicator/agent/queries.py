@@ -876,3 +876,80 @@ def verify_user(email: str, password: str) -> dict[str, Any]:
     if not row or not _verify_password(password, row["password_hash"]):
         return {"ok": False}
     return {"ok": True, "email": email}
+
+
+# ── Public: live execution status (site dashboard, 2026-07-30) ──────────
+# Percentages, directions and timing ONLY — no contract sizes, no dollar
+# equity. The public layer shows how the strategy behaves; account scale
+# stays private. Reads only the whitelisted v7_okx_positions table.
+
+def public_live_status() -> dict[str, Any]:
+    if _seed_mode():
+        return {
+            "open_position": {"direction": "SHORT", "tier": "Strong",
+                              "entry_price": 64100.0, "held_hours": 3.0},
+            "recent": [
+                {"entry_utc": "07-28 09:00", "direction": "SHORT",
+                 "net_pct": 2.15, "exit_reason": "opp_signal"},
+                {"entry_utc": "07-25 17:00", "direction": "LONG",
+                 "net_pct": -0.68, "exit_reason": "trail_stop"},
+            ],
+            "totals": {"n_closed": 34, "win_rate_pct": 52.9,
+                       "cum_net_pct": 4.1},
+            "disclaimer": DISCLAIMER,
+            "_source": "seed",
+        }
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT direction, entry_tier, entry_time, entry_price "
+                "FROM v7_okx_positions WHERE status='OPEN' "
+                "ORDER BY id DESC LIMIT 1")
+            op = cur.fetchone()
+            cur.execute(
+                "SELECT entry_time, direction, net_pct, exit_reason "
+                "FROM v7_okx_positions WHERE status='CLOSED' "
+                "ORDER BY exit_time DESC LIMIT 6")
+            recent = cur.fetchall() or []
+            cur.execute(
+                "SELECT net_pct FROM v7_okx_positions "
+                "WHERE status='CLOSED' AND net_pct IS NOT NULL "
+                "ORDER BY exit_time")
+            allpct = [float(r["net_pct"]) for r in (cur.fetchall() or [])]
+    finally:
+        conn.close()
+
+    comp = 1.0
+    for p in allpct:
+        comp *= 1.0 + p / 100.0
+    open_position = None
+    if op:
+        held_h = None
+        if op.get("entry_time"):
+            held_h = round(
+                (datetime.utcnow() - op["entry_time"]).total_seconds() / 3600, 1)
+        open_position = {
+            "direction": op.get("direction"),
+            "tier": op.get("entry_tier"),
+            "entry_price": (float(op["entry_price"])
+                            if op.get("entry_price") is not None else None),
+            "held_hours": held_h,
+        }
+    n = len(allpct)
+    wins = sum(1 for p in allpct if p > 0)
+    return {
+        "open_position": open_position,
+        "recent": [{
+            "entry_utc": (r["entry_time"].strftime("%m-%d %H:%M")
+                          if r.get("entry_time") else None),
+            "direction": r.get("direction"),
+            "net_pct": (round(float(r["net_pct"]), 2)
+                        if r.get("net_pct") is not None else None),
+            "exit_reason": r.get("exit_reason"),
+        } for r in recent],
+        "totals": {"n_closed": n,
+                   "win_rate_pct": round(100 * wins / n, 1) if n else None,
+                   "cum_net_pct": round((comp - 1.0) * 100, 2)},
+        "disclaimer": DISCLAIMER,
+    }
