@@ -456,7 +456,7 @@ _LIQ_MAP_CACHE_TTL_S = 300.0
 async def public_liquidity_map_route(request: Request) -> Response:
     return await _proxy_html(
         _liq_map_cache, _LIQ_MAP_CACHE_TTL_S,
-        f"{INDICATOR_BASE_URL}/research/shadow-review?symbol=BTC&hours=72",
+        f"{INDICATOR_BASE_URL}/research/shadow-review?symbol=BTC&hours=168",
         token=INDICATOR_ADMIN_TOKEN)
 
 

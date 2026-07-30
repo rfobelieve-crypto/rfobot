@@ -384,7 +384,7 @@ th{{background:#1a1f27}} td:first-child,th:first-child{{text-align:left}}
 <div id="eq" style="height:18vh"></div>
 <table><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>B</th><th>狀態</th><th>netR</th></tr>{rows}</table>
 <script>
-const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0e1116'}},textColor:'#9aa0a6'}},grid:{{vertLines:{{color:'#1c2129'}},horzLines:{{color:'#1c2129'}}}},timeScale:{{timeVisible:true,secondsVisible:false,rightOffset:6}}}});
+const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0e1116'}},textColor:'#9aa0a6'}},grid:{{vertLines:{{color:'#1c2129'}},horzLines:{{color:'#1c2129'}}}},timeScale:{{timeVisible:true,secondsVisible:false,rightOffset:3}}}});
 const cs=chart.addCandlestickSeries({{upColor:'#26a269',downColor:'#e01b24',borderVisible:false,wickUpColor:'#26a269',wickDownColor:'#e01b24'}});
 cs.setData({candles});
 cs.setMarkers({markers});
