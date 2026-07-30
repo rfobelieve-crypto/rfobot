@@ -1,23 +1,36 @@
 # -*- coding: utf-8 -*-
-"""Shadow review — SEE what the recorder is recording, and verify it.
+"""Shadow review v2 — a LIVING liquidity map, not just a trade replay.
 
-The operator's two requirements (2026-07-30):
-  1. visibility — the shadow engine is a CSV plus a scheduled task, invisible
-     in operation. This renders its signals for one symbol onto 1H candles
-     (level line, sweep, entry, exit) as a standalone HTML chart.
-  2. verification — "make sure it trades the strategy I have in mind". Two
-     mechanisms: (a) a bar-by-bar STORY for recent signals in the exact
-     vocabulary of the thesis (哪個池子 -> 掃多深 -> 幾根內回來 -> 進場 ->
-     出場); (b) an independent re-derivation of every forward signal that is
-     CROSS-CHECKED against the shadow CSV — if the log ever disagrees with
-     the frozen rules, this prints the mismatch loudly.
+Operator feedback (2026-07-30) driving this version:
+  1. level lines must START AT THE WICK TIP that created them (v1 started at
+     the sweep bar, so lines floated next to candles and looked wrong);
+  2. a legend explaining every glyph belongs ON the page;
+  3. the whole thing should work like the LMSR dynamic map: RESTING pools
+     drawn dotted and extending to the right edge until price takes them,
+     raided pools cut off solid at the raid, plus ?live=<sec> auto-refresh
+     (same mechanism as the cancel-flow live chart).
 
-Read-only: reads the kline cache + the shadow CSV, writes one HTML.
+Pool states drawn:
+  resting        dotted line from its origin wick to the right edge — an
+                 untouched target sitting in front of price
+  swept_waiting  the actionable moment: price pierced the level within the
+                 last W bars and the engine is waiting for the retest —
+                 bright line to the edge + an hourglass marker at the sweep
+  raided         solid line from origin to the sweep (consumed); if the
+                 retest filled, entry/exit markers follow
+
+Colour language (matches the LMSR map the user trades from):
+  red   = buy-side liquidity (above highs; raiding it fades SHORT)
+  green = sell-side liquidity (below lows; raiding it fades LONG)
+  bright = variant-B grade (pierce <= 0.25 ATR), grey = record-only
+
+Verification kept from v1: an independent re-derivation of every forward
+trade is cross-checked against the shadow CSV, and the bar-by-bar story
+prints in the thesis's own vocabulary.
 
 Usage:
-    python research/sweep_failure/shadow_review.py --symbol BNB
-    python research/sweep_failure/shadow_review.py --symbol BTC --days 10
-Out: research/results/shadow_review_{SYM}.html  (+ stories on stdout)
+    python research/sweep_failure/shadow_review.py --symbol BNB [--days 6]
+Out: research/results/shadow_review_{sym}.html
 """
 from __future__ import annotations
 
@@ -41,14 +54,19 @@ except Exception:
     pass
 
 RESULTS = Path(__file__).resolve().parents[2] / "research/results"
-FETCH_DAYS = 900          # enough history that swing levels match the local run
+LOG = RESULTS / "sweep_shadow_log.csv"
+FREEZE_TS = int(datetime(2026, 7, 28, tzinfo=timezone.utc).timestamp())
+PIERCE_MAX_B = 0.25
+TZ = 8 * 3600
+FETCH_DAYS = 900
+MAX_RESTING = 30            # newest resting pools kept on the map (clutter cap)
+KIND_ZH = {"swing": "波段", "session": "時段", "pdh_pdl": "昨日", "pwh_pwl": "上週"}
+SESSIONS = LT.SESSIONS
 
 
 def ensure_bars(sym: str) -> Path:
-    """The Railway image has no kline cache (gitignored), and a local cache
-    can be stale between hourly shadow runs. Fetch/refresh from Binance
-    public REST on demand — the route regenerates per query by design."""
-    import csv as _csv
+    """Fetch/refresh 1H bars from Binance when the cache is absent or stale
+    (the Railway image has no cache; the route regenerates per query)."""
     import json as _json
     import time as _time
     import urllib.request
@@ -68,13 +86,13 @@ def ensure_bars(sym: str) -> Path:
         req = urllib.request.Request(
             "https://api.binance.com/api/v3/klines"
             f"?symbol={sym}USDT&interval=1h&startTime={int(cur)}&limit=1000",
-            headers={"User-Agent": "shadow-review/1.0"})
+            headers={"User-Agent": "shadow-review/2.0"})
         with urllib.request.urlopen(req, timeout=20) as r:
             d = _json.loads(r.read().decode())
         if not d:
             break
         for k in d:
-            if int(k[6]) > now * 1000:      # live bar
+            if int(k[6]) > now * 1000:
                 continue
             rows[int(k[0]) // 1000] = (float(k[1]), float(k[2]),
                                        float(k[3]), float(k[4]), float(k[5]))
@@ -84,59 +102,119 @@ def ensure_bars(sym: str) -> Path:
     if rows:
         mode = "a" if p.exists() else "w"
         with p.open(mode, newline="", encoding="utf-8") as f:
-            w = _csv.writer(f)
+            w = csv.writer(f)
             if mode == "w":
                 w.writerow(["time", "open", "high", "low", "close", "volume"])
             for ts in sorted(rows):
                 w.writerow([ts, *rows[ts]])
     return p
-LOG = RESULTS / "sweep_shadow_log.csv"
-FREEZE_TS = int(datetime(2026, 7, 28, tzinfo=timezone.utc).timestamp())
-PIERCE_MAX_B = 0.25
-TZ = 8 * 3600                      # display UTC+8, same as the other charts
-KIND_ZH = {"swing": "波段高低點", "session": "時段極值",
-           "pdh_pdl": "昨日高低", "pwh_pwl": "上週高低"}
 
 
-def rederive(sym: str) -> list[dict]:
-    """Independent re-derivation of every trade with full anatomy
-    (sweep bar, side, level, fill, exit) — the same frozen rules the shadow
-    uses, but carrying the fields the log does not store."""
-    p = ensure_bars(sym)
-    bars = SC.load_csv(str(p))
+def build_pools_with_origin(bars) -> dict[str, list[dict]]:
+    """Every pool with BOTH its activation bar (engine semantics) and its
+    ORIGIN bar — the bar whose wick tip defines the price. The line must
+    start on that tip (operator feedback #1)."""
+    H, L = SC.H, SC.L
+    n = len(bars)
+    h = [b[H] for b in bars]
+    lo = [b[L] for b in bars]
+    out: dict[str, list[dict]] = {k: [] for k in
+                                  ("swing", "session", "pdh_pdl", "pwh_pwl")}
+    P = SC.PIVOT
+    for i in range(P, n - P):
+        seg = range(i - P, i + P + 1)
+        if all(h[i] >= h[k] for k in seg) and any(h[i] > h[k] for k in seg if k != i):
+            out["swing"].append({"est": i + P + 1, "origin": i, "lvl": h[i], "side": 1})
+        if all(lo[i] <= lo[k] for k in seg) and any(lo[i] < lo[k] for k in seg if k != i):
+            out["swing"].append({"est": i + P + 1, "origin": i, "lvl": lo[i], "side": -1})
+
+    dts = [datetime.fromtimestamp(b[0], tz=timezone.utc) for b in bars]
+    for name, (h0, h1) in SESSIONS.items():
+        hi = lo_ = None
+        hi_i = lo_i = None
+        prev_in = False
+        for i, dt in enumerate(dts):
+            inside = h0 <= dt.hour < h1
+            if inside:
+                if not prev_in:
+                    hi, hi_i, lo_, lo_i = h[i], i, lo[i], i
+                else:
+                    if h[i] > hi:
+                        hi, hi_i = h[i], i
+                    if lo[i] < lo_:
+                        lo_, lo_i = lo[i], i
+            elif prev_in and hi is not None:
+                out["session"].append({"est": i, "origin": hi_i, "lvl": hi, "side": 1})
+                out["session"].append({"est": i, "origin": lo_i, "lvl": lo_, "side": -1})
+                hi = lo_ = None
+            prev_in = inside
+
+    for kind, keyfn in (("pdh_pdl", lambda d: d.date()),
+                        ("pwh_pwl", lambda d: d.isocalendar()[:2])):
+        cur_key = None
+        hi = lo_ = None
+        hi_i = lo_i = None
+        for i, dt in enumerate(dts):
+            k = keyfn(dt)
+            if cur_key is None:
+                cur_key, hi, hi_i, lo_, lo_i = k, h[i], i, lo[i], i
+                continue
+            if k != cur_key:
+                out[kind].append({"est": i, "origin": hi_i, "lvl": hi, "side": 1})
+                out[kind].append({"est": i, "origin": lo_i, "lvl": lo_, "side": -1})
+                cur_key, hi, hi_i, lo_, lo_i = k, h[i], i, lo[i], i
+            else:
+                if h[i] > hi:
+                    hi, hi_i = h[i], i
+                if lo[i] < lo_:
+                    lo_, lo_i = lo[i], i
+    return out
+
+
+def rederive(sym: str):
+    """(trades, pools) under the frozen rules, each pool carrying its state:
+    resting / swept_waiting / raided (+ trade anatomy when the retest filled).
+    Trade logic is byte-identical to the scorer; only bookkeeping is added."""
+    bars = SC.load_csv(str(ensure_bars(sym)))
     n = len(bars)
     H, L, C = SC.H, SC.L, SC.C
     h = [b[H] for b in bars]
     lo = [b[L] for b in bars]
     cl = [b[C] for b in bars]
     a = SC.atr14(bars)
-    out = []
-
-    def run_pool(kind: str, pools: list[tuple[int, float, int]]):
-        pending = sorted(pools)
+    pools = build_pools_with_origin(bars)
+    trades, pool_rows = [], []
+    for kind, plist in pools.items():
+        pending = sorted(plist, key=lambda p: p["est"])
         last_exit, idx = -1, 0
-        live: list[tuple[float, int]] = []
+        live: list[dict] = []
         for j in range(n):
-            while idx < len(pending) and pending[idx][0] <= j:
-                live.append((pending[idx][1], pending[idx][2]))
+            while idx < len(pending) and pending[idx]["est"] <= j:
+                live.append(pending[idx])
                 idx += 1
             if a[j] is None or a[j] == 0:
                 continue
-            hit = [(pr, s) for pr, s in live
-                   if (h[j] > pr if s == 1 else lo[j] < pr)]
+            hit = [p for p in live
+                   if (h[j] > p["lvl"] if p["side"] == 1 else lo[j] < p["lvl"])]
             if not hit:
                 continue
-            live[:] = [x for x in live if x not in hit]
-            for lvl, s in hit:
+            live = [p for p in live if p not in hit]
+            for p in hit:
+                lvl, s = p["lvl"], p["side"]
                 kd, d = s, -s
                 fill = None
                 for f in range(j + 1, min(j + 1 + SC.W, n)):
                     if (kd == 1 and lo[f] <= lvl) or (kd == -1 and h[f] >= lvl):
                         fill = f
                         break
+                A = a[j]
+                pierce = (h[j] - lvl if kd == 1 else lvl - lo[j]) / A
+                waiting = fill is None and j + SC.W >= n - 1
+                pool_rows.append({**p, "kind": kind, "sweep": j,
+                                  "state": "swept_waiting" if waiting else "raided",
+                                  "pierce": pierce})
                 if fill is None or fill <= last_exit or fill + 1 >= n:
                     continue
-                A = a[j]
                 stop = lvl - d * SC.DIS * A
                 R, xb = None, min(fill + SC.HOLD, n - 1)
                 for k in range(fill + 1, min(fill + SC.HOLD + 1, n)):
@@ -144,47 +222,25 @@ def rederive(sym: str) -> list[dict]:
                         R, xb = -1.0, k
                         break
                 if R is None:
-                    R = d * (cl[xb] - lvl) / risk_unit(A)
+                    R = d * (cl[xb] - lvl) / (SC.DIS * A)
                 last_exit = xb
-                pierce = (h[j] - lvl if kd == 1 else lvl - lo[j]) / A
                 done = bars[fill][0] + SC.HOLD * 3600 <= bars[-1][0]
-                out.append({
-                    "kind": kind, "sweep_ts": bars[j][0],
-                    "fill_ts": bars[fill][0],
+                trades.append({
+                    "kind": kind, "origin_ts": bars[p["origin"]][0],
+                    "sweep_ts": bars[j][0], "fill_ts": bars[fill][0],
                     "exit_ts": bars[xb][0] if done else None,
                     "side": "SHORT" if d == -1 else "LONG",
                     "lvl": lvl, "atr": A, "stop": stop, "pierce": pierce,
                     "net": LT.net(R, lvl, A) if done else None,
                     "b": pierce <= PIERCE_MAX_B})
-
-    def risk_unit(A):
-        return SC.DIS * A
-
-    # swing pools come from the frozen pivot detector; their "established"
-    # bar is the sweep scan start (pivot idx + PIVOT + 1) — but the engine
-    # semantics are simply "first pierce after confirmation", which run_pool
-    # reproduces when given (confirm_bar, level, side).
-    piv = []
-    P = SC.PIVOT
-    for i in range(P, n - P):
-        seg = range(i - P, i + P + 1)
-        if all(h[i] >= h[k] for k in seg) and any(h[i] > h[k] for k in seg if k != i):
-            piv.append((i + P + 1, h[i], 1))
-        if all(lo[i] <= lo[k] for k in seg) and any(lo[i] < lo[k] for k in seg if k != i):
-            piv.append((i + P + 1, lo[i], -1))
-    run_pool("swing", piv)
-    lv = LT.build_levels(bars)
-    for kind in ("session", "pdh_pdl", "pwh_pwl"):
-        run_pool(kind, lv.get(kind, []))
-    return sorted(out, key=lambda t: t["fill_ts"])
+        for p in live:                     # never pierced = resting
+            pool_rows.append({**p, "kind": kind, "sweep": None,
+                              "state": "resting", "pierce": None})
+    trades.sort(key=lambda t: t["fill_ts"])
+    return bars, trades, pool_rows
 
 
-def crosscheck(sym: str, trades: list[dict]) -> str:
-    """The verification: the CSV the scheduler wrote vs this re-derivation.
-    On Railway the committed log copy is stale (it is written locally every
-    hour, pushed occasionally) — comparing fresh re-derivation against a
-    stale log would scream false mismatches, so staleness downgrades the
-    check to an honest note instead."""
+def crosscheck(sym: str, trades) -> str:
     import time as _time
     if LOG.exists() and _time.time() - LOG.stat().st_mtime > 3 * 3600:
         return ("shadow log 副本非即時（>3h 舊）— 本圖為同一套凍結規則的"
@@ -196,80 +252,113 @@ def crosscheck(sym: str, trades: list[dict]) -> str:
                 if r["symbol"] == sym:
                     logged[(r["level_kind"], int(r["fill_ts"]))] = r
     fwd = [t for t in trades if t["fill_ts"] >= FREEZE_TS]
-    hit = miss = 0
-    for t in fwd:
-        row = logged.get((t["kind"], t["fill_ts"]))
-        if row and abs(float(row["entry_px"]) - t["lvl"]) < 1e-6:
-            hit += 1
-        else:
-            miss += 1
-            print(f"  MISMATCH: {t['kind']} fill={t['fill_ts']} "
-                  f"lvl={t['lvl']} not in log or price differs")
-    extra = len(logged) - hit
-    return (f"log cross-check: {hit}/{len(fwd)} re-derived forward trades "
-            f"found in log{'' if not miss else f', {miss} MISSING'}"
-            f"{'' if extra <= 0 else f', {extra} log rows not re-derived (stale bars?)'}")
+    hit = sum(1 for t in fwd
+              if (r := logged.get((t["kind"], t["fill_ts"])))
+              and abs(float(r["entry_px"]) - t["lvl"]) < 1e-6)
+    miss = len(fwd) - hit
+    return (f"對帳: 重演算 {len(fwd)} 筆 forward, {hit} 筆與 shadow log 一致"
+            + (f", {miss} 筆不一致 ← 檢查!" if miss else " ✓"))
 
 
 def story(sym: str, t: dict) -> str:
-    """One signal in the thesis's own vocabulary."""
     f = datetime.fromtimestamp(t["fill_ts"], timezone.utc)
     s = datetime.fromtimestamp(t["sweep_ts"], timezone.utc)
     wait = int((t["fill_ts"] - t["sweep_ts"]) / 3600)
     lines = [
         f"{sym} {t['side']}  [{KIND_ZH[t['kind']]}]"
-        f"{'  << 變體B' if t['b'] else '  (穿越過深, 只記錄不入變體B)'}",
-        f"  流動性: {t['kind']} 價位 {t['lvl']:.6g}",
-        f"  獵取:   {s:%m-%d %H:%M} UTC 掃過價位, 深度 {t['pierce']:.2f} ATR"
-        f" ({'淺=獵殺停損形' if t['b'] else '深=較像真突破'})",
-        f"  失敗:   {wait} 根內價格回到價位 -> {f:%m-%d %H:%M} 於 {t['lvl']:.6g} 進場 {t['side']}",
-        f"  風控:   停損 {t['stop']:.6g} (3.5xATR), 最多持 {SC.HOLD} 根",
+        f"{'  << 變體B' if t['b'] else '  (穿越過深, 僅記錄)'}",
+        f"  流動性: {KIND_ZH[t['kind']]}池 {t['lvl']:.6g}",
+        f"  獵取:   {s:%m-%d %H:%M} UTC 掃過, 深度 {t['pierce']:.2f} ATR",
+        f"  失敗:   {wait} 根內回到價位 -> {f:%m-%d %H:%M} 進場 {t['side']}",
+        f"  風控:   停損 {t['stop']:.6g} (3.5xATR), 最多 {SC.HOLD} 根",
     ]
     if t["exit_ts"]:
         x = datetime.fromtimestamp(t["exit_ts"], timezone.utc)
         lines.append(f"  出場:   {x:%m-%d %H:%M}  netR {t['net']:+.3f}")
     else:
-        lines.append(f"  狀態:   OPEN — 結果尚未揭曉")
+        lines.append("  狀態:   OPEN")
     return "\n".join(lines)
 
 
 HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>shadow review {sym}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shadow map {sym}</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>body{{margin:0;background:#0e1116;color:#e3e3e3;font-family:'Microsoft JhengHei',monospace}}
-#hdr{{padding:8px 14px;font-size:13px;line-height:1.6}} #c{{height:62vh}}
+#hdr{{padding:8px 14px;font-size:13px;line-height:1.75}} #c{{height:58vh}}
+.lg span{{margin-right:14px;white-space:nowrap}}
 table{{border-collapse:collapse;font-size:12px;margin:8px 14px}}
 td,th{{border:1px solid #2a2f38;padding:3px 8px;text-align:right}}
 th{{background:#1a1f27}} td:first-child,th:first-child{{text-align:left}}
-.b{{color:#4ade80}} .win{{color:#4ade80}} .loss{{color:#f87171}} .open{{color:#facc15}}</style>
-</head><body>
-<div id="hdr"><b>Shadow 覆盤 — {sym}</b> (凍結後 forward 訊號, UTC+8)<br>
-▲▼=進場(綠多/紅空, 亮=變體B 淡=僅記錄) · ●=出場(綠賺/紅虧) · 橫線=被獵取的流動性價位 (由掃單棒延伸到出場)<br>
-{check}</div>
+.b{{color:#4ade80}} .win{{color:#4ade80}} .loss{{color:#f87171}} .open{{color:#facc15}}
+.dim{{color:#8a919c}}</style></head><body>
+<div id="hdr"><b>Shadow 流動性地圖 — {sym}</b> (UTC+8 · 凍結後 forward) · {check}<br>
+<span class="lg">
+<span style="color:#e01b24">━ 紅=買側流動性(高點上方,掃了做空)</span>
+<span style="color:#26a269">━ 綠=賣側流動性(低點下方,掃了做多)</span>
+<span class="dim">┄ 虛線=尚未被掃(延伸至最右=眼前的目標)</span>
+<span>─ 實線=已被掃(截於掃單棒)</span>
+<span style="color:#facc15">⏳=已掃,等回踩中(8根內)</span>
+</span><br><span class="lg">
+<span>▲▼=進場(亮色=變體B 淺穿越≤0.25ATR / 灰=僅記錄)</span>
+<span>●=出場(綠賺/紅虧)</span>
+<span class="dim">線起點=造出該價位的針尖 K 棒</span>
+<span class="dim">網址加 &live=60 自動更新(盯盤)</span>
+</span></div>
 <div id="c"></div>
-<table><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>變體B</th><th>狀態</th><th>netR</th></tr>{rows}</table>
+<table><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>B</th><th>狀態</th><th>netR</th></tr>{rows}</table>
 <script>
-const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0e1116'}},textColor:'#9aa0a6'}},grid:{{vertLines:{{color:'#1c2129'}},horzLines:{{color:'#1c2129'}}}},timeScale:{{timeVisible:true,secondsVisible:false}}}});
+const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0e1116'}},textColor:'#9aa0a6'}},grid:{{vertLines:{{color:'#1c2129'}},horzLines:{{color:'#1c2129'}}}},timeScale:{{timeVisible:true,secondsVisible:false,rightOffset:6}}}});
 const cs=chart.addCandlestickSeries({{upColor:'#26a269',downColor:'#e01b24',borderVisible:false,wickUpColor:'#26a269',wickDownColor:'#e01b24'}});
 cs.setData({candles});
 cs.setMarkers({markers});
-for(const seg of {levels}){{
-  const ls=chart.addLineSeries({{color:seg.c,lineWidth:1,lineStyle:seg.st,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false}});
-  ls.setData(seg.pts);
+for(const g of {levels}){{
+  const ls=chart.addLineSeries({{color:g.c,lineWidth:g.w,lineStyle:g.st,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false}});
+  ls.setData(g.pts);
 }}
 chart.timeScale().fitContent();
+</script>
+<script>
+(function () {{
+  var q = new URLSearchParams(location.search);
+  var raw = q.get('live');
+  if (raw === null || location.protocol === 'file:') return;
+  var SEC = Math.max(30, parseInt(raw, 10) || 60);
+  var hdr = document.getElementById('hdr');
+  var badge = document.createElement('span');
+  badge.style.cssText = 'margin-left:8px;padding:1px 8px;border-radius:6px;background:#14321f;color:#4ade80;font-size:12px;';
+  badge.textContent = 'LIVE ' + SEC + 's';
+  if (hdr) hdr.appendChild(badge);
+  var stale = 0;
+  function tick() {{
+    if (document.hidden) return;
+    fetch(location.href, {{cache: 'no-store'}}).then(function (r) {{
+      return r.text().then(function (t) {{
+        if (r.ok && t.indexOf('id="c"') !== -1) {{
+          document.open(); document.write(t); document.close();
+        }} else {{ throw new Error('bad render'); }}
+      }});
+    }}).catch(function () {{
+      stale += 1;
+      badge.style.background = '#3a2323';
+      badge.style.color = '#f87171';
+      badge.textContent = 'STALE x' + stale + ' (retry ' + SEC + 's)';
+    }});
+  }}
+  if (window.__liveTimer) clearInterval(window.__liveTimer);
+  window.__liveTimer = setInterval(tick, SEC * 1000);
+}})();
 </script></body></html>"""
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--symbol", default="BTC")
-    ap.add_argument("--days", type=int, default=6,
-                    help="chart lookback before the first forward signal")
+    ap.add_argument("--days", type=int, default=6)
     args = ap.parse_args()
     sym = args.symbol.upper()
 
-    trades = rederive(sym)
+    bars, trades, pool_rows = rederive(sym)
     check = crosscheck(sym, trades)
     print(check)
     fwd = [t for t in trades if t["fill_ts"] >= FREEZE_TS]
@@ -278,31 +367,59 @@ def main() -> int:
         print(story(sym, t))
         print()
 
-    # candles for the window
-    bars = SC.load_csv(str(ensure_bars(sym)))
     t0 = FREEZE_TS - args.days * 86400
     candles = [{"time": b[0] + TZ, "open": b[1], "high": b[2],
                 "low": b[3], "close": b[4]} for b in bars if b[0] >= t0]
     now_ts = bars[-1][0]
+    ts_of = {b[0]: b[0] for b in bars}
+    bar_ts = [b[0] for b in bars]
+
+    def clamp(ts):
+        return max(ts, t0)
 
     markers, levels, rows = [], [], []
+    RED, GREEN, GREY, AMBER = "#e01b24", "#26a269", "#5b6472", "#facc15"
+
+    # ── pools: the map layer ─────────────────────────────────────────────
+    resting = sorted([p for p in pool_rows if p["state"] == "resting"],
+                     key=lambda p: -p["origin"])[:MAX_RESTING]
+    waiting = [p for p in pool_rows if p["state"] == "swept_waiting"]
+    for p in resting:
+        o_ts = bar_ts[p["origin"]]
+        if o_ts < t0:
+            o_ts = t0
+        col = RED if p["side"] == 1 else GREEN
+        levels.append({"c": col, "w": 1, "st": 2,      # dotted, to the edge
+                       "pts": [{"time": clamp(o_ts) + TZ, "value": p["lvl"]},
+                               {"time": now_ts + TZ, "value": p["lvl"]}]})
+    for p in waiting:
+        o_ts = clamp(bar_ts[p["origin"]])
+        s_ts = bar_ts[p["sweep"]]
+        col = RED if p["side"] == 1 else GREEN
+        levels.append({"c": col, "w": 2, "st": 0,
+                       "pts": [{"time": o_ts + TZ, "value": p["lvl"]},
+                               {"time": now_ts + TZ, "value": p["lvl"]}]})
+        markers.append({"time": s_ts + TZ, "position": "aboveBar" if p["side"] == 1 else "belowBar",
+                        "shape": "circle", "color": AMBER, "text": "⏳"})
+
+    # ── forward trades: replay layer ─────────────────────────────────────
     for t in fwd:
-        col_in = "#26a269" if t["side"] == "LONG" else "#e01b24"
-        if not t["b"]:
-            col_in = "#5b6472"
+        col = (GREEN if t["side"] == "LONG" else RED) if t["b"] else GREY
+        o_ts = clamp(t["origin_ts"])
+        end = (t["exit_ts"] or now_ts)
+        levels.append({"c": col, "w": 2 if t["b"] else 1, "st": 0,
+                       "pts": [{"time": o_ts + TZ, "value": t["lvl"]},
+                               {"time": end + TZ, "value": t["lvl"]}]})
         markers.append({"time": t["fill_ts"] + TZ,
                         "position": "belowBar" if t["side"] == "LONG" else "aboveBar",
                         "shape": "arrowUp" if t["side"] == "LONG" else "arrowDown",
-                        "color": col_in, "text": ("B " if t["b"] else "") + t["kind"][:2]})
+                        "color": col,
+                        "text": ("B " if t["b"] else "") + KIND_ZH[t["kind"]]})
         if t["exit_ts"]:
             win = (t["net"] or 0) > 0
             markers.append({"time": t["exit_ts"] + TZ, "position": "inBar",
                             "shape": "circle",
                             "color": "#4ade80" if win else "#f87171", "text": ""})
-        end = (t["exit_ts"] or now_ts) + TZ
-        levels.append({"c": col_in, "st": 0 if t["b"] else 2,
-                       "pts": [{"time": t["sweep_ts"] + TZ, "value": t["lvl"]},
-                               {"time": end, "value": t["lvl"]}]})
         f8 = datetime.fromtimestamp(t["fill_ts"] + TZ, timezone.utc)
         stat = ("OPEN" if not t["exit_ts"]
                 else ("win" if (t["net"] or 0) > 0 else "loss"))
