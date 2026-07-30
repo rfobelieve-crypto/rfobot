@@ -1671,6 +1671,39 @@ def _indicator_admin_headers() -> dict:
     return {"X-Admin-Token": tok} if tok else {}
 
 
+def _handle_shadow_review(chat_id):
+    """Strategy-#3 shadow 覆盤 — sends URL buttons that open the on-demand
+    review chart (indicator service regenerates per query). URL buttons so
+    the chart opens in a real browser: the in-app preview blocks the chart
+    library CDN (user hit exactly this on 2026-07-30)."""
+    if not INDICATOR_SERVICE_URL:
+        send_message(chat_id, "INDICATOR_SERVICE_URL 未設定")
+        return
+    tok = os.getenv("ADMIN_HEAL_TOKEN", "")
+    def u(sym):
+        q = f"symbol={sym}"
+        if tok:
+            q += f"&token={tok}"
+        return f"{INDICATOR_SERVICE_URL}/research/shadow-review?{q}"
+    kb = {"inline_keyboard": [
+        [{"text": "BTC", "url": u("BTC")}, {"text": "ETH", "url": u("ETH")},
+         {"text": "SOL", "url": u("SOL")}, {"text": "BNB", "url": u("BNB")}],
+        [{"text": "XRP", "url": u("XRP")}, {"text": "DOGE", "url": u("DOGE")},
+         {"text": "LINK", "url": u("LINK")}, {"text": "AVAX", "url": u("AVAX")}],
+    ]}
+    try:
+        requests.post(f"{API_URL}/sendMessage", data={
+            "chat_id": chat_id,
+            "text": ("Shadow 覆盤（策略 #3 記錄器）\n"
+                     "選幣開圖：橫線=被獵取的流動性價位、▲▼=進場"
+                     "（亮=變體B 灰=僅記錄）、●=出場。\n"
+                     "查詢當下即時重算（首次開一個幣約 5-10 秒）。"
+                     "其他幣直接改網址 symbol= 參數。"),
+            "reply_markup": json.dumps(kb)}, timeout=10)
+    except Exception:
+        logger.exception("shadow_review_buttons_failed")
+
+
 _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
     [
         {"text": "\U0001f4ca Chart", "callback_data": "chart"},
@@ -1682,6 +1715,7 @@ _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
     ],
     [
         {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
+        {"text": "\U0001f50d Shadow 覆盤", "callback_data": "shadow_review"},
     ],
 ]})
 
@@ -2258,6 +2292,7 @@ def _send_help(chat_id: str):
         ],
         [
             {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
+            {"text": "\U0001f50d Shadow 覆盤", "callback_data": "shadow_review"},
         ],
     ]})
     url = f"{API_URL}/sendMessage"
@@ -2417,6 +2452,8 @@ def webhook():
                 threading.Thread(target=_handle_alpha_decay, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "okx_perf":
                 threading.Thread(target=_handle_okx_perf, args=(cb_chat_id,), daemon=True).start()
+            elif cb_data == "shadow_review":
+                threading.Thread(target=_handle_shadow_review, args=(cb_chat_id,), daemon=True).start()
             elif cb_data == "help":
                 _send_help(cb_chat_id)
             return "ok"

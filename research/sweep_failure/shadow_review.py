@@ -41,6 +41,55 @@ except Exception:
     pass
 
 RESULTS = Path(__file__).resolve().parents[2] / "research/results"
+FETCH_DAYS = 900          # enough history that swing levels match the local run
+
+
+def ensure_bars(sym: str) -> Path:
+    """The Railway image has no kline cache (gitignored), and a local cache
+    can be stale between hourly shadow runs. Fetch/refresh from Binance
+    public REST on demand — the route regenerates per query by design."""
+    import csv as _csv
+    import json as _json
+    import time as _time
+    import urllib.request
+    p = LT.CACHE / f"{sym}USDT_1h.csv"
+    now = _time.time()
+    if p.exists():
+        last = SC.load_csv(str(p))[-1][0]
+        if now - last < 2 * 3600:
+            return p
+        start_ms = (last + 3600) * 1000
+    else:
+        LT.CACHE.mkdir(parents=True, exist_ok=True)
+        start_ms = int((now - FETCH_DAYS * 86400) * 1000)
+    rows = {}
+    cur = start_ms
+    while cur < now * 1000:
+        req = urllib.request.Request(
+            "https://api.binance.com/api/v3/klines"
+            f"?symbol={sym}USDT&interval=1h&startTime={int(cur)}&limit=1000",
+            headers={"User-Agent": "shadow-review/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            d = _json.loads(r.read().decode())
+        if not d:
+            break
+        for k in d:
+            if int(k[6]) > now * 1000:      # live bar
+                continue
+            rows[int(k[0]) // 1000] = (float(k[1]), float(k[2]),
+                                       float(k[3]), float(k[4]), float(k[5]))
+        cur = int(d[-1][0]) + 3600_000
+        if len(d) < 1000:
+            break
+    if rows:
+        mode = "a" if p.exists() else "w"
+        with p.open(mode, newline="", encoding="utf-8") as f:
+            w = _csv.writer(f)
+            if mode == "w":
+                w.writerow(["time", "open", "high", "low", "close", "volume"])
+            for ts in sorted(rows):
+                w.writerow([ts, *rows[ts]])
+    return p
 LOG = RESULTS / "sweep_shadow_log.csv"
 FREEZE_TS = int(datetime(2026, 7, 28, tzinfo=timezone.utc).timestamp())
 PIERCE_MAX_B = 0.25
@@ -53,7 +102,7 @@ def rederive(sym: str) -> list[dict]:
     """Independent re-derivation of every trade with full anatomy
     (sweep bar, side, level, fill, exit) — the same frozen rules the shadow
     uses, but carrying the fields the log does not store."""
-    p = LT.CACHE / f"{sym}USDT_1h.csv"
+    p = ensure_bars(sym)
     bars = SC.load_csv(str(p))
     n = len(bars)
     H, L, C = SC.H, SC.L, SC.C
@@ -131,7 +180,15 @@ def rederive(sym: str) -> list[dict]:
 
 
 def crosscheck(sym: str, trades: list[dict]) -> str:
-    """The verification: the CSV the scheduler wrote vs this re-derivation."""
+    """The verification: the CSV the scheduler wrote vs this re-derivation.
+    On Railway the committed log copy is stale (it is written locally every
+    hour, pushed occasionally) — comparing fresh re-derivation against a
+    stale log would scream false mismatches, so staleness downgrades the
+    check to an honest note instead."""
+    import time as _time
+    if LOG.exists() and _time.time() - LOG.stat().st_mtime > 3 * 3600:
+        return ("shadow log 副本非即時（>3h 舊）— 本圖為同一套凍結規則的"
+                "即時重演算；逐筆對帳請在本機跑")
     logged = {}
     if LOG.exists():
         with LOG.open(newline="", encoding="utf-8") as f:
@@ -222,7 +279,7 @@ def main() -> int:
         print()
 
     # candles for the window
-    bars = SC.load_csv(str(LT.CACHE / f"{sym}USDT_1h.csv"))
+    bars = SC.load_csv(str(ensure_bars(sym)))
     t0 = FREEZE_TS - args.days * 86400
     candles = [{"time": b[0] + TZ, "open": b[1], "high": b[2],
                 "low": b[3], "close": b[4]} for b in bars if b[0] >= t0]

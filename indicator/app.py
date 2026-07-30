@@ -1577,6 +1577,56 @@ def research_cancel_flow_interactive_api():
                     "trace": _tb.format_exc()[-1500:]}), 500
 
 
+@app.route("/research/shadow-review", methods=["GET"])
+def research_shadow_review_api():
+    """Strategy-#3 shadow review chart (research/覆盤 aid — NOT a signal).
+
+    Renders research/sweep_failure/shadow_review.py in a subprocess and
+    returns the HTML inline. Regenerates on every load ("查詢時再更新",
+    user 2026-07-30): the script re-derives all forward signals from the
+    frozen rules, fetching klines from Binance public REST on demand, so it
+    works on Railway where the local kline cache does not exist (first query
+    per symbol fetches ~900d ≈ 5-10s; later queries refresh incrementally).
+    Admin-guarded via the /research/ prefix (?token= works for phone links).
+
+    Query params:  symbol=<BASE>  e.g. BTC, ETH, BNB (default BTC)
+    """
+    from flask import request as _rq, jsonify as _js, send_file as _sf
+    import subprocess as _sp
+    import sys as _sys
+    import traceback as _tb
+
+    root = Path(__file__).resolve().parent.parent
+    script = root / "research" / "sweep_failure" / "shadow_review.py"
+    if not script.exists():
+        return _js({"error": "research/ not present in this image"}), 501
+    allowed = {"BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "LINK",
+               "AVAX", "TRX", "DOT", "LTC", "UNI", "ATOM", "ETC", "NEAR",
+               "APT", "FIL", "ARB", "OP", "INJ", "SUI", "AAVE", "ICP",
+               "ALGO", "VET", "HBAR", "SAND", "AXS"}
+    symbol = (_rq.args.get("symbol", "") or "BTC").strip().upper()
+    if symbol not in allowed:
+        return _js({"error": f"symbol not in universe: {symbol}",
+                    "allowed": sorted(allowed)}), 400
+    out = root / "research" / "results" / f"shadow_review_{symbol.lower()}.html"
+    try:
+        out.unlink(missing_ok=True)      # never serve a stale leftover
+        r = _sp.run([_sys.executable, str(script), "--symbol", symbol],
+                    capture_output=True, text=True, timeout=110,
+                    cwd=str(root))
+        if r.returncode != 0 or not out.exists():
+            return _js({"error": "render failed",
+                        "stdout": (r.stdout or "")[-800:],
+                        "stderr": (r.stderr or "")[-800:]}), 500
+        return _sf(out, mimetype="text/html", max_age=0)
+    except _sp.TimeoutExpired:
+        return _js({"error": "render timed out (110s)"}), 500
+    except Exception:
+        logger.exception("shadow_review_route_failed")
+        return _js({"error": "shadow-review route crashed",
+                    "trace": _tb.format_exc()[-1500:]}), 500
+
+
 @app.route("/research/cancel-analyze", methods=["GET"])
 def research_cancel_analyze_api():
     """Deterministic cancel-flow window summary (research aid — NOT a signal).
