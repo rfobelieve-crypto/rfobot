@@ -85,7 +85,135 @@ LEVEL_KINDS = ("swing", "session", "pdh_pdl", "pwh_pwl")
 
 FIELDS = ["symbol", "universe", "level_kind", "first_seen_utc", "fill_ts",
           "fill_utc", "entry_px", "atr", "pierce_atr", "variant_b", "status",
-          "exit_ts", "exit_utc", "stopped", "gross_r", "net_r"]
+          "exit_ts", "exit_utc", "stopped", "gross_r", "net_r",
+          # Order-flow annotation (2026-07-31, operator: "shadow 不整合我就
+          # 沒辦法看到訊號的樣子"). PROSPECTIVE observation columns computed
+          # from public 1m klines at record time — they change NOTHING in
+          # the gate arithmetic (gate_stats reads net_r/variant_b/status
+          # only; the registered Variant B track is untouched). Stored raw,
+          # no thresholds baked in, so the October pre-registration can
+          # apply its cuts to genuinely prospective values instead of
+          # retro-computed ones. Definitions mirror the raid-anatomy round-4
+          # attack-window features, sourced from klines so all 29 symbols
+          # get them (taker delta = 2*taker_buy_base - volume):
+          #   flow_reject   1m close crossed back inside before hour end
+          #   flow_att_min  minutes spent beyond the level in the sweep hour
+          #   flow_vshock   attack-minute vol / trailing-24h median 1m vol
+          #   flow_taker    signed taker share INTO the break, attack mins
+          #   flow_absorb   flow_taker / max(pierce, 0.1)
+          "flow_reject", "flow_att_min", "flow_vshock", "flow_taker",
+          "flow_absorb"]
+
+FLOW_BACKFILL_PER_RUN = 40      # cap 1m-kline fetch work per hourly run
+
+
+def fetch_1m_window(sym: str, start_s: int, end_s: int) -> dict[int, tuple]:
+    """minute -> (high, low, close, volume, taker_buy_base) from Binance
+    spot 1m klines, [start_s, end_s). No disk cache: callers keep windows
+    small (~25h) and the hourly run touches only new/blank rows."""
+    out: dict[int, tuple] = {}
+    cur = start_s * 1000
+    while cur < end_s * 1000:
+        req = urllib.request.Request(
+            f"{BASE}?symbol={sym}USDT&interval=1m&startTime={int(cur)}"
+            f"&endTime={end_s * 1000}&limit=1000",
+            headers={"User-Agent": "sweep-shadow/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            d = json.loads(r.read().decode())
+        if not d:
+            break
+        for k in d:
+            out[int(k[0]) // 60_000] = (float(k[2]), float(k[3]), float(k[4]),
+                                        float(k[5]), float(k[9]))
+        cur = int(d[-1][0]) + 60_000
+        if len(d) < 1000:
+            break
+        time.sleep(0.05)
+    return out
+
+
+def find_sweep(bars, fill_ts: int, lvl: float, atr: float, pierce: float):
+    """Recover the sweep bar (and side) the log row came from: the nearest
+    bar before the fill whose pierce of `lvl` matches the recorded
+    pierce_atr. The log predates these columns, so this stays derivable for
+    every historical row instead of only new ones."""
+    idx = {b[0]: i for i, b in enumerate(bars)}
+    j0 = idx.get(fill_ts)
+    if j0 is None or atr <= 0:
+        return None
+    for j in range(j0 - 1, max(-1, j0 - 1 - SC.W), -1):
+        hi, lo = bars[j][SC.H], bars[j][SC.L]
+        if abs((hi - lvl) / atr - pierce) < 5e-4 and hi > lvl:
+            return bars[j][0], 1
+        if abs((lvl - lo) / atr - pierce) < 5e-4 and lo < lvl:
+            return bars[j][0], -1
+    return None
+
+
+def flow_flags(sym: str, sweep_ts: int, side: int, lvl: float) -> dict | None:
+    """The round-4 attack-window features for ONE sweep, minutes-only."""
+    m0 = sweep_ts // 60
+    m1 = fetch_1m_window(sym, sweep_ts - 24 * 3600, sweep_ts + 3600)
+    mins = [(m, *m1[m]) for m in range(m0, m0 + 60) if m in m1]
+    base = [m1[m][3] for m in range(m0 - 1440, m0) if m in m1]
+    if len(mins) < 50 or len(base) < 500:
+        return None
+    beyond = [(m, hi, lo, c, v, tb) for (m, hi, lo, c, v, tb) in mins
+              if (hi > lvl if side == 1 else lo < lvl)]
+    if not beyond:
+        return None
+    last_beyond = beyond[-1][0]
+    rej = 0
+    for (m, _hi, _lo, c, _v, _tb) in mins:
+        if m > last_beyond and ((c <= lvl) if side == 1 else (c >= lvl)):
+            rej = 1
+            break
+    vol = sum(b[4] for b in beyond)
+    med = sorted(base)[len(base) // 2]
+    taker = (side * sum(2 * b[5] - b[4] for b in beyond) / vol
+             if vol > 0 else None)
+    return {
+        "flow_reject": rej,
+        "flow_att_min": len(beyond),
+        "flow_vshock": (round((vol / len(beyond)) / med, 2)
+                        if med > 0 else None),
+        "flow_taker": round(taker, 4) if taker is not None else None,
+    }
+
+
+def annotate_flow(log: dict, sym: str, bars) -> int:
+    """Fill blank flow_* columns for this symbol's rows, oldest first,
+    respecting the per-run fetch cap. Values are immutable once written
+    (the sweep hour is always closed by the time a fill exists)."""
+    todo = sorted((k for k, r in log.items()
+                   if k[0] == sym and r.get("flow_reject") in (None, "")
+                   and r.get("pierce_atr")),
+                  key=lambda k: k[2])[:FLOW_BACKFILL_PER_RUN]
+    done = 0
+    for k in todo:
+        r = log[k]
+        try:
+            sw = find_sweep(bars, int(r["fill_ts"]), float(r["entry_px"]),
+                            float(r["atr"]), float(r["pierce_atr"]))
+            if sw is None:
+                r["flow_reject"] = "na"
+                continue
+            sweep_ts, side = sw
+            f = flow_flags(sym, sweep_ts, side, float(r["entry_px"]))
+            if f is None:
+                r["flow_reject"] = "na"
+                continue
+            pierce = float(r["pierce_atr"])
+            f["flow_absorb"] = (round(f["flow_taker"] / max(pierce, 0.1), 3)
+                                if f.get("flow_taker") is not None else "")
+            for c in ("flow_reject", "flow_att_min", "flow_vshock",
+                      "flow_taker", "flow_absorb"):
+                r[c] = f.get(c, "")
+            done += 1
+        except Exception as e:  # noqa: BLE001 — leave blank, retry next run
+            print(f"  {sym}: flow annotate failed ({type(e).__name__}: {e})")
+            break
+    return done
 
 
 def refresh(sym: str) -> Path | None:
@@ -267,6 +395,7 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     stamp = f"{now:%Y-%m-%d %H:%M}"
     new = 0
+    flow_done = 0
     for uni, syms in (("core9", CORE9), ("added20", ADDED20)):
         for sym in syms:
             p = refresh(sym)
@@ -315,8 +444,12 @@ def main() -> int:
                     "gross_r": f"{gross:.6f}" if (done and gross is not None) else "",
                     "net_r": f"{netv:.6f}" if done else "",
                 })
+            flow_done += annotate_flow(log, sym, bars)
     write_log(log)
-    print(f"shadow run {stamp}  new signals: {new}")
+    n_flow = sum(1 for r in log.values()
+                 if r.get("flow_reject") not in (None, "", "na"))
+    print(f"shadow run {stamp}  new signals: {new}  "
+          f"flow annotated: +{flow_done} ({n_flow}/{len(log)} covered)")
     summary(log)
     print("  " + gate_progress(log))
     return 0

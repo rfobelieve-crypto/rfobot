@@ -332,7 +332,7 @@ def crosscheck(sym: str, trades) -> str:
             + nm + ("" if miss or (nm_tot and nm_ok < nm_tot) else " ✓"))
 
 
-def story(sym: str, t: dict) -> str:
+def story(sym: str, t: dict, fl: dict | None = None) -> str:
     f = datetime.fromtimestamp(t["fill_ts"], timezone.utc)
     s = datetime.fromtimestamp(t["sweep_ts"], timezone.utc)
     wait = int((t["fill_ts"] - t["sweep_ts"]) / 3600)
@@ -344,6 +344,10 @@ def story(sym: str, t: dict) -> str:
         f"  失敗:   {wait} 根內回到價位 -> {f:%m-%d %H:%M} 進場 {t['side']}",
         f"  風控:   停損 {t['stop']:.6g} (3.5xATR), 最多 {SC.HOLD} 根",
     ]
+    if fl and fl.get("flow_reject") not in (None, "", "na"):
+        lines.append(f"  流特徵: 收回{'✓' if fl['flow_reject'] == '1' else '✗'}"
+                     f" · 攻擊 {fl.get('flow_att_min', '?')} 分"
+                     f" · 量能 {fl.get('flow_vshock', '?')}x")
     if t["exit_ts"]:
         x = datetime.fromtimestamp(t["exit_ts"], timezone.utc)
         lines.append(f"  出場:   {x:%m-%d %H:%M}  netR {t['net']:+.3f}")
@@ -382,7 +386,8 @@ th{{background:#1a1f27}} td:first-child,th:first-child{{text-align:left}}
 <div id="c"></div>
 <div id="eqt" class="dim" style="padding:2px 14px;font-size:12px">累積 netR（凍結後已平倉 · 灰=全部 / 綠=變體B）</div>
 <div id="eq" style="height:18vh"></div>
-<table><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>B</th><th>狀態</th><th>netR</th></tr>{rows}</table>
+<table><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>B</th><th>收回</th><th>攻擊</th><th>量能</th><th>狀態</th><th>netR</th></tr>{rows}</table>
+<div style="padding:2px 14px 10px;font-size:11px" class="dim">流特徵（前瞻記錄, 不參與 gate）: 收回=獵取小時內 1m 收回價位內側 · 攻擊=突破價位的分鐘數 · 量能=攻擊分鐘量/24h 中位分鐘量。反轉配方候選 = 收回✓+量能高（10 月預註冊驗）。</div>
 <script>
 const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0e1116'}},textColor:'#9aa0a6'}},grid:{{vertLines:{{color:'#1c2129'}},horzLines:{{color:'#1c2129'}}}},timeScale:{{timeVisible:true,secondsVisible:false,rightOffset:3}}}});
 const cs=chart.addCandlestickSeries({{upColor:'#26a269',downColor:'#e01b24',borderVisible:false,wickUpColor:'#26a269',wickDownColor:'#e01b24'}});
@@ -447,10 +452,18 @@ def main() -> int:
     bars, trades, pool_rows = rederive(sym)
     check = crosscheck(sym, trades)
     print(check)
+    # flow annotation lives in the shadow CSV (prospective columns written
+    # by the hourly recorder) — keyed the same way the crosscheck matches
+    flow: dict[tuple[str, int], dict] = {}
+    if LOG.exists():
+        with LOG.open(newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                if r["symbol"] == sym:
+                    flow[(r.get("level_kind", "swing"), int(r["fill_ts"]))] = r
     fwd = [t for t in trades if t["fill_ts"] >= FREEZE_TS]
     print(f"{sym}: {len(fwd)} forward signals since freeze\n")
     for t in fwd[-3:]:
-        print(story(sym, t))
+        print(story(sym, t, flow.get((t["kind"], t["fill_ts"]))))
         print()
 
     # ── performance panel (the point of watching a shadow at all) ────────
@@ -582,11 +595,21 @@ def main() -> int:
         f8 = datetime.fromtimestamp(t["fill_ts"] + TZ, timezone.utc)
         stat = ("OPEN" if not t["exit_ts"]
                 else ("win" if (t["net"] or 0) > 0 else "loss"))
+        fl = flow.get((t["kind"], t["fill_ts"]), {})
+        rej = fl.get("flow_reject", "")
+        rej_cell = ("<td class='b'>✓</td>" if rej == "1"
+                    else "<td>—</td>" if rej == "0"
+                    else "<td class='dim'>·</td>")
+        att = fl.get("flow_att_min", "")
+        vsh = fl.get("flow_vshock", "")
         rows.append(
             f"<tr><td>{f8:%m-%d %H:%M}</td><td>{KIND_ZH[t['kind']]}</td>"
             f"<td>{t['side']}</td><td>{t['lvl']:.6g}</td>"
             f"<td>{t['pierce']:.2f}</td>"
             f"<td class='b'>{'✓' if t['b'] else ''}</td>"
+            + rej_cell
+            + f"<td>{att + '分' if att else '·'}</td>"
+            f"<td>{vsh + 'x' if vsh else '·'}</td>"
             f"<td class='{stat.lower() if stat != 'OPEN' else 'open'}'>{stat}</td>"
             f"<td>{('%+.3f' % t['net']) if t['net'] is not None else '—'}</td></tr>")
 
