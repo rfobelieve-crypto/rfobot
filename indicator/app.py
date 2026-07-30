@@ -1617,13 +1617,12 @@ def research_shadow_review_api():
     if symbol not in allowed:
         return _js({"error": f"symbol not in universe: {symbol}",
                     "allowed": sorted(allowed)}), 400
-    # default one week — operator feedback 2026-07-30: 48h reads as "only
-    # this many candles" on the phone; a week gives real context and pinch
-    # zoom handles detail
+    # default 90 days (operator, 2026-07-30) — full window; pinch zoom
+    # handles detail, &hours= overrides down to 12
     try:
-        hours = max(12, min(2160, int(_rq.args.get("hours", "168"))))
+        hours = max(12, min(2160, int(_rq.args.get("hours", "2160"))))
     except ValueError:
-        hours = 168
+        hours = 2160
     out = root / "research" / "results" / f"shadow_review_{symbol.lower()}.html"
     try:
         out.unlink(missing_ok=True)      # never serve a stale leftover
