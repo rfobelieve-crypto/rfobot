@@ -1,0 +1,92 @@
+{
+  "att_min": {
+    "low": {
+      "n": 613,
+      "breakout_pct": 1.7944535073409462,
+      "reversal_pct": 60.35889070146819,
+      "netR_if_retested": 0.0934633577916233
+    },
+    "mid": {
+      "n": 615,
+      "breakout_pct": 9.75609756097561,
+      "reversal_pct": 50.89430894308943,
+      "netR_if_retested": 0.050524892691521224
+    },
+    "high": {
+      "n": 603,
+      "breakout_pct": 21.558872305140962,
+      "reversal_pct": 37.97678275290215,
+      "netR_if_retested": -0.0058728105316512265
+    }
+  },
+  "att_taker": {
+    "low": {
+      "n": 611,
+      "breakout_pct": 11.456628477905074,
+      "reversal_pct": 47.299509001636665,
+      "netR_if_retested": 0.03277894775287916
+    },
+    "mid": {
+      "n": 610,
+      "breakout_pct": 13.60655737704918,
+      "reversal_pct": 50.16393442622951,
+      "netR_if_retested": 0.09924866162626757
+    },
+    "high": {
+      "n": 610,
+      "breakout_pct": 7.868852459016393,
+      "reversal_pct": 51.967213114754095,
+      "netR_if_retested": 0.02044655167531989
+    }
+  },
+  "att_vshock": {
+    "low": {
+      "n": 611,
+      "breakout_pct": 9.983633387888707,
+      "reversal_pct": 48.28150572831424,
+      "netR_if_retested": -0.026348743717401365
+    },
+    "mid": {
+      "n": 613,
+      "breakout_pct": 10.929853181076671,
+      "reversal_pct": 44.69820554649266,
+      "netR_if_retested": 0.025283279943384508
+    },
+    "high": {
+      "n": 607,
+      "breakout_pct": 12.026359143327841,
+      "reversal_pct": 56.50741350906095,
+      "netR_if_retested": 0.15396171469730943
+    }
+  },
+  "post_rej_taker": {
+    "low": {
+      "n": 306,
+      "breakout_pct": 0.0,
+      "reversal_pct": 57.51633986928105,
+      "netR_if_retested": -0.0032142245176592196
+    },
+    "mid": {
+      "n": 306,
+      "breakout_pct": 0.0,
+      "reversal_pct": 60.78431372549019,
+      "netR_if_retested": 0.11420909686561728
+    },
+    "high": {
+      "n": 305,
+      "breakout_pct": 0.0,
+      "reversal_pct": 61.63934426229508,
+      "netR_if_retested": 0.1396024878093002
+    }
+  },
+  "reject_0": {
+    "n": 914,
+    "breakout_pct": 21.99124726477024,
+    "netR": 0.006991904253252027
+  },
+  "reject_1": {
+    "n": 917,
+    "breakout_pct": 0.0,
+    "netR": 0.08347130831004546
+  }
+}
