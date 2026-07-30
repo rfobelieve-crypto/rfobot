@@ -64,10 +64,14 @@ def _make_reply_markup():
     import json
     # /dashboard is admin-guarded; embed the token so the button keeps working
     # (the Telegram chat is operator-only, so the URL stays private).
-    dash_url = "https://enchanting-emotion-production-4b4d.up.railway.app/dashboard"
+    _base = "https://enchanting-emotion-production-4b4d.up.railway.app"
     _tok = os.environ.get("ADMIN_HEAL_TOKEN", "")
-    if _tok:
-        dash_url += f"?token={_tok}"
+    dash_url = f"{_base}/dashboard" + (f"?token={_tok}" if _tok else "")
+    # Shadow 覆盤 (strategy #3 recorder): URL button like Dashboard — opens
+    # the on-demand review chart in a real browser, regenerated per query.
+    # Other symbols by editing the symbol= param.
+    shadow_url = (f"{_base}/research/shadow-review?symbol=BTC"
+                  + (f"&token={_tok}" if _tok else ""))
     return json.dumps({"inline_keyboard": [
         [
             {"text": "\U0001f4ca Chart", "callback_data": "chart"},
@@ -85,7 +89,11 @@ def _make_reply_markup():
         ],
         [
             {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
-            {"text": "\U0001f9f2 撤單流", "callback_data": "cancel_flow"},
+            # 撤單流 button removed 2026-07-30 (user): cancel-flow lives on
+            # its own bot now. Old messages keep the old button — the
+            # cancel_flow callback handler in the main webhook stays so
+            # those do not dead-end.
+            {"text": "\U0001f50d Shadow 覆盤", "url": shadow_url},
         ],
     ]})
 
