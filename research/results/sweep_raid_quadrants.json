@@ -1,0 +1,102 @@
+{
+  "all": {
+    "up/with": {
+      "n": 1206,
+      "breakout_pct": 12.520729684908789,
+      "reversal_pct": 45.27363184079602,
+      "netR": 0.005161738180962808
+    },
+    "dn/with": {
+      "n": 1269,
+      "breakout_pct": 12.214342001576044,
+      "reversal_pct": 51.536643026004725,
+      "netR": 0.09234128229296522
+    },
+    "up/anti": {
+      "n": 95,
+      "breakout_pct": 5.2631578947368425,
+      "reversal_pct": 58.94736842105263,
+      "netR": 0.0266070214232388
+    },
+    "dn/anti": {
+      "n": 123,
+      "breakout_pct": 8.130081300813009,
+      "reversal_pct": 65.04065040650407,
+      "netR": 0.3064451681359121
+    }
+  },
+  "material_oi": {
+    "up/with": {
+      "n": 913,
+      "breakout_pct": 14.457831325301205,
+      "reversal_pct": 46.768893756845564,
+      "netR": 0.025026019474789798
+    },
+    "dn/with": {
+      "n": 972,
+      "breakout_pct": 14.40329218106996,
+      "reversal_pct": 50.82304526748971,
+      "netR": 0.1211053620872836
+    },
+    "up/anti": null,
+    "dn/anti": null
+  },
+  "shallow": {
+    "up/with": {
+      "n": 346,
+      "breakout_pct": 0.5780346820809249,
+      "reversal_pct": 57.80346820809248,
+      "netR": 0.08030672318257222
+    },
+    "dn/with": {
+      "n": 270,
+      "breakout_pct": 0.0,
+      "reversal_pct": 63.7037037037037,
+      "netR": 0.10072424441408658
+    },
+    "up/anti": null,
+    "dn/anti": {
+      "n": 66,
+      "breakout_pct": 0.0,
+      "reversal_pct": 71.21212121212122,
+      "netR": 0.34300168447857715
+    }
+  },
+  "H1": {
+    "up/with": {
+      "n": 606,
+      "breakout_pct": 14.686468646864686,
+      "reversal_pct": 46.20462046204621,
+      "netR": 0.026536814718489357
+    },
+    "dn/with": {
+      "n": 623,
+      "breakout_pct": 12.841091492776886,
+      "reversal_pct": 48.95666131621188,
+      "netR": 0.05026803224433069
+    },
+    "up/anti": null,
+    "dn/anti": {
+      "n": 64,
+      "breakout_pct": 0.0,
+      "reversal_pct": 78.125,
+      "netR": 0.39011334601058617
+    }
+  },
+  "H2": {
+    "up/with": {
+      "n": 600,
+      "breakout_pct": 10.333333333333334,
+      "reversal_pct": 44.333333333333336,
+      "netR": -0.015378995220340532
+    },
+    "dn/with": {
+      "n": 646,
+      "breakout_pct": 11.609907120743035,
+      "reversal_pct": 54.024767801857585,
+      "netR": 0.1323513957367628
+    },
+    "up/anti": null,
+    "dn/anti": null
+  }
+}
