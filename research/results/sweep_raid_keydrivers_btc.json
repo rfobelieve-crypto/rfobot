@@ -1,0 +1,75 @@
+{
+ "pierce": {
+  "auc": 0.863,
+  "ic": 0.037,
+  "verdict": "\u89e3\u6790"
+ },
+ "att_min": {
+  "auc": 0.8,
+  "ic": -0.07,
+  "verdict": "\u89e3\u6790+\u54c1\u8cea"
+ },
+ "reject_in_hour": {
+  "auc": 0.227,
+  "ic": 0.051,
+  "verdict": "\u89e3\u6790+\u54c1\u8cea"
+ },
+ "att_vshock": {
+  "auc": 0.498,
+  "ic": 0.152,
+  "verdict": "\u54c1\u8cea"
+ },
+ "oi_chg_raid": {
+  "auc": 0.441,
+  "ic": -0.079,
+  "verdict": "\u54c1\u8cea"
+ },
+ "fut_taker_signed": {
+  "auc": 0.618,
+  "ic": -0.043,
+  "verdict": "\u89e3\u6790"
+ },
+ "liq_burst": {
+  "auc": 0.731,
+  "ic": 0.064,
+  "verdict": "\u89e3\u6790"
+ },
+ "stop_fuel": {
+  "auc": 0.586,
+  "ic": -0.111,
+  "verdict": "\u89e3\u6790+\u54c1\u8cea"
+ },
+ "funding_signed": {
+  "auc": 0.492,
+  "ic": 0.109,
+  "verdict": "\u54c1\u8cea"
+ },
+ "mv_resolution": {
+  "oos_auc": 0.795,
+  "perm": {
+   "pierce": 0.1063,
+   "att_min": -0.0003,
+   "reject_in_hour": 0.0716,
+   "att_vshock": -0.0029,
+   "oi_chg_raid": -0.0132,
+   "fut_taker_signed": 0.0172,
+   "liq_burst": -0.0001,
+   "stop_fuel": 0.0066,
+   "funding_signed": 0.0028
+  }
+ },
+ "mv_quality": {
+  "oos_ic": -0.074,
+  "perm": {
+   "pierce": 0.0083,
+   "att_min": -0.0146,
+   "reject_in_hour": 0.004,
+   "att_vshock": 0.0204,
+   "oi_chg_raid": -0.0104,
+   "fut_taker_signed": -0.0591,
+   "liq_burst": 0.0117,
+   "stop_fuel": -0.0341,
+   "funding_signed": -0.0455
+  }
+ }
+}
