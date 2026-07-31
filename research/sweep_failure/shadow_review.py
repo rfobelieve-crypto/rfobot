@@ -553,7 +553,7 @@ def main() -> int:
     perf = ("<div class='chips'>" + "".join(chips) + "</div>"
             + "<div class='sub'><b>變體A</b>=原始版·波段池·無濾網（Gate F 正式軌道）"
             + "　<b>變體B</b>=四種池＋淺穿越≤0.25ATR（預註冊 forward 中，表格 B 欄）"
-            + "　<b>變體C</b>=B∧收回內側✓＝流確認（觀察 cohort，表格 C 欄）</div>"
+            + "　<b>變體C</b>=B∧收回內側✓（1m 價格收回確認·非訂單流，觀察 cohort，表格 C 欄）</div>"
             + "<div class='sub'>凍結後 forward · 情境A成本 · "
             + " · ".join(kind_bits)
             + (f" · log截至 {asof} UTC" if asof else "") + "</div>")
