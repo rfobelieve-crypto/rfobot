@@ -1,0 +1,102 @@
+{
+ "pierce": {
+  "auc": 0.887,
+  "auc_h": [
+   0.882,
+   0.892
+  ],
+  "ic": -0.003,
+  "ic_h": [
+   0.004,
+   -0.027
+  ],
+  "verdict": "\u89e3\u6790"
+ },
+ "att_min": {
+  "auc": 0.772,
+  "auc_h": [
+   0.792,
+   0.754
+  ],
+  "ic": -0.113,
+  "ic_h": [
+   -0.1,
+   -0.147
+  ],
+  "verdict": "\u89e3\u6790+\u54c1\u8cea"
+ },
+ "reject_in_hour": {
+  "auc": 0.218,
+  "auc_h": [
+   0.211,
+   0.225
+  ],
+  "ic": 0.086,
+  "ic_h": [
+   0.044,
+   0.135
+  ],
+  "verdict": "\u89e3\u6790+\u54c1\u8cea"
+ },
+ "att_vshock": {
+  "auc": 0.559,
+  "auc_h": [
+   0.534,
+   0.587
+  ],
+  "ic": 0.136,
+  "ic_h": [
+   0.07,
+   0.219
+  ],
+  "verdict": "\u89e3\u6790+\u54c1\u8cea"
+ },
+ "att_taker": {
+  "auc": 0.451,
+  "auc_h": [
+   0.437,
+   0.467
+  ],
+  "ic": -0.004,
+  "ic_h": [
+   -0.02,
+   0.011
+  ],
+  "verdict": "\u89e3\u6790"
+ },
+ "absorption": {
+  "auc": 0.311,
+  "auc_h": [
+   0.292,
+   0.332
+  ],
+  "ic": 0.001,
+  "ic_h": [
+   -0.027,
+   0.041
+  ],
+  "verdict": "\u89e3\u6790"
+ },
+ "mv_resolution": {
+  "oos_auc": 0.844,
+  "perm": {
+   "pierce": 0.1175,
+   "att_min": -0.014,
+   "reject_in_hour": 0.1482,
+   "att_vshock": -0.0079,
+   "att_taker": 0.0006,
+   "absorption": 0.0031
+  }
+ },
+ "mv_quality": {
+  "oos_ic": -0.097,
+  "perm": {
+   "pierce": -0.0348,
+   "att_min": -0.0141,
+   "reject_in_hour": -0.0076,
+   "att_vshock": -0.0333,
+   "att_taker": -0.0609,
+   "absorption": -0.0303
+  }
+ }
+}
