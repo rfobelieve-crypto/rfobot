@@ -1704,17 +1704,15 @@ def _handle_shadow_review(chat_id):
         logger.exception("shadow_review_buttons_failed")
 
 
+# Consolidated 2026-07-31: main five only (handlers for the removed
+# buttons stay in the webhook for old messages / typed commands).
 _INDICATOR_BUTTONS = json.dumps({"inline_keyboard": [
     [
         {"text": "\U0001f4ca Chart", "callback_data": "chart"},
+        {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
         {"text": "\U0001f4cb Status", "callback_data": "status"},
     ],
     [
-        {"text": "\U0001f4c8 Perf", "callback_data": "perf"},
-        {"text": "\U0001f4e6 DB", "callback_data": "db"},
-    ],
-    [
-        {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
         {"text": "\U0001f50d Shadow 覆盤", "callback_data": "shadow_review"},
     ],
 ]})
@@ -2274,24 +2272,15 @@ def _send_help(chat_id: str):
         "(撤單流研究功能已移至獨立 bot)\n\n"
         "<i>也可直接點擊下方按鈕操作</i>"
     )
+    # Consolidated 2026-07-31: main five only (removed buttons keep
+    # working via typed commands / old messages — handlers untouched).
     keyboard = json_mod.dumps({"inline_keyboard": [
         [
             {"text": "\U0001f4ca Chart", "callback_data": "chart"},
-            {"text": "\U0001f4c8 Perf", "callback_data": "perf"},
-            {"text": "\U0001f4e6 DB", "callback_data": "db"},
-        ],
-        [
-            {"text": "\U0001f30a Flow BTC", "callback_data": "flow_btc"},
-            {"text": "\U0001f30d Flow All", "callback_data": "flow_all"},
+            {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
             {"text": "\u2699\ufe0f Status", "callback_data": "status"},
         ],
         [
-            {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
-            {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
-            {"text": "\u2753 Help", "callback_data": "help"},
-        ],
-        [
-            {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
             {"text": "\U0001f50d Shadow 覆盤", "callback_data": "shadow_review"},
         ],
     ]})

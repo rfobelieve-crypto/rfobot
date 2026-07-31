@@ -72,28 +72,19 @@ def _make_reply_markup():
     # Other symbols by editing the symbol= param.
     shadow_url = (f"{_base}/research/shadow-review?symbol=BTC"
                   + (f"&token={_tok}" if _tok else ""))
+    # Consolidated 2026-07-31 (user: "不用那麼多功能主要的幾個就好").
+    # Removed from DISPLAY only — perf/db/flow_all/ichart/decay handlers
+    # all stay in the webhook, so old messages' buttons and typed
+    # commands keep working; those views also live on the site dashboard.
     return json.dumps({"inline_keyboard": [
         [
             {"text": "\U0001f4ca Chart", "callback_data": "chart"},
-            {"text": "\U0001f4c8 Perf", "callback_data": "perf"},
-            {"text": "\U0001f4e6 DB", "callback_data": "db"},
-        ],
-        [
-            {"text": "\U0001f4cb Dashboard", "url": dash_url},
-            {"text": "\U0001f30d Flow All", "callback_data": "flow_all"},
+            {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
             {"text": "\u2699\ufe0f Status", "callback_data": "status"},
         ],
         [
-            {"text": "\U0001f4c8 iChart", "callback_data": "ichart"},
-            {"text": "\U0001f4c9 Decay", "callback_data": "decay"},
-        ],
-        [
-            {"text": "\U0001f4b0 LIVE Perf", "callback_data": "okx_perf"},
-            # 撤單流 button removed 2026-07-30 (user): cancel-flow lives on
-            # its own bot now. Old messages keep the old button — the
-            # cancel_flow callback handler in the main webhook stays so
-            # those do not dead-end.
             {"text": "\U0001f50d Shadow 覆盤", "url": shadow_url},
+            {"text": "\U0001f4cb Dashboard", "url": dash_url},
         ],
     ]})
 
