@@ -80,6 +80,15 @@
 - 紀律：**變體 A（凍結、swing、無濾網）仍是 Gate F 正式軌道，未被改寫**；
       #3 的搜尋今日到此為止，任何新想法先寫下來、等 forward 窗口跑完再測
 
+### 0.473 存活特徵前瞻記錄上線（2026-08-02）
+使用者：「繼續研究並把這些特徵列入紀錄」——shadow log 新增 BTC 四欄
+drv_q / drv_liqburst / drv_gap_oi / v7_align（全部有存活紀錄的特徵），
+15/15 BTC forward 列已覆蓋；十月驗證從此拿到全前瞻樣本。
+**順手修掉一個靜默失敗**：研究線 cg_*_1h parquet 自 07-28 停更（兩條平行
+CG 資料線——DailyCollect 只餵 raw_data/coinglass/，研究線靠 ensure_fresh
+偶發觸發；排程綠燈+資料死亡的老家族）→ `research/backfill_all_parquet.py`
+已掛進 daily_collect.bat step 1.5，每日隨排程刷新
+
 ### 0.472 存活者堆疊評分 PASS（2026-08-02，`sweep_raid_survivor_stack.py`·BTC）
 使用者 A-L 清單的「簡單評分測試」——但只堆疊有存活紀錄的 7 特徵（pierce/
 att_min/收回/量能/Q/清算爆量/pred_align），5 折擴窗 OOS，預定判準通過：

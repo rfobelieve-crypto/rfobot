@@ -325,6 +325,14 @@ D = 變體 C ∧ 量能高 = 研究收斂的**訂單流反轉組合**（收回�
 攻擊分鐘數（att_min）、量能倍數（vshock，攻擊分鐘量/24h 中位分鐘量）、
 追價佔比（taker）、吸收（absorb）。只記錄、不參與 gate。
 
+**存活者前瞻欄位（drv_\*/v7_align，2026-08-02 起，BTC-only）**
+研究線裡「掙得席位」的特徵全部進 shadow log 前瞻記錄：drv_q（獵取小時
+OI↓∧追價順破＝Q 旗標）、drv_liqburst（清算爆量倍數）、drv_gap_oi
+（獵取後到回踩間的 OI 變化——OI 失血否決候選；立即回踩＝na）、
+v7_align（−side×V7 pred_return_4h＝模型站不站在 fade 這邊）。
+資料源：研究線 cg_\*_1h parquet（每日隨 DailyCollect 更新）＋
+indicator_history（UTC）。只記錄、不參與 gate。
+
 **Gate F**
 變體 A 的 forward 判準：pooled n≥1400 ＋ 日聚類 bootstrap CI 下緣>0
 ＋ ≥6/9 幣為正。變體 B 沿用同款算術。任一變體過 gate 才談上線，

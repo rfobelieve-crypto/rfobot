@@ -107,7 +107,21 @@ FIELDS = ["symbol", "universe", "level_kind", "first_seen_utc", "fill_ts",
           # the MEDIAN of this symbol's own strictly-earlier recorded raid
           # vshocks (>=5 priors required, else "na"). Causal, scale-free
           # (every symbol compared to itself), parameter-free (median).
-          "flow_vhigh"]
+          "flow_vhigh",
+          # BTC-only survivor columns (2026-08-02, user: 存活的特徵就該列入
+          # 紀錄) — prospective recording of every feature that EARNED a
+          # seat in the research line, so October validates on genuinely
+          # prospective values. Blank for non-BTC symbols by design
+          # (Coinglass + V7 are BTC-scope). All causal at decision time:
+          #   drv_q        raid-hour OI down AND taker with break (Q flag)
+          #   drv_liqburst raid-hour liquidation total / trailing-24h mean
+          #   drv_gap_oi   OI % change over complete hours between raid
+          #                hour and fill ("na" for immediate fills) — the
+          #                post-raid OI-bleed veto candidate
+          #   v7_align     -side x V7 pred_return_4h at the raid bar
+          #                (indicator_history, stored UTC — verified
+          #                2026-08-02, max-dt lag vs UTC ~1.6h)
+          "drv_q", "drv_liqburst", "drv_gap_oi", "v7_align"]
 
 FLOW_BACKFILL_PER_RUN = 40      # cap 1m-kline fetch work per hourly run
 
@@ -366,6 +380,102 @@ def is_variant_d(row: dict) -> bool:
     return is_variant_c(row) and str(row.get("flow_vhigh", "")) == "1"
 
 
+def annotate_btc_survivors(log: dict, bars) -> int:
+    """Fill the BTC-only survivor columns (drv_q / drv_liqburst /
+    drv_gap_oi / v7_align) for rows still blank. Heavy deps (pandas for
+    the Coinglass parquets, MySQL for V7 preds) are imported lazily and
+    any failure leaves blanks for the next hourly run — the 29-symbol
+    flow annotation must never depend on them. Values are immutable once
+    written; CG parquets refresh daily, so recent raids may stay blank
+    for up to a day (retried automatically)."""
+    todo = [k for k, r in log.items()
+            if k[0] == "BTC" and (r.get("drv_q") in (None, "")
+                                  or r.get("v7_align") in (None, ""))]
+    if not todo:
+        return 0
+    root = Path(__file__).resolve().parents[2]
+    try:
+        import pandas as pd
+        raw = root / "market_data" / "raw_data"
+
+        def hmap(fname, col):
+            df = pd.read_parquet(raw / fname)
+            idx = pd.to_datetime(df.index)
+            if idx.tz is not None:
+                idx = idx.tz_convert("UTC").tz_localize(None)
+            return {int(t.value // 10**9) // 3600: float(v)
+                    for t, v in zip(idx, df[col].astype(float)) if v == v}
+
+        oi = hmap("cg_oi_agg_1h.parquet", "close")
+        fdf = pd.read_parquet(raw / "cg_futures_cvd_agg_1h.parquet")
+        fb = hmap("cg_futures_cvd_agg_1h.parquet", "agg_taker_buy_vol")
+        fs = hmap("cg_futures_cvd_agg_1h.parquet", "agg_taker_sell_vol")
+        del fdf
+        ll = hmap("cg_liq_agg_1h.parquet", "aggregated_long_liquidation_usd")
+        ls = hmap("cg_liq_agg_1h.parquet", "aggregated_short_liquidation_usd")
+    except Exception as e:  # noqa: BLE001
+        print(f"  BTC survivors: CG parquets unavailable ({type(e).__name__})")
+        return 0
+    preds: dict[int, float] = {}
+    try:
+        import sys as _sys
+        if str(root) not in _sys.path:
+            _sys.path.insert(0, str(root))
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT dt, pred_return_4h FROM indicator_history "
+                            "WHERE pred_return_4h IS NOT NULL")
+                for row in cur.fetchall():
+                    preds[int(row["dt"].replace(
+                        tzinfo=timezone.utc).timestamp())] = float(
+                            row["pred_return_4h"])
+        finally:
+            conn.close()
+    except Exception as e:  # noqa: BLE001
+        print(f"  BTC survivors: V7 preds unavailable ({type(e).__name__})")
+
+    done = 0
+    for k in todo:
+        r = log[k]
+        try:
+            sw = find_sweep(bars, int(r["fill_ts"]), float(r["entry_px"]),
+                            float(r["atr"]), float(r["pierce_atr"]))
+            if sw is None:
+                r["drv_q"] = "na"
+                r["v7_align"] = "na"
+                continue
+            sweep_ts, side = sw
+            hh = sweep_ts // 3600
+            if r.get("drv_q") in (None, ""):
+                if all(x is not None for x in
+                       (oi.get(hh), oi.get(hh - 1), fb.get(hh), fs.get(hh))):
+                    r["drv_q"] = int(oi[hh] < oi[hh - 1]
+                                     and side * (fb[hh] - fs[hh]) > 0)
+                    tot = (ll.get(hh, 0) + ls.get(hh, 0))
+                    base = [ll.get(hh - j, 0) + ls.get(hh - j, 0)
+                            for j in range(1, 25)]
+                    base = [b for b in base if b > 0]
+                    r["drv_liqburst"] = (round(tot / (sum(base) / len(base)), 2)
+                                         if base and tot > 0 else "na")
+                    fill_hh = int(r["fill_ts"]) // 3600
+                    if fill_hh >= hh + 2:
+                        o0, o1 = oi.get(hh), oi.get(fill_hh - 1)
+                        r["drv_gap_oi"] = (round((o1 / o0 - 1) * 100, 3)
+                                           if o0 and o1 else "")
+                    else:
+                        r["drv_gap_oi"] = "na"
+                    done += 1
+            if r.get("v7_align") in (None, "") and preds:
+                p = preds.get(sweep_ts)
+                if p is not None:          # missing -> stay blank, retry
+                    r["v7_align"] = round(-side * p, 6)
+        except Exception:  # noqa: BLE001 — leave blank, retry next run
+            continue
+    return done
+
+
 def annotate_vhigh(log: dict) -> int:
     """Fill flow_vhigh for rows that have a vshock but no verdict yet.
     Uses only strictly-earlier fills of the same symbol — causal by
@@ -480,6 +590,7 @@ def main() -> int:
     stamp = f"{now:%Y-%m-%d %H:%M}"
     new = 0
     flow_done = 0
+    drv_done = 0
     for uni, syms in (("core9", CORE9), ("added20", ADDED20)):
         for sym in syms:
             p = refresh(sym)
@@ -529,12 +640,15 @@ def main() -> int:
                     "net_r": f"{netv:.6f}" if done else "",
                 })
             flow_done += annotate_flow(log, sym, bars)
+            if sym == "BTC":
+                drv_done = annotate_btc_survivors(log, bars)
     annotate_vhigh(log)
     write_log(log)
     n_flow = sum(1 for r in log.values()
                  if r.get("flow_reject") not in (None, "", "na"))
     print(f"shadow run {stamp}  new signals: {new}  "
-          f"flow annotated: +{flow_done} ({n_flow}/{len(log)} covered)")
+          f"flow annotated: +{flow_done} ({n_flow}/{len(log)} covered)  "
+          f"BTC survivors: +{drv_done}")
     summary(log)
     print("  " + gate_progress(log))
     return 0

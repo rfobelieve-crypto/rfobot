@@ -350,6 +350,15 @@ def story(sym: str, t: dict, fl: dict | None = None) -> str:
                      f" · 量能 {fl.get('flow_vshock', '?')}x"
                      + ("  << 變體C" if (t.get('b')
                         and fl['flow_reject'] == '1') else ""))
+    if fl and fl.get("drv_q") not in (None, "", "na"):
+        seg = f"  衍生品: Q{'✓' if fl['drv_q'] == '1' else '✗'}"
+        if fl.get("drv_liqburst") not in (None, "", "na"):
+            seg += f" · 清算 {fl['drv_liqburst']}x"
+        if fl.get("v7_align") not in (None, "", "na"):
+            seg += f" · V7站隊 {float(fl['v7_align']):+.4f}"
+        if fl.get("drv_gap_oi") not in (None, "", "na"):
+            seg += f" · gapOI {fl['drv_gap_oi']}%"
+        lines.append(seg)
     if t["exit_ts"]:
         x = datetime.fromtimestamp(t["exit_ts"], timezone.utc)
         lines.append(f"  出場:   {x:%m-%d %H:%M}  netR {t['net']:+.3f}")
