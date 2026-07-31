@@ -293,7 +293,8 @@ def summary(log: dict) -> None:
     # freshly-built rows hold int 1; rows read back from CSV hold "1"
     def _isb(r):
         return str(r.get("variant_b", "")) == "1"
-    groups = [("ALL", lambda r: True), ("B (pierce)", _isb)]
+    groups = [("ALL", lambda r: True), ("B (pierce)", _isb),
+              ("C (B∧收回)", is_variant_c)]
     groups += [(f"B:{k}", (lambda k_: lambda r: _isb(r)
                            and r.get("level_kind") == k_)(k))
                for k in LEVEL_KINDS]
@@ -321,23 +322,49 @@ def summary(log: dict) -> None:
     print(f"  genuinely prospective (first_seen < exit): {pro}")
 
 
+# ── VARIANT C (registered 2026-07-31, before any of its forward outcomes
+# were examined as a cohort): the flow-confirmed subset the operator asked
+# to see live instead of waiting for October ("為什麼不直接加進去").
+#   C = variant_b AND flow_reject == 1  (raid hour closed back inside)
+# Deliberately THRESHOLD-FREE: the only flow condition is the binary
+# close-back flag — the strongest single resolution feature in the raid
+# anatomy work. The volume-shock cut is NOT part of C: the shadow basket's
+# vshock scale differs wildly across symbols (median 9.4x, tercile
+# boundaries 5.9/16.4 vs ~3 in the BTC/ETH research), so any fixed number
+# today would be either arbitrary or tuned. Raw vshock stays recorded; the
+# October pre-registration decides whether a percentile-framed volume
+# condition adds anything on top of C.
+# C changes NOTHING for A/B: same trades, same gate arithmetic, one more
+# label. It is an OBSERVATION cohort — promotion to a tradeable rule still
+# requires its own forward evidence under the same clustered-CI bar.
+
+
+def is_variant_c(row: dict) -> bool:
+    return (str(row.get("variant_b", "")) == "1"
+            and str(row.get("flow_reject", "")) == "1")
+
+
 GATE_N = 1400          # same floor as Variant A's Gate F
 
 
-def gate_stats(log: dict) -> dict:
-    """Structured Variant B gate progress — same arithmetic as Gate F:
-    day-clustered bootstrap CI on net R plus the n>=1400 floor. Consumed by
-    gate_progress (weekly report string) and the agent's /public/sweep-status
-    JSON route (product-site strategy board). Without this the shadow log
-    accumulates unwatched — a two-month clock nobody reads is a clock that
-    does not exist."""
+def gate_stats(log: dict, cohort=None) -> dict:
+    """Structured gate progress — same arithmetic as Gate F: day-clustered
+    bootstrap CI on net R plus the n>=1400 floor. Consumed by gate_progress
+    (weekly report string) and the agent's /public/sweep-status JSON route
+    (product-site strategy board). `cohort` defaults to variant B (the
+    registered track); pass is_variant_c for the observation cohort — same
+    arithmetic, so the two lines are always comparable. Without this the
+    shadow log accumulates unwatched — a two-month clock nobody reads is a
+    clock that does not exist."""
     import random
     from collections import defaultdict
+    if cohort is None:
+        def cohort(r):  # noqa: E306
+            return str(r.get("variant_b", "")) == "1"
     rows = [r for r in log.values()
-            if str(r.get("variant_b", "")) == "1" and r["status"] == "CLOSED"
-            and r["net_r"] != ""]
+            if cohort(r) and r["status"] == "CLOSED" and r["net_r"] != ""]
     n_open = sum(1 for r in log.values()
-                 if str(r.get("variant_b", "")) == "1" and r["status"] == "OPEN")
+                 if cohort(r) and r["status"] == "OPEN")
     if not rows:
         return {"n_closed": 0, "n_open": n_open, "floor": GATE_N,
                 "mean_r": None, "ci_low": None, "wr_pct": None, "status": "empty"}
@@ -368,13 +395,18 @@ def gate_stats(log: dict) -> dict:
 
 
 def gate_progress(log: dict) -> str:
-    """One line of Variant B gate progress, for the weekly report."""
+    """Variant B gate line + the variant C observation line (same maths)."""
     s = gate_stats(log)
     if s["n_closed"] == 0:
         return "Variant B: 0/%d (no closed signals yet)" % GATE_N
-    return (f"Variant B: n={s['n_closed']}/{s['floor']} meanR={s['mean_r']:+.4f} "
-            f"clustered-CI-low={s['ci_low']:+.4f} -> "
-            f"{'PASS' if s['status'] == 'PASS' else 'accumulating'}")
+    out = (f"Variant B: n={s['n_closed']}/{s['floor']} meanR={s['mean_r']:+.4f} "
+           f"clustered-CI-low={s['ci_low']:+.4f} -> "
+           f"{'PASS' if s['status'] == 'PASS' else 'accumulating'}")
+    c = gate_stats(log, is_variant_c)
+    if c["n_closed"]:
+        out += (f" | C(B∧收回): n={c['n_closed']} meanR={c['mean_r']:+.4f} "
+                f"CI-low={c['ci_low']:+.4f}")
+    return out
 
 
 def main() -> int:
