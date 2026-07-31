@@ -386,7 +386,7 @@ table{{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:t
 th,td{{padding:7px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}}
 th{{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;background:var(--panel)}}
 tr:hover td{{background:#151a21}}
-th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5),th:nth-child(9),td:nth-child(9),th:nth-child(10),td:nth-child(10),th:nth-child(12),td:nth-child(12){{text-align:right}}
+th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5),th:nth-child(10),td:nth-child(10),th:nth-child(11),td:nth-child(11),th:nth-child(13),td:nth-child(13){{text-align:right}}
 .b{{color:var(--up)}} .win{{color:var(--up)}} .loss{{color:var(--down)}} .open{{color:var(--accent)}} .dim{{color:var(--muted)}}
 details{{padding:8px 16px 14px;font-size:11px;color:var(--muted);line-height:1.8}}
 summary{{cursor:pointer;user-select:none}}
@@ -406,10 +406,10 @@ summary{{cursor:pointer;user-select:none}}
 <div id="c"></div>
 <div class="pane-t" id="eqt">累積 netR（凍結後已平倉 · <span class="dim">─ 全部</span> · <span style="color:var(--up)">─ 變體B</span>）</div>
 <div id="eq"></div>
-<div class="twrap"><table><thead><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>B</th><th>C</th><th>收回</th><th>攻擊</th><th>量能</th><th>狀態</th><th>netR</th></tr></thead><tbody>{rows}</tbody></table></div>
+<div class="twrap"><table><thead><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>B</th><th>C</th><th>D</th><th>收回</th><th>攻擊</th><th>量能</th><th>狀態</th><th>netR</th></tr></thead><tbody>{rows}</tbody></table></div>
 <details><summary>圖例與定義</summary>
 線起點=造出該價位的針尖K棒 · 變體B=掃單穿越≤0.25 ATR（已註冊濾網） · 形成中=樞紐未滿10根確認／當日當週極值未收盤<br>
-變體C（2026-07-31 註冊的觀察 cohort）= 變體B ∧ 收回✓，無任何數值門檻；表格 C 欄與 chips 追蹤它的 forward 表現 · 流特徵（前瞻記錄，不參與 gate）：收回=獵取小時內 1m 收回價位內側 · 攻擊=突破價位的分鐘數 · 量能=攻擊分鐘量／24h 中位分鐘量 · 反轉配方候選=收回✓+量能高（10 月預註冊驗）<br>
+變體C（07-31 註冊）= B∧收回✓（1m 價格路徑確認）；變體D（08-01 註冊）= C∧量能高 = 研究的訂單流反轉配方（收回∧量能），量能高=vshock≥該幣自身此前獵取的中位數（因果·零參數·≥5 筆先例才判定）；各 cohort 同 gate 算術並列，升格需自己的 forward 證據 · 流特徵（前瞻記錄，不參與 gate）：收回=獵取小時內 1m 收回價位內側 · 攻擊=突破價位的分鐘數 · 量能=攻擊分鐘量／24h 中位分鐘量 · 反轉配方候選=收回✓+量能高（10 月預註冊驗）<br>
 成本=情境A（進場7／時間出場3／停損10 bps） · 網址參數：&hours=12-2160 · &live=60 自動更新
 </details>
 <script>
@@ -521,10 +521,18 @@ def main() -> int:
                    "flow_reject") == "1"]
     s_c = sum(t["net"] for t in cclosed)
     wr_c = _wr(cclosed)
+    dclosed = [t for t in cclosed
+               if (flow.get((t["kind"], t["fill_ts"])) or {}).get(
+                   "flow_vhigh") == "1"]
+    s_d = sum(t["net"] for t in dclosed)
+    wr_d = _wr(dclosed)
     chips += [
         chip("變體C(B∧收回) 平倉", f"{len(cclosed)}"),
         chip("變體C 勝率", f"{wr_c:.0f}%" if wr_c is not None else "—"),
         chip("變體C ΣnetR", f"{s_c:+.2f}", _sgn(s_c)),
+        chip("變體D(C∧量能高) 平倉", f"{len(dclosed)}"),
+        chip("變體D 勝率", f"{wr_d:.0f}%" if wr_d is not None else "—"),
+        chip("變體D ΣnetR", f"{s_d:+.2f}", _sgn(s_d)),
     ]
     gate_line = "全籃進度: 見每週一 09:30 PortfolioClocks 報告"
     asof = ""
@@ -553,7 +561,7 @@ def main() -> int:
     perf = ("<div class='chips'>" + "".join(chips) + "</div>"
             + "<div class='sub'><b>變體A</b>=原始版·波段池·無濾網（Gate F 正式軌道）"
             + "　<b>變體B</b>=四種池＋淺穿越≤0.25ATR（預註冊 forward 中，表格 B 欄）"
-            + "　<b>變體C</b>=B∧收回內側✓（1m 價格收回確認·非訂單流，觀察 cohort，表格 C 欄）</div>"
+            + "　<b>變體C</b>=B∧收回內側✓（1m 價格收回確認，表格 C 欄）　<b>變體D</b>=C∧量能高（收回∧量能=訂單流組合配方，量能高=高於該幣自身歷史中位，表格 D 欄）</div>"
             + "<div class='sub'>凍結後 forward · 情境A成本 · "
             + " · ".join(kind_bits)
             + (f" · log截至 {asof} UTC" if asof else "") + "</div>")
@@ -668,6 +676,7 @@ def main() -> int:
             f"<td>{t['pierce']:.2f}</td>"
             f"<td class='b'>{'✓' if t['b'] else ''}</td>"
             f"<td class='b'>{'✓' if (t['b'] and rej == '1') else ''}</td>"
+            f"<td class='b'>{'✓' if (t['b'] and rej == '1' and fl.get('flow_vhigh') == '1') else ''}</td>"
             + rej_cell
             + f"<td>{att + '分' if att else '·'}</td>"
             f"<td>{vsh + 'x' if vsh else '·'}</td>"

@@ -102,7 +102,12 @@ FIELDS = ["symbol", "universe", "level_kind", "first_seen_utc", "fill_ts",
           #   flow_taker    signed taker share INTO the break, attack mins
           #   flow_absorb   flow_taker / max(pierce, 0.1)
           "flow_reject", "flow_att_min", "flow_vshock", "flow_taker",
-          "flow_absorb"]
+          "flow_absorb",
+          # flow_vhigh (2026-08-01, variant D): 1 if this raid's vshock >=
+          # the MEDIAN of this symbol's own strictly-earlier recorded raid
+          # vshocks (>=5 priors required, else "na"). Causal, scale-free
+          # (every symbol compared to itself), parameter-free (median).
+          "flow_vhigh"]
 
 FLOW_BACKFILL_PER_RUN = 40      # cap 1m-kline fetch work per hourly run
 
@@ -294,7 +299,7 @@ def summary(log: dict) -> None:
     def _isb(r):
         return str(r.get("variant_b", "")) == "1"
     groups = [("ALL", lambda r: True), ("B (pierce)", _isb),
-              ("C (B∧收回)", is_variant_c)]
+              ("C (B∧收回)", is_variant_c), ("D (C∧量能高)", is_variant_d)]
     groups += [(f"B:{k}", (lambda k_: lambda r: _isb(r)
                            and r.get("level_kind") == k_)(k))
                for k in LEVEL_KINDS]
@@ -342,6 +347,49 @@ def summary(log: dict) -> None:
 def is_variant_c(row: dict) -> bool:
     return (str(row.get("variant_b", "")) == "1"
             and str(row.get("flow_reject", "")) == "1")
+
+
+# ── VARIANT D (registered 2026-08-01): the ACTUAL order-flow combination
+# from the raid anatomy — reversal recipe R∧V (close-back AND high attack
+# volume). The operator's point stood: C alone is a 1m price-path confirm,
+# not order flow. "High volume" is defined causally and scale-free:
+#   flow_vhigh = vshock >= median of THIS symbol's own strictly-earlier
+#   recorded raid vshocks (>=5 priors, else excluded) — every coin compared
+#   to itself, median = parameter-free central cut. October's
+#   pre-registration may test the tercile framing on top; BTC's OI x CVD
+#   (Q) stays October-scope (Coinglass, BTC-only, separate data path).
+# D ⊂ C ⊂ B ⊂ A. Observation cohort, same rules as C: gate arithmetic
+# shared, A/B untouched, promotion needs its own forward evidence.
+
+
+def is_variant_d(row: dict) -> bool:
+    return is_variant_c(row) and str(row.get("flow_vhigh", "")) == "1"
+
+
+def annotate_vhigh(log: dict) -> int:
+    """Fill flow_vhigh for rows that have a vshock but no verdict yet.
+    Uses only strictly-earlier fills of the same symbol — causal by
+    construction, and immutable once written (priors never change)."""
+    from statistics import median
+    bysym: dict[str, list] = {}
+    for k, r in log.items():
+        if r.get("flow_vshock") not in (None, "", "na"):
+            bysym.setdefault(k[0], []).append(
+                (int(r["fill_ts"]), float(r["flow_vshock"]), k))
+    done = 0
+    for sym, rows in bysym.items():
+        rows.sort()
+        for i, (fts, vs, k) in enumerate(rows):
+            r = log[k]
+            if r.get("flow_vhigh") not in (None, ""):
+                continue
+            prior = [v for (ft2, v, _k2) in rows[:i] if ft2 < fts]
+            if len(prior) < 5:
+                r["flow_vhigh"] = "na"
+            else:
+                r["flow_vhigh"] = int(vs >= median(prior))
+                done += 1
+    return done
 
 
 GATE_N = 1400          # same floor as Variant A's Gate F
@@ -406,6 +454,10 @@ def gate_progress(log: dict) -> str:
     if c["n_closed"]:
         out += (f" | C(B∧收回): n={c['n_closed']} meanR={c['mean_r']:+.4f} "
                 f"CI-low={c['ci_low']:+.4f}")
+    d = gate_stats(log, is_variant_d)
+    if d["n_closed"]:
+        out += (f" | D(C∧量能高): n={d['n_closed']} meanR={d['mean_r']:+.4f} "
+                f"CI-low={d['ci_low']:+.4f}")
     return out
 
 
@@ -477,6 +529,7 @@ def main() -> int:
                     "net_r": f"{netv:.6f}" if done else "",
                 })
             flow_done += annotate_flow(log, sym, bars)
+    annotate_vhigh(log)
     write_log(log)
     n_flow = sum(1 for r in log.values()
                  if r.get("flow_reject") not in (None, "", "na"))
