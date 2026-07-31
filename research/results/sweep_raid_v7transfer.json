@@ -1,0 +1,122 @@
+{
+ "T1_pred_align": {
+  "n": 892,
+  "auc_res": 0.423,
+  "ic": 0.128,
+  "ic_h": [
+   0.183,
+   0.083
+  ]
+ },
+ "T2_counts": {
+  "screened": 276,
+  "res_surv": 93,
+  "q_surv": 92
+ },
+ "T2_top_res": [
+  [
+   "trade_intensity_zscore",
+   0.20861791326558943
+  ],
+  [
+   "avg_trade_size_zscore",
+   0.782608695652174
+  ],
+  [
+   "avg_trade_notional_zscore",
+   0.7755844300072187
+  ],
+  [
+   "flow_trend_score",
+   0.763354433894164
+  ],
+  [
+   "body_ratio",
+   0.7503192848020435
+  ],
+  [
+   "quote_vol_zscore",
+   0.7389777333555444
+  ],
+  [
+   "quote_vol_ratio",
+   0.7357710033871953
+  ],
+  [
+   "cg_liq_surge",
+   0.7330501415958688
+  ],
+  [
+   "cg_liq_total_zscore",
+   0.7310094952523738
+  ],
+  [
+   "absorption_buy",
+   0.2717113665389527
+  ]
+ ],
+ "T2_top_q": [
+  [
+   "init_funding_sign_persist_8h",
+   -0.17917622780017395
+  ],
+  [
+   "cg_bfx_margin_ratio_zscore",
+   -0.17426066204988352
+  ],
+  [
+   "vol_acceleration",
+   0.15704972385220314
+  ],
+  [
+   "sell_flow_price_impact",
+   0.15404089091557863
+  ],
+  [
+   "cg_taker_buy",
+   0.15079659536106005
+  ],
+  [
+   "quote_vol_ratio",
+   0.14966138868363932
+  ],
+  [
+   "cg_liq_agg_short",
+   0.14822640354692815
+  ],
+  [
+   "trade_count_accel",
+   0.14739000289849682
+  ],
+  [
+   "tox_bv_vpin_zscore",
+   0.14626130727613462
+  ],
+  [
+   "taker_buy_quote",
+   0.14596228495859057
+  ]
+ ],
+ "T3_resolution": {
+  "base": 0.758,
+  "with": 0.805,
+  "added": [
+   "trade_intensity_zscore",
+   "flow_trend_score",
+   "body_ratio",
+   "quote_vol_zscore",
+   "absorption_buy"
+  ]
+ },
+ "T3_quality": {
+  "base": 0.052,
+  "with": 0.084,
+  "added": [
+   "init_funding_sign_persist_8h",
+   "cg_bfx_margin_ratio_zscore",
+   "vol_acceleration",
+   "sell_flow_price_impact",
+   "cg_taker_buy"
+  ]
+ }
+}
