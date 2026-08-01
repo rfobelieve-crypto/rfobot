@@ -1,0 +1,43 @@
+{
+ "pool_cls": {
+  "low": {
+   "n": 1180,
+   "breakout_pct": 13.3
+  },
+  "mid": {
+   "n": 39,
+   "breakout_pct": 0.0
+  },
+  "high": {
+   "n": 612,
+   "breakout_pct": 7.8
+  }
+ },
+ "pool_netR": {
+  "low": {
+   "n": 1180,
+   "netR": 0.067,
+   "wr": 57.4
+  },
+  "mid": {
+   "n": 39,
+   "netR": 0.204,
+   "wr": 66.7
+  },
+  "high": {
+   "n": 612,
+   "netR": 0.004,
+   "wr": 53.0
+  }
+ },
+ "flag_CVD\u78ba\u8a8d(\u7121\u80cc\u96e2)": {
+  "n": 1180,
+  "breakout_pct": 13.3,
+  "netR": 0.067
+ },
+ "flag_\u6709\u80cc\u96e2": {
+  "n": 651,
+  "breakout_pct": 7.4,
+  "netR": 0.017
+ }
+}
