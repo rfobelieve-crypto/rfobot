@@ -121,7 +121,12 @@ FIELDS = ["symbol", "universe", "level_kind", "first_seen_utc", "fill_ts",
           #   v7_align     -side x V7 pred_return_4h at the raid bar
           #                (indicator_history, stored UTC — verified
           #                2026-08-02, max-dt lag vs UTC ~1.6h)
-          "drv_q", "drv_liqburst", "drv_gap_oi", "v7_align"]
+          #   drv_gap_cvd  s x futures taker share over the same gap hours
+          #                ("na" for immediate fills) — the sequence
+          #                hypothesis' second stage (post-raid CVD flip),
+          #                added 2026-08-02 when the operator caught the
+          #                recording gap
+          "drv_q", "drv_liqburst", "drv_gap_oi", "v7_align", "drv_gap_cvd"]
 
 FLOW_BACKFILL_PER_RUN = 40      # cap 1m-kline fetch work per hourly run
 
@@ -314,7 +319,7 @@ def summary(log: dict) -> None:
         return str(r.get("variant_b", "")) == "1"
     groups = [("ALL", lambda r: True), ("B (pierce)", _isb),
               ("C (B∧收回)", is_variant_c), ("D (C∧量能高)", is_variant_d),
-              ("E (BTC·Q∧清算高)", variant_e_pred(log))]
+              ("E (BTC·OI↓∧CVD順破∧清算高)", variant_e_pred(log))]
     groups += [(f"B:{k}", (lambda k_: lambda r: _isb(r)
                            and r.get("level_kind") == k_)(k))
                for k in LEVEL_KINDS]
@@ -424,7 +429,8 @@ def annotate_btc_survivors(log: dict, bars) -> int:
     for up to a day (retried automatically)."""
     todo = [k for k, r in log.items()
             if k[0] == "BTC" and (r.get("drv_q") in (None, "")
-                                  or r.get("v7_align") in (None, ""))]
+                                  or r.get("v7_align") in (None, "")
+                                  or r.get("drv_gap_cvd") in (None, ""))]
     if not todo:
         return 0
     root = Path(__file__).resolve().parents[2]
@@ -501,6 +507,22 @@ def annotate_btc_survivors(log: dict, bars) -> int:
                     else:
                         r["drv_gap_oi"] = "na"
                     done += 1
+            if r.get("drv_gap_cvd") in (None, ""):
+                fill_hh = int(r["fill_ts"]) // 3600
+                if fill_hh >= hh + 2:
+                    num = den = 0.0
+                    ok = True
+                    for h2 in range(hh + 1, fill_hh):
+                        b_, s_ = fb.get(h2), fs.get(h2)
+                        if b_ is None or s_ is None:
+                            ok = False
+                            break
+                        num += b_ - s_
+                        den += b_ + s_
+                    if ok and den > 0:
+                        r["drv_gap_cvd"] = round(side * num / den, 4)
+                else:
+                    r["drv_gap_cvd"] = "na"
             if r.get("v7_align") in (None, "") and preds:
                 p = preds.get(sweep_ts)
                 if p is not None:          # missing -> stay blank, retry
@@ -604,7 +626,7 @@ def gate_progress(log: dict) -> str:
                 f"CI-low={d['ci_low']:+.4f}")
     e = gate_stats(log, variant_e_pred(log))
     if e["n_closed"]:
-        out += (f" | E(BTC·Q∧清算高): n={e['n_closed']} "
+        out += (f" | E(BTC·OI↓∧CVD順破∧清算高): n={e['n_closed']} "
                 f"meanR={e['mean_r']:+.4f}")
     return out
 
