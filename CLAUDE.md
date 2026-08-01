@@ -1,5 +1,58 @@
 # 專案 CLAUDE.md - BTC 量化交易系統（從指標漸進演化）
 
+---
+
+## 現況速覽（快照 2026-08-02）
+
+> 這一節是「**現在在哪**」。底下的歷史章節是「**怎麼走到這裡**」，**不要
+> 拿歷史章節的數字當現行值**——很多已被後面的決策取代。
+> 下面的數字全是**快照**，活數字請跑：`python research/portfolio_clocks.py`
+> （時鐘）、`python research/sweep_failure/shadow_engine.py --gate`（變體）、
+> `indicator/okx/config.py`（風控參數的真相源）。
+
+**一句話**：三條策略共用一套資料層與風控紀律；只有 V7 碰真錢，另外兩條
+在 forward 驗證中。
+
+**實盤參數（V7，Stage 3）**
+
+| 項目 | 現行值 | 出處 |
+|---|---|---|
+| 資本基準 | **$274**（2026-07-28 重置） | `okx/config.py: initial_capital_usd` |
+| 策略有效槓桿 | **2x**（名目 = 2 × equity） | `NOTIONAL_LEV_MULT`；guard 上限 3.0 |
+| OKX 帳戶槓桿 | 10x（**只決定鎖多少保證金**，非策略風險） | `config.leverage` |
+| Daily / Total kill | **−20% / −30%**（≈ −$54.8 / −$82.2） | `daily_/total_loss_cap_pct` |
+| 同時持倉 | **1 筆** | `max_position_count` |
+| 出場 | 3×ATR trailing、opp_signal 反向、conviction_decay(2 根) | `okx/executor.py` |
+
+**三策略狀態**
+
+| 策略 | 狀態 | 距離下一個決策點 |
+|---|---|---|
+| **V7**（4h 方向+幅度） | Stage 3 live | Gate B 執行驗證 13/30 筆 |
+| **流動性獵取**（策略 #2） | 規則凍結、forward 記帳 | 變體 B **161/1400**（clustered CI 下緣 −0.12，累積中）|
+| **撤單流**（策略 #3） | 方向性判決 FAIL | `cancel_lead_ic` 判決排程 **2026-08-10** |
+
+**進行中的時鐘**
+
+- **地形濾網上線扳機**：新 Strong **0/60**，90d 保留 vs 否決 gap **+17.7pp**
+  （門檻 8pp；kept 62.2% n=37 / veto 44.4% n=18）→ 兩條同時成立才議進 executor
+- **真實掛單簿**（depth_deltas）：**21/90 天** → 十月 L2 檢查點
+- **每月 5 號**：`quarterly_revalidation.py` 自動復驗（帶 STALE-DATA guard）
+
+**文件地圖（別人要看哪一份）**
+
+| 想知道 | 看這裡 |
+|---|---|
+| 策略分工、風控階段、override 紀錄、網站呈現面 | **本檔（CLAUDE.md）** |
+| 名詞白話解釋（含地形層、池子四種） | `docs/GLOSSARY.md` |
+| 流動性獵取全貌（變體/配方/評分/上線路徑） | `docs/RAID_PLAYBOOK.md` |
+| V7 本體架構細節（資料層→模型→推論） | `docs/系統架構說明書.md` |
+| 多策略組合風控設計 | `docs/PORTFOLIO_RISK_FRAMEWORK.md` |
+| 踩過的坑（**開工前必讀**） | `.claude/rules/mistake.md` |
+| 當前任務、預註冊、凍結假設 | `TODO.md` |
+
+---
+
 ## 專案定位（2026-05-09 更新）
 這個專案最初是「多空強度預測指標 / Market Intelligence Indicator」，
 從 2026-05-09 起，**正在漸進演化成量化交易系統（含自動下單）**。
@@ -11,6 +64,32 @@
   - Strong / CHOPPY 91.8% WR 是 sample artifact（regime 標記從 3/21 才開始），不是真 edge
   - 整體 Strong 95% CI [-2.2, +14.6] bps 含 0，無法統計上斷言 edge 顯著
   - 可信的判斷是「邊際正 EV，需要 forward window 驗證」
+
+---
+
+# 決策與 override 歷史
+
+下面每一節都是當時的完整推理與代價自負聲明，**刻意不刪**——這份紀錄本身
+就是紀律的一部分（做了什麼、為什麼、放棄了什麼保護）。但章節順序是歷史
+堆疊的、不是時間序，所以先給索引：
+
+| 日期 | 決策 | 狀態 |
+|---|---|---|
+| 2026-05-27 | 研究 + small live 並進（跳過 100 筆 paper gate） | 生效 |
+| 2026-05-28 | **10x leverage informed override**（$100 開得起 1 張） | 部分作廢 → 見 06-06 |
+| 2026-05-28 | 跳過 testnet，改 read-only smoke（第 2 次 override） | 生效（已完成） |
+| 2026-06-05 | **Paper cohort 整個移除**，LIVE 成唯一 cohort | 生效 |
+| 2026-06-06 | **分數合約 sizing「B」取代 10x 權宜** | **生效（現行 sizing）** |
+| 2026-06-10 | 壓縮版 Stage 3→4：Gate A（統計）+ Gate B（執行）| 生效（Gate A 已過→後又漂移，Gate B 累積中）|
+| 2026-07-14 | 資本 top-up $197.55（第 4 次 override）| **已被 07-28 取代** |
+| 2026-07-23 | V7 多幣化提前啟動（第 5 次 override）| 已收尾（ETH NO-GO）|
+| 2026-07-24 | 資本再加碼 $1218.44（第 6 次 override）| **已被 07-28 取代** |
+| 2026-07-25 | conviction_decay 上線，0 shadow 樣本 | 生效（`OKX_CONVICTION_DECAY_BARS=2`）|
+| 2026-07-28 | **基準回落 $274**（第二次手動爆倉後；非 override）| **現行基準** |
+
+**讀法**：資本基準只認最後一條（$274）。leverage 只認 2026-06-06 那條
+（有效 2x，10x 只是保證金設定）。歷史章節裡的美元數字（$100 / $197 /
+$1218）全部是過去式。
 
 ## Staged auto-trading framework
 不是「驗證夠了再上線」vs「不驗證就上線」的二元選擇。是「金額大小 × 風控深度 對齊
@@ -405,6 +484,12 @@ Step 2 研究基礎建設（backfill 歷史、建特徵表、跑乾淨 WF），�
 提前投入的 ETH/SOL 研究基礎建設就是純沉沒成本——這是明知故犯接受的風險，
 換取的是不用等未知長度的時間才能開始累積多幣化這條線自己的證據。
 
+---
+
+# 現行規則與系統
+
+（以下全部是**現在生效**的內容，與上面的歷史章節分開讀。）
+
 ## 仍然禁止的（避免在錯的階段做錯事）
 - **Stage 2-3**：禁鬆 hard kill switches 以外的 trigger；leverage hard cap = 10x（不可再放寬）
 - **Stage 3**：禁未經 manual approval 5 筆就切自動（paper cohort 已於 2026-06-05 移除，不再有「paper 停寫」這條）
@@ -527,9 +612,19 @@ y_path_ret_4h = mean(close[t+1..t+4]) / close[t] - 1 (TWAP path return)
 1. **無前視偏差**：所有特徵計算使用 trailing-only rolling，嚴格禁止 look-ahead。
 2. **歷史與即時一致性**：`build_live_features()` 同時用於訓練數據建構和生產推論。
 3. **時間對齊精準**：Coinglass 使用 merge_asof backward 對齊，快照數據只設定最後一根 bar。
-4. **預測導向設計**：所有評估以 IC、方向準確率、calibration 為準，不做交易績效回測。
+4. **模型評估與交易評估分離**（2026-08-02 修正原文「不做交易績效回測」——
+   那句自 2026-05 起就不成立了）：**模型本身**只用 IC / 方向準確率 /
+   calibration 判斷，**絕不拿 PnL 回頭調模型或重訓**；但**出場、sizing、
+   濾網、策略 #2/#3** 的決策確實走回測 harness（walk-forward + 逐折 +
+   bootstrap）。兩者不可混：用 PnL 選模型 = 在小樣本上擬合雜訊。
 5. **特徵先回測再加入**：新特徵必須先跑 IC 回測驗證有效才加進系統。
+   **2026-06 起追加**：同源資料（OHLCV/Coinglass/Deribit/Binance flow）已
+   三度證實飽和，預設**不再跑同源特徵 A/B**；要加就加異源。
 6. **Edge Cases 處理**：假日流動性差異、Funding 結算跳動、rate limit、資料缺失。
+7. **驗證儀式不可事後放寬**（2026-08 地形戰役定型）：先寫預測再看數據；
+   分桶要全格報告不挑格；門檻/分桶定義寫死後不因為「差一點」而改
+   （S3 差 0.0 就是差 0.0）；跟先驗矛盾**或**完全符合先驗的漂亮結果，
+   都要先查產生它的程式碼。
 
 ## 圖表同步規則
 **V7 有兩個圖表，修改時必須同步更新**：
