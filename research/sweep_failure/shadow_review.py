@@ -413,8 +413,10 @@ summary{{cursor:pointer;user-select:none}}
 <span>淡色┄ 形成中(引擎尚不可交易)</span>
 </div>
 <div id="c"></div>
-<div class="pane-t" id="eqt">累積 netR（凍結後已平倉 · <span class="dim">─ 全部</span> · <span style="color:var(--up)">─ 變體B</span>）</div>
-<div id="eq"></div>
+<div class="pane-t" id="eqvt">累積 netR · 全籃29幣 · 變體階梯　{eqvleg}</div>
+<div id="eqv" style="height:16vh"></div>
+<div class="pane-t" id="eqct">累積 netR · 全籃29幣 · 組合 watchlist　{eqcleg}</div>
+<div id="eqc" style="height:16vh"></div>
 <div class="twrap"><table><thead><tr><th>進場(UTC+8)</th><th>池子</th><th>方向</th><th>價位</th><th>穿越ATR</th><th>B</th><th>C</th><th>D</th><th>收回</th><th>攻擊</th><th>量能</th><th>狀態</th><th>netR</th></tr></thead><tbody>{rows}</tbody></table></div>
 <details><summary>白話說明（代號、提名組合、數字怎麼讀）</summary>
 <b>代號＝圖上看的一件事：</b><br>
@@ -440,13 +442,15 @@ for(const g of {levels}){{
   ls.setData(g.pts);
 }}
 chart.timeScale().fitContent();
-const eqa={eq_all}, eqb={eq_b};
-if(eqa.length>1){{
-  const ec=LightweightCharts.createChart(document.getElementById('eq'),{{layout:{{background:{{color:'#0b0e11'}},textColor:'#848e9c',fontSize:10}},grid:{{vertLines:{{color:'#151a21'}},horzLines:{{color:'#151a21'}}}},rightPriceScale:{{borderColor:'#1e242d'}},timeScale:{{timeVisible:true,secondsVisible:false,borderColor:'#1e242d'}}}});
-  ec.addLineSeries({{color:'#848e9c',lineWidth:1,lastValueVisible:true,priceLineVisible:false}}).setData(eqa);
-  if(eqb.length>1)ec.addLineSeries({{color:'#0ecb81',lineWidth:2,lastValueVisible:true,priceLineVisible:false}}).setData(eqb);
-  ec.timeScale().fitContent();
-}}else{{document.getElementById('eq').style.display='none';document.getElementById('eqt').style.display='none';}}
+function eqPane(id,data){{
+  const el=document.getElementById(id), tl=document.getElementById(id+'t');
+  if(!data.length||!data.some(g=>g.pts.length>1)){{el.style.display='none';if(tl)tl.style.display='none';return;}}
+  const ch=LightweightCharts.createChart(el,{{layout:{{background:{{color:'#0b0e11'}},textColor:'#848e9c',fontSize:10}},grid:{{vertLines:{{color:'#151a21'}},horzLines:{{color:'#151a21'}}}},rightPriceScale:{{borderColor:'#1e242d'}},timeScale:{{timeVisible:true,secondsVisible:false,borderColor:'#1e242d'}}}});
+  for(const g of data){{if(g.pts.length>1)ch.addLineSeries({{color:g.c,lineWidth:g.w||1,title:g.k,lastValueVisible:true,priceLineVisible:false,crosshairMarkerVisible:false}}).setData(g.pts);}}
+  ch.timeScale().fitContent();
+}}
+eqPane('eqv',{eqv});
+eqPane('eqc',{eqc});
 </script>
 <script>
 (function () {{
@@ -604,20 +608,48 @@ def main() -> int:
             + (f" · log截至 {asof} UTC" if asof else "") + "</div>")
     print(gate_line)
 
-    def _dedup(pts):
-        d = {}
-        for p in pts:
-            d[p["time"]] = p["value"]
-        return [{"time": k, "value": v} for k, v in sorted(d.items())]
+    # global (29-coin) cumulative netR curves — one line per cohort and per
+    # frozen watchlist combo, so "which one is winning" reads off the chart
+    # (operator request 2026-08-02). Per-symbol curves dropped: single-coin
+    # n is noise-grade, the basket is the honest unit.
+    def cum_series(slog_, pred):
+        rows_ = [(int(r["exit_ts"]), float(r["net_r"]))
+                 for r in slog_.values()
+                 if r["status"] == "CLOSED" and r["net_r"] != ""
+                 and r.get("exit_ts") not in (None, "") and pred(r)]
+        rows_.sort()
+        acc_, d_ = 0.0, {}
+        for ts_, v_ in rows_:
+            acc_ += v_
+            d_[ts_ + TZ] = round(acc_, 3)
+        return [{"time": k, "value": v} for k, v in sorted(d_.items())]
 
-    eq_all, eq_b, acc, accb = [], [], 0.0, 0.0
-    for t in sorted(closed, key=lambda x: x["exit_ts"]):
-        acc += t["net"]
-        eq_all.append({"time": t["exit_ts"] + TZ, "value": round(acc, 4)})
-        if t["b"]:
-            accb += t["net"]
-            eq_b.append({"time": t["exit_ts"] + TZ, "value": round(accb, 4)})
-    eq_all, eq_b = _dedup(eq_all), _dedup(eq_b)
+    eqv, eqc = [], []
+    try:
+        import combo_watchlist as CW
+        slog3 = SE.read_log()
+        _isb = lambda r: str(r.get("variant_b", "")) == "1"  # noqa: E731
+        for k, c, w, pred in (
+                ("A", "#848e9c", 1, lambda r: True),
+                ("B", "#0ecb81", 2, _isb),
+                ("C", "#22d3ee", 1, SE.is_variant_c),
+                ("D", "#f0b90b", 2, SE.is_variant_d),
+                ("E", "#a78bfa", 1, SE.variant_e_pred(slog3))):
+            eqv.append({"k": k, "c": c, "w": w, "pts": cum_series(slog3, pred)})
+        combo_col = {"R∧V": "#0ecb81", "R∧Q": "#22d3ee", "R∧V∧Q": "#f0b90b",
+                     "R∧快": "#f97316", "R∧快∧Q": "#ec4899", "R": "#848e9c",
+                     "PA": "#a78bfa", "V∧LIQ": "#f6465d"}
+        for name, pred in CW.combo_preds(slog3).items():
+            eqc.append({"k": name, "c": combo_col.get(name, "#848e9c"),
+                        "w": 2 if name in ("R∧V", "R") else 1,
+                        "pts": cum_series(slog3, pred)})
+    except Exception:
+        pass
+
+    def _leg(data):
+        return " ".join(
+            f"<span style='color:{g['c']}'>─{g['k']}</span>" for g in data)
+    eqvleg, eqcleg = _leg(eqv), _leg(eqc)
 
     now_ts = bars[-1][0]
     t0 = now_ts - hours * 3600           # window anchored to NOW, not freeze
@@ -748,7 +780,9 @@ def main() -> int:
     out.write_text(HTML.format(
         sym=sym, hours=hours, check=check, candles=json.dumps(candles),
         markers=json.dumps(markers), levels=json.dumps(levels),
-        perf=perf, eq_all=json.dumps(eq_all), eq_b=json.dumps(eq_b),
+        perf=perf, eqv=json.dumps(eqv, ensure_ascii=False),
+        eqc=json.dumps(eqc, ensure_ascii=False),
+        eqvleg=eqvleg, eqcleg=eqcleg,
         rows="".join(reversed(rows))), encoding="utf-8")
     print(f"chart -> {out}")
     return 0
