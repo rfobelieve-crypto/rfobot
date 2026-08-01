@@ -313,7 +313,8 @@ def summary(log: dict) -> None:
     def _isb(r):
         return str(r.get("variant_b", "")) == "1"
     groups = [("ALL", lambda r: True), ("B (pierce)", _isb),
-              ("C (B∧收回)", is_variant_c), ("D (C∧量能高)", is_variant_d)]
+              ("C (B∧收回)", is_variant_c), ("D (C∧量能高)", is_variant_d),
+              ("E (BTC·Q∧清算高)", variant_e_pred(log))]
     groups += [(f"B:{k}", (lambda k_: lambda r: _isb(r)
                            and r.get("level_kind") == k_)(k))
                for k in LEVEL_KINDS]
@@ -378,6 +379,39 @@ def is_variant_c(row: dict) -> bool:
 
 def is_variant_d(row: dict) -> bool:
     return is_variant_c(row) and str(row.get("flow_vhigh", "")) == "1"
+
+
+# ── VARIANT E (registered 2026-08-02): the operator's own manual read,
+# as a tracked cohort. When a raid happens they judge the next move from
+# three panels — liquidations, CVD, open interest — so E encodes exactly
+# that, from columns already recorded prospectively:
+#   E = BTC raid ∧ drv_q = 1 (OI down AND taker with break: the OI+CVD
+#       panels' stop-flush read) ∧ liquidation burst >= the causal median
+#       of BTC's own earlier recorded raids (>=5 priors; zero tuned
+#       numbers, same convention as flow_vhigh).
+# E is deliberately NOT restricted to variant B — it tracks the manual
+# read on every BTC raid, so its overlap with B/C/D stays measurable.
+# BTC-only (Coinglass scope). Observation cohort, same rules as C/D.
+
+
+def variant_e_pred(log: dict):
+    """Build the E-membership test (causal liq-burst median needs the
+    whole log, so this returns a closure for gate_stats)."""
+    from statistics import median
+    rows = [(int(r["fill_ts"]), float(r["drv_liqburst"]),
+             (r["symbol"], r.get("level_kind", "swing"), int(r["fill_ts"])))
+            for r in log.values()
+            if r["symbol"] == "BTC"
+            and r.get("drv_liqburst") not in (None, "", "na")]
+    rows.sort()
+    eligible = set()
+    for i, (fts, lb, key) in enumerate(rows):
+        prior = [v for (ft2, v, _k) in rows[:i] if ft2 < fts]
+        if len(prior) >= 5 and lb >= median(prior):
+            eligible.add(key)
+    return lambda r: (str(r.get("drv_q", "")) == "1"
+                      and (r["symbol"], r.get("level_kind", "swing"),
+                           int(r["fill_ts"])) in eligible)
 
 
 def annotate_btc_survivors(log: dict, bars) -> int:
@@ -568,6 +602,10 @@ def gate_progress(log: dict) -> str:
     if d["n_closed"]:
         out += (f" | D(C∧量能高): n={d['n_closed']} meanR={d['mean_r']:+.4f} "
                 f"CI-low={d['ci_low']:+.4f}")
+    e = gate_stats(log, variant_e_pred(log))
+    if e["n_closed"]:
+        out += (f" | E(BTC·Q∧清算高): n={e['n_closed']} "
+                f"meanR={e['mean_r']:+.4f}")
     return out
 
 

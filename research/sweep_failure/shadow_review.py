@@ -535,6 +535,19 @@ def main() -> int:
                    "flow_vhigh") == "1"]
     s_d = sum(t["net"] for t in dclosed)
     wr_d = _wr(dclosed)
+    eclosed = []
+    if sym == "BTC":
+        try:
+            slog2 = SE.read_log()
+            epred = SE.variant_e_pred(slog2)
+            ekeys = {(r["symbol"], r.get("level_kind", "swing"), int(r["fill_ts"]))
+                     for r in slog2.values()
+                     if r["symbol"] == "BTC" and r["status"] == "CLOSED"
+                     and r["net_r"] != "" and epred(r)}
+            eclosed = [t for t in closed
+                       if ("BTC", t["kind"], t["fill_ts"]) in ekeys]
+        except Exception:
+            eclosed = []
     chips += [
         chip("變體C(B∧收回) 平倉", f"{len(cclosed)}"),
         chip("變體C 勝率", f"{wr_c:.0f}%" if wr_c is not None else "—"),
@@ -543,6 +556,12 @@ def main() -> int:
         chip("變體D 勝率", f"{wr_d:.0f}%" if wr_d is not None else "—"),
         chip("變體D ΣnetR", f"{s_d:+.2f}", _sgn(s_d)),
     ]
+    if eclosed:
+        s_e = sum(t["net"] for t in eclosed)
+        chips += [
+            chip("變體E(Q∧清算高) 平倉", f"{len(eclosed)}"),
+            chip("變體E ΣnetR", f"{s_e:+.2f}", _sgn(s_e)),
+        ]
     gate_line = "全籃進度: 見每週一 09:30 PortfolioClocks 報告"
     asof = ""
     try:
@@ -570,7 +589,7 @@ def main() -> int:
     perf = ("<div class='chips'>" + "".join(chips) + "</div>"
             + "<div class='sub'><b>變體A</b>=原始版·波段池·無濾網（Gate F 正式軌道）"
             + "　<b>變體B</b>=四種池＋淺穿越≤0.25ATR（預註冊 forward 中，表格 B 欄）"
-            + "　<b>變體C</b>=B∧收回內側✓（1m 價格收回確認，表格 C 欄）　<b>變體D</b>=C∧量能高（收回∧量能=訂單流組合配方，量能高=高於該幣自身歷史中位，表格 D 欄）</div>"
+            + "　<b>變體C</b>=B∧收回內側✓（1m 價格收回確認，表格 C 欄）　<b>變體D</b>=C∧量能高（收回∧量能=訂單流組合配方，量能高=高於該幣自身歷史中位，表格 D 欄）　<b>變體E</b>=BTC·Q∧清算爆量高（操作者三面板讀法：OI+CVD+清算，觀察 cohort）</div>"
             + "<div class='sub'>凍結後 forward · 情境A成本 · "
             + " · ".join(kind_bits)
             + (f" · log截至 {asof} UTC" if asof else "") + "</div>")
