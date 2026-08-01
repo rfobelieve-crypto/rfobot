@@ -186,6 +186,13 @@ def main() -> int:
     else:
         errors.append(f"combo_watchlist rc={rcc}")
 
+    # 2d ── V7 raid-chase veto forward gap (registered 2026-08-02) ──────
+    rcv, outv = run(["research/v7_raid_veto.py", "--clock"], 180)
+    if rcv == 0:
+        lines.append(grep_tail(outv, "V7 raid-veto", "raid-veto check failed"))
+    else:
+        errors.append(f"raid_veto rc={rcv}")
+
     # 3 ── depth_deltas span (subhourly revival due?) ────────────────────
     try:
         r = q1("SELECT (MAX(minute_start_ms)-MIN(minute_start_ms))/86400000.0 d "
