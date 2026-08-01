@@ -610,7 +610,7 @@ def main() -> int:
         for ts_, v_ in rows_:
             acc_ += v_
             d_[ts_ + TZ] = round(acc_, 3)
-        d_[now_ts + TZ] = round(acc_, 3)
+        d_[bars[-1][0] + TZ] = round(acc_, 3)
         return [{"time": k, "value": v} for k, v in sorted(d_.items())]
 
     eqv, eqc = [], []
@@ -632,8 +632,9 @@ def main() -> int:
             eqc.append({"k": name, "c": combo_col.get(name, "#848e9c"),
                         "w": 2 if name in ("R∧V", "R") else 1,
                         "pts": cum_series(slog3, pred)})
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        # never silent again — an empty pane hid a NameError for a day
+        print(f"  [WARN] equity curves failed: {type(e).__name__}: {e}")
 
     def _leg(data):
         return " ".join(
