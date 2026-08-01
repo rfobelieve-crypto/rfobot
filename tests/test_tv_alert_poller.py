@@ -90,10 +90,21 @@ class TestHRFlags:
 class TestHumanize:
     """白話翻譯層 — display-only, 凍結定義不碰（2026-07-20）。"""
 
-    def test_story_absorption_up_mentions_reversal(self):
+    def test_story_absorption_up_describes_flow_without_predicting(self):
+        """吸收卡只描述「發生了什麼」，不得預告方向。
+
+        原版斷言 "反轉向上" —— 那句話在 351256e (2026-07-29) 被刻意刪除，
+        因為撤單劇本的方向性判決是 FAIL（固定時間 hit <50%、路徑 MFE/MAE
+        0.94 劣於對照 1.08）。程式碼改了、測試沒跟上，於是紅了好幾天。
+        現在這個測試守的是相反的東西：描述性欄位要在，**被證偽的方向宣稱
+        不准回來**。
+        """
         from market_data.tasks.cancel_playbook_watcher import humanize_story
         s = humanize_story("absorption", "UP", vshock=28.9, taker_ratio=-0.50)
-        assert "吸收" in s and "反轉向上" in s and "29 倍" in s and "50%" in s
+        assert "吸收" in s and "29 倍" in s and "50%" in s
+        assert "價格守住沒跌" in s          # 描述，不是預測
+        for claim in ("反轉向上", "預期反轉", "此劇本預期"):
+            assert claim not in s, f"被證偽的方向宣稱又出現了: {claim}"
 
     def test_story_vacuum_down_and_state_alias(self):
         from market_data.tasks.cancel_playbook_watcher import humanize_story
