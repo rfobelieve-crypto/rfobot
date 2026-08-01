@@ -30,7 +30,7 @@ import argparse
 import json
 import sys
 from collections import defaultdict
-from datetime import timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,15 +49,18 @@ except Exception:
 OUT = ROOT / "research/results/v7_raid_veto.json"
 
 
-def load():
+def load(tier: str = "Strong"):
+    """tier defaults to Strong — the frozen registration. 'Moderate' feeds
+    the PARALLEL clock registered 2026-08-02 (TODO 0.49); it shares every
+    definition and threshold, only the population differs."""
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT signal_time, direction, regime, correct, "
                 "actual_return_4h FROM tracked_signals "
-                "WHERE strength='Strong' AND correct IS NOT NULL "
-                "ORDER BY signal_time")
+                "WHERE strength=%s AND correct IS NOT NULL "
+                "ORDER BY signal_time", (tier,))
             sigs = cur.fetchall()
     finally:
         conn.close()
@@ -65,6 +68,41 @@ def load():
     for r in raids_with_fill("BTC"):
         by_hh[r["ts"] // 3600].append(r["side"])
     return sigs, by_hh
+
+
+TRIGGER_START = "2026-08-02"   # both clocks start the same instant
+TRIGGER_TARGET = 60
+GAP_THRESHOLD_PP = 8.0
+
+
+def clock_block(rows, tier):
+    """90d kept-vs-vetoed gap + forward count since TRIGGER_START.
+
+    Identical arithmetic for both tiers — the ONLY difference between the
+    frozen Strong clock and the parallel Moderate one is which signals go
+    in. Counting starts at TRIGGER_START so neither clock can be fed by
+    data that existed when it was registered."""
+    if not rows:
+        return {"tier": tier, "kept_wr": None, "veto_wr": None,
+                "gap_pp": None, "n_kept": 0, "n_veto": 0,
+                "since_trigger": 0, "trigger_target": TRIGGER_TARGET,
+                "gap_threshold_pp": GAP_THRESHOLD_PP}
+    cut = max(r["ts"] for r in rows) - 90 * 86400
+    rec = [r for r in rows if r["ts"] >= cut]
+    kept = [r for r in rec if r["b"] != "follow"]
+    veto = [r for r in rec if r["b"] == "follow"]
+    k, v = wr(kept), wr(veto)
+    t0 = datetime.strptime(TRIGGER_START, "%Y-%m-%d").replace(
+        tzinfo=timezone.utc).timestamp()
+    return {"tier": tier,
+            "kept_wr": round(k, 1) if k is not None else None,
+            "veto_wr": round(v, 1) if v is not None else None,
+            "gap_pp": round(k - v, 1) if (k is not None and v is not None)
+            else None,
+            "n_kept": len(kept), "n_veto": len(veto),
+            "since_trigger": sum(1 for r in rows if r["ts"] >= t0),
+            "trigger_target": TRIGGER_TARGET,
+            "gap_threshold_pp": GAP_THRESHOLD_PP}
 
 
 def bucket(by_hh, ts_h, direction, look):
@@ -116,15 +154,33 @@ def main() -> int:
                      "b": bucket(by_hh, ts // 3600, d, 4)})
 
     if args.clock:
-        cut = max(r["ts"] for r in rows) - 90 * 86400
-        rec = [r for r in rows if r["ts"] >= cut]
-        kept = [r for r in rec if r["b"] != "follow"]
-        veto = [r for r in rec if r["b"] == "follow"]
-        k = wr(kept)
-        v = wr(veto)
-        print(f"V7 raid-veto (90d): kept {k:.0f}% (n={len(kept)}) vs "
-              f"vetoed {v:.0f}% (n={len(veto)}) — gap "
-              f"{k - v:+.0f}pp" if k and v else "V7 raid-veto: thin")
+        blocks = {"strong": clock_block(rows, "Strong")}
+        # PARALLEL Moderate clock (registered 2026-08-02, TODO 0.49):
+        # identical dims, identical +60 / >=8pp thresholds, 3-5x the fire
+        # rate. Indirect evidence — the executor trades Strong only — and
+        # it must be labelled as such wherever it is displayed.
+        try:
+            msigs, mby = load("Moderate")
+            mrows = [{"ts": int(x["signal_time"].replace(
+                          tzinfo=timezone.utc).timestamp()),
+                      "dir": x["direction"], "c": int(x["correct"]),
+                      "b": bucket(mby, int(x["signal_time"].replace(
+                          tzinfo=timezone.utc).timestamp()) // 3600,
+                          x["direction"], 4)}
+                     for x in msigs]
+            blocks["moderate"] = clock_block(mrows, "Moderate")
+        except Exception as e:  # noqa: BLE001
+            print(f"  [WARN] moderate clock failed: {e}")
+        for tag, b in blocks.items():
+            if b["kept_wr"] is None or b["veto_wr"] is None:
+                print(f"V7 raid-veto [{tag}]: thin")
+                continue
+            print(f"V7 raid-veto [{tag}] (90d): kept {b['kept_wr']:.0f}% "
+                  f"(n={b['n_kept']}) vs vetoed {b['veto_wr']:.0f}% "
+                  f"(n={b['n_veto']}) — gap {b['gap_pp']:+.1f}pp | "
+                  f"trigger {b['since_trigger']}/{b['trigger_target']}")
+        k = blocks["strong"]["kept_wr"]
+        v = blocks["strong"]["veto_wr"]
         # adoption-trigger progress (TODO 0.483): +60 Strong fired since
         # 2026-08-02, then gap >=8pp tables the informed decision. Written
         # as JSON so the agent/site can display the countdown (refreshes
@@ -141,12 +197,15 @@ def main() -> int:
                     since = int((cur.fetchone() or {}).get("n") or 0)
             finally:
                 conn.close()
+            blocks["strong"]["since_trigger"] = since
             out = {"kept_wr": round(k, 1) if k else None,
                    "veto_wr": round(v, 1) if v else None,
                    "gap_pp": round(k - v, 1) if k and v else None,
-                   "n_kept": len(kept), "n_veto": len(veto),
+                   "n_kept": blocks["strong"]["n_kept"],
+                   "n_veto": blocks["strong"]["n_veto"],
                    "strong_since_trigger": since, "trigger_target": 60,
                    "gap_threshold_pp": 8.0,
+                   "clocks": blocks,
                    "asof_utc": f"{_dt.utcnow():%Y-%m-%d %H:%M}"}
             (ROOT / "research/results/v7_veto_clock.json").write_text(
                 json.dumps(out, indent=1), encoding="utf-8")

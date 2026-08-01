@@ -187,9 +187,15 @@ def main() -> int:
         errors.append(f"combo_watchlist rc={rcc}")
 
     # 2d ── V7 raid-chase veto forward gap (registered 2026-08-02) ──────
+    # Two clocks since 2026-08-02 (TODO 0.49): the frozen Strong one and
+    # the parallel Moderate one. grep_tail keeps only the last hit, so both
+    # lines are collected explicitly — a weekly report that silently showed
+    # one of two clocks would be the same failure mode as a green scheduler
+    # over a dead job.
     rcv, outv = run(["research/v7_raid_veto.py", "--clock"], 180)
     if rcv == 0:
-        lines.append(grep_tail(outv, "V7 raid-veto", "raid-veto check failed"))
+        hits = [ln.strip() for ln in outv.splitlines() if "V7 raid-veto" in ln]
+        lines.extend(hits or ["raid-veto check failed"])
     else:
         errors.append(f"raid_veto rc={rcv}")
 
