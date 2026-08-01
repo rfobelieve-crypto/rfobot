@@ -517,65 +517,46 @@ def main() -> int:
     bsub = [t for t in fwd if t["b"]]
     bclosed = [t for t in closed if t["b"]]
 
-    def chip(label, val, cls=""):
-        return (f"<div class='chip'><div class='l'>{label}</div>"
-                f"<div class='v{(' ' + cls) if cls else ''}'>{val}</div></div>")
-
     def _wr(ts):
         return (100 * sum(1 for t in ts if t["net"] > 0) / len(ts)) if ts else None
 
-    def _sgn(x):
-        return "win" if x > 0 else "loss" if x < 0 else ""
+    # cohort membership including OPEN trades (flags are known at entry),
+    # rendered as an aligned table — one ROW per ledger with fixed columns
+    # (operator 2026-08-02: "版面排好、變體E少了勝率")
+    def _fl(t):
+        return flow.get((t["kind"], t["fill_ts"]), {})
 
-    s_all = sum(t["net"] for t in closed)
-    s_b = sum(t["net"] for t in bclosed)
-    wr_all, wr_b = _wr(closed), _wr(bclosed)
-    chips = [
-        chip("本幣 平倉/持倉", f"{len(closed)} / {len(fwd) - len(closed)}"),
-        chip("本幣 勝率", f"{wr_all:.0f}%" if wr_all is not None else "—"),
-        chip("本幣 ΣnetR", f"{s_all:+.2f}", _sgn(s_all)),
-        chip("變體B 平倉/持倉", f"{len(bclosed)} / {len(bsub) - len(bclosed)}"),
-        chip("變體B 勝率", f"{wr_b:.0f}%" if wr_b is not None else "—"),
-        chip("變體B ΣnetR", f"{s_b:+.2f}", _sgn(s_b)),
-    ]
-    cclosed = [t for t in bclosed
-               if (flow.get((t["kind"], t["fill_ts"])) or {}).get(
-                   "flow_reject") == "1"]
-    s_c = sum(t["net"] for t in cclosed)
-    wr_c = _wr(cclosed)
-    dclosed = [t for t in cclosed
-               if (flow.get((t["kind"], t["fill_ts"])) or {}).get(
-                   "flow_vhigh") == "1"]
-    s_d = sum(t["net"] for t in dclosed)
-    wr_d = _wr(dclosed)
-    eclosed = []
-    if sym == "BTC":
-        try:
-            slog2 = SE.read_log()
-            epred = SE.variant_e_pred(slog2)
-            ekeys = {(r["symbol"], r.get("level_kind", "swing"), int(r["fill_ts"]))
-                     for r in slog2.values()
-                     if r["symbol"] == "BTC" and r["status"] == "CLOSED"
-                     and r["net_r"] != "" and epred(r)}
-            eclosed = [t for t in closed
-                       if ("BTC", t["kind"], t["fill_ts"]) in ekeys]
-        except Exception:
-            eclosed = []
-    chips += [
-        chip("變體C(B∧收回) 平倉", f"{len(cclosed)}"),
-        chip("變體C 勝率", f"{wr_c:.0f}%" if wr_c is not None else "—"),
-        chip("變體C ΣnetR", f"{s_c:+.2f}", _sgn(s_c)),
-        chip("變體D(C∧量能高) 平倉", f"{len(dclosed)}"),
-        chip("變體D 勝率", f"{wr_d:.0f}%" if wr_d is not None else "—"),
-        chip("變體D ΣnetR", f"{s_d:+.2f}", _sgn(s_d)),
-    ]
-    if eclosed:
-        s_e = sum(t["net"] for t in eclosed)
-        chips += [
-            chip("變體E(OI↓∧CVD順破∧清算高) 平倉", f"{len(eclosed)}"),
-            chip("變體E ΣnetR", f"{s_e:+.2f}", _sgn(s_e)),
-        ]
+    call_a = [t for t in fwd if t["b"] and _fl(t).get("flow_reject") == "1"]
+    dall = [t for t in call_a if _fl(t).get("flow_vhigh") == "1"]
+    try:
+        _ep2 = SE.variant_e_pred(SE.read_log())
+    except Exception:
+        _ep2 = lambda _r: False  # noqa: E731
+    eall = [t for t in fwd if _fl(t) and _ep2(_fl(t))]
+    cclosed = [t for t in call_a if t["net"] is not None]
+    dclosed = [t for t in dall if t["net"] is not None]
+    eclosed = [t for t in eall if t["net"] is not None]
+    bclosed = [t for t in closed if t["b"]]
+    bsub = [t for t in fwd if t["b"]]
+
+    def prow(label, alln, cl):
+        s_ = sum(t["net"] for t in cl)
+        wr = _wr(cl)
+        cls = "win" if s_ > 0 else "loss" if s_ < 0 else ""
+        return (f"<tr><td>{label}</td>"
+                f"<td>{len(cl)} / {len(alln) - len(cl)}</td>"
+                f"<td>{(f'{wr:.0f}%' if wr is not None else '—')}</td>"
+                f"<td class='{cls}'>{s_:+.2f}</td></tr>")
+
+    perf_rows = "".join([
+        prow("本幣全部 (A)", fwd, closed),
+        prow("變體B 淺穿越", bsub, bclosed),
+        prow("變體C ＋收回", call_a, cclosed),
+        prow("變體D ＋量能", dall, dclosed),
+        prow("變體E 三面板", eall, eclosed),
+    ])
     gate_line = "全籃進度: 見每週一 09:30 PortfolioClocks 報告"
+    gsub = ""
     asof = ""
     try:
         slog = SE.read_log()
@@ -583,13 +564,10 @@ def main() -> int:
         asof = max((r.get("first_seen_utc") or "" for r in slog.values()),
                    default="")
         if gs["n_closed"]:
-            chips += [
-                chip("全籃29幣 B進度", f"{gs['n_closed']} / {gs['floor']}"),
-                chip("全籃 均netR", f"{gs['mean_r']:+.3f}", _sgn(gs["mean_r"])),
-                chip("CI低緣·日聚類", f"{gs['ci_low']:+.3f}", _sgn(gs["ci_low"])),
-                chip("GATE 狀態", "累積中" if gs["status"] == "accumulating"
-                     else gs["status"]),
-            ]
+            gsub = (f"全籃29幣：B 進度 {gs['n_closed']}/{gs['floor']}"
+                    f" · 均netR {gs['mean_r']:+.3f}"
+                    f" · CI低緣·日聚類 {gs['ci_low']:+.3f}"
+                    f" · {'PASS' if gs['status'] == 'PASS' else '累積中'}")
         gate_line = ("全籃(29幣) " + SE.gate_progress(slog)
                      + (f" · log截至 {asof} UTC" if asof else ""))
     except Exception:
@@ -599,10 +577,16 @@ def main() -> int:
         kc = [t for t in closed if t["kind"] == k]
         kind_bits.append(f"{KIND_ZH[k]} {len(kc)}筆"
                          + (f" Σ{sum(t['net'] for t in kc):+.2f}" if kc else ""))
-    perf = ("<div class='chips'>" + "".join(chips) + "</div>"
+    perf = ("<div style='padding:0 16px'><table style='max-width:560px'>"
+            "<thead><tr><th>帳本（本幣）</th><th>平倉 / 持倉</th><th>勝率</th>"
+            "<th>ΣnetR</th></tr></thead>"
+            f"<tbody>{perf_rows}</tbody></table></div>"
+            + (f"<div class='sub'>{gsub}</div>" if gsub else "")
             + "<div class='sub'><b>變體A</b>=原始版·波段池·無濾網（Gate F 正式軌道）"
             + "　<b>變體B</b>=四種池＋淺穿越≤0.25ATR（預註冊 forward 中，表格 B 欄）"
-            + "　<b>變體C</b>=B∧收回內側✓（1m 價格收回確認，表格 C 欄）　<b>變體D</b>=C∧量能高（收回∧量能=訂單流組合配方，量能高=高於該幣自身歷史中位，表格 D 欄）　<b>變體E</b>=BTC·OI↓∧CVD順破∧清算爆量高＝操作者三面板「當下」讀法（事後段=序列配方另計）</div>"
+            + "　<b>變體C</b>=B∧收回內側✓（1m 價格收回確認，表格 C 欄）"
+            + "　<b>變體D</b>=C∧量能高（訂單流組合配方，量能高=高於該幣自身歷史中位，表格 D 欄）"
+            + "　<b>變體E</b>=BTC·OI↓∧CVD順破∧清算爆量高＝操作者三面板「當下」讀法</div>"
             + "<div class='sub'>凍結後 forward · 情境A成本 · "
             + " · ".join(kind_bits)
             + (f" · log截至 {asof} UTC" if asof else "") + "</div>")
