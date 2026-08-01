@@ -904,6 +904,70 @@ ChatGPT for Claude」）確認真正的視覺語言，跟第一版描述（互�
       現有的 `ADMIN_HEAL_TOKEN`），撤單流圖表才會通。Phase 2（互動圖表
       版）留待之後，範圍明顯更大（iframe 或整個用 React 重刻）
 
+
+---
+
+## 0.5 個人語音助理（JARVIS-like）— **調研完成，尚未動工**（2026-08-01 入列）
+
+**狀態：待辦，零程式碼、未建 repo。** 使用者的決定是「先列入待辦事項」，
+不是開始施工。第一用途已定：**用語音操作這套量化系統**。
+
+### 這條紀律先寫在最前面（未來 session 必讀）
+語音助理要碰量化系統，**只能走 `indicator/agent/` 的唯讀路徑**，受
+`.claude/rules/agent-boundary.md` 管：可以問訊號／績效／shadow 狀態，
+**絕不可下單、改部位、碰 kill switch、寫任何非 `agent_*` 的表**。
+「語音」不是新的權限來源——它只是 agent 既有唯讀能力的另一個前端。
+真要有「動作」類指令（例如暫停 executor），必須走既有的 admin endpoint
+＋ token ＋人工確認，不得由語音層自行實作捷徑。
+
+### 已查證的事實（省下未來重查）
+本機（實測）：RTX 3070 Laptop **8 GB VRAM**（Windows API 報 4 GB 是
+AdapterRAM 溢位，以 nvidia-smi 為準）、i7-11370H 4C/8T、RAM 23.7 GB、
+C 槽 131 GB、**桌面走 Intel Iris Xe 所以 8 GB 幾乎全可用**；已有
+node／docker／git／WSL2，**缺 ollama、ffmpeg**；base Python 3.9.12
+（jarvis_ai 需 3.11+，要開新環境）。
+
+`eadmin2/jarvis_ai`（MIT、109 stars、7 commits）：
+- **macOS-first**（launchd ＋ 全 `.sh`，只在 Apple Silicon 測過）
+- **ElevenLabs 是硬編的**，不是 provider 抽象——「之後換本地 TTS」
+  是改程式碼不是改設定；`config/server.yaml` 只能設 `voice_id`
+- 需要 Hermes Agent 跑在 `localhost:8642`，靠 `~/.hermes/.env` 的
+  `API_SERVER_ENABLED` / `API_SERVER_KEY` / `JARVIS_HUD_TOKEN`
+- HUD 是**單檔 vanilla JS、無 build step** → 可以只留 HUD 換後端
+- 瀏覽器麥克風強制 HTTPS，自簽憑證那步不能跳
+
+Hermes Agent（Nous Research，MIT）：走 Ollama 的 OpenAI 相容端點
+`http://localhost:11434/v1`，**要求 num_ctx >= 64K**（Ollama 預設 2048，
+不改必爛），官方推薦 `gemma4:31b`（要 24 GB）並明說**小模型會忽略工具
+呼叫、吐純文字**——這是 8 GB 純本地路線的真正瓶頸，不是速度。
+
+### 三條路徑（使用者尚未選）
+1. **30 分鐘驗證跑**（原推薦）：Ollama ＋ Qwen3 8B ＋ Open WebUI，先量
+   延遲／中文辨識／工具呼叫成功率，數據好再投 HUD。零成本可逆——同
+   「5 分鐘 sanity 擋掉兩週浪費」的紀律
+2. **混合腦**：本地語音管線 ＋ `claude -p`（headless Claude Code，用
+   現有訂閱、不開 API key）當代理大腦；本地小模型只做閒聊與路由
+3. **照 jarvis_ai 原樣裝**：電影體驗優先，接受 macOS→Windows 移植工
+   與 ElevenLabs 免費額度很快用完
+
+### 8 GB 的模型選擇
+**Qwen3 8B Q4_K_M（~5 GB）為首選**（中文優於 Llama 系；需配
+`OLLAMA_KV_CACHE_TYPE=q8_0` 才塞得下 64K KV）；Qwen3.5 9B（6.6 GB）
+次選但 context 要降到 16-32K；14B 以上必 offload 到 RAM，語音互動不可用。
+**STT 先跑 CPU**（faster-whisper base/small），把 8 GB 全留給 LLM。
+本地 TTS 首選 **Kokoro-82M**（CPU 可跑、延遲低），替代 Piper／Chatterbox。
+
+### 踩坑清單（已預先蒐集）
+num_ctx 沒改 → 多步就失憶｜Python 3.9 裝到一半炸｜`.sh` 要 Git Bash
+或 WSL2｜**Hermes 是否支援 Windows 原生未經證實**（不行就整組進 WSL2、
+Ollama 留 Windows）｜麥克風要 HTTPS ＋ 信任自簽憑證｜缺 ffmpeg｜
+ElevenLabs 免費額度以字計費、用很快｜VRAM 爆掉時 Ollama 會靜默 offload
+到 CPU（要看 nvidia-smi，不是等它報錯）
+
+### 落地位置
+**開在 `flow_system` 之外**（例如 `C:\Users\rfo\Desktop\jarvis`），不要污染量化 repo。
+Hermes 的資料存 `~/.hermes/`（內含 token），要排除在任何同步／備份之外。
+
 ---
 
 ## 已歸檔（2026-04 舊計畫，多數已被後續工作取代）
