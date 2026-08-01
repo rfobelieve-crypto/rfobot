@@ -475,6 +475,7 @@ def _sweep_status_payload() -> dict:
         if p not in sys.path:
             sys.path.insert(0, p)
     import shadow_engine as SE  # noqa: PLC0415  (lazy: research is optional)
+    import combo_watchlist as CW  # noqa: PLC0415
     log = SE.read_log()
     gate = SE.gate_stats(log)
     closed = sorted(
@@ -486,7 +487,37 @@ def _sweep_status_payload() -> dict:
         "net_r": round(float(r["net_r"]), 3),
     } for r in closed[:6]]
     asof = max((r.get("first_seen_utc") or "" for r in log.values()), default="")
+    # full ledger board (2026-08-02, operator: "很多都只記錄在資料庫沒有
+    # 顯示出來...不好管理") — every cohort and every frozen watchlist combo,
+    # same clustered-CI arithmetic, plain-language labels included so the
+    # site renders 白話 without duplicating definitions.
+    cohorts = []
+    for key, zh, pred in (
+            ("A", "A 全樣本（無濾網·對照組）", lambda r: True),
+            ("B", "B 淺穿越（主 gate n/1400）",
+             lambda r: str(r.get("variant_b", "")) == "1"),
+            ("C", "C ＋收回（1m 縮回價位內）", SE.is_variant_c),
+            ("D", "D ＋量能（訂單流組合）", SE.is_variant_d),
+            ("E", "E 三面板盤感（OI↓∧CVD順破∧清算高）",
+             SE.variant_e_pred(log))):
+        st = SE.gate_stats(log, pred)
+        cohorts.append({"key": key, "label_zh": zh, **st})
+    combo_zh = {
+        "R∧V": "放量刺、縮回來", "R∧Q": "縮回＋確認掃止損",
+        "R∧V∧Q": "三重確認（歷史最肥）", "R∧快": "五分鐘搶完就跑",
+        "R∧快∧Q": "快閃＋止損確認", "R": "有縮回就算（最寬）",
+        "PA": "V7 也站這邊", "V∧LIQ": "放量＋清算噴"}
+    combos = []
+    for name, pred in CW.combo_preds(log).items():
+        st = SE.gate_stats(log, pred)
+        combos.append({"key": name, "label_zh": combo_zh.get(name, ""), **st})
+    try:
+        clocks = queries.public_research_clocks()
+    except Exception:  # noqa: BLE001
+        clocks = None
     return {"gate": gate, "recent": recent, "asof_utc": asof,
+            "cohorts": cohorts, "combos": combos, "clocks": clocks,
+            "watchlist_registered": CW.REGISTERED,
             "mode": "shadow", "disclaimer":
             "Forward shadow validation in progress — not a live strategy, "
             "not financial advice."}

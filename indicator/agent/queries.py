@@ -953,3 +953,35 @@ def public_live_status() -> dict[str, Any]:
                    "cum_net_pct": round((comp - 1.0) * 100, 2)},
         "disclaimer": DISCLAIMER,
     }
+
+
+# ── Public: research clocks (site ledger board, 2026-08-02) ─────────────
+# Counts only — which clock stands where. All tables whitelisted reads.
+
+def public_research_clocks() -> dict[str, Any]:
+    if _seed_mode():
+        return {"gate_b_closed": 15, "gate_b_target": 30,
+                "depth_days": 23, "depth_target": 90,
+                "tracked_strong": 766, "next_verdict": "2026-08-06",
+                "_source": "seed"}
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) n FROM v7_okx_positions "
+                "WHERE status='CLOSED' AND exit_time >= '2026-06-10'")
+            gb = int((cur.fetchone() or {}).get("n") or 0)
+            cur.execute(
+                "SELECT COUNT(*) n FROM tracked_signals "
+                "WHERE strength='Strong' AND correct IS NOT NULL")
+            ts = int((cur.fetchone() or {}).get("n") or 0)
+            cur.execute(
+                "SELECT (MAX(minute_start_ms)-MIN(minute_start_ms))"
+                "/86400000.0 d FROM depth_deltas_1m")
+            row = cur.fetchone() or {}
+            dd = float(row.get("d") or 0.0)
+    finally:
+        conn.close()
+    return {"gate_b_closed": gb, "gate_b_target": 30,
+            "depth_days": round(dd), "depth_target": 90,
+            "tracked_strong": ts, "next_verdict": "2026-08-06"}
