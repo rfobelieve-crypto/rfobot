@@ -639,6 +639,15 @@ def update_cycle() -> dict:
                 except Exception as e:
                     logger.warning("SHAP explanation failed (non-critical): %s", e)
 
+            # Terrain stamp (2026-08-02): display-only line from the three
+            # verified structural conditions. Never blocks the alert.
+            terrain_txt = ""
+            try:
+                from indicator.terrain import terrain_line as _terrain
+                terrain_txt = _terrain(features, direction)
+            except Exception as e:
+                logger.warning("terrain line failed (non-critical): %s", e)
+
             risk_line = ""
             alert = (
                 f"{icon} <b>{label} SIGNAL</b>\n\n"
@@ -647,6 +656,7 @@ def update_cycle() -> dict:
                 f"Confidence: {conf:.0f}{risk_line}\n"
                 f"Regime: {regime}"
                 f"{mag_tier_line}"
+                f"{terrain_txt}"
                 f"{shap_text}\n\n"
                 f"\u23f0 {now_str}"
             )

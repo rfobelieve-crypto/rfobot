@@ -1,0 +1,30 @@
+{
+ "T0 現狀": {
+  "n": 766,
+  "share_pct": 100.0,
+  "per_month": 91.5,
+  "wr": 59.5,
+  "ret_pct": 0.2
+ },
+ "T1 +追突破veto": {
+  "n": 569,
+  "share_pct": 74.3,
+  "per_month": 68.0,
+  "wr": 62.0,
+  "ret_pct": 0.23
+ },
+ "T2 +前方牆veto": {
+  "n": 407,
+  "share_pct": 53.1,
+  "per_month": 48.6,
+  "wr": 63.1,
+  "ret_pct": 0.23
+ },
+ "T3 +需背靠支撐": {
+  "n": 194,
+  "share_pct": 25.3,
+  "per_month": 23.2,
+  "wr": 68.0,
+  "ret_pct": 0.37
+ }
+}
