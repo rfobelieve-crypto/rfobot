@@ -1,0 +1,11 @@
+{
+ "kept_wr": 62.2,
+ "veto_wr": 44.4,
+ "gap_pp": 17.7,
+ "n_kept": 37,
+ "n_veto": 18,
+ "strong_since_trigger": 0,
+ "trigger_target": 60,
+ "gap_threshold_pp": 8.0,
+ "asof_utc": "2026-08-01 09:36"
+}

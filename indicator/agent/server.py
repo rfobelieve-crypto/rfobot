@@ -515,7 +515,16 @@ def _sweep_status_payload() -> dict:
         clocks = queries.public_research_clocks()
     except Exception:  # noqa: BLE001
         clocks = None
+    v7f = None
+    try:
+        import json as _json
+        vp = root / "research" / "results" / "v7_veto_clock.json"
+        if vp.exists():
+            v7f = _json.loads(vp.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        v7f = None
     return {"gate": gate, "recent": recent, "asof_utc": asof,
+            "v7_filters": v7f,
             "cohorts": cohorts, "combos": combos, "clocks": clocks,
             "watchlist_registered": CW.REGISTERED,
             "mode": "shadow", "disclaimer":

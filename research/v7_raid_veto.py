@@ -125,6 +125,33 @@ def main() -> int:
         print(f"V7 raid-veto (90d): kept {k:.0f}% (n={len(kept)}) vs "
               f"vetoed {v:.0f}% (n={len(veto)}) — gap "
               f"{k - v:+.0f}pp" if k and v else "V7 raid-veto: thin")
+        # adoption-trigger progress (TODO 0.483): +60 Strong fired since
+        # 2026-08-02, then gap >=8pp tables the informed decision. Written
+        # as JSON so the agent/site can display the countdown (refreshes
+        # into the Railway image on each push; asof stamped for honesty).
+        try:
+            from datetime import datetime as _dt
+            conn = get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT COUNT(*) n FROM tracked_signals "
+                        "WHERE strength='Strong' "
+                        "AND signal_time >= '2026-08-02'")
+                    since = int((cur.fetchone() or {}).get("n") or 0)
+            finally:
+                conn.close()
+            out = {"kept_wr": round(k, 1) if k else None,
+                   "veto_wr": round(v, 1) if v else None,
+                   "gap_pp": round(k - v, 1) if k and v else None,
+                   "n_kept": len(kept), "n_veto": len(veto),
+                   "strong_since_trigger": since, "trigger_target": 60,
+                   "gap_threshold_pp": 8.0,
+                   "asof_utc": f"{_dt.utcnow():%Y-%m-%d %H:%M}"}
+            (ROOT / "research/results/v7_veto_clock.json").write_text(
+                json.dumps(out, indent=1), encoding="utf-8")
+        except Exception as e:  # noqa: BLE001
+            print(f"  [WARN] veto clock json failed: {e}")
         return 0
 
     print("=" * 78)
