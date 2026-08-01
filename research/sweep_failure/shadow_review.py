@@ -618,10 +618,15 @@ def main() -> int:
                  if r["status"] == "CLOSED" and r["net_r"] != ""
                  and r.get("exit_ts") not in (None, "") and pred(r)]
         rows_.sort()
-        acc_, d_ = 0.0, {}
+        # every ledger starts at 0 on the freeze day and extends flat to
+        # "now" — short-history lines (e.g. a 3-trade combo) stay visible
+        # across the full pane instead of being a 3-point stub (operator:
+        # "怎麼沒看到 R∧V∧Q 的曲線", 2026-08-02)
+        acc_, d_ = 0.0, {FREEZE_TS + TZ: 0.0}
         for ts_, v_ in rows_:
             acc_ += v_
             d_[ts_ + TZ] = round(acc_, 3)
+        d_[now_ts + TZ] = round(acc_, 3)
         return [{"time": k, "value": v} for k, v in sorted(d_.items())]
 
     eqv, eqc = [], []
