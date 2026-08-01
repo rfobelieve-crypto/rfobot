@@ -408,8 +408,8 @@ summary{{cursor:pointer;user-select:none}}
 <span>┄ 未被掃</span>
 <span>─ 已被掃</span>
 <span style="color:var(--accent)">⏳ 已掃·等回踩(8根內)</span>
-<span>▲▼ 進場(亮=變體B/灰=僅記錄)</span>
-<span>● 出場(綠賺紅虧)</span>
+<span>▲▼ 進場·字母=變體(A灰=僅記錄 / B·C=方向色 / <span style="color:var(--accent)">D=金</span> / +E=盤感線)</span>
+<span>● 出場(綠賺紅虧·同字母)</span>
 <span>淡色┄ 形成中(引擎尚不可交易)</span>
 </div>
 <div id="c"></div>
@@ -623,6 +623,23 @@ def main() -> int:
     markers, levels, rows = [], [], []
     RED, GREEN, GREY, AMBER = "#f6465d", "#0ecb81", "#5b6472", "#f0b90b"
 
+    # variant ladder per trade (A<B<C<D from recorded columns; E via the
+    # engine's own membership closure — display shows what is KNOWN so far,
+    # blank flow columns fall back to the highest provable tier)
+    try:
+        _epred = SE.variant_e_pred(SE.read_log())
+    except Exception:
+        _epred = lambda _r: False  # noqa: E731
+
+    def tier_of(t, fl):
+        if not t["b"]:
+            return "A"
+        if fl.get("flow_reject") == "1":
+            if fl.get("flow_vhigh") == "1":
+                return "D"
+            return "C"
+        return "B"
+
     # ── pools: the map layer ─────────────────────────────────────────────
     # resting pools capped by DISTANCE TO PRICE (not recency): the map's job
     # is "targets in front of price", and recency let fast-churning session
@@ -670,24 +687,30 @@ def main() -> int:
     # ── forward trades: replay layer (chart shows the window; the table
     #    below always lists every forward trade since freeze) ──────────────
     for t in fwd:
-        col = (GREEN if t["side"] == "LONG" else RED) if t["b"] else GREY
+        fl_t = flow.get((t["kind"], t["fill_ts"]), {})
+        tier = tier_of(t, fl_t)
+        is_e = bool(fl_t) and _epred(fl_t)
+        tag = tier + ("+E" if is_e else "")
+        line_col = (GREEN if t["side"] == "LONG" else RED) if t["b"] else GREY
+        mk_col = (GREY if tier == "A" else AMBER if tier == "D" else line_col)
         end = (t["exit_ts"] or now_ts)
         if end >= t0:                      # off-window lines would stretch
             o_ts = clamp(t["origin_ts"])   # fitContent past the 48h view
-            levels.append({"c": col, "w": 2 if t["b"] else 1, "st": 0,
+            levels.append({"c": line_col, "w": 2 if t["b"] else 1, "st": 0,
                            "pts": [{"time": o_ts + TZ, "value": t["lvl"]},
                                    {"time": end + TZ, "value": t["lvl"]}]})
         if t["fill_ts"] >= t0:
             markers.append({"time": t["fill_ts"] + TZ,
                             "position": "belowBar" if t["side"] == "LONG" else "aboveBar",
                             "shape": "arrowUp" if t["side"] == "LONG" else "arrowDown",
-                            "color": col,
-                            "text": ("B " if t["b"] else "") + KIND_ZH[t["kind"]]})
+                            "color": mk_col,
+                            "text": tag + "·" + KIND_ZH[t["kind"]]})
         if t["exit_ts"] and t["exit_ts"] >= t0:
             win = (t["net"] or 0) > 0
             markers.append({"time": t["exit_ts"] + TZ, "position": "inBar",
                             "shape": "circle",
-                            "color": "#0ecb81" if win else "#f6465d", "text": ""})
+                            "color": "#0ecb81" if win else "#f6465d",
+                            "text": tag})
         f8 = datetime.fromtimestamp(t["fill_ts"] + TZ, timezone.utc)
         stat = ("OPEN" if not t["exit_ts"]
                 else ("win" if (t["net"] or 0) > 0 else "loss"))
