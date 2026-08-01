@@ -57,6 +57,7 @@ TRIGGER = "2026-08-02"          # both adoption clocks start here
 BUFFER_FIX = "2026-04-19"       # warmup-buffer fix: decode changed
 WALL, SUP = 1.4, 1.8
 
+matplotlib.rcParams["figure.dpi"] = 100
 for k, v in {"figure.facecolor": BG, "axes.facecolor": BG,
              "savefig.facecolor": BG, "text.color": FG,
              "axes.labelcolor": FG, "xtick.color": FG, "ytick.color": FG,
@@ -162,9 +163,14 @@ def main() -> int:
     strong = [s for s in sigs if s["strength"] == "Strong"]
     mod = [s for s in sigs if s["strength"] == "Moderate"]
 
-    fig, axes = plt.subplots(2, 2, figsize=(15, 9))
+    # Stacked, not a 2x2 grid (operator 2026-08-02: "四個圖表不要全放在
+    # 一起太小了"). Each panel now gets the full width — roughly 4x the
+    # area it had in the grid, which is the difference between reading
+    # the rolling win-rate lines and guessing at them.
+    fig, axcol = plt.subplots(4, 1, figsize=(15, 21))
+    axes = [[axcol[0], axcol[1]], [axcol[2], axcol[3]]]
     fig.suptitle("V7 績效累積 — 訊號 edge / 濾網對照 / 滾動勝率 / 實盤真錢",
-                 color=FG, fontsize=14, y=0.98)
+                 color=FG, fontsize=15, y=0.995)
     trig = pd.Timestamp(TRIGGER, tz="UTC")
 
     # ① cumulative directional return
@@ -295,12 +301,12 @@ def main() -> int:
     ax.set_ylabel("累積帳戶報酬 %（equity_ret_pct 相加）")
     ax.grid(alpha=.25)
 
-    fig.tight_layout(rect=(0, 0.025, 1, 0.96))
-    fig.text(0.5, 0.006,
+    fig.tight_layout(rect=(0, 0.018, 1, 0.985), h_pad=3.2)
+    fig.text(0.5, 0.004,
              "①③ 是訊號品質（未扣成本、未套停損、未計 sizing），不是交易績效；"
              "② 比的是每筆平均（濾網會減少筆數，總和不可比）；只有 ④ 是真錢"
              "（equity_ret_pct，已含 2x 名目）。②的陰影區為推導資料，非證據。",
-             ha="center", color="#8b93a1", fontsize=8)
+             ha="center", color="#8b93a1", fontsize=9)
     fig.savefig(OUT, dpi=140)
     print(f"  Strong {len(strong)} · Moderate {len(mod)} · live {len(live)}")
     if strong:
