@@ -58,9 +58,15 @@ C_STRONG, C_MOD, C_RES = "#00d1b2", "#7b6cff", "#f0b90b"
 for k, v in {"figure.facecolor": BG, "axes.facecolor": BG,
              "savefig.facecolor": BG, "text.color": FG,
              "axes.labelcolor": FG, "xtick.color": FG, "ytick.color": FG,
-             "axes.edgecolor": GRID, "grid.color": GRID,
-             "font.family": "Microsoft JhengHei"}.items():
+             "axes.edgecolor": GRID, "grid.color": GRID}.items():
     matplotlib.rcParams[k] = v
+# MS fonts = local Windows; Noto CJK = the Railway image (Dockerfile.indicator
+# installs fonts-noto-cjk). Hardcoding JhengHei would render every Chinese
+# label as tofu boxes on the server — same list as plot_cancel_flow.py.
+matplotlib.rcParams["font.sans-serif"] = [
+    "Microsoft JhengHei", "Microsoft YaHei", "SimHei",
+    "Noto Sans CJK TC", "Noto Sans CJK SC", "WenQuanYi Zen Hei"]
+matplotlib.rcParams["axes.unicode_minus"] = False
 
 
 def load_live():
