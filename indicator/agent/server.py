@@ -368,6 +368,22 @@ _cancel_chart_cache: dict = {"bytes": None, "ts": 0.0}
 _CANCEL_CHART_CACHE_TTL_S = 120.0
 
 
+# V7 cumulative performance PNG (2026-08-02). Rendered by a subprocess on
+# the indicator service (matplotlib, ~10-20s with the terrain panel), so
+# the TTL here is doing real work: without it every page view would fan
+# out a fresh render. 30 min matches how fast the inputs actually move —
+# tracked_signals backfills 4h after a signal fires.
+_v7_accum_cache: dict = {"bytes": None, "ts": 0.0}
+_V7_ACCUM_CACHE_TTL_S = 1800.0
+
+
+@mcp.custom_route("/public/v7-accum", methods=["GET"])
+async def public_v7_accum_route(request: Request) -> Response:
+    return await _proxy_png(
+        _v7_accum_cache, _V7_ACCUM_CACHE_TTL_S,
+        f"{INDICATOR_BASE_URL}/research/v7-accum", token=INDICATOR_ADMIN_TOKEN)
+
+
 @mcp.custom_route("/public/cancel-flow-chart", methods=["GET"])
 async def public_cancel_flow_chart_route(request: Request) -> Response:
     return await _proxy_png(
