@@ -416,6 +416,43 @@ Step 2 研究基礎建設（backfill 歷史、建特徵表、跑乾淨 WF），�
 - 任何階段：禁再鬆 leverage cap——10x 已經是「informed 一次」的極限；下次再要鬆要寫進 mistake.md
 - 任何階段：hit kill trigger 必須降階重驗，不准「我覺得這次例外」
 
+## 三策略架構（2026-08-02 更新）
+
+這個 repo 已經不只是「V7 指標」，是三條並行的策略線，共用同一個資料層與
+風控框架設計（見 docs/PORTFOLIO_RISK_FRAMEWORK.md、TODO.md §0.4）：
+
+| # | 策略 | 現況 | 碰不碰真錢 |
+|---|---|---|---|
+| 1 | **V7 dual-model**（4h 方向 + 幅度） | Stage 3 live（$274 基準） | **是**，唯一 |
+| 2 | **流動性獵取 / 掃單失敗**（sweep-failure） | 規則凍結 + Gate F forward 驗證中；A-E 變體 + 8 組合每小時記帳 | 否 |
+| 3 | **撤單流**（cancel playbook） | 方向性判決 FAIL，全線繫於 cancel_lead_ic | 否 |
+
+**硬規則**：策略 #2/#3 在自己的 Gate 通過前，一律停在 research/shadow
+track——不得進 executor、不得用來加碼、不得互相背書（「機制可複製」不等於
+「機制有 edge」）。第二條策略要上線必須先有統一風控框架（兩層 kill /
+風險預算 / 中央曝險帳本 / 相關性預算），不是各跑各的。
+
+### 地形層（V7 × 流動性位置，2026-08-02 戰役收官）
+
+用「訊號開火時，價格離未掃流動性池多遠」當訊號品質背景。10 個維度按凍結
+測序逐一過三關（G1 分桶+兩半 → G2 已定案邊際殘餘 → G3 置換+bootstrap+
+逐季），結果：
+
+- **定案四維（全是流動性）**：D1 情境 veto（追突破 52% vs 64%）、D2 前方牆
+  （≤1.4 ATR 57% vs 淨 65%）、D3 背後支撐（≤1.8 ATR 68%）、D5 池子密度
+  （前方 3 ATR ≥3 池 54% vs ≤1 池 62%）
+- **門口候選（各一次復審權）**：S3 折價/溢價（CI 下緣恰觸零）、L1-B 清算牆
+  （樣本 n=49 攤不出殘餘格）
+- **全滅**：市場結構層（S1 方向 / S2 BOS·CHoCH / S3）、D4 牆等級、D6 翻轉位、
+  D8 風暴、D9 彈簧、D10 牆齡
+- **兩次獨立證明**（D6 翻轉位、L1-A 清算現場）：**被消耗掉的流動性不留下
+  任何效應**——系統吃的是還掛在那裡的單，不是價格記憶
+
+**地形目前是 display-only**：告警帶「🗺 地形」標記（`indicator/terrain.py`），
+**entry 規則一行都沒動**。要進 executor 必須先過凍結扳機（自 2026-08-02
+起 +60 筆新 Strong **且** 90d 保留 vs 否決 gap ≥8pp），達標後由操作者選檔位
+（T0-T3），D5 列為下次 policy 修訂的第 4 維候選。
+
 ## 系統架構（v7 Dual-Model）
 Dual XGBoost 架構：Direction Regressor + Magnitude Regressor，獨立管線。
 
@@ -495,11 +532,20 @@ y_path_ret_4h = mean(close[t+1..t+4]) / close[t] - 1 (TWAP path return)
 6. **Edge Cases 處理**：假日流動性差異、Funding 結算跳動、rate limit、資料缺失。
 
 ## 圖表同步規則
-系統有兩個圖表，修改時**必須同步更新**：
+**V7 有兩個圖表，修改時必須同步更新**：
 1. **靜態圖表** (`indicator/chart_renderer.py`) — Telegram 推送的 PNG
 2. **互動圖表** (`indicator/chart_interactive.py`) — `/ichart` 的 TradingView Lightweight Charts HTML
 
-任何圖表邏輯變更（面板、三角形、顏色、過濾條件）都要兩邊一起改。
+任何 V7 圖表邏輯變更（面板、三角形、顏色、過濾條件）都要兩邊一起改。
+
+第三張圖屬於策略 #2、**不與上面兩張同步**（不同資料源、不同語意）：
+3. **獵取覆盤** (`research/sweep_failure/shadow_review.py`) — `/shadow-review`
+   的多幣種 K 線 + 變體階梯進出場 + 累積 netR 曲線（5 變體 + 8 組合）
+
+## 使用者可見改動的同步規則（2026-07-23 起）
+V7 或撤單流只要有**使用者看得到**的改動（新圖表、新指令、新幣種、新研究
+結論上牆），要主動同步三處：**product-site**（`../product-site`，Next.js /
+Vercel）、**兩個 Telegram bot**。純研究腳本 / 後端管線改動不適用。
 
 ## 命名與程式碼規範
 - Class：CamelCase（如 IndicatorEngine、SignalExplainer）
@@ -507,10 +553,16 @@ y_path_ret_4h = mean(close[t+1..t+4]) / close[t] - 1 (TWAP path return)
 - 偏好：清晰、可讀性高、模組化
 - 新特徵加入前必須回測驗證 IC
 
-## 專案階段
-- 階段 4：特徵工程（目前重點 — 自訂 alpha 特徵 + 數據累積）
-- 階段 5：模型開發（Magnitude 已重訓 v2, Direction 等 2 週後重訓）
-- 階段 9：持續迭代（績效追蹤、IC 監控、衰退警報已上線）
+## 專案階段（2026-08-02 更新）
+- **V7 特徵工程 = 飽和**：同源資料（OHLCV + Coinglass + Deribit + Binance
+  order flow）已三度證實榨乾（WQ101、liq proxy、86 個新特徵全部 A/B 不過）。
+  預設**不再跑同源特徵 A/B**；唯一槓桿是異源（options GEX / on-chain whale /
+  真實掛單簿 depth_deltas，10 月檢查點）
+- **V7 模型**：維持現役，每月 5 號自動復驗（`quarterly_revalidation.py`，
+  帶 STALE-DATA guard）
+- **當前研究重心**：策略 #2 的 forward 驗證（Gate F / 變體 B 1400 筆時鐘）
+  與統一風控框架設計；V7 這側是地形層的凍結扳機在跑
+- **持續運行**：績效追蹤、IC 監控、衰退警報、每小時 shadow 記帳
 
 ## 跨 session 任務同步（2026-07-07）
 - **TODO.md 是唯一的跨 session 任務真相源**。每次開工先讀 TODO.md 的「當前任務」區。
