@@ -545,7 +545,32 @@ y_path_ret_4h = mean(close[t+1..t+4]) / close[t] - 1 (TWAP path return)
 ## 使用者可見改動的同步規則（2026-07-23 起）
 V7 或撤單流只要有**使用者看得到**的改動（新圖表、新指令、新幣種、新研究
 結論上牆），要主動同步三處：**product-site**（`../product-site`，Next.js /
-Vercel）、**兩個 Telegram bot**。純研究腳本 / 後端管線改動不適用。
+Vercel，分支是 **master** 不是 main）、**兩個 Telegram bot**。純研究腳本 /
+後端管線改動不適用。
+
+## 對外網站呈現面（product-site，2026-08-02 盤點）
+
+網站是三條策略**唯一的對外展示層**。資料一律走 agent-mcp 的 `/public/*`
+唯讀端點（Railway `agent-mcp-production-46d7`），網站**不直連 MySQL、不碰
+任何交易路徑**——這條界線由 `.claude/rules/agent-boundary.md` 管，網站只是
+它下游的下游。
+
+| 策略 | 頁面 | 主要元件 | 吃的端點 |
+|---|---|---|---|
+| **V7** | `/charts/v7`、`/dashboard`、`/signals`、`/track-record` | ChartDetail、V7KpiRow、**V7FilterCard**（地形四維＋扳機進度）、LiveTradesPanel | `/public/chart`、`/live-chart`、`/signal-feed`、`/signal-history`、`/live-status`、`/track-record` |
+| **流動性獵取** | `/charts/liquidity`、`/dashboard` | ChartDetail（獵取覆盤圖）、SweepKpiRow、**ShadowLedgerBoard**（5 變體 + 8 組合 + 時鐘）、ShadowTradesPanel | `/public/liquidity-map`、`/public/sweep-status` |
+| **撤單流** | `/charts/cancel-flow`、`/dashboard` | CancelFlowExpert、CancelFlowKpiGrid | `/public/cancel-flow-chart`、`-chart-i`、`-stats` |
+| 共通 | `/`、`/system`、`/incidents`、`/writeups`、登入註冊 | Hero、StrategyBoard、SystemDetail、Waitlist | `/public/login`、`/register`、`/waitlist` |
+
+**公開面硬規則（違反就是資訊外洩，不是 UI 問題）**：
+- **只出百分比、方向、時間**——絕不出現合約張數、美元權益、帳戶餘額、
+  單筆部位金額（`queries.public_live_status` 就是照這條寫的）
+- **只出模型輸出**（方向 / tier / 信心 / 驅動因子），不出模型內部（特徵
+  定義、cutoff、權重）
+- 任何可被讀成投資建議的回應都要帶 disclaimer 欄位
+- **研究結論上牆必須標狀態**：已驗證 / 待整合 / 門口候選 / 已陣亡。像 D5
+  這種「過了三關但還沒進生產」的，卡片上要有明確標記（現在是虛線框 +
+  琥珀「待整合」chip），不能讓頁面暗示它已生效
 
 ## 命名與程式碼規範
 - Class：CamelCase（如 IndicatorEngine、SignalExplainer）
