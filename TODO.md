@@ -80,6 +80,18 @@
 - 紀律：**變體 A（凍結、swing、無濾網）仍是 Gate F 正式軌道，未被改寫**；
       #3 的搜尋今日到此為止，任何新想法先寫下來、等 forward 窗口跑完再測
 
+### 0.478 組合篩選→凍結 watchlist→shadow 計分板（2026-08-02）
+使用者管線落地：`sweep_raid_combo_screen.py` 全網格 287 格（深度×收回×量能×
+攻速×BTC旗標）、事前提名規則（n≥80∧|t|≥2.5∧兩半同號∧雙幣同號→去重 cap 8）：
+- **8 個提名凍結進 `combo_watchlist.py`**（R∧V / R∧Q / R∧V∧Q / R∧快 /
+  R∧快∧Q / R / PA / V∧LIQ）——定義不可改，改=新註冊
+- `shadow_engine.py --combos` = forward 計分板（同日聚類 CI 算術）；已接進
+  每週一 PortfolioClocks 報告
+- 首讀（僅 5 天，勿當證據）：R n=220 meanR +0.165 CI低緣 +0.034；
+  R∧V n=63 +0.186 CI低緣 +0.034；BTC 系組合個位數 n 純記錄
+- **上線判準（沿用兩段式）**：watchlist 條目要 forward n 累積 + CI 低緣>0
+  + 十月預註冊蓋章，缺一不可；in-sample 篩選只是入場券
+
 ### 0.477 V7×獵取情境（2026-08-02，`v7_raid_context.py`）——pred_align 的鏡像
 使用者觀察「V7 完全沒用價格行為/位置」。特徵方向 2026-06-01 已死（位置特徵
 進 ensemble 零提升）；**事件方向活的**：766 筆 live Strong 訊號按獵取情境分桶——

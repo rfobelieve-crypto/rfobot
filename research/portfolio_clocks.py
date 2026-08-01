@@ -177,6 +177,15 @@ def main() -> int:
     if rcb != 0:
         errors.append(f"variant_b rc={rcb}")
 
+    # 2c ── frozen combo watchlist scoreboard (registered 2026-08-02) ────
+    rcc, outc = run(["research/sweep_failure/shadow_engine.py", "--combos"], 120)
+    if rcc == 0:
+        lines.append("combo watchlist (forward):")
+        lines += ["  " + ln.strip() for ln in outc.splitlines()
+                  if ln.strip().startswith(("R", "PA", "V∧"))]
+    else:
+        errors.append(f"combo_watchlist rc={rcc}")
+
     # 3 ── depth_deltas span (subhourly revival due?) ────────────────────
     try:
         r = q1("SELECT (MAX(minute_start_ms)-MIN(minute_start_ms))/86400000.0 d "

@@ -637,8 +637,23 @@ def main() -> int:
                     help="print the log summary without refreshing data")
     ap.add_argument("--gate", action="store_true",
                     help="one-line Variant B gate progress (for the weekly report)")
+    ap.add_argument("--combos", action="store_true",
+                    help="forward scoreboard for the frozen combo watchlist")
     args = ap.parse_args()
     log = read_log()
+    if args.combos:
+        import combo_watchlist as CW
+        print(f"combo watchlist (registered {CW.REGISTERED}) — forward rows, "
+              "clustered-CI arithmetic:")
+        for name, pred in CW.combo_preds(log).items():
+            st = gate_stats(log, pred)
+            if st["n_closed"]:
+                print(f"  {name:<10} closed={st['n_closed']:>4} open={st['n_open']:>3}"
+                      f"  meanR={st['mean_r']:+.4f}  CI-low={st['ci_low']:+.4f}"
+                      f"  WR={st['wr_pct']:.0f}%")
+            else:
+                print(f"  {name:<10} closed=0 (accumulating)")
+        return 0
     if args.gate:
         print(gate_progress(log))
         return 0

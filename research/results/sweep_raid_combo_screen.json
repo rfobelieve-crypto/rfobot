@@ -1,0 +1,1550 @@
+{
+ "grid": {
+  "淺∧R∧V∧快": {
+   "n": 158,
+   "n_fill": 158,
+   "netR": 0.0986,
+   "t": 2.12,
+   "wr": 60.1,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧V∧快∧Q": null,
+  "淺∧R∧V∧快∧LIQ": {
+   "n": 58,
+   "n_fill": 58,
+   "netR": 0.1111,
+   "t": 1.33,
+   "wr": 48.3,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧V∧快∧PA": {
+   "n": 53,
+   "n_fill": 53,
+   "netR": 0.0888,
+   "t": 1.03,
+   "wr": 49.1,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧V": {
+   "n": 165,
+   "n_fill": 165,
+   "netR": 0.0975,
+   "t": 2.18,
+   "wr": 59.4,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧V∧Q": {
+   "n": 40,
+   "n_fill": 40,
+   "netR": 0.0888,
+   "t": 0.82,
+   "wr": 52.5,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧V∧LIQ": {
+   "n": 62,
+   "n_fill": 62,
+   "netR": 0.1138,
+   "t": 1.43,
+   "wr": 46.8,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧V∧PA": {
+   "n": 57,
+   "n_fill": 57,
+   "netR": 0.0934,
+   "t": 1.15,
+   "wr": 47.4,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧¬V∧快": {
+   "n": 197,
+   "n_fill": 197,
+   "netR": 0.0525,
+   "t": 1.37,
+   "wr": 61.4,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧¬V∧快∧Q": null,
+  "淺∧R∧¬V∧快∧LIQ": null,
+  "淺∧R∧¬V∧快∧PA": {
+   "n": 51,
+   "n_fill": 51,
+   "netR": -0.0307,
+   "t": -0.38,
+   "wr": 54.9,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧¬V": {
+   "n": 263,
+   "n_fill": 263,
+   "netR": 0.051,
+   "t": 1.51,
+   "wr": 62.0,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧¬V∧Q": null,
+  "淺∧R∧¬V∧LIQ": null,
+  "淺∧R∧¬V∧PA": {
+   "n": 69,
+   "n_fill": 69,
+   "netR": 0.0213,
+   "t": 0.3,
+   "wr": 60.9,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧快": {
+   "n": 355,
+   "n_fill": 355,
+   "netR": 0.073,
+   "t": 2.47,
+   "wr": 60.8,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧快∧Q": {
+   "n": 67,
+   "n_fill": 67,
+   "netR": 0.1258,
+   "t": 1.83,
+   "wr": 71.6,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧快∧LIQ": {
+   "n": 87,
+   "n_fill": 87,
+   "netR": 0.1368,
+   "t": 2.16,
+   "wr": 60.9,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧快∧PA": {
+   "n": 104,
+   "n_fill": 104,
+   "netR": 0.0302,
+   "t": 0.51,
+   "wr": 51.9,
+   "breakout_pct": 0.0
+  },
+  "淺∧R": {
+   "n": 428,
+   "n_fill": 428,
+   "netR": 0.0689,
+   "t": 2.56,
+   "wr": 61.0,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧Q": {
+   "n": 77,
+   "n_fill": 77,
+   "netR": 0.1418,
+   "t": 2.08,
+   "wr": 70.1,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧LIQ": {
+   "n": 101,
+   "n_fill": 101,
+   "netR": 0.1552,
+   "t": 2.61,
+   "wr": 61.4,
+   "breakout_pct": 0.0
+  },
+  "淺∧R∧PA": {
+   "n": 126,
+   "n_fill": 126,
+   "netR": 0.0539,
+   "t": 1.01,
+   "wr": 54.8,
+   "breakout_pct": 0.0
+  },
+  "淺∧¬R∧V∧快": null,
+  "淺∧¬R∧V∧快∧Q": null,
+  "淺∧¬R∧V∧快∧LIQ": null,
+  "淺∧¬R∧V∧快∧PA": null,
+  "淺∧¬R∧V": null,
+  "淺∧¬R∧V∧Q": null,
+  "淺∧¬R∧V∧LIQ": null,
+  "淺∧¬R∧V∧PA": null,
+  "淺∧¬R∧¬V∧快": null,
+  "淺∧¬R∧¬V∧快∧Q": null,
+  "淺∧¬R∧¬V∧快∧LIQ": null,
+  "淺∧¬R∧¬V∧快∧PA": null,
+  "淺∧¬R∧¬V": null,
+  "淺∧¬R∧¬V∧Q": null,
+  "淺∧¬R∧¬V∧LIQ": null,
+  "淺∧¬R∧¬V∧PA": null,
+  "淺∧¬R∧快": null,
+  "淺∧¬R∧快∧Q": null,
+  "淺∧¬R∧快∧LIQ": null,
+  "淺∧¬R∧快∧PA": null,
+  "淺∧¬R": {
+   "n": 63,
+   "n_fill": 61,
+   "netR": -0.0173,
+   "t": -0.32,
+   "wr": 57.4,
+   "breakout_pct": 3.2
+  },
+  "淺∧¬R∧Q": null,
+  "淺∧¬R∧LIQ": null,
+  "淺∧¬R∧PA": null,
+  "淺∧V∧快": {
+   "n": 181,
+   "n_fill": 181,
+   "netR": 0.0933,
+   "t": 2.26,
+   "wr": 60.2,
+   "breakout_pct": 0.0
+  },
+  "淺∧V∧快∧Q": {
+   "n": 48,
+   "n_fill": 48,
+   "netR": 0.0711,
+   "t": 0.77,
+   "wr": 62.5,
+   "breakout_pct": 0.0
+  },
+  "淺∧V∧快∧LIQ": {
+   "n": 74,
+   "n_fill": 74,
+   "netR": 0.1149,
+   "t": 1.74,
+   "wr": 52.7,
+   "breakout_pct": 0.0
+  },
+  "淺∧V∧快∧PA": {
+   "n": 70,
+   "n_fill": 70,
+   "netR": 0.1021,
+   "t": 1.55,
+   "wr": 54.3,
+   "breakout_pct": 0.0
+  },
+  "淺∧V": {
+   "n": 189,
+   "n_fill": 188,
+   "netR": 0.0925,
+   "t": 2.32,
+   "wr": 59.6,
+   "breakout_pct": 0.5
+  },
+  "淺∧V∧Q": {
+   "n": 52,
+   "n_fill": 52,
+   "netR": 0.0775,
+   "t": 0.9,
+   "wr": 59.6,
+   "breakout_pct": 0.0
+  },
+  "淺∧V∧LIQ": {
+   "n": 78,
+   "n_fill": 78,
+   "netR": 0.1169,
+   "t": 1.84,
+   "wr": 51.3,
+   "breakout_pct": 0.0
+  },
+  "淺∧V∧PA": {
+   "n": 75,
+   "n_fill": 74,
+   "netR": 0.1049,
+   "t": 1.66,
+   "wr": 52.7,
+   "breakout_pct": 1.3
+  },
+  "淺∧¬V∧快": {
+   "n": 213,
+   "n_fill": 213,
+   "netR": 0.0321,
+   "t": 0.87,
+   "wr": 59.6,
+   "breakout_pct": 0.0
+  },
+  "淺∧¬V∧快∧Q": null,
+  "淺∧¬V∧快∧LIQ": null,
+  "淺∧¬V∧快∧PA": {
+   "n": 59,
+   "n_fill": 59,
+   "netR": -0.0337,
+   "t": -0.46,
+   "wr": 54.2,
+   "breakout_pct": 0.0
+  },
+  "淺∧¬V": {
+   "n": 302,
+   "n_fill": 301,
+   "netR": 0.0367,
+   "t": 1.18,
+   "wr": 61.1,
+   "breakout_pct": 0.3
+  },
+  "淺∧¬V∧Q": {
+   "n": 51,
+   "n_fill": 51,
+   "netR": 0.1434,
+   "t": 2.08,
+   "wr": 80.4,
+   "breakout_pct": 0.0
+  },
+  "淺∧¬V∧LIQ": {
+   "n": 45,
+   "n_fill": 45,
+   "netR": 0.2019,
+   "t": 2.53,
+   "wr": 80.0,
+   "breakout_pct": 0.0
+  },
+  "淺∧¬V∧PA": {
+   "n": 88,
+   "n_fill": 88,
+   "netR": 0.0543,
+   "t": 0.92,
+   "wr": 64.8,
+   "breakout_pct": 0.0
+  },
+  "淺∧快": {
+   "n": 394,
+   "n_fill": 394,
+   "netR": 0.0602,
+   "t": 2.19,
+   "wr": 59.9,
+   "breakout_pct": 0.0
+  },
+  "淺∧快∧Q": {
+   "n": 87,
+   "n_fill": 87,
+   "netR": 0.0946,
+   "t": 1.66,
+   "wr": 71.3,
+   "breakout_pct": 0.0
+  },
+  "淺∧快∧LIQ": {
+   "n": 106,
+   "n_fill": 106,
+   "netR": 0.1233,
+   "t": 2.34,
+   "wr": 60.4,
+   "breakout_pct": 0.0
+  },
+  "淺∧快∧PA": {
+   "n": 129,
+   "n_fill": 129,
+   "netR": 0.04,
+   "t": 0.82,
+   "wr": 54.3,
+   "breakout_pct": 0.0
+  },
+  "淺": {
+   "n": 491,
+   "n_fill": 489,
+   "netR": 0.0582,
+   "t": 2.36,
+   "wr": 60.5,
+   "breakout_pct": 0.4
+  },
+  "淺∧Q": {
+   "n": 103,
+   "n_fill": 103,
+   "netR": 0.1101,
+   "t": 1.99,
+   "wr": 69.9,
+   "breakout_pct": 0.0
+  },
+  "淺∧LIQ": {
+   "n": 123,
+   "n_fill": 123,
+   "netR": 0.148,
+   "t": 2.98,
+   "wr": 61.8,
+   "breakout_pct": 0.0
+  },
+  "淺∧PA": {
+   "n": 163,
+   "n_fill": 162,
+   "netR": 0.0774,
+   "t": 1.79,
+   "wr": 59.3,
+   "breakout_pct": 0.6
+  },
+  "中∧R∧V∧快": {
+   "n": 99,
+   "n_fill": 99,
+   "netR": 0.1157,
+   "t": 2.01,
+   "wr": 59.6,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧V∧快∧Q": null,
+  "中∧R∧V∧快∧LIQ": null,
+  "中∧R∧V∧快∧PA": null,
+  "中∧R∧V": {
+   "n": 127,
+   "n_fill": 127,
+   "netR": 0.2027,
+   "t": 3.93,
+   "wr": 65.4,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧V∧Q": null,
+  "中∧R∧V∧LIQ": {
+   "n": 43,
+   "n_fill": 43,
+   "netR": 0.1703,
+   "t": 1.63,
+   "wr": 51.2,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧V∧PA": null,
+  "中∧R∧¬V∧快": null,
+  "中∧R∧¬V∧快∧Q": null,
+  "中∧R∧¬V∧快∧LIQ": null,
+  "中∧R∧¬V∧快∧PA": null,
+  "中∧R∧¬V": {
+   "n": 187,
+   "n_fill": 187,
+   "netR": -0.0304,
+   "t": -0.75,
+   "wr": 50.3,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧¬V∧Q": null,
+  "中∧R∧¬V∧LIQ": {
+   "n": 61,
+   "n_fill": 61,
+   "netR": -0.0239,
+   "t": -0.3,
+   "wr": 45.9,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧¬V∧PA": {
+   "n": 53,
+   "n_fill": 53,
+   "netR": 0.0124,
+   "t": 0.18,
+   "wr": 62.3,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧快": {
+   "n": 129,
+   "n_fill": 129,
+   "netR": 0.1043,
+   "t": 2.09,
+   "wr": 59.7,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧快∧Q": {
+   "n": 40,
+   "n_fill": 40,
+   "netR": 0.1537,
+   "t": 2.63,
+   "wr": 57.5,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧快∧LIQ": null,
+  "中∧R∧快∧PA": null,
+  "中∧R": {
+   "n": 314,
+   "n_fill": 314,
+   "netR": 0.0639,
+   "t": 1.97,
+   "wr": 56.4,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧Q": {
+   "n": 73,
+   "n_fill": 73,
+   "netR": 0.1605,
+   "t": 2.64,
+   "wr": 58.9,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧LIQ": {
+   "n": 104,
+   "n_fill": 104,
+   "netR": 0.0564,
+   "t": 0.89,
+   "wr": 48.1,
+   "breakout_pct": 0.0
+  },
+  "中∧R∧PA": {
+   "n": 88,
+   "n_fill": 88,
+   "netR": 0.0765,
+   "t": 1.24,
+   "wr": 55.7,
+   "breakout_pct": 0.0
+  },
+  "中∧¬R∧V∧快": null,
+  "中∧¬R∧V∧快∧Q": null,
+  "中∧¬R∧V∧快∧LIQ": null,
+  "中∧¬R∧V∧快∧PA": null,
+  "中∧¬R∧V": null,
+  "中∧¬R∧V∧Q": null,
+  "中∧¬R∧V∧LIQ": null,
+  "中∧¬R∧V∧PA": null,
+  "中∧¬R∧¬V∧快": null,
+  "中∧¬R∧¬V∧快∧Q": null,
+  "中∧¬R∧¬V∧快∧LIQ": null,
+  "中∧¬R∧¬V∧快∧PA": null,
+  "中∧¬R∧¬V": {
+   "n": 162,
+   "n_fill": 154,
+   "netR": -0.0677,
+   "t": -1.73,
+   "wr": 43.5,
+   "breakout_pct": 4.9
+  },
+  "中∧¬R∧¬V∧Q": {
+   "n": 42,
+   "n_fill": 42,
+   "netR": -0.1955,
+   "t": -2.4,
+   "wr": 33.3,
+   "breakout_pct": 0.0
+  },
+  "中∧¬R∧¬V∧LIQ": {
+   "n": 60,
+   "n_fill": 55,
+   "netR": -0.1127,
+   "t": -2.07,
+   "wr": 38.2,
+   "breakout_pct": 8.3
+  },
+  "中∧¬R∧¬V∧PA": null,
+  "中∧¬R∧快": null,
+  "中∧¬R∧快∧Q": null,
+  "中∧¬R∧快∧LIQ": null,
+  "中∧¬R∧快∧PA": null,
+  "中∧¬R": {
+   "n": 202,
+   "n_fill": 191,
+   "netR": -0.0342,
+   "t": -0.89,
+   "wr": 47.6,
+   "breakout_pct": 5.4
+  },
+  "中∧¬R∧Q": {
+   "n": 58,
+   "n_fill": 56,
+   "netR": -0.08,
+   "t": -0.89,
+   "wr": 44.6,
+   "breakout_pct": 3.4
+  },
+  "中∧¬R∧LIQ": {
+   "n": 79,
+   "n_fill": 72,
+   "netR": -0.0495,
+   "t": -0.78,
+   "wr": 47.2,
+   "breakout_pct": 8.9
+  },
+  "中∧¬R∧PA": {
+   "n": 52,
+   "n_fill": 47,
+   "netR": 0.0631,
+   "t": 0.72,
+   "wr": 55.3,
+   "breakout_pct": 9.6
+  },
+  "中∧V∧快": {
+   "n": 120,
+   "n_fill": 119,
+   "netR": 0.0959,
+   "t": 1.8,
+   "wr": 62.2,
+   "breakout_pct": 0.8
+  },
+  "中∧V∧快∧Q": null,
+  "中∧V∧快∧LIQ": null,
+  "中∧V∧快∧PA": null,
+  "中∧V": {
+   "n": 167,
+   "n_fill": 164,
+   "netR": 0.1807,
+   "t": 3.83,
+   "wr": 65.2,
+   "breakout_pct": 1.8
+  },
+  "中∧V∧Q": {
+   "n": 53,
+   "n_fill": 51,
+   "netR": 0.3114,
+   "t": 3.51,
+   "wr": 68.6,
+   "breakout_pct": 3.8
+  },
+  "中∧V∧LIQ": {
+   "n": 62,
+   "n_fill": 60,
+   "netR": 0.1659,
+   "t": 1.78,
+   "wr": 58.3,
+   "breakout_pct": 3.2
+  },
+  "中∧V∧PA": {
+   "n": 50,
+   "n_fill": 48,
+   "netR": 0.1787,
+   "t": 1.69,
+   "wr": 54.2,
+   "breakout_pct": 4.0
+  },
+  "中∧¬V∧快": null,
+  "中∧¬V∧快∧Q": null,
+  "中∧¬V∧快∧LIQ": null,
+  "中∧¬V∧快∧PA": null,
+  "中∧¬V": {
+   "n": 349,
+   "n_fill": 341,
+   "netR": -0.0472,
+   "t": -1.67,
+   "wr": 47.2,
+   "breakout_pct": 2.3
+  },
+  "中∧¬V∧Q": {
+   "n": 78,
+   "n_fill": 78,
+   "netR": -0.1109,
+   "t": -1.89,
+   "wr": 42.3,
+   "breakout_pct": 0.0
+  },
+  "中∧¬V∧LIQ": {
+   "n": 121,
+   "n_fill": 116,
+   "netR": -0.066,
+   "t": -1.35,
+   "wr": 42.2,
+   "breakout_pct": 4.1
+  },
+  "中∧¬V∧PA": {
+   "n": 90,
+   "n_fill": 87,
+   "netR": 0.0128,
+   "t": 0.25,
+   "wr": 56.3,
+   "breakout_pct": 3.3
+  },
+  "中∧快": {
+   "n": 154,
+   "n_fill": 153,
+   "netR": 0.0936,
+   "t": 1.99,
+   "wr": 62.1,
+   "breakout_pct": 0.6
+  },
+  "中∧快∧Q": {
+   "n": 49,
+   "n_fill": 49,
+   "netR": 0.0859,
+   "t": 1.19,
+   "wr": 57.1,
+   "breakout_pct": 0.0
+  },
+  "中∧快∧LIQ": {
+   "n": 43,
+   "n_fill": 43,
+   "netR": -0.0832,
+   "t": -0.87,
+   "wr": 41.9,
+   "breakout_pct": 0.0
+  },
+  "中∧快∧PA": {
+   "n": 40,
+   "n_fill": 40,
+   "netR": -0.0295,
+   "t": -0.32,
+   "wr": 47.5,
+   "breakout_pct": 0.0
+  },
+  "中": {
+   "n": 516,
+   "n_fill": 505,
+   "netR": 0.0268,
+   "t": 1.08,
+   "wr": 53.1,
+   "breakout_pct": 2.1
+  },
+  "中∧Q": {
+   "n": 131,
+   "n_fill": 129,
+   "netR": 0.0561,
+   "t": 1.06,
+   "wr": 52.7,
+   "breakout_pct": 1.5
+  },
+  "中∧LIQ": {
+   "n": 183,
+   "n_fill": 176,
+   "netR": 0.0131,
+   "t": 0.29,
+   "wr": 47.7,
+   "breakout_pct": 3.8
+  },
+  "中∧PA": {
+   "n": 140,
+   "n_fill": 135,
+   "netR": 0.0718,
+   "t": 1.43,
+   "wr": 55.6,
+   "breakout_pct": 3.6
+  },
+  "深∧R∧V∧快": {
+   "n": 44,
+   "n_fill": 44,
+   "netR": 0.4479,
+   "t": 5.79,
+   "wr": 81.8,
+   "breakout_pct": 0.0
+  },
+  "深∧R∧V∧快∧Q": null,
+  "深∧R∧V∧快∧LIQ": null,
+  "深∧R∧V∧快∧PA": null,
+  "深∧R∧V": {
+   "n": 98,
+   "n_fill": 98,
+   "netR": 0.2288,
+   "t": 3.51,
+   "wr": 71.4,
+   "breakout_pct": 0.0
+  },
+  "深∧R∧V∧Q": null,
+  "深∧R∧V∧LIQ": null,
+  "深∧R∧V∧PA": null,
+  "深∧R∧¬V∧快": null,
+  "深∧R∧¬V∧快∧Q": null,
+  "深∧R∧¬V∧快∧LIQ": null,
+  "深∧R∧¬V∧快∧PA": null,
+  "深∧R∧¬V": {
+   "n": 86,
+   "n_fill": 86,
+   "netR": 0.0815,
+   "t": 1.41,
+   "wr": 59.3,
+   "breakout_pct": 0.0
+  },
+  "深∧R∧¬V∧Q": null,
+  "深∧R∧¬V∧LIQ": null,
+  "深∧R∧¬V∧PA": null,
+  "深∧R∧快": {
+   "n": 47,
+   "n_fill": 47,
+   "netR": 0.4643,
+   "t": 6.36,
+   "wr": 83.0,
+   "breakout_pct": 0.0
+  },
+  "深∧R∧快∧Q": null,
+  "深∧R∧快∧LIQ": null,
+  "深∧R∧快∧PA": null,
+  "深∧R": {
+   "n": 184,
+   "n_fill": 184,
+   "netR": 0.1599,
+   "t": 3.62,
+   "wr": 65.8,
+   "breakout_pct": 0.0
+  },
+  "深∧R∧Q": {
+   "n": 52,
+   "n_fill": 52,
+   "netR": 0.3393,
+   "t": 6.27,
+   "wr": 80.8,
+   "breakout_pct": 0.0
+  },
+  "深∧R∧LIQ": {
+   "n": 70,
+   "n_fill": 70,
+   "netR": 0.1628,
+   "t": 2.51,
+   "wr": 67.1,
+   "breakout_pct": 0.0
+  },
+  "深∧R∧PA": null,
+  "深∧¬R∧V∧快": null,
+  "深∧¬R∧V∧快∧Q": null,
+  "深∧¬R∧V∧快∧LIQ": null,
+  "深∧¬R∧V∧快∧PA": null,
+  "深∧¬R∧V": {
+   "n": 162,
+   "n_fill": 98,
+   "netR": 0.0519,
+   "t": 0.7,
+   "wr": 51.0,
+   "breakout_pct": 39.5
+  },
+  "深∧¬R∧V∧Q": null,
+  "深∧¬R∧V∧LIQ": {
+   "n": 88,
+   "n_fill": 64,
+   "netR": 0.1195,
+   "t": 1.27,
+   "wr": 54.7,
+   "breakout_pct": 27.3
+  },
+  "深∧¬R∧V∧PA": {
+   "n": 56,
+   "n_fill": 44,
+   "netR": 0.2225,
+   "t": 2.42,
+   "wr": 56.8,
+   "breakout_pct": 21.4
+  },
+  "深∧¬R∧¬V∧快": null,
+  "深∧¬R∧¬V∧快∧Q": null,
+  "深∧¬R∧¬V∧快∧LIQ": null,
+  "深∧¬R∧¬V∧快∧PA": null,
+  "深∧¬R∧¬V": {
+   "n": 489,
+   "n_fill": 365,
+   "netR": 0.0218,
+   "t": 0.71,
+   "wr": 51.5,
+   "breakout_pct": 25.4
+  },
+  "深∧¬R∧¬V∧Q": {
+   "n": 134,
+   "n_fill": 105,
+   "netR": 0.0416,
+   "t": 0.67,
+   "wr": 49.5,
+   "breakout_pct": 21.6
+  },
+  "深∧¬R∧¬V∧LIQ": {
+   "n": 187,
+   "n_fill": 138,
+   "netR": 0.0012,
+   "t": 0.02,
+   "wr": 50.0,
+   "breakout_pct": 26.2
+  },
+  "深∧¬R∧¬V∧PA": {
+   "n": 138,
+   "n_fill": 114,
+   "netR": 0.1081,
+   "t": 1.96,
+   "wr": 55.3,
+   "breakout_pct": 17.4
+  },
+  "深∧¬R∧快": null,
+  "深∧¬R∧快∧Q": null,
+  "深∧¬R∧快∧LIQ": null,
+  "深∧¬R∧快∧PA": null,
+  "深∧¬R": {
+   "n": 651,
+   "n_fill": 463,
+   "netR": 0.0282,
+   "t": 0.97,
+   "wr": 51.4,
+   "breakout_pct": 28.9
+  },
+  "深∧¬R∧Q": {
+   "n": 170,
+   "n_fill": 131,
+   "netR": 0.065,
+   "t": 1.07,
+   "wr": 53.4,
+   "breakout_pct": 22.9
+  },
+  "深∧¬R∧LIQ": {
+   "n": 275,
+   "n_fill": 202,
+   "netR": 0.0387,
+   "t": 0.86,
+   "wr": 51.5,
+   "breakout_pct": 26.5
+  },
+  "深∧¬R∧PA": {
+   "n": 194,
+   "n_fill": 158,
+   "netR": 0.14,
+   "t": 2.96,
+   "wr": 55.7,
+   "breakout_pct": 18.6
+  },
+  "深∧V∧快": {
+   "n": 68,
+   "n_fill": 58,
+   "netR": 0.3033,
+   "t": 3.49,
+   "wr": 72.4,
+   "breakout_pct": 14.7
+  },
+  "深∧V∧快∧Q": null,
+  "深∧V∧快∧LIQ": null,
+  "深∧V∧快∧PA": null,
+  "深∧V": {
+   "n": 260,
+   "n_fill": 196,
+   "netR": 0.1403,
+   "t": 2.83,
+   "wr": 61.2,
+   "breakout_pct": 24.6
+  },
+  "深∧V∧Q": {
+   "n": 71,
+   "n_fill": 61,
+   "netR": 0.3005,
+   "t": 3.57,
+   "wr": 83.6,
+   "breakout_pct": 14.1
+  },
+  "深∧V∧LIQ": {
+   "n": 123,
+   "n_fill": 99,
+   "netR": 0.2087,
+   "t": 3.11,
+   "wr": 67.7,
+   "breakout_pct": 19.5
+  },
+  "深∧V∧PA": {
+   "n": 69,
+   "n_fill": 57,
+   "netR": 0.2006,
+   "t": 2.77,
+   "wr": 64.9,
+   "breakout_pct": 17.4
+  },
+  "深∧¬V∧快": null,
+  "深∧¬V∧快∧Q": null,
+  "深∧¬V∧快∧LIQ": null,
+  "深∧¬V∧快∧PA": null,
+  "深∧¬V": {
+   "n": 575,
+   "n_fill": 451,
+   "netR": 0.0332,
+   "t": 1.21,
+   "wr": 53.0,
+   "breakout_pct": 21.6
+  },
+  "深∧¬V∧Q": {
+   "n": 151,
+   "n_fill": 122,
+   "netR": 0.0641,
+   "t": 1.16,
+   "wr": 50.0,
+   "breakout_pct": 19.2
+  },
+  "深∧¬V∧LIQ": {
+   "n": 222,
+   "n_fill": 173,
+   "netR": -0.0083,
+   "t": -0.19,
+   "wr": 48.6,
+   "breakout_pct": 22.1
+  },
+  "深∧¬V∧PA": {
+   "n": 158,
+   "n_fill": 134,
+   "netR": 0.1261,
+   "t": 2.55,
+   "wr": 55.2,
+   "breakout_pct": 15.2
+  },
+  "深∧快": {
+   "n": 72,
+   "n_fill": 62,
+   "netR": 0.3241,
+   "t": 3.95,
+   "wr": 74.2,
+   "breakout_pct": 13.9
+  },
+  "深∧快∧Q": null,
+  "深∧快∧LIQ": null,
+  "深∧快∧PA": null,
+  "深": {
+   "n": 835,
+   "n_fill": 647,
+   "netR": 0.0657,
+   "t": 2.7,
+   "wr": 55.5,
+   "breakout_pct": 22.5
+  },
+  "深∧Q": {
+   "n": 222,
+   "n_fill": 183,
+   "netR": 0.1429,
+   "t": 3.04,
+   "wr": 61.2,
+   "breakout_pct": 17.6
+  },
+  "深∧LIQ": {
+   "n": 345,
+   "n_fill": 272,
+   "netR": 0.0706,
+   "t": 1.88,
+   "wr": 55.5,
+   "breakout_pct": 21.2
+  },
+  "深∧PA": {
+   "n": 227,
+   "n_fill": 191,
+   "netR": 0.1484,
+   "t": 3.63,
+   "wr": 58.1,
+   "breakout_pct": 15.9
+  },
+  "R∧V∧快": {
+   "n": 301,
+   "n_fill": 301,
+   "netR": 0.1553,
+   "t": 4.64,
+   "wr": 63.1,
+   "breakout_pct": 0.0
+  },
+  "R∧V∧快∧Q": {
+   "n": 78,
+   "n_fill": 78,
+   "netR": 0.2141,
+   "t": 3.34,
+   "wr": 65.4,
+   "breakout_pct": 0.0
+  },
+  "R∧V∧快∧LIQ": {
+   "n": 103,
+   "n_fill": 103,
+   "netR": 0.1459,
+   "t": 2.35,
+   "wr": 53.4,
+   "breakout_pct": 0.0
+  },
+  "R∧V∧快∧PA": {
+   "n": 80,
+   "n_fill": 80,
+   "netR": 0.0408,
+   "t": 0.62,
+   "wr": 46.2,
+   "breakout_pct": 0.0
+  },
+  "R∧V": {
+   "n": 390,
+   "n_fill": 390,
+   "netR": 0.1648,
+   "t": 5.45,
+   "wr": 64.4,
+   "breakout_pct": 0.0
+  },
+  "R∧V∧Q": {
+   "n": 112,
+   "n_fill": 112,
+   "netR": 0.2669,
+   "t": 5.16,
+   "wr": 69.6,
+   "breakout_pct": 0.0
+  },
+  "R∧V∧LIQ": {
+   "n": 140,
+   "n_fill": 140,
+   "netR": 0.1956,
+   "t": 3.8,
+   "wr": 59.3,
+   "breakout_pct": 0.0
+  },
+  "R∧V∧PA": {
+   "n": 105,
+   "n_fill": 105,
+   "netR": 0.1242,
+   "t": 2.13,
+   "wr": 52.4,
+   "breakout_pct": 0.0
+  },
+  "R∧¬V∧快": {
+   "n": 230,
+   "n_fill": 230,
+   "netR": 0.0628,
+   "t": 1.77,
+   "wr": 61.7,
+   "breakout_pct": 0.0
+  },
+  "R∧¬V∧快∧Q": {
+   "n": 47,
+   "n_fill": 47,
+   "netR": 0.1811,
+   "t": 3.5,
+   "wr": 80.9,
+   "breakout_pct": 0.0
+  },
+  "R∧¬V∧快∧LIQ": null,
+  "R∧¬V∧快∧PA": {
+   "n": 63,
+   "n_fill": 63,
+   "netR": 0.0397,
+   "t": 0.56,
+   "wr": 60.3,
+   "breakout_pct": 0.0
+  },
+  "R∧¬V": {
+   "n": 536,
+   "n_fill": 536,
+   "netR": 0.0275,
+   "t": 1.16,
+   "wr": 57.5,
+   "breakout_pct": 0.0
+  },
+  "R∧¬V∧Q": {
+   "n": 90,
+   "n_fill": 90,
+   "netR": 0.1153,
+   "t": 2.23,
+   "wr": 67.8,
+   "breakout_pct": 0.0
+  },
+  "R∧¬V∧LIQ": {
+   "n": 135,
+   "n_fill": 135,
+   "netR": 0.0411,
+   "t": 0.8,
+   "wr": 56.3,
+   "breakout_pct": 0.0
+  },
+  "R∧¬V∧PA": {
+   "n": 142,
+   "n_fill": 142,
+   "netR": 0.0472,
+   "t": 1.03,
+   "wr": 60.6,
+   "breakout_pct": 0.0
+  },
+  "R∧快": {
+   "n": 531,
+   "n_fill": 531,
+   "netR": 0.1152,
+   "t": 4.7,
+   "wr": 62.5,
+   "breakout_pct": 0.0
+  },
+  "R∧快∧Q": {
+   "n": 125,
+   "n_fill": 125,
+   "netR": 0.2017,
+   "t": 4.55,
+   "wr": 71.2,
+   "breakout_pct": 0.0
+  },
+  "R∧快∧LIQ": {
+   "n": 139,
+   "n_fill": 139,
+   "netR": 0.1514,
+   "t": 3.0,
+   "wr": 59.7,
+   "breakout_pct": 0.0
+  },
+  "R∧快∧PA": {
+   "n": 143,
+   "n_fill": 143,
+   "netR": 0.0403,
+   "t": 0.84,
+   "wr": 52.4,
+   "breakout_pct": 0.0
+  },
+  "R": {
+   "n": 926,
+   "n_fill": 926,
+   "netR": 0.0853,
+   "t": 4.54,
+   "wr": 60.4,
+   "breakout_pct": 0.0
+  },
+  "R∧Q": {
+   "n": 202,
+   "n_fill": 202,
+   "netR": 0.1994,
+   "t": 5.38,
+   "wr": 68.8,
+   "breakout_pct": 0.0
+  },
+  "R∧LIQ": {
+   "n": 275,
+   "n_fill": 275,
+   "netR": 0.1198,
+   "t": 3.28,
+   "wr": 57.8,
+   "breakout_pct": 0.0
+  },
+  "R∧PA": {
+   "n": 247,
+   "n_fill": 247,
+   "netR": 0.0799,
+   "t": 2.21,
+   "wr": 57.1,
+   "breakout_pct": 0.0
+  },
+  "¬R∧V∧快": {
+   "n": 68,
+   "n_fill": 57,
+   "netR": -0.015,
+   "t": -0.19,
+   "wr": 61.4,
+   "breakout_pct": 16.2
+  },
+  "¬R∧V∧快∧Q": null,
+  "¬R∧V∧快∧LIQ": null,
+  "¬R∧V∧快∧PA": null,
+  "¬R∧V": {
+   "n": 226,
+   "n_fill": 158,
+   "netR": 0.065,
+   "t": 1.22,
+   "wr": 55.7,
+   "breakout_pct": 30.1
+  },
+  "¬R∧V∧Q": {
+   "n": 64,
+   "n_fill": 52,
+   "netR": 0.1605,
+   "t": 1.42,
+   "wr": 75.0,
+   "breakout_pct": 18.8
+  },
+  "¬R∧V∧LIQ": {
+   "n": 123,
+   "n_fill": 97,
+   "netR": 0.1272,
+   "t": 1.79,
+   "wr": 60.8,
+   "breakout_pct": 21.1
+  },
+  "¬R∧V∧PA": {
+   "n": 89,
+   "n_fill": 74,
+   "netR": 0.1991,
+   "t": 2.83,
+   "wr": 63.5,
+   "breakout_pct": 16.9
+  },
+  "¬R∧¬V∧快": null,
+  "¬R∧¬V∧快∧Q": null,
+  "¬R∧¬V∧快∧LIQ": null,
+  "¬R∧¬V∧快∧PA": null,
+  "¬R∧¬V": {
+   "n": 690,
+   "n_fill": 557,
+   "netR": -0.0086,
+   "t": -0.37,
+   "wr": 49.6,
+   "breakout_pct": 19.3
+  },
+  "¬R∧¬V∧Q": {
+   "n": 190,
+   "n_fill": 161,
+   "netR": -0.0242,
+   "t": -0.51,
+   "wr": 46.0,
+   "breakout_pct": 15.3
+  },
+  "¬R∧¬V∧LIQ": {
+   "n": 253,
+   "n_fill": 199,
+   "netR": -0.0279,
+   "t": -0.74,
+   "wr": 46.7,
+   "breakout_pct": 21.3
+  },
+  "¬R∧¬V∧PA": {
+   "n": 194,
+   "n_fill": 167,
+   "netR": 0.0964,
+   "t": 2.31,
+   "wr": 56.3,
+   "breakout_pct": 13.9
+  },
+  "¬R∧快": {
+   "n": 89,
+   "n_fill": 78,
+   "netR": -0.0391,
+   "t": -0.59,
+   "wr": 57.7,
+   "breakout_pct": 12.4
+  },
+  "¬R∧快∧Q": null,
+  "¬R∧快∧LIQ": null,
+  "¬R∧快∧PA": null,
+  "¬R": {
+   "n": 916,
+   "n_fill": 715,
+   "netR": 0.0076,
+   "t": 0.35,
+   "wr": 50.9,
+   "breakout_pct": 21.9
+  },
+  "¬R∧Q": {
+   "n": 254,
+   "n_fill": 213,
+   "netR": 0.0209,
+   "t": 0.46,
+   "wr": 53.1,
+   "breakout_pct": 16.1
+  },
+  "¬R∧LIQ": {
+   "n": 376,
+   "n_fill": 296,
+   "netR": 0.0229,
+   "t": 0.66,
+   "wr": 51.4,
+   "breakout_pct": 21.3
+  },
+  "¬R∧PA": {
+   "n": 283,
+   "n_fill": 241,
+   "netR": 0.1279,
+   "t": 3.53,
+   "wr": 58.5,
+   "breakout_pct": 14.8
+  },
+  "V∧快": {
+   "n": 369,
+   "n_fill": 358,
+   "netR": 0.1282,
+   "t": 4.14,
+   "wr": 62.8,
+   "breakout_pct": 3.0
+  },
+  "V∧快∧Q": {
+   "n": 102,
+   "n_fill": 102,
+   "netR": 0.1052,
+   "t": 1.71,
+   "wr": 63.7,
+   "breakout_pct": 0.0
+  },
+  "V∧快∧LIQ": {
+   "n": 137,
+   "n_fill": 132,
+   "netR": 0.0728,
+   "t": 1.33,
+   "wr": 53.8,
+   "breakout_pct": 3.6
+  },
+  "V∧快∧PA": {
+   "n": 103,
+   "n_fill": 103,
+   "netR": 0.0323,
+   "t": 0.59,
+   "wr": 50.5,
+   "breakout_pct": 0.0
+  },
+  "V": {
+   "n": 616,
+   "n_fill": 548,
+   "netR": 0.136,
+   "t": 5.13,
+   "wr": 61.9,
+   "breakout_pct": 11.0
+  },
+  "V∧Q": {
+   "n": 176,
+   "n_fill": 164,
+   "netR": 0.2332,
+   "t": 4.63,
+   "wr": 71.3,
+   "breakout_pct": 6.8
+  },
+  "V∧LIQ": {
+   "n": 263,
+   "n_fill": 237,
+   "netR": 0.1676,
+   "t": 3.99,
+   "wr": 59.9,
+   "breakout_pct": 9.9
+  },
+  "V∧PA": {
+   "n": 194,
+   "n_fill": 179,
+   "netR": 0.1552,
+   "t": 3.46,
+   "wr": 57.0,
+   "breakout_pct": 7.7
+  },
+  "¬V∧快": {
+   "n": 251,
+   "n_fill": 251,
+   "netR": 0.0488,
+   "t": 1.42,
+   "wr": 60.6,
+   "breakout_pct": 0.0
+  },
+  "¬V∧快∧Q": {
+   "n": 57,
+   "n_fill": 57,
+   "netR": 0.1237,
+   "t": 2.25,
+   "wr": 75.4,
+   "breakout_pct": 0.0
+  },
+  "¬V∧快∧LIQ": null,
+  "¬V∧快∧PA": {
+   "n": 72,
+   "n_fill": 72,
+   "netR": 0.0332,
+   "t": 0.52,
+   "wr": 59.7,
+   "breakout_pct": 0.0
+  },
+  "¬V": {
+   "n": 1226,
+   "n_fill": 1093,
+   "netR": 0.0091,
+   "t": 0.54,
+   "wr": 53.4,
+   "breakout_pct": 10.8
+  },
+  "¬V∧Q": {
+   "n": 280,
+   "n_fill": 251,
+   "netR": 0.0259,
+   "t": 0.72,
+   "wr": 53.8,
+   "breakout_pct": 10.4
+  },
+  "¬V∧LIQ": {
+   "n": 388,
+   "n_fill": 334,
+   "netR": -0.0,
+   "t": -0.0,
+   "wr": 50.6,
+   "breakout_pct": 13.9
+  },
+  "¬V∧PA": {
+   "n": 336,
+   "n_fill": 309,
+   "netR": 0.0738,
+   "t": 2.39,
+   "wr": 58.3,
+   "breakout_pct": 8.0
+  },
+  "快": {
+   "n": 620,
+   "n_fill": 609,
+   "netR": 0.0955,
+   "t": 4.14,
+   "wr": 61.9,
+   "breakout_pct": 1.8
+  },
+  "快∧Q": {
+   "n": 159,
+   "n_fill": 159,
+   "netR": 0.1118,
+   "t": 2.54,
+   "wr": 67.9,
+   "breakout_pct": 0.0
+  },
+  "快∧LIQ": {
+   "n": 176,
+   "n_fill": 171,
+   "netR": 0.0862,
+   "t": 1.88,
+   "wr": 57.9,
+   "breakout_pct": 2.8
+  },
+  "快∧PA": {
+   "n": 175,
+   "n_fill": 175,
+   "netR": 0.0327,
+   "t": 0.78,
+   "wr": 54.3,
+   "breakout_pct": 0.0
+  },
+  "Q": {
+   "n": 456,
+   "n_fill": 415,
+   "netR": 0.1078,
+   "t": 3.62,
+   "wr": 60.7,
+   "breakout_pct": 9.0
+  },
+  "LIQ": {
+   "n": 651,
+   "n_fill": 571,
+   "netR": 0.0696,
+   "t": 2.76,
+   "wr": 54.5,
+   "breakout_pct": 12.3
+  },
+  "PA": {
+   "n": 530,
+   "n_fill": 488,
+   "netR": 0.1036,
+   "t": 4.05,
+   "wr": 57.8,
+   "breakout_pct": 7.9
+  }
+ },
+ "nominees": [
+  {
+   "name": "R∧V",
+   "n": 390,
+   "n_fill": 390,
+   "netR": 0.1648,
+   "t": 5.45,
+   "wr": 64.4,
+   "breakout_pct": 0.0
+  },
+  {
+   "name": "R∧Q",
+   "n": 202,
+   "n_fill": 202,
+   "netR": 0.1994,
+   "t": 5.38,
+   "wr": 68.8,
+   "breakout_pct": 0.0
+  },
+  {
+   "name": "R∧V∧Q",
+   "n": 112,
+   "n_fill": 112,
+   "netR": 0.2669,
+   "t": 5.16,
+   "wr": 69.6,
+   "breakout_pct": 0.0
+  },
+  {
+   "name": "R∧快",
+   "n": 531,
+   "n_fill": 531,
+   "netR": 0.1152,
+   "t": 4.7,
+   "wr": 62.5,
+   "breakout_pct": 0.0
+  },
+  {
+   "name": "R∧快∧Q",
+   "n": 125,
+   "n_fill": 125,
+   "netR": 0.2017,
+   "t": 4.55,
+   "wr": 71.2,
+   "breakout_pct": 0.0
+  },
+  {
+   "name": "R",
+   "n": 926,
+   "n_fill": 926,
+   "netR": 0.0853,
+   "t": 4.54,
+   "wr": 60.4,
+   "breakout_pct": 0.0
+  },
+  {
+   "name": "PA",
+   "n": 530,
+   "n_fill": 488,
+   "netR": 0.1036,
+   "t": 4.05,
+   "wr": 57.8,
+   "breakout_pct": 7.9
+  },
+  {
+   "name": "V∧LIQ",
+   "n": 263,
+   "n_fill": 237,
+   "netR": 0.1676,
+   "t": 3.99,
+   "wr": 59.9,
+   "breakout_pct": 9.9
+  }
+ ],
+ "eligible": 33,
+ "liq_med_insample": 2.2848551836944853
+}
