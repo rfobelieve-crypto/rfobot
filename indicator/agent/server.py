@@ -496,6 +496,31 @@ _sweep_status_cache: dict = {"data": None, "ts": 0.0}
 _SWEEP_STATUS_CACHE_TTL_S = 300.0
 
 
+_v7_clock_cache: dict = {"data": None, "ts": 0.0}
+_V7_CLOCK_CACHE_TTL_S = 600.0
+
+
+def _v7_clock_cached() -> dict | None:
+    """Adoption clock from the indicator service, cached 10 min. Returns
+    None on any failure so the caller can fall back to the shipped file."""
+    import json as _j
+    now = time.monotonic()
+    if (_v7_clock_cache["data"] is not None
+            and now - _v7_clock_cache["ts"] < _V7_CLOCK_CACHE_TTL_S):
+        return _v7_clock_cache["data"]
+    raw = _fetch_origin_png(f"{INDICATOR_BASE_URL}/research/v7-clock",
+                            INDICATOR_ADMIN_TOKEN)
+    if not raw:
+        return None
+    try:
+        data = _j.loads(raw.decode("utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+    _v7_clock_cache["data"] = data
+    _v7_clock_cache["ts"] = now
+    return data
+
+
 def _sweep_status_payload() -> dict:
     import sys
     from pathlib import Path
@@ -550,8 +575,14 @@ def _sweep_status_payload() -> dict:
     v7f = None
     try:
         import json as _json
+        # Live from the indicator service. Reading the committed file
+        # meant the board froze at whatever was in the image at build
+        # time; the file is now only the fallback when the origin is
+        # unreachable, and it carries its own asof stamp so a stale
+        # answer is visibly stale rather than quietly wrong.
+        v7f = _v7_clock_cached()
         vp = root / "research" / "results" / "v7_veto_clock.json"
-        if vp.exists():
+        if v7f is None and vp.exists():
             v7f = _json.loads(vp.read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         v7f = None

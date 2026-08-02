@@ -190,14 +190,32 @@ def main() -> int:
             conn = get_db_conn()
             try:
                 with conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT COUNT(*) n FROM tracked_signals "
-                        "WHERE strength='Strong' "
-                        "AND signal_time >= '2026-08-02'")
-                    since = int((cur.fetchone() or {}).get("n") or 0)
+                    # Two counts per tier, because they answer different
+                    # questions and only one of them ticks immediately:
+                    #   resolved = the EVIDENCE count (correct backfilled
+                    #              ~4h after the bar) — this is what the
+                    #              trigger is actually about
+                    #   fired    = signals emitted, which moves the moment
+                    #              a signal prints
+                    # Reporting only `resolved` made the counter look
+                    # frozen for four hours after every signal (operator
+                    # noticed on 2026-08-02, a Moderate fired and the
+                    # board still read 0/60).
+                    for tier_key, tier_name in (("strong", "Strong"),
+                                                ("moderate", "Moderate")):
+                        cur.execute(
+                            "SELECT SUM(correct IS NOT NULL) resolved, "
+                            "COUNT(*) fired FROM tracked_signals "
+                            "WHERE strength=%s AND signal_time >= %s",
+                            (tier_name, TRIGGER_START))
+                        row = cur.fetchone() or {}
+                        blk = blocks.get(tier_key)
+                        if blk is not None:
+                            blk["since_trigger"] = int(row.get("resolved") or 0)
+                            blk["since_trigger_fired"] = int(row.get("fired") or 0)
+                    since = blocks.get("strong", {}).get("since_trigger", 0)
             finally:
                 conn.close()
-            blocks["strong"]["since_trigger"] = since
             out = {"kept_wr": round(k, 1) if k else None,
                    "veto_wr": round(v, 1) if v else None,
                    "gap_pp": round(k - v, 1) if k and v else None,

@@ -1644,6 +1644,41 @@ def research_shadow_review_api():
                     "trace": _tb.format_exc()[-1500:]}), 500
 
 
+@app.route("/research/v7-clock", methods=["GET"])
+def research_v7_clock_api():
+    """Adoption-trigger clock, computed on demand (research aid).
+
+    The JSON used to be a committed file, so the website served whatever
+    was in the image at build time — the board sat at 2026-08-01 15:18
+    while signals kept firing. Now the numbers are produced per request
+    from the live DB, and the file is only a fallback.
+    Admin-guarded via the /research/ prefix.
+    """
+    from flask import jsonify as _js, send_file as _sf
+    import subprocess as _sp
+    import sys as _sys
+
+    root = Path(__file__).resolve().parent.parent
+    script = root / "research" / "v7_raid_veto.py"
+    out = root / "research" / "results" / "v7_veto_clock.json"
+    if not script.exists():
+        return _js({"error": "research/ not present in this image"}), 501
+    try:
+        r = _sp.run([_sys.executable, str(script), "--clock"],
+                    capture_output=True, text=True, timeout=110, cwd=str(root))
+        if r.returncode != 0 and not out.exists():
+            return _js({"error": "clock failed",
+                        "stderr": (r.stderr or "")[-800:]}), 500
+        return _sf(out, mimetype="application/json", max_age=0)
+    except _sp.TimeoutExpired:
+        if out.exists():          # stale beats nothing, but say so
+            return _sf(out, mimetype="application/json", max_age=0)
+        return _js({"error": "clock timed out (110s)"}), 500
+    except Exception:
+        logger.exception("v7_clock_route_failed")
+        return _js({"error": "v7-clock route crashed"}), 500
+
+
 @app.route("/research/v7-accum-i", methods=["GET"])
 def research_v7_accum_interactive_api():
     """V7 cumulative performance — INTERACTIVE (Lightweight Charts).

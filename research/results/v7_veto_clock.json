@@ -17,19 +17,21 @@
    "n_veto": 18,
    "since_trigger": 0,
    "trigger_target": 60,
-   "gap_threshold_pp": 8.0
+   "gap_threshold_pp": 8.0,
+   "since_trigger_fired": 0
   },
   "moderate": {
    "tier": "Moderate",
-   "kept_wr": 52.5,
+   "kept_wr": 52.1,
    "veto_wr": 43.5,
-   "gap_pp": 9.0,
-   "n_kept": 139,
+   "gap_pp": 8.7,
+   "n_kept": 140,
    "n_veto": 69,
    "since_trigger": 0,
    "trigger_target": 60,
-   "gap_threshold_pp": 8.0
+   "gap_threshold_pp": 8.0,
+   "since_trigger_fired": 1
   }
  },
- "asof_utc": "2026-08-01 15:18"
+ "asof_utc": "2026-08-02 03:14"
 }
