@@ -139,6 +139,13 @@ V7 重構成 adapter 是**觸發點之後**的事；屆時 executor 的訊號→
 ## 4. 落地計畫（觸發點之後才動 P1+）
 
 - **P0（本文件）**：設計定稿，等第二條策略過 gate。
+  **2026-08-02 實作進度**：規則層已寫成可測的函式庫
+  `indicator/portfolio/`（limits / ledger / risk_engine），27 個測試釘住
+  §3.2-§3.4 的每一條規則。**刻意零接線**——`tests/test_portfolio_risk.py`
+  裡有一條 AST 測試，只要 app.py / executor.py / runner.py /
+  BTC_perp_data.py 任何一個 import 到這個套件就會紅。行為零改動，
+  DDL 只是字串常數還沒建表。這樣 Gate F 過關那天，要接的是線路，
+  不是還沒被審過的規則。
 - **P1 帳本先行（零行為改動）**：建 `pf_*` 表；V7 executor dual-write；
   PortfolioClocks 加組合視圖（跨策略 net_r 曲線、相關性矩陣）。跑 2 週
   確認帳本與 `v7_okx_positions` 對帳一致。
