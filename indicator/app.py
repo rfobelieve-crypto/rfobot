@@ -1644,6 +1644,42 @@ def research_shadow_review_api():
                     "trace": _tb.format_exc()[-1500:]}), 500
 
 
+@app.route("/research/v7-accum-i", methods=["GET"])
+def research_v7_accum_interactive_api():
+    """V7 cumulative performance — INTERACTIVE (Lightweight Charts).
+
+    Four independent, full-width panes (zoom / pan / crosshair), the same
+    data the PNG route renders. This is what the site embeds; the PNG
+    variant stays for Telegram and anywhere an image is the only option.
+    Regenerates per load like its siblings. Admin-guarded via /research/.
+    """
+    from flask import jsonify as _js, send_file as _sf
+    import subprocess as _sp
+    import sys as _sys
+    import traceback as _tb
+
+    root = Path(__file__).resolve().parent.parent
+    script = root / "research" / "v7_perf_interactive.py"
+    if not script.exists():
+        return _js({"error": "research/ not present in this image"}), 501
+    out = root / "research" / "results" / "v7_perf_interactive.html"
+    try:
+        out.unlink(missing_ok=True)
+        r = _sp.run([_sys.executable, str(script)], capture_output=True,
+                    text=True, timeout=110, cwd=str(root))
+        if r.returncode != 0 or not out.exists():
+            return _js({"error": "render failed",
+                        "stdout": (r.stdout or "")[-800:],
+                        "stderr": (r.stderr or "")[-800:]}), 500
+        return _sf(out, mimetype="text/html", max_age=0)
+    except _sp.TimeoutExpired:
+        return _js({"error": "render timed out (110s)"}), 500
+    except Exception:
+        logger.exception("v7_accum_i_route_failed")
+        return _js({"error": "v7-accum-i route crashed",
+                    "trace": _tb.format_exc()[-1500:]}), 500
+
+
 @app.route("/research/v7-accum", methods=["GET"])
 def research_v7_accum_api():
     """V7 cumulative performance chart (research aid — NOT a signal).

@@ -377,6 +377,22 @@ _v7_accum_cache: dict = {"bytes": None, "ts": 0.0}
 _V7_ACCUM_CACHE_TTL_S = 1800.0
 
 
+# Interactive twin of /public/v7-accum — an already-rendered HTML page
+# (Lightweight Charts), relayed with the same token the PNG route uses.
+# This is what product-site iframes; the PNG stays for image-only
+# surfaces. Shorter TTL than the PNG: the HTML is what people actually
+# look at, and the render is the same subprocess cost either way.
+_v7_accum_i_cache: dict = {"bytes": None, "ts": 0.0}
+_V7_ACCUM_I_CACHE_TTL_S = 900.0
+
+
+@mcp.custom_route("/public/v7-accum-i", methods=["GET"])
+async def public_v7_accum_i_route(request: Request) -> Response:
+    return await _proxy_html(
+        _v7_accum_i_cache, _V7_ACCUM_I_CACHE_TTL_S,
+        f"{INDICATOR_BASE_URL}/research/v7-accum-i", token=INDICATOR_ADMIN_TOKEN)
+
+
 @mcp.custom_route("/public/v7-accum", methods=["GET"])
 async def public_v7_accum_route(request: Request) -> Response:
     return await _proxy_png(
