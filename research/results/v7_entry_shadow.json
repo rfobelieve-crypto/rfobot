@@ -1,0 +1,41 @@
+{
+ "frozen_at": "2026-08-04",
+ "params": {
+  "band": 0.003,
+  "k": 4,
+  "window_h": 1,
+  "maker": 0.0002,
+  "taker": 0.0005,
+  "slip": 0.0005
+ },
+ "by_tier": [
+  {
+   "tier": "Moderate",
+   "n": 1359,
+   "mkt_bps": -8.37,
+   "grid_bps": -6.87,
+   "diff_bps": 1.5,
+   "entry_imp_bps": -0.26,
+   "fill_rate": 0.586,
+   "h1_diff_bps": 2.65,
+   "h2_diff_bps": 0.35,
+   "halves_agree": true,
+   "n_forward": 0,
+   "forward_diff_bps": null
+  },
+  {
+   "tier": "Strong",
+   "n": 766,
+   "mkt_bps": 4.59,
+   "grid_bps": 4.83,
+   "diff_bps": 0.24,
+   "entry_imp_bps": -1.59,
+   "fill_rate": 0.609,
+   "h1_diff_bps": 5.14,
+   "h2_diff_bps": -4.65,
+   "halves_agree": false,
+   "n_forward": 0,
+   "forward_diff_bps": null
+  }
+ ]
+}

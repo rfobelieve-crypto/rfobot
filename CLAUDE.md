@@ -547,14 +547,19 @@ Dual XGBoost 架構：Direction Regressor + Magnitude Regressor，獨立管線�
 - **Deribit Public API** (2 endpoints)：DVOL 波動率指數、Options Summary
 
 ### 特徵工程
-- **200+ 工程特徵**（Direction 136, Magnitude 72），12 個群組
+- **200+ 工程特徵**（Direction 136, Magnitude **76**，且是 Direction 那 136 個
+  剪枝後的**真子集**），12 個群組
 - 所有計算為 trailing-only（無前視偏差）
 - Coinglass 原生 1h 使用 merge_asof 精確對齊
 - 自訂 alpha 特徵：impact_asymmetry (IC=-0.071)、post_absorb_breakout (mag IC=0.191)
 
 ### 模型
 - **Direction Model**：XGBRegressor, 136 特徵, 輸出 pred_return_4h (TWAP path return)，rolling percentile 解碼為 UP/DOWN/NEUTRAL
-- **Magnitude Model**：XGBRegressor, 72 特徵, 輸出 |return_4h|
+- **Magnitude Model**：XGBRegressor, **76** 特徵, target = `y_vol_adj_abs`
+  = |return_4h| / realized_vol（**σ 單位，不是報酬單位**）；推論時
+  `mag_pred = 模型輸出 × realized_vol_20b` 才還原成報酬尺度
+  （`inference.py`）。**不參與訊號分級**：`use_mag_gate=False`，見
+  §信號生成的 confidence 說明
 - **Regime Detection**：CHOPPY / TRENDING_BULL / TRENDING_BEAR / WARMUP
 
 ### 信號生成
