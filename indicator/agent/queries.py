@@ -920,9 +920,17 @@ def public_live_status() -> dict[str, Any]:
     finally:
         conn.close()
 
+    # v7_okx_positions.net_pct 存的是**小數**（0.0216 = +2.16%），不是百分比 ——
+    # 儘管欄位名以 _pct 結尾，而同一張表的 equity_ret_pct 又確實是百分比。
+    # 交叉驗證：id17 net_pct=0.021648、notional/equity=2.009x，
+    # 0.021648 × 2.009 = 4.349% 正好等於該列的 equity_ret_pct=4.3485。
+    # 原本寫 `comp *= 1 + p/100` 等於再除一次 100，累積績效在對外網站上
+    # 被低估約 79 倍（顯示 +0.01%，實際 +0.84%）。
+    # 同檔案其他三處都是對的（avg_net*10000 轉 bps、MDD 的 equity*=(1+r)、
+    # 勝率只看符號），只有這個函式錯 —— 而它正是網站 LiveTradesPanel 在用的。
     comp = 1.0
     for p in allpct:
-        comp *= 1.0 + p / 100.0
+        comp *= 1.0 + p
     open_position = None
     if op:
         held_h = None
@@ -944,7 +952,8 @@ def public_live_status() -> dict[str, Any]:
             "entry_utc": (r["entry_time"].strftime("%m-%d %H:%M")
                           if r.get("entry_time") else None),
             "direction": r.get("direction"),
-            "net_pct": (round(float(r["net_pct"]), 2)
+            # 小數 → 百分比（見上方 comp 的說明）
+            "net_pct": (round(float(r["net_pct"]) * 100, 2)
                         if r.get("net_pct") is not None else None),
             "exit_reason": r.get("exit_reason"),
         } for r in recent],
