@@ -643,10 +643,10 @@ def main() -> int:
     log = read_log()
     if args.combos:
         import combo_watchlist as CW
-        print(f"combo watchlist (registered {CW.REGISTERED}) — forward rows, "
-              "clustered-CI arithmetic:")
+        print(f"combo watchlist (registered {CW.REGISTERED}) — rows first seen "
+              "AFTER registration only, clustered-CI arithmetic:")
         for name, pred in CW.combo_preds(log).items():
-            st = gate_stats(log, pred)
+            st = gate_stats(log, CW.forward_only(pred))
             if st["n_closed"]:
                 print(f"  {name:<10} closed={st['n_closed']:>4} open={st['n_open']:>3}"
                       f"  meanR={st['mean_r']:+.4f}  CI-low={st['ci_low']:+.4f}"

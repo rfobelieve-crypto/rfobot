@@ -549,14 +549,21 @@ def _sweep_status_payload() -> dict:
     # same clustered-CI arithmetic, plain-language labels included so the
     # site renders 白話 without duplicating definitions.
     cohorts = []
+    # D/E 是看著已累積的列註冊的（D 2026-08-01、E 2026-08-02），註冊前那段
+    # 是挑選期資料 —— 拿它計分是自我證成。實測（2026-08-07 拆分）：E 看板
+    # +0.589 全靠挑選期（真前瞻 n=2 為 −0.206）；D 反而是健康形狀（挑選期
+    # +0.013 平、真前瞻 +0.195 CI-low +0.077）。A/B/C 的規則在 log 起點
+    # （07-28/29）就凍結，不受影響。
+    _dp, _ep = SE.is_variant_d, SE.variant_e_pred(log)
     for key, zh, pred in (
             ("A", "A 全樣本（無濾網·對照組）", lambda r: True),
             ("B", "B 淺穿越（主 gate n/1400）",
              lambda r: str(r.get("variant_b", "")) == "1"),
             ("C", "C ＋收回（1m 縮回價位內）", SE.is_variant_c),
-            ("D", "D ＋量能（訂單流組合）", SE.is_variant_d),
+            ("D", "D ＋量能（訂單流組合）",
+             lambda r: _dp(r) and (r.get("first_seen_utc") or "") >= "2026-08-01"),
             ("E", "E 三面板盤感（OI↓∧CVD順破∧清算高）",
-             SE.variant_e_pred(log))):
+             lambda r: _ep(r) and (r.get("first_seen_utc") or "") >= "2026-08-02")):
         st = SE.gate_stats(log, pred)
         cohorts.append({"key": key, "label_zh": zh, **st})
     combo_zh = {
@@ -566,7 +573,10 @@ def _sweep_status_payload() -> dict:
         "PA": "V7 也站這邊", "V∧LIQ": "放量＋清算噴"}
     combos = []
     for name, pred in CW.combo_preds(log).items():
-        st = SE.gate_stats(log, pred)
+        # forward_only: 組合是看著 07-28→08-02 的列挑出來的，那段是挑選期
+        # 資料 —— 拿它給被挑出來的組合打分是自我證成（R∧Q 看板 +0.82，
+        # 真前瞻 n=4 CI −0.206）。網站只呈現註冊後的列。
+        st = SE.gate_stats(log, CW.forward_only(pred))
         combos.append({"key": name, "label_zh": combo_zh.get(name, ""), **st})
     try:
         clocks = queries.public_research_clocks()

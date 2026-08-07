@@ -32,6 +32,17 @@ from statistics import median
 
 REGISTERED = "2026-08-02"
 
+
+def forward_only(pred):
+    """Wrap a combo predicate so scoring sees ONLY rows first seen after
+    registration. The watchlist was **picked by looking at the 07-28→08-02
+    rows**, so those rows are selection-period data — scoring them with the
+    combos they selected is self-grading. Measured cost of the mistake
+    (2026-08-07 split): R∧Q showed +0.82 on the board but its true-forward
+    n=4 CI-low is −0.206; V∧LIQ +1.08/100%WR collapsed to −0.206/0%.
+    R∧V is the one that honestly survives (+0.145, CI-low +0.115, n=187)."""
+    return lambda r: pred(r) and (r.get("first_seen_utc") or "") >= REGISTERED
+
 WATCHLIST = {
     "R∧V": ("R", "V"),
     "R∧Q": ("R", "Q"),
