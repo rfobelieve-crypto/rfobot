@@ -171,7 +171,7 @@ class TestLiveModeGuards:
             validate_okx_config(cfg)
 
     def test_live_capital_at_current_baseline_passes(self):
-        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=274.0)
+        cfg = _valid_cfg(is_simulated=0, initial_capital_usd=311.6)
         with patch.dict(os.environ, {"STAGE": "live"}):
             validate_okx_config(cfg)  # must not raise
 

@@ -263,7 +263,11 @@ INITIAL_CAPITAL_USD = 155.0   # original Stage 3 deposit (2026-05-31, $154.86)
 # headline baseline here is not laundering strategy losses; it is excluding
 # activity the strategy did not perform. Trade-count gates (Gate B / shadow)
 # are NOT reset — they continue.
-EXECUTOR_RESTART_CAPITAL_USD = 274.0
+# 274.0 -> 311.6 (2026-08-08): correction — snapshots + id21 equity_before
+# prove the true post-reset start was $311.60, not $274 (figure read
+# mid-deposit). With 274 the report showed +10.7% while the true
+# since-restart return was -2.7%.
+EXECUTOR_RESTART_CAPITAL_USD = 311.6
 EXECUTOR_RESTART_SINCE = "2026-07-28"
 
 

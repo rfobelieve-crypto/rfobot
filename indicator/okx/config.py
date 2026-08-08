@@ -148,7 +148,17 @@ class OkxConfig:
     # 1.5×initial → HALT) and the loss-cap bases key off this, so it MUST
     # match the real deposit. Railway OKX_INITIAL_CAPITAL_USD env overrides
     # this default — keep them in sync.
-    initial_capital_usd: float = 274.0
+    #
+    # 274→311.6 (2026-08-08): CORRECTION, not a top-up. The $274 figure was
+    # read mid-deposit on 07-28; balance snapshots show equity flat at
+    # 311.57-311.63 for 11h before the first post-reset trade, and that
+    # trade's own equity_before is 311.60 (v7_okx_positions id=21). The
+    # wrong baseline inflated reported performance (+10.7% shown vs -2.7%
+    # true) and LOOSENED CAP-4 (DEMOTE at $192 instead of $218). Raising
+    # the baseline tightens protection -> reduction-class change, no
+    # override ceremony needed. Fourth baseline-sync incident; see
+    # mistake.md 2026-07-13 / 2026-07-28.
+    initial_capital_usd: float = 311.6
     risk_frac: float = 0.02
     max_position_count: int = 1
     # Tightened on 2026-05-28 for 10x leverage.  At 10x, a 2% BTC move

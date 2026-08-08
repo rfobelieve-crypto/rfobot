@@ -17,10 +17,10 @@
 
 | 項目 | 現行值 | 出處 |
 |---|---|---|
-| 資本基準 | **$274**（2026-07-28 重置） | `okx/config.py: initial_capital_usd` |
+| 資本基準 | **$311.60**（2026-07-28 重置；08-08 修正——$274 是入金中途讀的，snapshots+id21 equity_before 證明真實起點 311.60） | `okx/config.py: initial_capital_usd` |
 | 策略有效槓桿 | **2x**（名目 = 2 × equity） | `NOTIONAL_LEV_MULT`；guard 上限 3.0 |
 | OKX 帳戶槓桿 | 10x（**只決定鎖多少保證金**，非策略風險） | `config.leverage` |
-| Daily / Total kill | **−20% / −30%**（≈ −$54.8 / −$82.2） | `daily_/total_loss_cap_pct` |
+| Daily / Total kill | **−20% / −30%**（≈ −$62.3 / −$93.5） | `daily_/total_loss_cap_pct` |
 | 同時持倉 | **1 筆** | `max_position_count` |
 | 出場 | 3×ATR trailing、opp_signal 反向、conviction_decay(2 根) | `okx/executor.py` |
 
