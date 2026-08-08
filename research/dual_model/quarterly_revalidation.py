@@ -136,6 +136,49 @@ def main() -> int:
     log(f"- recent {RECENT_DAYS}d IC = {ic_recent:+.3f}  vs older = {ic_older:+.3f}  "
         f"→ {'DRIFT — recent edge halved' if decay else 'OK'}\n")
 
+    # ── 2b. PRODUCTION output-level drift (rank-blind failure mode) ─────
+    # 2026-08-08: the 05-01 model's live pred MEAN drifted +0.0024 in four
+    # months while every IC check above stayed green — Spearman is
+    # shift-invariant, and the WF harness refits per fold so its preds
+    # re-centre themselves. Only the FROZEN production stream shows the
+    # drift. The two-tail rolling-percentile decode turned that level
+    # shift into direction skew (July fired 14 UP : 1 DOWN Strong) and the
+    # executor traded almost only its weak side (live LONG -27 bps vs
+    # SHORT +38 bps). So this check reads indicator_history, not WF OOS.
+    log("## 2b. Production output-level drift (rank metrics are blind to this)")
+    _LVL_FLOOR = 0.0008
+    try:
+        from shared.db import get_db_conn as _gdc
+        _c = _gdc()
+        try:
+            with _c.cursor() as _cur:
+                _cur.execute(
+                    "SELECT pred_return_4h p FROM indicator_history "
+                    "WHERE dt >= DATE_SUB(NOW(), INTERVAL 30 DAY) "
+                    "AND pred_return_4h IS NOT NULL")
+                _lp = [float(r["p"]) for r in _cur.fetchall()]
+        finally:
+            _c.close()
+        if len(_lp) >= 240:
+            _a = np.asarray(_lp)
+            _m = float(_a.mean())
+            _dn = float((_a <= -_LVL_FLOOR).mean())
+            _up = float((_a >= _LVL_FLOOR).mean())
+            _drift = abs(_m) > _LVL_FLOOR or min(_dn, _up) < 0.02
+            if _drift:
+                flags.append(f"PRODUCTION level drift: 30d pred mean {_m:+.5f}, "
+                             f"tails dn {_dn:.1%} / up {_up:.1%}")
+            _verdict = "LEVEL DRIFT — two-tail decode will skew" if _drift else "OK"
+            log(f"- live 30d pred mean = {_m:+.5f}  (floor ±{_LVL_FLOOR})  "
+                f"tails beyond floor: dn {_dn:.1%} / up {_up:.1%}  → {_verdict}\n")
+        else:
+            # 07-05 lesson: an unavailable check must FLAG, never silently pass
+            flags.append(f"level-drift check UNAVAILABLE (only {len(_lp)} live preds)")
+            log(f"- only {len(_lp)} live preds in 30d — UNAVAILABLE (flagged)\n")
+    except Exception as _e:  # noqa: BLE001
+        flags.append("level-drift check UNAVAILABLE: " + str(_e)[:80])
+        log(f"- level-drift check failed: {_e} (flagged, not silently passed)\n")
+
     # ── 3. Tier edge intact ──────────────────────────────────────────────
     log("## 3. Tier edge (sign-accuracy by decoded tier)")
     dec = decode_tiers(oos["pred_ret"])
