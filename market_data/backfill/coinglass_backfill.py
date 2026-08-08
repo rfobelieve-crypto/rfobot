@@ -61,7 +61,7 @@ def _get_api_key() -> str:
     if not key:
         env_path = ROOT / ".env"
         if env_path.exists():
-            for line in env_path.read_text().splitlines():
+            for line in env_path.read_text(encoding="utf-8").splitlines():  # cp950 died on a UTF-8 dash in .env since 07-19
                 if line.startswith("COINGLASS_API_KEY="):
                     key = line.split("=", 1)[1].strip().strip('"')
     if not key:

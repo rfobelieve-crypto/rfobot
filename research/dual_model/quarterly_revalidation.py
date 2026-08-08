@@ -246,6 +246,10 @@ def main() -> int:
         log("     doesn't recover, de-stage / tighten until re-validated.")
         log("  3. Do NOT add leverage to compensate a decaying edge.")
         log("  4. If ceiling exceeded (AUC>ceil): suspect leak before celebrating.")
+        log("  5. LEVEL-DRIFT flag (2b): rank-invisible model aging, NOT edge decay —")
+        log("     run the maintenance refresh: retrain → research/validate_direction_refresh.py")
+        log("     (G1-G4 pre-registered gates) → deploy. Precedent: 2026-08-08, deployed")
+        log("     model sat 99 days, pred mean drifted +0.0024, July fired 14 UP : 1 DOWN.")
 
     out = RESULTS_DIR / f"quarterly_revalidation_{datetime.now(timezone.utc):%Y%m%d}.md"
     out.write_text("\n".join(lines), encoding="utf-8")

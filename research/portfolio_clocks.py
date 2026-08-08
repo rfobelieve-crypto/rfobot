@@ -199,6 +199,49 @@ def main() -> int:
     else:
         errors.append(f"raid_veto rc={rcv}")
 
+    # 2e ── V7 fired-direction balance (level-drift EARLY warning) ──────
+    # 2026-08-08: the 05-01 model's output level drifted for months and
+    # July fired 14 UP : 1 DOWN Strong while every rank-based check stayed
+    # green (Spearman is shift-invariant). quarterly_revalidation 2b now
+    # checks the pred level monthly; this weekly line watches the SYMPTOM
+    # so the alarm rings within days, not at month-end.
+    try:
+        import shared.db as _sdb
+        _conn = _sdb.get_db_conn()
+        try:
+            with _conn.cursor() as _cur:
+                _cur.execute(
+                    "SELECT direction, COUNT(*) n FROM tracked_signals "
+                    "WHERE strength IN ('Strong','Moderate') "
+                    "AND signal_time >= DATE_SUB(NOW(), INTERVAL 21 DAY) "
+                    "GROUP BY direction")
+                _cnt = {r["direction"]: int(r["n"]) for r in _cur.fetchall()}
+        finally:
+            _conn.close()
+        _up, _dn = _cnt.get("UP", 0), _cnt.get("DOWN", 0)
+        _tot = _up + _dn
+        if _tot >= 15:
+            _share = max(_up, _dn) / _tot
+            _ln = f"signal balance 21d: UP {_up} / DOWN {_dn}"
+            if _share >= 0.85:
+                _ln += "  << ONE-SIDED >=85% - check pred level (revalidation 2b)"
+            lines.append(_ln)
+        else:
+            lines.append(f"signal balance 21d: n={_tot} (too few to judge)")
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"signal_balance: {e}")
+
+    # 2f ── V7 entry-execution shadow refresh (frozen 2026-08-04) ────────
+    # The forward counter only accumulates when the script runs; it had no
+    # scheduler until 2026-08-08 (79h stale when caught). Weekly is enough:
+    # it recomputes prospectively-tagged rows from the DB each run.
+    rce, oute = run(["research/v7_entry_shadow.py"], 300)
+    if rce == 0:
+        tail = [ln.strip() for ln in oute.strip().splitlines()[-3:] if ln.strip()]
+        lines.append("entry-shadow: " + " | ".join(tail)[:300])
+    else:
+        errors.append(f"entry_shadow rc={rce}")
+
     # 3 ── depth_deltas span (subhourly revival due?) ────────────────────
     try:
         r = q1("SELECT (MAX(minute_start_ms)-MIN(minute_start_ms))/86400000.0 d "
