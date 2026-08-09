@@ -32,6 +32,18 @@ Pre-registered variants (frozen before the first run):
                   a number.
   V7 giveback     exit if the trade gives back 50% of its max favourable
                   excursion, once MFE >= 1R. Tests MFE-based exits.
+  V8 pool_target  (added 2026-08-09, user's idea) take profit at the next
+                  UNSWEPT liquidity pool in the trade's direction, keeping
+                  the 8-bar time cap. Grounded in this repo's own terrain
+                  campaign: unswept pools move price (D2 wall ahead 57% vs
+                  65%, D3 support behind 68%), swept ones provably do not
+                  (D6, L1-A). Structural target instead of a clock.
+                  NOTE it cannot lengthen holds — the time cap still binds —
+                  so it asks "is a pool a better exit than the close WITHIN
+                  the same 8 bars", not "should we hold longer" (hold_12
+                  already answered that: no).
+  V8b pool_ladder same, but scale out 1/3 at each of the first three
+                  unswept pools. Tests whether laddering beats all-at-first.
 
 Gates (declared before running):
   G1 pooled paired mean dR > 0 AND both halves agree in sign
@@ -97,6 +109,80 @@ def entries(bars):
     return out
 
 
+_POOLS: dict[int, list] = {}
+
+
+def _pool_levels(bars):
+    """Unswept-pool timeline, one entry per bar: the pool prices that are
+    still LIVE at that bar. Definitions copied from indicator/terrain.py
+    (PIVOT=10 swings, session extremes, prev-day, prev-week) so the exit
+    test uses the same terrain the campaign validated — not a new one.
+
+    Causality: a pool becomes visible at `est` (pivot needs PIVOT bars of
+    right-hand confirmation) and dies the first time price trades through
+    it. Both are strictly backward-looking at any bar k.
+    """
+    key = id(bars)
+    got = _POOLS.get(key)
+    if got is not None:
+        return got
+    import datetime as _dt
+    n = len(bars)
+    h = [b[SC.H] for b in bars]
+    lo = [b[SC.L] for b in bars]
+    dts = [_dt.datetime.utcfromtimestamp(b[0] / 1000) for b in bars]
+    PIVOT, SESSIONS = 10, ((0, 8), (7, 16), (12, 21))
+    raw = []                                   # (est_bar, level, side)
+    for i in range(PIVOT, n - PIVOT):
+        seg = range(i - PIVOT, i + PIVOT + 1)
+        if all(h[i] >= h[k] for k in seg) and any(h[i] > h[k] for k in seg if k != i):
+            raw.append((i + PIVOT + 1, h[i], 1))
+        if all(lo[i] <= lo[k] for k in seg) and any(lo[i] < lo[k] for k in seg if k != i):
+            raw.append((i + PIVOT + 1, lo[i], -1))
+    for h0, h1 in SESSIONS:
+        hi = lo_ = None
+        prev_in = False
+        for i in range(n):
+            inside = h0 <= dts[i].hour < h1
+            if inside:
+                hi = h[i] if not prev_in else max(hi, h[i])
+                lo_ = lo[i] if not prev_in else min(lo_, lo[i])
+            elif prev_in and hi is not None:
+                raw.append((i, hi, 1)); raw.append((i, lo_, -1))
+                hi = lo_ = None
+            prev_in = inside
+    for keyfn in (lambda d: d.date(), lambda d: d.isocalendar()[:2]):
+        cur = hi = lo_ = None
+        for i in range(n):
+            k = keyfn(dts[i])
+            if cur is None:
+                cur, hi, lo_ = k, h[i], lo[i]
+            elif k != cur:
+                raw.append((i, hi, 1)); raw.append((i, lo_, -1))
+                cur, hi, lo_ = k, h[i], lo[i]
+            else:
+                hi, lo_ = max(hi, h[i]), min(lo_, lo[i])
+    raw.sort()
+    live, out, pi = [], [], 0
+    for k in range(n):
+        while pi < len(raw) and raw[pi][0] <= k:
+            live.append([raw[pi][1], raw[pi][2]]); pi += 1
+        live = [p for p in live
+                if not (h[k] > p[0] if p[1] == 1 else lo[k] < p[0])]
+        out.append([p[0] for p in live])
+    _POOLS[key] = out
+    return out
+
+
+def _targets(bars, fill, entry, d, want):
+    """The `want` nearest unswept pools strictly beyond entry, in the trade
+    direction, as known at the FILL bar (not later)."""
+    lv = _pool_levels(bars)[fill]
+    ahead = sorted((x for x in lv if (x > entry if d == 1 else x < entry)),
+                   reverse=(d == -1))
+    return ahead[:want]
+
+
 _COLS: dict[int, tuple] = {}
 
 
@@ -134,6 +220,10 @@ def run_exit(bars, e, kind):
     stop = entry - d * risk
     hold = {"hold_12": 12, "hold_4": 4}.get(kind, SC.HOLD)
     trail_atr = {"trail_2atr": 2.0, "trail_1atr": 1.0}.get(kind)
+    # V8: structural take-profit at unswept pools, known at the fill bar
+    tgts = (_targets(bars, fill, entry, d, 1 if kind == "pool_target" else 3)
+            if kind in ("pool_target", "pool_ladder") else [])
+    tgt_i = 0
     last = min(fill + hold, n - 1)
     peak = entry
     booked = 0.0            # realised part for the scale-out variant
@@ -170,6 +260,22 @@ def run_exit(bars, e, kind):
             booked += 0.5 * ((d * (px - entry) / risk) - SC.SLIP * A / risk)
             frac = 0.5
         peak = max(peak, hi_k) if d == 1 else min(peak, lo_k)
+        # V8 pool targets: a resting limit beyond the market — same
+        # justification as half_at_1r for using this bar's extreme.
+        while tgt_i < len(tgts):
+            t = tgts[tgt_i]
+            reached = (hi_k >= t) if d == 1 else (lo_k <= t)
+            if not reached:
+                break
+            px = touch_fill(t, k, -d) - d * SC.SLIP * A
+            if kind == "pool_target":
+                return booked + frac * (d * (px - entry) / risk), k
+            part = min(frac, 1.0 / 3.0)
+            booked += part * (d * (px - entry) / risk)
+            frac -= part
+            tgt_i += 1
+            if frac <= 1e-9:
+                return booked, k
         if kind == "fail_fast":
             # closed back through the swept level against us => the
             # retest thesis is dead; leave at this close
@@ -182,7 +288,8 @@ def run_exit(bars, e, kind):
 
 
 VARIANTS = ("baseline", "trail_2atr", "trail_1atr", "half_at_1r",
-            "hold_12", "hold_4", "fail_fast", "giveback")
+            "hold_12", "hold_4", "fail_fast", "giveback",
+            "pool_target", "pool_ladder")
 
 
 def main() -> int:
