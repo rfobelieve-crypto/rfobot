@@ -98,6 +98,20 @@ class OkxConfig:
     # Does NOT touch management of an already-open position.
     strong_only_entry: bool = False
 
+    # Entry pause (2026-08-11).  Refuses to OPEN, keeps managing what is
+    # already open — trailing amends, conviction_decay, opp_signal exits,
+    # reconciliation and every kill check keep running.  This is the tool
+    # for "the signal stream is suspect but an open position still needs
+    # its stop moved"; OKX_EXECUTOR_ENABLED=0 is NOT (it kills the whole
+    # executor and orphans the live position's exit management).
+    #
+    # Why it exists: on 2026-08-11 the decode was found to have locked the
+    # DOWN side out entirely (Strong DOWN needed pred <= -0.002066, the
+    # model's post-deploy minimum was -0.001480), so live traded LONG-only
+    # for months.  Entry paused while the decode is repaired; exits stay
+    # live.  Toggle via OKX_ENTRY_PAUSED=1 — Railway env, no redeploy.
+    entry_paused: bool = False
+
     # Flip on opposite-Strong (2026-07-10).  Evidence
     # (research/dual_model/strong_preempt_bt, real exit + occupancy, 5mo OOS):
     # flipped entries n=24, +63bps/tr, bootstrap CI[+18.7,+116.2] bps, first/
@@ -235,6 +249,9 @@ def load_okx_config_from_env(stage: Literal["testnet", "live"] = "testnet") -> O
     soe = os.environ.get("OKX_STRONG_ONLY_ENTRY", "").strip().lower()
     if soe in ("1", "true", "yes", "on"):
         kwargs["strong_only_entry"] = True
+    ep = os.environ.get("OKX_ENTRY_PAUSED", "").strip().lower()
+    if ep in ("1", "true", "yes", "on"):
+        kwargs["entry_paused"] = True
     fos = os.environ.get("OKX_FLIP_ON_OPP_STRONG", "").strip().lower()
     if fos in ("0", "false", "no", "off"):
         kwargs["flip_on_opp_strong"] = False

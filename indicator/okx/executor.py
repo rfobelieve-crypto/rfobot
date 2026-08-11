@@ -1110,6 +1110,20 @@ class V7OkxExecutor:
           - Auto mode (5+ manual approvals): execute immediately
           - Manual mode: build intent, push Telegram, return pending
         """
+        # Entry pause (OKX_ENTRY_PAUSED).  Checked FIRST and inside
+        # _open_position rather than at the two call sites, so the flip
+        # path cannot slip past it: when paused a flip closes and stays
+        # flat instead of re-entering.  Exits, trailing amends, kill
+        # checks and reconciliation are untouched — see config.entry_paused.
+        if self._cfg.entry_paused:
+            logger.info("entry_paused: refusing to open %s %s",
+                        signal_strength, signal_direction)
+            return CycleResult(
+                action="none",
+                detail={"reason": "entry_paused",
+                        "direction": signal_direction,
+                        "tier": signal_strength})
+
         intent = self._build_intent(
             klines=klines, signal_direction=signal_direction,
             signal_strength=signal_strength, model_version=model_version,

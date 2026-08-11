@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 from indicator.okx.config import OkxConfig
-from indicator.okx.executor import V7OkxExecutor
+from indicator.okx.executor import CycleResult, V7OkxExecutor
 from indicator.okx.types import (
     Balance,
     BalanceEvent,
@@ -271,6 +271,84 @@ class TestStrongOnlyEntry:
                            signal_strength="Moderate")
         # Flag off (default) → Moderate is NOT gated; reaches _open_position.
         assert result.detail.get("reason") != "moderate_skipped_strong_only"
+
+
+# ── entry_paused gate ────────────────────────────────────────────────
+
+
+class TestEntryPaused:
+    """OKX_ENTRY_PAUSED refuses to OPEN while leaving exit management alone.
+
+    The distinction is the whole point: OKX_EXECUTOR_ENABLED=0 also stops
+    trailing amends / conviction_decay / kill checks, orphaning whatever is
+    already live.  These tests pin both halves so a future refactor cannot
+    quietly turn the entry pause into a full stop (or vice versa).
+    """
+
+    def test_strong_signal_does_not_open_when_paused(self):
+        exe, client, store, recon = _mk_executor(cfg=_mk_cfg(entry_paused=True))
+        exe.start()
+        result = exe.cycle(klines=pd.DataFrame(), signal_direction="UP",
+                           signal_strength="Strong")
+        assert result.action == "none"
+        assert result.detail["reason"] == "entry_paused"
+        client.submit_market_order.assert_not_called()
+
+    def test_both_directions_blocked(self):
+        """Not a long/short filter — the pause is symmetric."""
+        for d in ("UP", "DOWN"):
+            exe, client, store, recon = _mk_executor(
+                cfg=_mk_cfg(entry_paused=True))
+            exe.start()
+            result = exe.cycle(klines=pd.DataFrame(), signal_direction=d,
+                               signal_strength="Strong")
+            assert result.detail["reason"] == "entry_paused", d
+            client.submit_market_order.assert_not_called()
+
+    def test_open_position_still_managed_while_paused(self):
+        """The reason this flag exists instead of killing the executor."""
+        exe, client, store, recon = _mk_executor(cfg=_mk_cfg(entry_paused=True))
+        exe.start()
+        pos = {"id": 7, "direction": "LONG", "size_contracts": 0.93,
+               "entry_price": 64205.3}
+        store.get_open_position.return_value = pos
+        with patch.object(exe, "_manage_position",
+                          return_value=CycleResult(action="hold",
+                                                   detail={})) as mg:
+            exe.cycle(klines=pd.DataFrame(), signal_direction="NEUTRAL",
+                      signal_strength="Weak")
+        mg.assert_called_once()
+        assert mg.call_args.args[0] == pos
+
+    def test_flip_closes_but_does_not_reenter_when_paused(self):
+        """Flip path must not slip past the gate: close, then stay flat."""
+        exe, client, store, recon = _mk_executor(
+            cfg=_mk_cfg(entry_paused=True, flip_on_opp_strong=True))
+        exe.start()
+        store.get_open_position.return_value = {
+            "id": 7, "direction": "LONG", "size_contracts": 0.93,
+            "entry_price": 64205.3}
+        close_res = CycleResult(action="close",
+                                detail={"exit_reason": "opp_signal",
+                                        "position_id": 7})
+        with patch.object(exe, "_manage_position", return_value=close_res), \
+             patch.object(exe, "_flip_daily_cap_ok", return_value=True):
+            result = exe.cycle(klines=pd.DataFrame(), signal_direction="DOWN",
+                               signal_strength="Strong")
+        assert result.action == "flip"
+        assert result.detail["open_action"] == "none"
+        assert result.detail["opened"]["reason"] == "entry_paused"
+        client.submit_market_order.assert_not_called()
+
+    def test_not_paused_by_default(self):
+        """Default must be off — a pause that survives a redeploy silently
+        would be its own silent failure."""
+        assert _mk_cfg().entry_paused is False
+        exe, client, store, recon = _mk_executor()
+        exe.start()
+        result = exe.cycle(klines=pd.DataFrame(), signal_direction="UP",
+                           signal_strength="Strong")
+        assert result.detail.get("reason") != "entry_paused"
 
 
 # ── _force_close_all ─────────────────────────────────────────────────
