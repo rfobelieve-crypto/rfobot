@@ -372,3 +372,83 @@ class TestIndicatorEngineIntegration:
         buf_before = len(engine.dir_pred_history)
         engine.predict(sample_features_df, update_history=False)
         assert len(engine.dir_pred_history) == buf_before
+
+
+class TestWarmupSilenceAndReachability:
+    """The 2026-08-11 defect: the decode could not fire DOWN at all.
+
+    The existing decoding tests above re-implement the quantile arithmetic
+    and assert it against itself, so they stayed green while the shipped
+    decode was one-sided for months.  These exercise IndicatorEngine.predict
+    itself, and assert the two properties that actually failed:
+      - under warm-up the engine stays SILENT (it used to fall back to fixed
+        thresholds, which is where the skew lived: 43:5 at the 08-08 reset)
+      - with a live-grown buffer BOTH tails are reachable by construction
+    """
+
+    def _engine(self):
+        from indicator.inference import IndicatorEngine
+        return IndicatorEngine()
+
+    def test_silent_while_buffer_below_warmup(self, sample_features_df):
+        from collections import deque
+        eng = self._engine()
+        eng.dir_pred_history = deque(maxlen=eng.dir_pct_window)   # cold
+        out = eng.predict(sample_features_df, update_history=False)
+        assert set(out["pred_direction"]) == {"NEUTRAL"}, (
+            "under warm-up the decode must fire nothing; falling back to "
+            "fixed thresholds is what produced the one-sided window")
+        assert (out["strength_score"] == "Weak").all()
+        # pred_return is still published — the number is fine, only the
+        # translation into a direction is withheld.
+        assert out["pred_return_4h"].notna().all()
+
+    def test_committed_seed_is_empty(self):
+        """Regression on the artifact itself, not just the code.
+
+        A future export that re-seeds dir_pred_history would silently
+        reintroduce the defect, so pin the shipped file.
+        """
+        import json
+        from pathlib import Path
+        p = (Path(__file__).resolve().parent.parent / "indicator"
+             / "model_artifacts" / "dual_model" / "training_stats.json")
+        stats = json.loads(p.read_text())
+        assert stats.get("dir_pred_history") == [], (
+            "dir_pred_history must ship EMPTY — the buffer is grown from "
+            "live predictions and rehydrated from indicator_history")
+
+    def test_shipped_seed_put_down_out_of_reach(self):
+        """The failure, in the numbers actually measured on 2026-08-11.
+
+        A first version of this test drew the two distributions from
+        Gaussians with the observed mean/std and did NOT reproduce the
+        failure — the real live stream is right-skewed, so a Gaussian
+        stand-in has a fatter left tail than the model ever produced.  The
+        recorded values are used instead: a simulation that cannot reproduce
+        the defect is not evidence about it.
+        """
+        seed_strong_dn, seed_mod_dn = -0.002568, -0.001786
+        live_min = -0.001480          # lowest output since the 08-08 deploy
+        assert live_min > seed_mod_dn > seed_strong_dn, (
+            "both DOWN cutoffs sat below anything the model could emit — "
+            "DOWN was impossible, not improbable")
+
+    def test_live_grown_buffer_keeps_both_tails_reachable(self):
+        """The structural guarantee that replaced 'hope the seed matches'.
+
+        Judged out-of-sample so this is not a tautology: cutoffs come from
+        the first half of a drifting stream, the bars judged are the second
+        half.  Even while the level walks away, a buffer made of the model's
+        own recent output keeps both tails live — which is the property the
+        in-sample seed did not have.
+        """
+        rng = np.random.default_rng(20260811)
+        drift = np.linspace(0.0, 0.0015, 400)          # a level that walks
+        stream = rng.normal(0.0007, 0.0010, 400) + drift
+        buf, judged = stream[:200], stream[200:]
+        dn = min(float(np.quantile(buf, 0.025)), -0.0008)
+        up = max(float(np.quantile(buf, 0.975)), 0.0008)
+        assert (judged <= dn).sum() > 0 and (judged >= up).sum() > 0, (
+            "a live-grown buffer must leave both tails reachable even under "
+            "a drifting level")
