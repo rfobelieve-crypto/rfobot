@@ -15,15 +15,19 @@ This script:
   3. Loads the walk-forward OOS parquet and calibrates fallback ± thresholds
      (= top-strong_top_frac symmetric quantiles of all WF OOS predictions)
      for cold-start use when dir_pred_history < warmup_bars.
-  4. Seeds training_stats.json's "dir_pred_history" with the last 500
-     IN-SAMPLE predictions of the freshly-trained PRODUCTION MODEL on its
-     own training data, so the rolling-percentile decoder starts warm with
-     a buffer that lives on the same scale as live predictions.
+  4. CLEARS training_stats.json's "dir_pred_history" so the decoder grows
+     its buffer from LIVE predictions.  It used to seed the buffer with the
+     model's in-sample predictions; that shipped a decode which could not
+     fire DOWN at all (2026-08-11 — the seed sits +0.60 sigma away from
+     where the model actually lands out of sample, which put every DOWN
+     cutoff below the model's reachable range).  The in-sample buffer is
+     still COMPUTED below, purely as a diagnostic printout.
 
-     ⚠ Do NOT seed from WF OOS predictions: WF fold models train on a small
-     subset and produce ~3.5x narrower variance than the production model,
-     which biases the rolling-percentile thresholds and causes runaway
-     same-side signals (mistake.md 2026-04-19).
+     ⚠ Do not "fix" this by seeding from WF OOS predictions either: WF fold
+     models train on a small subset and produce ~3.5x narrower variance
+     than the production model (mistake.md 2026-04-19).  Neither in-sample
+     nor WF predictions describe where this model lands live.  Only live
+     predictions do — hence the cold start.
 
   5. Does NOT touch magnitude_xgb.json / magnitude_feature_cols.json /
      magnitude_config.json.
@@ -216,21 +220,45 @@ def export(objective: str, strong_frac: float, mod_frac: float,
     with open(cfg_path, "w") as f:
         json.dump(config, f, indent=2)
 
-    # Merge warmup buffer into training_stats.json (preserve existing keys)
+    # dir_pred_history is deliberately CLEARED, not seeded (2026-08-11).
+    #
+    # It used to be seeded with the new model's predictions on its own
+    # TRAINING data.  Those live in a different place from what the model
+    # emits out of sample: measured on the 08-08 refresh, seed mean
+    # -0.000005 vs live mean +0.000716 — a +0.60-sigma offset.  Because the
+    # decode ranks each live prediction against that buffer, the offset made
+    # the DOWN cutoffs unreachable: loosest DOWN threshold -0.001786 while
+    # the model's lowest live output was -0.001480.  Zero DOWN signals of
+    # any tier could fire, and live traded LONG-only for days.
+    #
+    # research/decode_replay.py replayed the real production stream with the
+    # reset modelled (and had to reproduce the 9:0 failure before being
+    # trusted).  All the skew sat in the warm-up window: with the seed
+    # removed and the buffer grown from live predictions, post-warm-up
+    # balance went 73:47 -> 42:54 while directional accuracy did not drop.
+    #
+    # Cost: ~100 bars (~4 days) of no direction signals after each retrain,
+    # because inference.py now stays silent until the buffer is live-grown
+    # rather than falling back to fixed thresholds (those are WF-calibrated
+    # and were themselves skewed in that window: 43:5 at the 08-08 cut).
+    # Four quiet days beats four days of guaranteed one-sided signals.
+    #
+    # Read-then-update, never a bare dump — several scripts share this file
+    # (mistake.md 2026-04-19, where a plain json.dump erased this same key).
     if stats_path.exists():
         with open(stats_path) as f:
             stats = json.load(f)
     else:
         stats = {}
-    stats["dir_pred_history"] = warmup_buffer
+    stats["dir_pred_history"] = []
     with open(stats_path, "w") as f:
         json.dump(stats, f, indent=2)
 
     print(f"[export] wrote {model_path.name}")
     print(f"[export] wrote {feats_path.name}  ({len(features)} features)")
     print(f"[export] wrote {cfg_path.name}")
-    print(f"[export] seeded {stats_path.name}::dir_pred_history "
-          f"({len(warmup_buffer)} bars)")
+    print(f"[export] CLEARED {stats_path.name}::dir_pred_history "
+          f"(was seeding {len(warmup_buffer)} in-sample bars; see comment)")
     print("[export] magnitude model UNTOUCHED")
     print(f"\nRollback: delete {cfg_path.name} + restore from "
           f"{backup_dir.name}/")

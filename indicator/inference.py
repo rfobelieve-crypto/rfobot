@@ -342,11 +342,23 @@ class IndicatorEngine:
             buf_len = len(self.dir_pred_history)
 
             if buf_len < warmup:
-                # Cold start → fixed fallback thresholds
-                up_strong = self.dir_fallback_strong_up
-                dn_strong = self.dir_fallback_strong_dn
-                up_mod = self.dir_fallback_mod_up
-                dn_mod = self.dir_fallback_mod_dn
+                # Cold start → stay SILENT (2026-08-11).  This used to fall
+                # back to fixed WF-calibrated thresholds, but the replay in
+                # research/decode_replay.py showed the warm-up window is
+                # exactly where the direction skew lives: at the five reset
+                # points tested, fallback decoding fired 53:17, 64:4, 54:20,
+                # 65:2 and 43:5 UP:DOWN.  The WF quantiles describe the
+                # model's OOS shape but not the level it happens to be
+                # sitting at right now, and a wrong level is precisely what
+                # turns a two-tail decode into a one-sided one.
+                # Post-warm-up balance with a live-grown buffer: 42:54.
+                # ~100 bars (~4 days) of silence after a retrain is the
+                # price; the alternative is 4 days of one-sided signals.
+                direction[i] = "NEUTRAL"
+                strength_tier[i] = "Weak"
+                pred_return[i] = p
+                confidence[i] = 0.0
+                continue
             else:
                 buf = np.fromiter(self.dir_pred_history, dtype=float)
                 up_strong = float(np.quantile(buf, 1.0 - strong_frac / 2.0))

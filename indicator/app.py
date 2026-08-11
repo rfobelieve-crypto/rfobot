@@ -349,6 +349,7 @@ def update_cycle() -> dict:
         # Initialize engine on first run
         if _engine is None:
             _engine = IndicatorEngine()
+            _rehydrate_pred_buffer(_engine)
 
         # Load or get existing indicator data
         with _lock:
@@ -840,8 +841,75 @@ def update_cycle() -> dict:
         raise
 
 
+def _rehydrate_pred_buffer(engine):
+    """Rebuild the rolling-percentile buffer from the DB, not from a file.
+
+    2026-08-11.  The buffer was persisted to training_stats.json INSIDE the
+    container.  Railway's filesystem is ephemeral and this repo deploys 2-10
+    times a day, so every push reset the buffer to whatever was committed —
+    which was 500 of the model's own IN-SAMPLE predictions.  The buffer
+    therefore never grew live at all.  That is why the DOWN side was not
+    merely slow to recover but permanently unreachable: the seed sits +0.60
+    sigma from where the model lands out of sample, putting every DOWN
+    cutoff below the model's reachable output range (loosest DOWN threshold
+    -0.001786 vs lowest live output -0.001480; 9 UP : 0 DOWN, six straight
+    LONG positions).
+
+    indicator_history already stores every bar's prediction with its
+    model_version, so the live buffer can simply be read back.  Restricting
+    to the CURRENT model_version matters: mixing two models' outputs into
+    one percentile window is the same category of error as the in-sample
+    seed — ranking today's prediction against a distribution that is not
+    the one producing it.
+
+    Fail-open: on any DB problem the engine keeps whatever it loaded from
+    disk.  A rehydration helper must never be the reason the bot cannot
+    start (mistake.md 2026-07-05: fail-open is only acceptable when the
+    degraded state is visible, hence the WARN).
+    """
+    if engine is None:
+        return
+    try:
+        from shared.db import get_db_conn
+        want = getattr(engine, "dir_pct_window", 500)
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT model_version FROM indicator_history "
+                    "WHERE pred_return_4h IS NOT NULL "
+                    "ORDER BY dt DESC LIMIT 1")
+                row = cur.fetchone()
+                if not row or not row.get("model_version"):
+                    logger.warning("pred_buffer_rehydrate: no model_version, "
+                                   "keeping on-disk buffer")
+                    return
+                cur.execute(
+                    "SELECT pred_return_4h p FROM indicator_history "
+                    "WHERE pred_return_4h IS NOT NULL AND model_version=%s "
+                    "ORDER BY dt DESC LIMIT %s",
+                    (row["model_version"], int(want)))
+                vals = [float(r["p"]) for r in cur.fetchall()][::-1]
+        finally:
+            conn.close()
+    except Exception:
+        logger.exception("pred_buffer_rehydrate_failed_keeping_disk_buffer")
+        return
+
+    from collections import deque
+    engine.dir_pred_history = deque(vals, maxlen=want)
+    logger.info("pred_buffer_rehydrate: %d live preds for model_version=%s "
+                "(warmup needs %d)", len(vals), row["model_version"],
+                getattr(engine, "dir_warmup_bars", 100))
+
+
 def _persist_pred_buffer(engine):
-    """Save engine's dir_pred_history to training_stats.json for restart resilience."""
+    """Save engine's dir_pred_history to training_stats.json for restart resilience.
+
+    Kept as a secondary cache only — _rehydrate_pred_buffer reads the DB at
+    startup and overwrites whatever this wrote.  See that function for why
+    the file alone was never a real persistence layer here.
+    """
     if engine is None:
         return
     buf = getattr(engine, 'dir_pred_history', None)

@@ -4,7 +4,7 @@
   "target": "y_path_ret_4h = mean(close[t+1..t+4])/close[t] - 1 (TWAP)",
   "horizon_bars": 4,
   "decoding": "rolling_percentile",
-  "percentile_window": 500,
+  "percentile_window": 200,
   "strong_top_frac": 0.05,
   "moderate_top_frac": 0.15,
   "warmup_bars": 100,
