@@ -90,6 +90,21 @@ def main():
         daemon=True, name="depth-delta-perp").start()
     logger.info("Depth-delta PERP collector started (exchange=binance_perp).")
 
+    # F7 second-resolution depth events (2026-08-13, TODO §0.46): BTC-only
+    # 1s buckets with price bands + cancel→re-add matching — the structures
+    # the 1m aggregation destroys. Additive third consumer of the same
+    # streams; the frozen 1m BTC series above is untouched.
+    from market_data.adapters.depth_events_1s import (
+        DepthEvents1sCollector, PERP_WS_URL as F7_PERP_WS_URL)
+    threading.Thread(target=DepthEvents1sCollector().start, daemon=True,
+                     name="depth-events-1s").start()
+    threading.Thread(
+        target=DepthEvents1sCollector(ws_url=F7_PERP_WS_URL,
+                                      exchange="binance_perp").start,
+        daemon=True, name="depth-events-1s-perp").start()
+    logger.info("F7 depth-events 1s collectors started (depth_events_1s, "
+                "BTC spot+perp).")
+
     # ETH parallel series (2026-07-23, V7/cancel-flow multicoin override —
     # see CLAUDE.md "V7 多幣化提前啟動"): same decomposition, new coin, own
     # canonical_symbol so it writes to rows the BTC cancel tests never touch.
