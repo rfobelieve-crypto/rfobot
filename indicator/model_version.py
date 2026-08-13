@@ -79,3 +79,52 @@ def get_current_model_deploy_date() -> str:
     if version != "unknown" and len(version) >= 10:
         return version[:10]
     return _DEPLOY_DATE_FALLBACK
+
+
+# ── Semantic epochs ──────────────────────────────────────────────────────────
+# A model retrain is not the only thing that makes older rows incomparable.
+# When the CODE that produces a stored column changes meaning, every row
+# before that moment is measuring something else — and because the past is
+# read-only (feedback_no_signal_overwrite), the two definitions coexist in
+# one table forever.  Any query that pools them silently averages apples and
+# oranges, which is exactly how 2026-08-08's level drift hid for months.
+#
+# Rule: a since-filter must floor at BOTH the model deploy date AND every
+# epoch that touches the column it reads.  Use `sample_floor()`.
+
+# Decoding: the rolling-percentile buffer stopped being an in-sample seed
+# reset on every deploy and became a live-grown window rebuilt from the DB
+# (commit c26b125).  Bars before this were decoded against a distribution
+# that was not the one producing them — on the DOWN side the cutoff sat
+# below the model's reachable range, so "UP:DOWN ratio" means something
+# categorically different either side of this line.
+DECODE_EPOCH = "2026-08-12 16:00:00"   # first bar decoded by a live-grown buffer
+
+# Confidence: the scale's denominator changed from max(|up|,|dn|) on the raw
+# quantiles to the bar's OWN effective Strong cutoff (commit 02876ba).  Under
+# a skewed buffer the old form discounted the narrow side — a Strong DOWN
+# scored 54.4 where its mirror UP scored 100 — so confidence values are not
+# comparable across this line.
+CONFIDENCE_EPOCH = "2026-08-13 00:00:00"
+
+
+def sample_floor(*epochs: str) -> str:
+    """Latest of the model deploy date and any semantic epochs given.
+
+    Returns 'YYYY-MM-DD HH:MM:SS'.  Bare dates are read as midnight, so
+    passing a deploy date and a mid-day epoch compares correctly.
+    """
+    from datetime import datetime
+
+    def _parse(s: str) -> datetime:
+        s = s.strip()
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(s, fmt)
+            except ValueError:
+                continue
+        # Unparseable epoch must not silently widen the window.
+        raise ValueError(f"sample_floor: cannot parse {s!r}")
+
+    candidates = [get_current_model_deploy_date(), *epochs]
+    return max((_parse(c) for c in candidates)).strftime("%Y-%m-%d %H:%M:%S")

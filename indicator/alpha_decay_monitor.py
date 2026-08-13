@@ -253,9 +253,17 @@ def check_confidence_wr_decoupling() -> dict:
     If they're the same, confidence score has lost discriminative power.
     """
     try:
-        from indicator.model_version import get_current_model_deploy_date
+        from indicator.model_version import CONFIDENCE_EPOCH, sample_floor
 
-        model_deploy = get_current_model_deploy_date()
+        # Floor at the confidence-formula epoch as well as the model deploy
+        # date (2026-08-13).  The denominator changed from max(|up|,|dn|) to
+        # the bar's own effective cutoff, so a row stored before that line is
+        # on a different scale — and under the skew that prompted the fix, the
+        # old scale discounted DOWN signals specifically.  Pooling the two
+        # would compare a tercile split across two definitions and read the
+        # seam as decay.  Rows are never re-scored (feedback_no_signal_
+        # overwrite), so the only correct handling is to exclude them.
+        since = sample_floor(CONFIDENCE_EPOCH)
         conn = _get_db_conn()
         try:
             with conn.cursor() as cur:
@@ -265,14 +273,17 @@ def check_confidence_wr_decoupling() -> dict:
                     WHERE filled = 1 AND strength IN ('Strong', 'Moderate')
                       AND signal_time >= %s
                     ORDER BY signal_time ASC
-                """, (model_deploy,))
+                """, (since,))
                 rows = cur.fetchall()
         finally:
             conn.close()
 
         if len(rows) < 20:
             return {"status": "insufficient_data",
-                    "detail": f"只有 {len(rows)} 筆 filled signals，需要 20+"}
+                    "detail": (f"只有 {len(rows)} 筆 filled signals，需要 20+"
+                               f"（樣本自 {since} 起算：confidence 公式在"
+                               f" {CONFIDENCE_EPOCH[:10]} 換了分母，之前的分數"
+                               f"不同尺度，不可混算）")}
 
         df = pd.DataFrame(rows)
         df["confidence"] = df["confidence"].astype(float)

@@ -205,16 +205,27 @@ def main() -> int:
     # green (Spearman is shift-invariant). quarterly_revalidation 2b now
     # checks the pred level monthly; this weekly line watches the SYMPTOM
     # so the alarm rings within days, not at month-end.
+    #
+    # 2026-08-13: the window is also floored at DECODE_EPOCH.  Bars decoded
+    # before it were ranked against an in-sample seed that put the DOWN cutoff
+    # below the model's reachable output — a 95:5 split there is the FIXED
+    # defect's echo, not evidence about the decode running now.  Left
+    # unfloored this line would have paged every week until the 21d window
+    # rolled past 08-12, training the operator to ignore it (and it is the
+    # fast-path alarm for exactly this failure).  It goes quiet by design
+    # until enough post-fix signals exist to judge.
     try:
         import shared.db as _sdb
+        from indicator.model_version import DECODE_EPOCH, sample_floor
+        _since = sample_floor(DECODE_EPOCH)
         _conn = _sdb.get_db_conn()
         try:
             with _conn.cursor() as _cur:
                 _cur.execute(
                     "SELECT direction, COUNT(*) n FROM tracked_signals "
                     "WHERE strength IN ('Strong','Moderate') "
-                    "AND signal_time >= DATE_SUB(NOW(), INTERVAL 21 DAY) "
-                    "GROUP BY direction")
+                    "AND signal_time >= GREATEST(DATE_SUB(NOW(), INTERVAL 21 DAY), %s) "
+                    "GROUP BY direction", (_since,))
                 _cnt = {r["direction"]: int(r["n"]) for r in _cur.fetchall()}
         finally:
             _conn.close()
@@ -227,7 +238,22 @@ def main() -> int:
                 _ln += "  << ONE-SIDED >=85% - check pred level (revalidation 2b)"
             lines.append(_ln)
         else:
-            lines.append(f"signal balance 21d: n={_tot} (too few to judge)")
+            # Flooring the window created a new way to be blind: "not enough
+            # samples yet" and "the decode has stopped firing again" print the
+            # same line.  That is the failure mode this check exists to catch,
+            # so put a clock on the silence itself — at ~15-18 Strong/month
+            # plus Moderates, two weeks with almost nothing is not a quiet
+            # market, it is a decode that is not reaching either tail.
+            _elapsed = (datetime.now(timezone.utc)
+                        - datetime.strptime(_since, "%Y-%m-%d %H:%M:%S")
+                        .replace(tzinfo=timezone.utc)).days
+            _ln = f"signal balance: n={_tot} in {_elapsed}d since {_since}"
+            if _elapsed >= 14:
+                _ln += ("  << TOO QUIET - expected ~15-18 Strong/mo; check "
+                        "both tails are reachable (decode_replay.py / G5)")
+            else:
+                _ln += " (need 15; post-decode-fix sample accumulating)"
+            lines.append(_ln)
     except Exception as e:  # noqa: BLE001
         errors.append(f"signal_balance: {e}")
 
