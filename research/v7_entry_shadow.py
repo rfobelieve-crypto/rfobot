@@ -57,6 +57,16 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+try:
+    # The weekly clocks run this under Windows' cp950 console, where a single
+    # '✓' in the Strong summary raises UnicodeEncodeError *after* the work is
+    # done — the run dies at the last print and portfolio_clocks records
+    # `entry_shadow rc=1`, so the section silently vanishes from the report
+    # while looking like a job failure.  Same guard the cancel_* scripts use.
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 import pandas as pd
 import requests
 

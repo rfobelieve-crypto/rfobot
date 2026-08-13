@@ -560,6 +560,24 @@ def annotate_vhigh(log: dict) -> int:
 
 GATE_N = 1400          # same floor as Variant A's Gate F
 
+# Variants C/D were pre-registered 2026-08-09 (TODO §0.44) with their own
+# clock and their own floor: n >= 400 counted FROM THAT DAY.  Rows first seen
+# before it are the "既有基礎" the section explicitly excludes — C/D were
+# promoted to candidates *because* those rows looked good, so scoring them is
+# self-grading, the same error combo_watchlist.forward_only() exists to stop.
+# It matters here more than anywhere: on 2026-08-13 the unfiltered board read
+# C +0.0965 / CI-low +0.0097 and D +0.1021 / +0.0062 — both apparently through
+# the bar — while the true-forward cohorts were C +0.0068 / CI-low -0.0886
+# (n=117) and D +0.0283 / -0.1178 (n=68).  All of the edge sat in the
+# selection period, exactly like the 08-07 split (R∧Q +0.973 -> n=4 CI -0.206).
+CD_CLOCK = "2026-08-09"
+CD_GATE_N = 400
+
+
+def _since_cd_clock(pred):
+    """Score C/D on rows first seen after their registration day only."""
+    return lambda r: pred(r) and (r.get("first_seen_utc") or "") >= CD_CLOCK
+
 
 def gate_stats(log: dict, cohort=None) -> dict:
     """Structured gate progress — same arithmetic as Gate F: day-clustered
@@ -616,14 +634,20 @@ def gate_progress(log: dict) -> str:
     out = (f"Variant B: n={s['n_closed']}/{s['floor']} meanR={s['mean_r']:+.4f} "
            f"clustered-CI-low={s['ci_low']:+.4f} -> "
            f"{'PASS' if s['status'] == 'PASS' else 'accumulating'}")
-    c = gate_stats(log, is_variant_c)
-    if c["n_closed"]:
-        out += (f" | C(B∧收回): n={c['n_closed']} meanR={c['mean_r']:+.4f} "
-                f"CI-low={c['ci_low']:+.4f}")
-    d = gate_stats(log, is_variant_d)
-    if d["n_closed"]:
-        out += (f" | D(C∧量能高): n={d['n_closed']} meanR={d['mean_r']:+.4f} "
-                f"CI-low={d['ci_low']:+.4f}")
+    # C/D on their own clock and their own floor (TODO §0.44).  The pre-clock
+    # rows are shown only as `base`, never mixed into the scored figure —
+    # printing the pooled number made both look through the bar while their
+    # true-forward CI was deeply negative.
+    for label, pred in (("C(B∧收回)", is_variant_c),
+                        ("D(C∧量能高)", is_variant_d)):
+        st = gate_stats(log, _since_cd_clock(pred))
+        base = gate_stats(log, pred)["n_closed"] - st["n_closed"]
+        if st["n_closed"]:
+            out += (f" | {label}: n={st['n_closed']}/{CD_GATE_N} since {CD_CLOCK} "
+                    f"meanR={st['mean_r']:+.4f} CI-low={st['ci_low']:+.4f}"
+                    f" (base {base} excluded)")
+        else:
+            out += f" | {label}: 0/{CD_GATE_N} since {CD_CLOCK} (base {base} excluded)"
     e = gate_stats(log, variant_e_pred(log))
     if e["n_closed"]:
         out += (f" | E(BTC·OI↓∧CVD順破∧清算高): n={e['n_closed']} "
