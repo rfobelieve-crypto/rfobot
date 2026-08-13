@@ -616,7 +616,15 @@ Dual XGBoost 架構：Direction Regressor + Magnitude Regressor，獨立管線�
 ### 信號生成
 - Direction: 500-bar rolling percentile 解碼，top 5% → Strong UP，top 15% → Moderate UP（DOWN 同理）
 - Absolute |pred| floor (Strong=0.0008, Moderate=0.0005)：低 vol regime 保險，rolling cutoff 比 floor 寬鬆時 floor 接管（2026-05-09 加入）
-- Confidence = `min(|pred|/Strong_cutoff, 1.0)^0.6 × 100`（純 |pred| 公式，2026-05-09 移除 mag bonus 因為 OOS 顯示高 mag bar 在模型失靈區）
+- Confidence = `min(|pred|/Strong_cutoff, 1.0)^0.6 × 100`（純 |pred| 公式，2026-05-09 移除 mag bonus 因為 OOS 顯示高 mag bar 在模型失靈區）。
+  **Strong_cutoff 是「該 bar 自己那一側」的有效門檻（含 floor 與 regime penalty），
+  2026-08-13 修正**——原本取 `max(|up|,|dn|)` 的**原始**分位數，buffer 一偏斜就
+  用寬的那側去量窄的那側：08-13 的實測 buffer 下，剛觸發 Strong DOWN 的 bar 只拿
+  54.4 分（顯示門檻是 80），鏡像的 UP 卻是 100。tier 判定一直是對的，是**印在它
+  旁邊的數字**在跟它打架，而且只打擊空側——系統賺錢的那側。現在的不變式：
+  **tier=Strong ⟺ confidence=100**（`tests/test_inference.py::TestConfidenceReferenceIsOwnSide`
+  釘住，反向證明過）。注意 confidence 的分佈在 08-13 有定義斷點，
+  `alpha_decay_monitor.check_confidence_wr_decoupling()` 跨越此點的窗口會混到兩種定義
 - Strong ≥ 80, Moderate ≥ 65, Weak < 65（顯示用，實際 tier 觸發看 |pred| vs cutoff）
 - Hysteresis + Cooldown
 

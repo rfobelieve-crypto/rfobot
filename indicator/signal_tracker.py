@@ -1,8 +1,16 @@
 """
 Signal performance tracker — tracks Strong + Moderate directional signals.
 
-Records signals with confidence >= 65 (Moderate+) and auto-backfills
-4h outcomes from indicator_history. Provides win rate reports by tier.
+Records every Strong/Moderate directional signal and auto-backfills 4h
+outcomes from indicator_history. Provides win rate reports by tier.
+
+The gate is the TIER (app.py: `strength in ("Strong","Moderate")`), not the
+confidence score — this docstring used to claim `confidence >= 65` and that
+was never the condition.  It matters: confidence is a display scaling of
+|pred| against the Strong cutoff, and under a skewed buffer the weak side's
+score can sit below 65 while the tier is legitimately Moderate (2026-08-13).
+Had confidence actually gated recording, Gate A's sample would have been
+silently biased against whichever side the model was drifting away from.
 """
 from __future__ import annotations
 

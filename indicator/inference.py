@@ -412,7 +412,28 @@ class IndicatorEngine:
             # (sign_acc 47.9%, IC ~0), and the bonus systematically pushed
             # those bars into high-confidence, producing the alpha-decay
             # confidence-WR inversion (high WR=48% < low WR=67%).
-            ref = max(abs(up_strong), abs(dn_strong), 1e-6)
+            # 2026-08-13: the reference is the Strong cutoff ON THIS BAR'S OWN
+            # SIDE, after floor + regime penalty — i.e. the exact number the
+            # tier decision above compared against.  It used to be
+            # max(|up_strong|, |dn_strong|) on the RAW quantiles, which breaks
+            # in two ways once the buffer is skewed (and a live buffer skews
+            # whenever the model's output level drifts — see mistake.md
+            # 2026-08-08 / 08-11):
+            #   * the wider tail wins the max(), so the narrow side is scored
+            #     against a cutoff it never has to clear.  With the 08-13
+            #     buffer (up +0.002764 / dn -0.001002) a bar that had just
+            #     triggered Strong DOWN scored 54.4 — below the 80 that the
+            #     UI calls Strong — while the mirror-image UP bar scored 100.
+            #     The tier was right and the number next to it disagreed, on
+            #     the exact side this system makes its money (SHORT +37.6 bps
+            #     vs LONG -26.0 bps over 19 closed trades).
+            #   * floor and contra-trend penalty were skipped entirely, so a
+            #     regime-suppressed signal (2.5x harder to fire) was scored as
+            #     if it had cleared the easy threshold.
+            # Now "confidence 100" means one thing on both sides: this bar sits
+            # at or beyond its own Strong threshold.
+            ref = up_strong_eff if p >= 0 else abs(dn_strong_eff)
+            ref = max(ref, 1e-6)
             confidence[i] = float(np.clip(
                 min(abs_p / ref, 1.0) ** 0.6 * 100, 0, 100))
 

@@ -6,6 +6,26 @@
 
 ## 當前任務（2026-07-16 更新）
 
+### 0.0 Magnitude 的 warmup buffer 仍是 in-sample seed（2026-08-13 盤點發現，未修）
+
+08-11 修 direction buffer 時做了全系統掃描，找到**同一個病的第二個實例**：
+`training_stats.json::pred_history`（mag 的 expanding-percentile buffer）現在
+仍有 **300 筆 in-sample 種子**（mean +1.78 σ 單位）。`_persist_pred_buffer`
+只存 dir、`_rehydrate_pred_buffer` 只重建 dir——mag 這條**從來沒有被持久化過、
+也沒有從 DB 重建**，每次 Railway 部署照樣重置回種子，跟 dir 側三個月的病同構。
+
+**為什麼判定為可以先放著**（不是忘了）：
+- 單尾（`|pred|` 的 expanding percentile），失效方式是「分數整體偏高/偏低」，
+  不會出現 dir 那種「一側算術上不可達」的死鎖
+- `mag_score` **不進任何交易決策**：`use_mag_gate=False`，grep 過全 repo，
+  它只在 `inference.py` 內部產生後供圖表面板顯示
+- 告警裡的 `Mag: N.NNx` 是 `mag_pred` 本身（另一條路徑），不是 mag_score
+
+**修之前要先解決的障礙**：DB 的 `indicator_history.mag_pred` 存的是**已經
+× realized_vol 還原成報酬尺度**的值，而 buffer 吃的是 **σ 單位**的原始輸出，
+後者沒有落庫。所以照 dir 那樣「從 DB 重建」在現況下重建不出來——要先讓
+σ 單位的預測落庫（新欄位或新表），才談得上修。
+
 ### 0. 撤單劇本偵測器已上線（2026-07-16）
 `market_data/tasks/cancel_playbook_watcher.py` 掛進 Service 2：機器前瞻記錄
 撤單劇本事件（凍結定義 v1-2026-07-16：吸收/真破/真空/雙側避險）→

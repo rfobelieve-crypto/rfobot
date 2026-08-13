@@ -452,3 +452,86 @@ class TestWarmupSilenceAndReachability:
         assert (judged <= dn).sum() > 0 and (judged >= up).sum() > 0, (
             "a live-grown buffer must leave both tails reachable even under "
             "a drifting level")
+
+
+@pytest.mark.skipif(not HAS_MODEL_FILES,
+                    reason="Model artifacts not found in dual_model/")
+class TestConfidenceReferenceIsOwnSide:
+    """confidence must be scaled by the cutoff the bar actually had to clear.
+
+    2026-08-13.  It was scaled by max(|up_cutoff|, |dn_cutoff|) on the RAW
+    quantiles.  Once the buffer skews — which is what a drifting output level
+    does to a live-grown buffer (mistake.md 2026-08-08 / 08-11) — the wider
+    tail wins that max() and the narrow side gets measured against a threshold
+    it never has to clear.  On the live 08-13 buffer (up +0.002764 /
+    dn -0.001002) a bar that had just triggered Strong DOWN scored 54.4 while
+    its mirror-image UP bar scored 100: the tier was right and the number
+    printed next to it in the Telegram alert disagreed, on the side this
+    system earns on (SHORT +37.6 bps vs LONG -26.0 bps over 19 closed trades).
+    The raw quantiles also skipped the absolute floor and the contra-trend
+    penalty that the tier decision does apply.
+
+    The invariant below follows directly from using the bar's OWN effective
+    cutoff and holds on both sides regardless of skew: a bar is Strong exactly
+    when |pred| >= its own Strong cutoff, so the ratio saturates and the score
+    is 100.  Reverting `ref` to the old max() turns these red on the DOWN side.
+    """
+
+    class _StubDir:
+        """Deterministic direction head so both tails are guaranteed to fire."""
+
+        def __init__(self, vals):
+            self._vals = np.asarray(vals, dtype=float)
+
+        def predict(self, X):
+            return self._vals[:len(X)]
+
+    def _skewed_run(self, features):
+        """Judge a wide sweep of predictions against a right-skewed buffer.
+
+        The buffer's centre sits well above zero, so |dn_cutoff| ends up far
+        smaller than up_cutoff — the exact asymmetry that produced the 54.4.
+        """
+        from collections import deque
+        from indicator.inference import IndicatorEngine
+        eng = IndicatorEngine()
+
+        rng = np.random.default_rng(20260813)
+        buf = rng.normal(0.00074, 0.00102, eng.dir_pct_window)   # measured 08-13 shape
+        eng.dir_pred_history = deque(buf.tolist(), maxlen=eng.dir_pct_window)
+
+        sweep = np.linspace(-0.006, 0.006, len(features))
+        eng.dual_dir_model = self._StubDir(sweep)
+        return eng.predict(features, update_history=False)
+
+    def test_both_tails_fire_strong(self, sample_features_df):
+        """Guard against a vacuous pass — without both sides there is nothing to compare."""
+        out = self._skewed_run(sample_features_df)
+        strong = out[out["strength_score"] == "Strong"]
+        assert set(strong["pred_direction"]) == {"UP", "DOWN"}, (
+            f"need Strong on both sides; got {set(strong['pred_direction'])}")
+
+    def test_every_strong_bar_saturates_confidence(self, sample_features_df):
+        """Strong means |pred| cleared its own cutoff, so the ratio saturates."""
+        out = self._skewed_run(sample_features_df)
+        strong = out[out["strength_score"] == "Strong"]
+        off = strong[strong["confidence_score"] < 99.99]
+        assert off.empty, (
+            "a Strong bar was scored against a cutoff it never had to clear:\n"
+            f"{off[['pred_return_4h', 'pred_direction', 'confidence_score']]}")
+
+    def test_down_side_not_discounted_against_up(self, sample_features_df):
+        """The defect was strictly one-sided: DOWN ~54 while UP ~100."""
+        out = self._skewed_run(sample_features_df)
+        strong = out[out["strength_score"] == "Strong"]
+        worst = strong.groupby("pred_direction")["confidence_score"].min()
+        assert abs(worst["UP"] - worst["DOWN"]) < 0.01, (
+            f"one side is measured against the other's threshold: {worst.to_dict()}")
+
+    def test_moderate_stays_below_strong(self, sample_features_df):
+        """Sanity on the scale's direction: Moderate must not reach saturation."""
+        out = self._skewed_run(sample_features_df)
+        moderate = out[out["strength_score"] == "Moderate"]
+        assert len(moderate) > 0, "no Moderate bars — this check would be vacuous"
+        assert (moderate["confidence_score"] < 99.99).all()
+        assert (moderate["confidence_score"] > 0).all()
