@@ -257,6 +257,55 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         errors.append(f"signal_balance: {e}")
 
+    # 2e-b ── absolute-floor headroom (the RESIDUAL drift vector) ────────
+    # 2026-08-14.  The live-grown buffer recentres the rolling cutoffs, so
+    # level drift no longer turns the decode one-sided through THAT path.
+    # But ABS_FLOOR_STRONG (±0.0008) is absolute and does NOT recentre: if
+    # the model's output mean walks above ~(-floor + 1.96*std), the DOWN
+    # cutoff is taken over by the floor and DOWN starves again — the same
+    # symptom as 2026-08-08, through the one piece the buffer fix cannot
+    # reach.  2e/§2b would catch the symptom in days-to-a-month; this line
+    # watches the CAUSE directly every week, with the distance quantified.
+    try:
+        import numpy as _np
+        import shared.db as _sdb
+        _conn = _sdb.get_db_conn()
+        try:
+            with _conn.cursor() as _cur:
+                _cur.execute(
+                    "SELECT pred_return_4h p FROM indicator_history "
+                    "WHERE pred_return_4h IS NOT NULL AND model_version = ("
+                    "  SELECT model_version FROM indicator_history "
+                    "  WHERE pred_return_4h IS NOT NULL "
+                    "  ORDER BY dt DESC LIMIT 1) "
+                    "ORDER BY dt DESC LIMIT 200")
+                _v = _np.array([float(r["p"]) for r in _cur.fetchall()])
+        finally:
+            _conn.close()
+        if len(_v) >= 50:
+            _FLOOR = 0.0008          # ABS_FLOOR_STRONG (indicator/inference.py)
+            _dn = float(_np.quantile(_v, 0.025))
+            _up = float(_np.quantile(_v, 0.975))
+            _std = float(_v.std()) or 1e-9
+            # headroom: how many std the mean can still walk (either way)
+            # before a floor takes over that side's rolling cutoff
+            _room_dn = ((-_FLOOR + 1.96 * _std) - float(_v.mean())) / _std
+            _room_up = (float(_v.mean()) - (_FLOOR - 1.96 * _std)) / _std
+            _room = min(_room_dn, _room_up)
+            _side = "DOWN" if _room_dn <= _room_up else "UP"
+            _ln = (f"floor headroom: mean {_v.mean():+.6f} "
+                   f"cutoffs {_dn:+.6f}/{_up:+.6f} "
+                   f"room {_room:+.2f} std ({_side} side nearest)")
+            if _dn > -_FLOOR or _up < _FLOOR:
+                _ln += "  << FLOOR BINDING - one tail is being choked NOW"
+            elif _room < 0.3:
+                _ln += "  << <0.3 std to floor takeover - level walking away"
+            lines.append(_ln)
+        else:
+            lines.append(f"floor headroom: n={len(_v)} preds (need 50)")
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"floor_headroom: {e}")
+
     # 2f ── V7 entry-execution shadow refresh (frozen 2026-08-04) ────────
     # The forward counter only accumulates when the script runs; it had no
     # scheduler until 2026-08-08 (79h stale when caught). Weekly is enough:
