@@ -306,6 +306,45 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         errors.append(f"floor_headroom: {e}")
 
+    # 2e-d ── Strong fire-rate vs design (2026-08-18) ───────────────────
+    # The 08-13→08-17 DOWN avalanche fired Strong on 21% of bars against a
+    # ~5% two-tailed design: a rank-vs-self decode under a fast output-level
+    # walk over-fires on the walk side while the other tail sits transiently
+    # unreachable (the 200-bar window needs ~8d to roll the old level out).
+    # 2e catches the direction share; this line catches the RATE — the two
+    # can fail independently (a balanced 20% fire-rate is still a sick
+    # decode).  Alert at >2x design.
+    try:
+        import shared.db as _sdb
+        from indicator.model_version import DECODE_EPOCH, sample_floor
+        _since = sample_floor(DECODE_EPOCH)
+        _conn = _sdb.get_db_conn()
+        try:
+            with _conn.cursor() as _cur:
+                _cur.execute(
+                    "SELECT COUNT(*) n FROM indicator_history "
+                    "WHERE dt >= GREATEST(DATE_SUB(NOW(), INTERVAL 21 DAY), %s)",
+                    (_since,))
+                _bars = int(_cur.fetchone()["n"])
+                _cur.execute(
+                    "SELECT COUNT(*) n FROM tracked_signals "
+                    "WHERE strength='Strong' AND signal_time >= "
+                    "GREATEST(DATE_SUB(NOW(), INTERVAL 21 DAY), %s)",
+                    (_since,))
+                _n_strong = int(_cur.fetchone()["n"])
+        finally:
+            _conn.close()
+        if _bars >= 48:
+            _rate = 100.0 * _n_strong / _bars
+            _ln = f"strong fire-rate: {_n_strong}/{_bars} bars = {_rate:.0f}% (design ~5%)"
+            if _rate > 10.0:
+                _ln += ("  << OVER-FIRING >2x design - output level walking; "
+                        "tier semantics diluted (self-limits in ~8d unless "
+                        "the walk continues)")
+            lines.append(_ln)
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"fire_rate: {e}")
+
     # 2e-c ── crowd-strategy battery (display-only, §0.49c) ─────────────
     # 2026-08-17.  Textbook-default archetypes' trailing-30d paper P&L as
     # regime states.  Wired per the frozen registration (2 of 3 predictions
