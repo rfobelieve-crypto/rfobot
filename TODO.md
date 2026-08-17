@@ -26,7 +26,7 @@
 後者沒有落庫。所以照 dir 那樣「從 DB 重建」在現況下重建不出來——要先讓
 σ 單位的預測落庫（新欄位或新表），才談得上修。
 
-### 0.49e 網站同步（待辦，依 2026-07-23 同步規則）
+### 0.49e 網站同步（✅ 完成 2026-08-17）
 
 生存條件層是新研究結論上牆，須同步 product-site（分支 master）：
 dashboard 加「生存條件」卡片——三個儀表現值（ADX regime + TRENDING
@@ -35,6 +35,7 @@ dashboard 加「生存條件」卡片——三個儀表現值（ADX regime + TRE
 agent 側加一個讀 clocks 產物或即時算的 endpoint——注意 agent-boundary：
 純讀 DB/快取計算可以，不得 import 交易路徑）。公開面規則照舊：只出
 狀態與百分比，不出部位與金額。TG bot 的 /clocks 類指令若有也帶上。
+**完成記錄**：鏈路 = `weather_station_publish.py`（搭 SweepShadow 每小時班車）→ `weather_station` 表 → agent `/public/weather-station`（已上線回 200）→ 網站 `WeatherStationCard`（dashboard，V7FilterCard 下方，證據等級 chip 照規則渲染）。product-site commit ee0dffe。TG bot 未做（低優先，另議）。
 
 ### 0.49 生存條件卡（2026-08-17 預註冊，跑數之前凍結）——「策略何時失效」研究線
 
