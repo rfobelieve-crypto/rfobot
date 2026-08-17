@@ -348,8 +348,15 @@ def main() -> int:
             if _s:
                 _tr_n += 1
                 _tr_coins += 1 if list(_s.values())[-1] == "TRENDING" else 0
+        # 2026-08-17 §0.49f: PSAR took the V7 trend seat from SMA50/200 in
+        # the pre-registered head-to-head (narrower CI, point no worse).
+        from research.crowd_battery3 import (
+            paid_states_from_pos as _ps_from, pos_psar as _psar)
+        _ps = _ps_from(_bars, _psar(_bars))
+        _trend_psar = ("PAID" if list(_ps.values())[-1] > 0 else "STARVED") \
+            if _ps else "?"
         _ln = (
-            f"crowd battery (BTC): trend {_last.get('trend','?')} / "
+            f"crowd battery (BTC): trend(PSAR) {_trend_psar} / "
             f"mr {_last.get('mr','?')} / breakout {_last.get('breakout','?')}"
             f" | ADX {_btc_adx}, TRENDING coins {_tr_coins}/{_tr_n}"
             f" | breakout-PAID coins {_bo_paid}/{_bo_n}")
