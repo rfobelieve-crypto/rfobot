@@ -605,6 +605,57 @@ def _sweep_status_payload() -> dict:
             "not financial advice."}
 
 
+_weather_cache: dict = {"data": None, "ts": 0.0}
+_WEATHER_CACHE_TTL_S = 300.0
+
+
+def _weather_payload() -> dict:
+    """Read the weather-station snapshot the quant system persists hourly.
+
+    Boundary note (2026-08-17): the agent only SELECTs — the battery is
+    computed and written by research/weather_station_publish.py on the
+    quant side.  Computing it here would need kline history the DB does
+    not hold, which is exactly the reach-into-the-trading-system pattern
+    agent-boundary.md forbids."""
+    import json as _json
+    from shared.db import get_db_conn
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT payload, updated_at FROM weather_station "
+                        "WHERE id = 1")
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return {"error": "weather station snapshot not yet published"}
+    data = _json.loads(row["payload"])
+    data["asof_utc"] = str(row["updated_at"])
+    return data
+
+
+@mcp.custom_route("/public/weather-station", methods=["GET"])
+async def public_weather_station_route(request: Request) -> JSONResponse:
+    """Crowd-strategy weather station for the site dashboard — which
+    popular-strategy crowds the market is feeding/starving, with each
+    gauge's evidence tier.  States and ratios only; no sizes, no dollars,
+    no model internals."""
+    now = time.monotonic()
+    if (_weather_cache["data"] is None
+            or now - _weather_cache["ts"] > _WEATHER_CACHE_TTL_S):
+        try:
+            data = await anyio.to_thread.run_sync(_weather_payload)
+        except Exception as e:  # noqa: BLE001 — degrade to 503, never crash
+            data = {"error": f"weather station unavailable: {type(e).__name__}"}
+        _weather_cache["data"] = data
+        _weather_cache["ts"] = now
+    payload = _weather_cache["data"]
+    resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 @mcp.custom_route("/public/sweep-status", methods=["GET"])
 async def public_sweep_status_route(request: Request) -> JSONResponse:
     now = time.monotonic()
