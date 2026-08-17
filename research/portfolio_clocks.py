@@ -306,6 +306,38 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         errors.append(f"floor_headroom: {e}")
 
+    # 2e-c ── crowd-strategy battery (display-only, §0.49c) ─────────────
+    # 2026-08-17.  Textbook-default archetypes' trailing-30d paper P&L as
+    # regime states.  Wired per the frozen registration (2 of 3 predictions
+    # passed on sign + breadth: SF eats when the breakout crowd starves,
+    # 7/9 coins; V7 starves when the trend crowd feasts).  DISPLAY ONLY —
+    # CIs still include zero, alerting needs CI-grade evidence.
+    try:
+        from research.crowd_battery import paid_states as _cb_states
+        from research.survival_cards import CACHE as _cb_cache, SC as _cb_sc
+        _bars = _cb_sc.load_csv(str(_cb_cache / "BTCUSDT_1h.csv"))
+        _st = _cb_states(_bars)
+        _last = {a: ("PAID" if list(v.values())[-1] > 0 else "STARVED")
+                 for a, v in _st.items() if v}
+        _bo_paid = 0
+        _bo_n = 0
+        for _sym in ("BTC", "ETH", "SOL", "BNB", "XRP",
+                     "DOGE", "ADA", "LINK", "AVAX"):
+            _fp = _cb_cache / f"{_sym}USDT_1h.csv"
+            if not _fp.exists():
+                continue
+            _s = _cb_states(_cb_sc.load_csv(str(_fp)))["breakout"]
+            if _s:
+                _bo_n += 1
+                _bo_paid += 1 if list(_s.values())[-1] > 0 else 0
+        lines.append(
+            f"crowd battery (BTC): trend {_last.get('trend','?')} / "
+            f"mr {_last.get('mr','?')} / breakout {_last.get('breakout','?')}"
+            f" | breakout-PAID coins {_bo_paid}/{_bo_n}"
+            f" (SF headwind when high; V7 headwind when trend PAID)")
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"crowd_battery: {e}")
+
     # 2f ── V7 entry-execution shadow refresh (frozen 2026-08-04) ────────
     # The forward counter only accumulates when the script runs; it had no
     # scheduler until 2026-08-08 (79h stale when caught). Weekly is enough:
