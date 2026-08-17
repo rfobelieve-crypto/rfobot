@@ -330,11 +330,32 @@ def main() -> int:
             if _s:
                 _bo_n += 1
                 _bo_paid += 1 if list(_s.values())[-1] > 0 else 0
-        lines.append(
+        # ADX joined 2026-08-17 (§0.49d): the crowd's own regime gauge beat
+        # trend_z head-to-head on BOTH strategies (SF: CI width 0.096 vs
+        # 0.219, breadth 8/9 vs 6/9, CI clear of zero -> the line's first
+        # tier-2 result).  RANGING = SF tailwind / TRENDING = SF headwind.
+        from research.crowd_battery2 import adx_state as _adx
+        _a = _adx(_bars)
+        _btc_adx = list(_a.values())[-1] if _a else "?"
+        _tr_coins = 0
+        _tr_n = 0
+        for _sym in ("BTC", "ETH", "SOL", "BNB", "XRP",
+                     "DOGE", "ADA", "LINK", "AVAX"):
+            _fp = _cb_cache / f"{_sym}USDT_1h.csv"
+            if not _fp.exists():
+                continue
+            _s = _adx(_cb_sc.load_csv(str(_fp)))
+            if _s:
+                _tr_n += 1
+                _tr_coins += 1 if list(_s.values())[-1] == "TRENDING" else 0
+        _ln = (
             f"crowd battery (BTC): trend {_last.get('trend','?')} / "
             f"mr {_last.get('mr','?')} / breakout {_last.get('breakout','?')}"
-            f" | breakout-PAID coins {_bo_paid}/{_bo_n}"
-            f" (SF headwind when high; V7 headwind when trend PAID)")
+            f" | ADX {_btc_adx}, TRENDING coins {_tr_coins}/{_tr_n}"
+            f" | breakout-PAID coins {_bo_paid}/{_bo_n}")
+        if _tr_n and _tr_coins / _tr_n > 0.5:
+            _ln += "  << ADX TRENDING majority - SF headwind (tier-2, B-P9)"
+        lines.append(_ln)
     except Exception as e:  # noqa: BLE001
         errors.append(f"crowd_battery: {e}")
 
