@@ -234,6 +234,34 @@ ERA1 n=717 WR 60.0% / ERA2 n=79 WR 51.9%，總差 −8.1pp 的分解：
 **接線**：clocks 2e-c 加 ADX 狀態（BTC + core9 TRENDING 幣數）。B-P9
 是二級證據，TRENDING 過半時的 SF 逆風標記有告警資格。
 
+### 0.5 SF 上線工程軌（2026-08-18 使用者拍板：工程並行＋守住判決）
+
+**決策**：使用者認為 SF 已趨穩、想量化上線。數據裁定：穩的是 R∧V 組合
+（CI 下緣 +0.087↑），主 gate B 仍在零下（−0.016，隨樣本走弱）。選項
+攤開後使用者選**工程並行＋守住判決**——統計 gate 一個不鬆（B 1400 筆
+判決 ~3 週後、以 ~250 筆/週的速度），工程現在開跑，讓 gate 通過成為
+唯一剩下的閘。這同時拍板了 PORTFOLIO_RISK_FRAMEWORK §5 開放問題 3
+（P1 提前並行，但用零接線方式）。
+
+**里程碑**
+- **M1 ✅（2026-08-18）**：`pf_intents`/`pf_positions` 建表 +
+  `research/pf_mirror.py` 每小時鏡射 V7 帳（21 筆入帳，net_r 同構可比）。
+  **零 live 代碼改動**——不走 executor dual-write（AST no-wire 測試
+  完好），用 (src_table, src_id) 冪等 upsert 從外面讀。
+- **M2（下一步，單獨小心做）**：shadow log **加 side 欄**（additive，
+  沿 2026-07-28「additive fields」先例）。乾跑第一天抓到的真缺口：
+  **影子帳沒記錄方向，執行層無法從它下單**。level_kind（session/
+  pdh_pdl/swing/pwh_pwl）不編碼高低側，非推導可得。動的是凍結記帳
+  腳本，改動只准 append 欄位、舊列照讀。
+- **M3**：SF 乾跑 intent 產生器——每小時把新 fill 的 B 變體轉 Intent
+  → `risk_engine.decide()` → `pf_intents` 落庫（含拒絕原因）。**誠實
+  反映帳戶現況**：CAP-2 仍 HALT 中 → intents 會被 `account_halted`
+  拒絕，這是事實不是 bug——資金基準解決本來就在上線關鍵路徑上。
+- **M4（gate 過後才動）**：OKX 執行路徑——core9 合約規格、stop-limit
+  進場（sweep_core 的 retest-touch 語意）、Scenario A 成本假設驗證。
+- **M5 上線前清單**：gate 判決 GO + 資金基準解決（CAP-2）+ M2-M4 +
+  首筆人工確認（慣例）+ 天氣站 ADX 顯示在操作面（生存層首次接生產）。
+
 ### 0.49f 天氣站 v3 擴編（2026-08-17 預註冊，使用者選 4 個群眾，跑數之前凍結）
 
 **凍結機械化（群眾預設，一個不調）**
