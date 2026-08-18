@@ -55,13 +55,13 @@ def collect() -> list[dict]:
             continue
         bars = SC.load_csv(str(p))
         # swing, via the frozen engine
-        for (f_ts, x_ts, R, lvl, atr, st_, pc) in SC.backtest_symbol(bars):
+        for (f_ts, x_ts, R, lvl, atr, st_, pc, *_) in SC.backtest_symbol(bars):
             if pc <= PIERCE_MAX:
                 out.append({"sym": sym, "kind": "swing", "f": f_ts, "x": x_ts,
                             "r": LT.net(R, lvl, atr)})
         lv = LT.build_levels(bars)
         for kind in ("session", "pdh_pdl", "pwh_pwl"):
-            for (f_ts, x_ts, netr, pc, lvl, atr, st_) in LT.trade_levels(
+            for (f_ts, x_ts, netr, pc, lvl, atr, st_, *_) in LT.trade_levels(
                     bars, lv.get(kind, [])):
                 if pc <= PIERCE_MAX:
                     out.append({"sym": sym, "kind": kind, "f": f_ts,

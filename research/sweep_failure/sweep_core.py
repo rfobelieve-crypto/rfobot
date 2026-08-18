@@ -104,7 +104,8 @@ def detect_sweeps(bars):
 def backtest_symbol(bars):
     """Tradeable rules: retest-touch stop-entry at level, disaster stop,
     time exit. One position per symbol (non-overlapping). Returns trade list
-    [(fill_ts, exit_ts, R)] with R in disaster-stop units, costs included."""
+    [(fill_ts, exit_ts, R, lvl, A, stopped, pierce, side)] with R in
+    disaster-stop units, costs included."""
     n = len(bars)
     h = [b[H] for b in bars]
     l = [b[L] for b in bars]
@@ -157,8 +158,11 @@ def backtest_symbol(bars):
         # it enables the pre-registered shallow-pierce variant without touching
         # the frozen entry/exit rules.
         pierce = (h[j] - lvl if kd == 1 else lvl - l[j]) / A
+        # 2026-08-18 additive (M2, TODO §0.5): trade SIDE, the one thing the
+        # shadow log could not record and the execution layer cannot live
+        # without. d=+1 pierce-down-reverted -> LONG; d=-1 -> SHORT.
         trades.append((bars[fill][0], bars[exitbar][0], R, lvl, A, stopped,
-                       pierce))
+                       pierce, "LONG" if d == 1 else "SHORT"))
         last_exit = exitbar
     return trades
 

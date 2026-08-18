@@ -128,7 +128,7 @@ def pivot_strength_test():
             p = CACHE / f"{sym}USDT_1h.csv"
             if not p.exists():
                 continue
-            for (_t, _x, R, lvl, atr, _s, _pc) in SC.backtest_symbol(
+            for (_t, _x, R, lvl, atr, _s, _pc, *_) in SC.backtest_symbol(
                     SC.load_csv(str(p))):
                 rs.append(net(R, lvl, atr))
         s = stat(rs)

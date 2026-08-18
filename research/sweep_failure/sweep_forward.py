@@ -136,7 +136,7 @@ def rescore(trades, scen):
     """gross (fill_ts, exit_ts, R, lvl, A, stopped) -> net R list (same order)."""
     s = SCEN[scen]
     out = []
-    for fill_ts, exit_ts, r, lvl, atr, stopped, _pierce in trades:
+    for fill_ts, exit_ts, r, lvl, atr, stopped, _pierce, *_ in trades:
         legs = s["entry"] + (s["sexit"] if stopped else s["texit"])
         cost_r = legs / 1e4 * lvl / (SC.DIS * atr)
         out.append((fill_ts, r - cost_r))

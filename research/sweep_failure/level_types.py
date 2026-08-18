@@ -110,7 +110,7 @@ def build_levels(bars) -> dict[str, list[tuple[int, float, int]]]:
 
 
 def trade_levels(bars, levels) -> list[tuple]:
-    """(fill_ts, exit_ts, netR, pierce_atr, lvl, atr, stopped) under the frozen
+    """(fill_ts, exit_ts, netR, pierce_atr, lvl, atr, stopped, side) under the frozen
     entry/exit rules. Single source of truth: the shadow recorder and the gate
     scorer both call THIS, so the forward log cannot drift from what is scored."""
     n = len(bars)
@@ -157,7 +157,8 @@ def trade_levels(bars, levels) -> list[tuple]:
             last_exit = xb
             pierce = (h[j] - lvl if kd == 1 else lvl - lo[j]) / A
             out.append((bars[fill][0], bars[xb][0], net(R, lvl, A), pierce,
-                        lvl, A, R <= -1.0))
+                        lvl, A, R <= -1.0,
+                        "LONG" if d == 1 else "SHORT"))   # M2 additive
     return out
 
 

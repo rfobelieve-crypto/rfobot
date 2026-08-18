@@ -126,7 +126,12 @@ FIELDS = ["symbol", "universe", "level_kind", "first_seen_utc", "fill_ts",
           #                hypothesis' second stage (post-raid CVD flip),
           #                added 2026-08-02 when the operator caught the
           #                recording gap
-          "drv_q", "drv_liqburst", "drv_gap_oi", "v7_align", "drv_gap_cvd"]
+          "drv_q", "drv_liqburst", "drv_gap_oi", "v7_align", "drv_gap_cvd",
+          # M2 additive (2026-08-18, TODO §0.5): trade side from the
+          # frozen detection (swept high -> SHORT, swept low -> LONG).
+          # Old rows carry "" and are deterministically backfilled on
+          # later passes; gate arithmetic never reads it.
+          "side"]
 
 FLOW_BACKFILL_PER_RUN = 40      # cap 1m-kline fetch work per hourly run
 
@@ -704,17 +709,18 @@ def main() -> int:
             # LT's flat taker model first).
             evts: list[tuple] = [
                 ("swing", t[0], t[1], t[2],
-                 net_r(t[2], t[3], t[4], t[5]), t[6], t[3], t[4], t[5])
+                 net_r(t[2], t[3], t[4], t[5]), t[6], t[3], t[4], t[5], t[7])
                 for t in SC.backtest_symbol(bars)]
             lv = LT.build_levels(bars)
             for kind in ("session", "pdh_pdl", "pwh_pwl"):
-                for (f_ts, x_ts, netr, pc, lvl, atr, st_) in LT.trade_levels(
+                for (f_ts, x_ts, netr, pc, lvl, atr, st_, sd) in LT.trade_levels(
                         bars, lv.get(kind, [])):
                     gross, neta = lt_to_scen_a(netr, lvl, atr, st_)
-                    evts.append((kind, f_ts, x_ts, gross, neta, pc, lvl, atr, st_))
+                    evts.append((kind, f_ts, x_ts, gross, neta, pc, lvl, atr,
+                                 st_, sd))
 
             for (kind, fill_ts, exit_ts, gross, netv, pierce, lvl, atr,
-                 stopped) in evts:
+                 stopped, side) in evts:
                 if fill_ts < FREEZE_TS:
                     continue
                 key = (sym, kind, fill_ts)
@@ -726,9 +732,12 @@ def main() -> int:
                            "fill_utc": f"{datetime.fromtimestamp(fill_ts, timezone.utc):%Y-%m-%d %H:%M}",
                            "entry_px": f"{lvl:.6f}", "atr": f"{atr:.6f}",
                            "pierce_atr": f"{pierce:.4f}",
-                           "variant_b": int(pierce <= PIERCE_MAX_B)}
+                           "variant_b": int(pierce <= PIERCE_MAX_B),
+                           "side": side}
                     log[key] = row
                     new += 1
+                if not row.get("side"):
+                    row["side"] = side   # deterministic backfill of old rows
                 row.update({
                     "status": "CLOSED" if done else "OPEN",
                     "exit_ts": exit_ts if done else "",
