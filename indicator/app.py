@@ -1095,6 +1095,34 @@ def prediction_json():
     return jsonify(pred)
 
 
+@app.route("/raid-signals")
+def raid_signals_feed():
+    """Read-only recent sweep-shadow rows for downstream copy-trade executors
+    (GRIDOS tenant RaidBot, 2026-08-18). The recorder stays pure: no filtering
+    beyond 72h recency — consumers apply their own variant/universe cuts.
+    Changes nothing in the gate arithmetic or the shadow log itself."""
+    import csv as _csv
+    import time as _time
+    log_path = Path(__file__).resolve().parent.parent / "research" / "results" / "sweep_shadow_log.csv"
+    if not log_path.exists():
+        return jsonify({"error": "shadow log not present in this image"}), 501
+    try:
+        with open(log_path, newline="", encoding="utf-8") as f:
+            rows = list(_csv.DictReader(f))
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": str(e)}), 500
+
+    def _ts(s):
+        try:
+            return datetime.strptime(s, "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc).timestamp()
+        except Exception:
+            return 0.0
+
+    cutoff = _time.time() - 72 * 3600
+    out = [r for r in rows[-500:] if _ts(r.get("first_seen_utc", "")) >= cutoff]
+    return jsonify({"list": out, "n": len(out)})
+
+
 @app.route("/research/exit-variants", methods=["GET"])
 def research_exit_variants_api():
     """Run V7 exit-variants backtest.  Mobile-friendly admin endpoint.
