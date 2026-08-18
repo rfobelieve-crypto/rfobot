@@ -256,8 +256,21 @@ ERA1 n=717 WR 60.0% / ERA2 n=79 WR 51.9%，總差 −8.1pp 的分解：
   原因）。**首輪 48h 回填實證：51 候選 → 37 筆 `account_halted` 拒絕 +
   14 去重**——引擎對真實訊號流的第一批可稽核決策，且帳本誠實反映
   CAP-2 仍 HALT 的事實：資金基準解決就在上線關鍵路徑上。
-- **M4（gate 過後才動）**：OKX 執行路徑——core9 合約規格、stop-limit
-  進場（sweep_core 的 retest-touch 語意）、Scenario A 成本假設驗證。
+- **M4（下單程式碼 gate 過後才動；唯讀前置 ✅ 2026-08-18）**：
+  **可行性審計全綠**（`research/sf_m4_feasibility.py`，OKX 公開端點）：
+  (a) core9 全部有 live USDT 永續（含 BNB-USDT-SWAP，本來最擔心的）；
+  (b) 0.15% 風險 × 3.5 ATR 停損下逐幣 sizing 全部可行，lot 捨入誤差
+  最大 −7.7%（ETH @ $274 基準）遠低於 20% 紅線；
+  (c) 併發 5 的最壞名目只佔 2× equity cap 的 **23%**（$274 與 $777
+  兩種基準都是）——容量餘裕極大。
+  **進場機制凍結**：sweep_core 的 retest-touch stop-entry 語意 =
+  OKX **trigger（條件單）**——掃高後價格從上方回落至水位觸發 SHORT
+  （鏡像同理）。不是 resting limit（價在水位外側掛限價會立即成交在
+  錯誤的一側）。TTL = W=8 根（8h）未觸發即撤。
+  **剩餘（gate 過後）**：trigger 下單路徑 + facade 補齊（**facade-skip
+  教訓 ×3**：OkxClient 需補 algo-trigger 與逐幣槓桿設定的 passthrough，
+  AST 守衛測試會抓）、多幣對帳擴展、Scenario A 成本假設 vs 真實成交
+  的首批驗證。
 - **M5 上線前清單**：gate 判決 GO + 資金基準解決（CAP-2）+ M2-M4 +
   首筆人工確認（慣例）+ 天氣站 ADX 顯示在操作面（生存層首次接生產）。
 
