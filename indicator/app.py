@@ -3319,6 +3319,23 @@ def _depth_freshness_check():
         logger.exception("depth_freshness_check_error")
 
 
+def _run_sweep_shadow():
+    """Hourly sweep-shadow recorder run (subprocess so a crash can't take the
+    Flask worker down). No-op when research/ is not in the image."""
+    import subprocess
+    import sys as _sys
+    root = Path(__file__).resolve().parent.parent
+    script = root / "research" / "sweep_failure" / "shadow_engine.py"
+    if not script.exists():
+        return
+    try:
+        subprocess.run([_sys.executable, str(script)], cwd=str(root),
+                       timeout=1200, check=False,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("sweep_shadow_run_failed")
+
+
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -3333,6 +3350,16 @@ def start_scheduler():
     scheduler.add_job(_depth_freshness_check, "cron", minute="8,38",
                       misfire_grace_time=600, max_instances=1,
                       id="depth_freshness")
+
+    # Sweep-shadow recorder (2026-08-18): the hourly log used to accrue only
+    # on the operator's machine, so the in-image CSV behind /raid-signals went
+    # stale after every deploy. Run it in-container too — the engine is
+    # idempotent (keyed by symbol+fill_ts, incremental kline cache), so dual
+    # running with the operator's machine is harmless; first run after a
+    # deploy re-pulls klines and rebuilds the post-freeze rows.
+    scheduler.add_job(_run_sweep_shadow, "cron", minute="12",
+                      misfire_grace_time=900, max_instances=1,
+                      id="sweep_shadow")
 
     # Agent watchdog: quick sweep every hour at :15, full sweep every 4h at :20
     scheduler.add_job(_run_watchdog_quick, "cron", minute="15",
