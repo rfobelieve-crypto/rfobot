@@ -38,6 +38,26 @@ from research.crowd_battery3 import (  # noqa: E402
 from research.survival_cards import CACHE, CORE9, SC  # noqa: E402
 
 
+def _carry_state() -> str:
+    try:
+        from research.crowd_battery4 import carry_states
+        st = carry_states()
+        return list(st.values())[-1] if st else "UNKNOWN"
+    except Exception:
+        return "UNKNOWN"
+
+
+def _liq_bounce_state(btc_bars) -> str:
+    try:
+        from research.crowd_battery3 import paid_states_from_pos
+        from research.crowd_battery4 import liq_burst_hours, pos_liq_bounce
+        st = paid_states_from_pos(
+            btc_bars, pos_liq_bounce(btc_bars, liq_burst_hours()))
+        return _last(st)
+    except Exception:
+        return "UNKNOWN"
+
+
 def _last(states: dict) -> str:
     if not states:
         return "UNKNOWN"
@@ -99,6 +119,16 @@ def build_payload() -> dict:
             {"id": "funding", "label_zh": "資金費率反向",
              "label_en": "Funding contrarian",
              "value": fund if fund != "STARVED" else "DORMANT"},
+            # v4 (2026-08-18, §0.49g): carry richness is the most macro
+            # sensor on the board — THIN has held for the ENTIRE 12-month
+            # sample (7d-mean funding never crossed baseline), i.e. no
+            # crowded-long mania era yet; RICH appearing would be news.
+            {"id": "carry", "label_zh": "carry 農夫",
+             "label_en": "Carry farmers", "value": _carry_state()},
+            # liq-bounce data rides DailyCollect (daily 04:00) — up to a
+            # day stale by design; the gauge is regime-scale anyway.
+            {"id": "liq_bounce", "label_zh": "清算搶反彈",
+             "label_en": "Liq-bounce hunters", "value": _liq_bounce_state(btc)},
         ],
         "cadence": "hourly",
         "disclaimer": "Research display only. Not financial advice.",
