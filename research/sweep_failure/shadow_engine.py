@@ -245,13 +245,58 @@ def annotate_flow(log: dict, sym: str, bars) -> int:
     return done
 
 
+BOOTSTRAP_START_S = 1705795200   # 2024-01-21 00:00 UTC — 與操作者本機 cache 同窗
+
+
+def _bootstrap(sym: str, p: Path) -> Path | None:
+    """Container cold-start (2026-08-18): the cache used to exist only on the
+    operator's machine, so in-image scheduler runs found nothing and skipped
+    every symbol (/raid-signals stayed empty forever). Pull the full 1h window
+    once — same start as the operator's cache, same CSV format — then the
+    normal incremental refresh takes over. Purely data-layer; the FROZEN
+    backtest and gate arithmetic are untouched."""
+    CACHE.mkdir(parents=True, exist_ok=True)
+    rows, start = [], BOOTSTRAP_START_S * 1000
+    try:
+        while True:
+            req = urllib.request.Request(
+                f"{BASE}?symbol={sym}USDT&interval=1h&startTime={start}&limit=1000",
+                headers={"User-Agent": "sweep-shadow/1.0"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                d = json.loads(r.read().decode())
+            if not d:
+                break
+            now_ms = int(time.time() * 1000)
+            for k in d:
+                if int(k[6]) > now_ms:      # live bar
+                    continue
+                rows.append([int(k[0]) // 1000, float(k[1]), float(k[2]),
+                             float(k[3]), float(k[4]), float(k[5])])
+            if len(d) < 1000:
+                break
+            start = int(d[-1][0]) + 3_600_000
+            time.sleep(0.15)                # 禮貌限速
+    except Exception as e:  # noqa: BLE001
+        print(f"  {sym}: bootstrap failed ({e})")
+        if not rows:
+            return None
+    if not rows:
+        return None
+    with p.open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["time", "open", "high", "low", "close", "volume"])
+        w.writerows(rows)
+    print(f"  {sym}: bootstrap {len(rows)} bars")
+    return p
+
+
 def refresh(sym: str) -> Path | None:
     """Append new closed 1H bars to the cache. Never rewrites old bars —
     a revision by the exchange would show up as a shadow/backtest mismatch
     rather than being silently absorbed."""
     p = CACHE / f"{sym}USDT_1h.csv"
     if not p.exists():
-        return None
+        return _bootstrap(sym, p)
     rows = SC.load_csv(str(p))
     last = rows[-1][0]
     got = []
