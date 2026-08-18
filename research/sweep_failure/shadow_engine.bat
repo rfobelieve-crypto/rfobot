@@ -8,3 +8,6 @@ python research\weather_station_publish.py >> research\results\sweep_shadow_run.
 REM 2026-08-18 M1: unified ledger mirror (v7_okx_positions -> pf_positions,
 REM idempotent upsert, zero live-code change). See TODO §0.5.
 python research\pf_mirror.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-08-18 M3: dry-run intent flow (fresh variant-B fills -> risk engine
+REM -> pf_intents with decisions). No orders; decisions are the deliverable.
+python research\pf_dry_intents.py >> research\results\sweep_shadow_run.log 2>&1

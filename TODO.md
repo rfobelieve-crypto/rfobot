@@ -248,19 +248,33 @@ ERA1 n=717 WR 60.0% / ERA2 n=79 WR 51.9%，總差 −8.1pp 的分解：
   `research/pf_mirror.py` 每小時鏡射 V7 帳（21 筆入帳，net_r 同構可比）。
   **零 live 代碼改動**——不走 executor dual-write（AST no-wire 測試
   完好），用 (src_table, src_id) 冪等 upsert 從外面讀。
-- **M2（下一步，單獨小心做）**：shadow log **加 side 欄**（additive，
-  沿 2026-07-28「additive fields」先例）。乾跑第一天抓到的真缺口：
-  **影子帳沒記錄方向，執行層無法從它下單**。level_kind（session/
-  pdh_pdl/swing/pwh_pwl）不編碼高低側，非推導可得。動的是凍結記帳
-  腳本，改動只准 append 欄位、舊列照讀。
-- **M3**：SF 乾跑 intent 產生器——每小時把新 fill 的 B 變體轉 Intent
-  → `risk_engine.decide()` → `pf_intents` 落庫（含拒絕原因）。**誠實
-  反映帳戶現況**：CAP-2 仍 HALT 中 → intents 會被 `account_halted`
-  拒絕，這是事實不是 bug——資金基準解決本來就在上線關鍵路徑上。
+- **M2 ✅（2026-08-18）**：shadow log **加 side 欄**（additive，兩個凍結
+  核心的偵測層外傳，7 個 exact-arity 呼叫端補 `*_`）。迴歸：--gate
+  改動前後 diff 為空；side 覆蓋 2192/2243，舊列逐 pass 確定性回填。
+- **M3 ✅（2026-08-18）**：SF 乾跑 intent 產生器每小時上線——新 fill 的
+  B 變體轉 Intent → `risk_engine.decide()` → `pf_intents` 落庫（含拒絕
+  原因）。**首輪 48h 回填實證：51 候選 → 37 筆 `account_halted` 拒絕 +
+  14 去重**——引擎對真實訊號流的第一批可稽核決策，且帳本誠實反映
+  CAP-2 仍 HALT 的事實：資金基準解決就在上線關鍵路徑上。
 - **M4（gate 過後才動）**：OKX 執行路徑——core9 合約規格、stop-limit
   進場（sweep_core 的 retest-touch 語意）、Scenario A 成本假設驗證。
 - **M5 上線前清單**：gate 判決 GO + 資金基準解決（CAP-2）+ M2-M4 +
   首筆人工確認（慣例）+ 天氣站 ADX 顯示在操作面（生存層首次接生產）。
+
+### 0.49g 天氣站 v4 候選池（2026-08-18 使用者提供來源，未動工）
+
+使用者指定來源：https://github.com/paperswithbacktest/awesome-systematic-trading
+——系統性策略大全（含論文出處與回測庫），可挖掘的群眾原型遠多於目前 11 個。
+
+**開工前的紀律備忘（沿 v2/v3 規矩）**：
+- 挑「幣圈群眾真的在跑的」，不是「論文裡最漂亮的」——天氣站量的是
+  群眾行為不是策略品質；沒有散戶群眾在跑的學術策略，量它沒有意義
+- 每個候選先過機制審查分身分（受測 vs 感測器）；回歸家族已 0/4 不再
+  開受測格；趨勢/regime 席位已有在任者（ADX/Donchian/PSAR），新原型
+  只能以挑戰者打對頭
+- 受測格控量（多重比較預算）、預測與記分程式同 commit、§0.49d 兩級判準
+- 優先方向（依既有缺口）：幣圈原生群眾（清算/擠壓類）、carry/basis 類
+  （與 K 線原型不同源）、跨資產動量（若資料可得）
 
 ### 0.49f 天氣站 v3 擴編（2026-08-17 預註冊，使用者選 4 個群眾，跑數之前凍結）
 
