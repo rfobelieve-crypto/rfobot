@@ -266,6 +266,30 @@ ERA1 n=717 WR 60.0% / ERA2 n=79 WR 51.9%，總差 −8.1pp 的分解：
 使用者指定來源：https://github.com/paperswithbacktest/awesome-systematic-trading
 ——系統性策略大全（含論文出處與回測庫），可挖掘的群眾原型遠多於目前 11 個。
 
+**v4 首輪（2026-08-18 開工，跑數之前凍結）**
+
+來源庫誠實對照：幣圈區只有 2 個策略（Overnight Seasonality、Rebalancing
+Premium），carry 掛在 FX 區。首輪選 2 個受測（都對應真實幣圈群眾＋資料
+在手）＋1 個候選延後：
+
+- **CY 資金費率 carry 農夫**（庫的 carry 家族幣圈翻譯 = basis farming，
+  真實大群眾）。凍結：RICH = trailing 7d（168h ffill）平均 funding >
+  +0.01%/8h（Binance 基準費率），否則 THIN。
+  **CY-P1（受測）**：V7 Strong **DOWN** 勝率 RICH > THIN——carry 肥 =
+  多頭擁擠 = 空訊號的擠壓燃料（live 實測空側 edge 的機制候選）。UP 列
+  照報不下注。
+- **LB 清算搶反彈群眾**（幣圈原生優先缺口；庫裡沒有，註明）。凍結：
+  burst = 該小時多單清算 USD ≥ 3.0× trailing-24h 均值（3.0 沿
+  cancel_shock intensity 凍結先例）；群眾玩法 = burst 後 4 根 bar 持多
+  （搶刀反彈）。資料 cg_liq_agg_1h（BTC，2025-10 起，DailyCollect 日更）。
+  **LB-P1（受測）**：BTC sweep_core 回測中 **LONG 側**交易（M2 的 side
+  欄第一次派上研究用場）netR 在反彈群眾 PAID 時 > STARVED——清算瀑布
+  掃低後的反彈與 SF 低側是同一族交易。
+- **Overnight Seasonality（候選延後）**：來自庫的幣圈區，但機械化需先
+  查原始論文的持有時段規則——不猜規則，查到再凍結。
+- 判準：§0.49d 兩級制（單資產無廣度項：一級 = 符號 + ≥2pp/≥0.01R；
+  二級 = CI95 離零）。記分程式同 commit。
+
 **開工前的紀律備忘（沿 v2/v3 規矩）**：
 - 挑「幣圈群眾真的在跑的」，不是「論文裡最漂亮的」——天氣站量的是
   群眾行為不是策略品質；沒有散戶群眾在跑的學術策略，量它沒有意義
