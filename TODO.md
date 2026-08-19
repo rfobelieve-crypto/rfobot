@@ -234,6 +234,43 @@ ERA1 n=717 WR 60.0% / ERA2 n=79 WR 51.9%，總差 −8.1pp 的分解：
 **接線**：clocks 2e-c 加 ADX 狀態（BTC + core9 TRENDING 幣數）。B-P9
 是二級證據，TRENDING 過半時的 SF 逆風標記有告警資格。
 
+### 0.51 出場機制歸因（2026-08-19，反事實重放）——decay 是主力，opp 是配角
+
+**為什麼要重做**：CLAUDE.md 掛的「opp_signal 85.7% WR vs trail_stop 37%」
+**無效**——一筆交易走到 trail_stop 正是因為沒等到反向訊號，走到 opp 是
+因為等到了；兩群交易從一開始就不同，那個比較量的是選擇效應不是出場品質。
+唯一誠實的形式是反事實：同一批進場、四種出場政策各重放一遍
+（`research/exit_attribution.py`，忠實對照 executor 語意：Strong-only
+next-open 單倉、3xATR 棘輪 intrabar、decay N=2 先於 opp、10bps 來回）。
+
+**結果（全期 n=38-48）**
+
+| 政策 | net/trade | WR | MDD |
+|---|---|---|---|
+| A 純 trail | −20.3 bps | 45% | −1686 |
+| B trail+opp | −12.4 | 45% | −1168 |
+| C trail+decay | **−0.1** | **54%** | **−1052** |
+| D trail+decay+opp（現行） | −0.3 | 54% | −1079 |
+
+- **conviction_decay 是主力**：邊際貢獻 **+20.2 bps/trade**（C−A），三個
+  時代一致（修法前 +16.2、修法後 +54.1）。0 shadow 樣本就上線的那個決定
+  （2026-07-25 informed override）**事後被證明是對的**。
+- **opp_signal 是配角**：單獨加只有 +7.9（B−A），而且**在 decay 之上是
+  負貢獻**（D−C = −0.2 全期、−7.7 修法後）——decay 更早觸發、涵蓋了 opp
+  的多數情境，剩下的 opp 觸發反而是較差的時點。
+- **純 trail 是負的**（−20.3 bps）：3xATR 單獨用會賠，V7 現在的正報酬
+  **全部來自 decay**。這修正了「正報酬來自出場紀律（trailing 讓 winner
+  跑）」的舊敘述——讓 winner 跑的不是 trailing，是 decay 及早停損。
+
+**不動手的理由（重要）**：D−C 的負差在全期只有 −0.2 bps、n=48，遠不到
+拆掉 opp_signal 的證據門檻；而 opp 是 decay 的 fallback（pred_ret 恰為
+0 的邊角）。**現階段只記錄，不改 executor**。要動需要：解碼修法後的樣本
+累積到 n≥30 且 D−C 的 bootstrap CI 離零。
+
+**誠實限制**：解碼修法後只有 4 筆，該欄的數字只能看方向不能下注；
+全期樣本含被鎖死時代（opp 天生餓死），所以 opp 的貢獻可能被低估——
+這正是分時代報告的原因。
+
 ### 0.5 SF 上線工程軌（2026-08-18 使用者拍板：工程並行＋守住判決）
 
 **決策**：使用者認為 SF 已趨穩、想量化上線。數據裁定：穩的是 R∧V 組合
