@@ -1118,9 +1118,91 @@ def raid_signals_feed():
         except Exception:
             return 0.0
 
+    # 變體歸屬（2026-08-19）：判定留在這一側 —— E 的因果中位需要完整 log，
+    # 下游只讀旗標不自算，才不會兩邊的定義漂移。A/B 直接來自欄位。
+    variants = {}
+    try:
+        import sys as _sys
+        root = Path(__file__).resolve().parent.parent
+        sf = root / "research" / "sweep_failure"
+        for p in (str(root), str(root / "research"), str(sf)):
+            if p not in _sys.path:
+                _sys.path.insert(0, p)
+        import shadow_engine as _SE
+        log = {f"{r['symbol']}|{r.get('level_kind','swing')}|{r['fill_ts']}": r for r in rows}
+        e_pred = _SE.variant_e_pred(log)
+        for key, r in log.items():
+            v = ["A"]
+            if str(r.get("variant_b", "")) == "1":
+                v.append("B")
+                if _SE.is_variant_c(r):
+                    v.append("C")
+                    if _SE.is_variant_d(r):
+                        v.append("D")
+            try:
+                if e_pred(r):
+                    v.append("E")
+            except Exception:  # noqa: BLE001
+                pass
+            variants[key] = v
+    except Exception:  # noqa: BLE001
+        variants = {}      # 判定失敗時下游只會看到 A/B（欄位自帶），不會誤判
+
     cutoff = _time.time() - 72 * 3600
-    out = [r for r in rows[-500:] if _ts(r.get("first_seen_utc", "")) >= cutoff]
+    out = []
+    for r in rows[-500:]:
+        if _ts(r.get("first_seen_utc", "")) < cutoff:
+            continue
+        key = f"{r['symbol']}|{r.get('level_kind','swing')}|{r['fill_ts']}"
+        r = dict(r)
+        r["variants"] = variants.get(key, (["A", "B"] if str(r.get("variant_b", "")) == "1" else ["A"]))
+        out.append(r)
     return jsonify({"list": out, "n": len(out)})
+
+
+@app.route("/raid-cohorts")
+def raid_cohorts_feed():
+    """Per-variant gate stats for the tenant UI (so users pick with the real
+    numbers in front of them, not adjectives). Same arithmetic as Gate F —
+    day-clustered bootstrap CI — computed on the PROSPECTIVE subset
+    (first_seen < exit), which is the only honest evidence. Read-only."""
+    import sys as _sys
+    root = Path(__file__).resolve().parent.parent
+    sf = root / "research" / "sweep_failure"
+    if not sf.exists():
+        return jsonify({"error": "research/ not present in this image"}), 501
+    for p in (str(root), str(root / "research"), str(sf)):
+        if p not in _sys.path:
+            _sys.path.insert(0, p)
+    try:
+        import shadow_engine as _SE
+        log = _SE.read_log()
+
+        def _fs(r):
+            try:
+                return datetime.strptime(r.get("first_seen_utc", ""), "%Y-%m-%d %H:%M").replace(
+                    tzinfo=timezone.utc).timestamp()
+            except Exception:  # noqa: BLE001
+                return 0.0
+
+        pro = {k: r for k, r in log.items()
+               if str(r.get("exit_ts", "")).isdigit() and _fs(r) < int(r["exit_ts"])}
+        e_pred = _SE.variant_e_pred(pro)
+        cohorts = {
+            "A": lambda r: True,
+            "B": lambda r: str(r.get("variant_b", "")) == "1",
+            "C": _SE.is_variant_c,
+            "D": _SE.is_variant_d,
+            "E": e_pred,
+        }
+        out = {}
+        for name, fn in cohorts.items():
+            s = _SE.gate_stats(pro, fn)
+            out[name] = {"n": s.get("n_closed"), "meanR": s.get("mean_r"),
+                         "ciLow": s.get("ci_low"), "wr": s.get("wr_pct")}
+        return jsonify({"basis": "prospective", "nRows": len(pro), "cohorts": out})
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/research/exit-variants", methods=["GET"])
