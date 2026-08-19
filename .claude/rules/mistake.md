@@ -1474,3 +1474,40 @@ WF OOS 的 `pred_ret` 是每個 fold 的子模型產生的，每個 fold 只用�
 驗證方式：比較 buffer std 和生產模型最近 200 筆的 std，ratio 應在 0.5~2.0 之間。最終修復後 ratio = 0.74x，信號分佈回到 5.5% UP / 88% NEUTRAL / 6.5% DOWN，符合 ~10%/80%/10% 的設計目標。
 
 **Rule:** Rolling percentile buffer 的初始化**只能用生產模型的預測**，不能用 WF OOS fold 模型的預測。WF OOS 的預測只能拿來評估模型泛化能力（IC、AUC），不能拿來校準生產閾值——它們的分佈不在同一個尺度。每次 seed buffer 後，必須比較 buffer std vs 生產模型 std，ratio 偏離 0.5~2.0 就是 red flag。
+
+---
+
+## 2026-08-19: 用 Edit 工具改 .bat 把 CRLF 換成 LF，每小時記帳排程靜默死了 29 小時
+
+**What happened:**
+08-18 為了把 `pf_dry_intents.py` 接進每小時班車，用 Edit 工具改
+`shadow_engine.bat`。Edit 寫回時把整個檔案的行尾從 CRLF 換成 LF。
+Windows 排程照常在跑、`State=Ready`、每小時觸發——但 `LastTaskResult=1`，
+而且**連 log 都沒寫進去一行**（run log 的 mtime 停在 08-18 07:05）。
+cmd.exe 對純 LF 的 .bat 解析不了，整個檔案等於沒有內容。
+
+停機 29 小時的東西不只是記錄：shadow log 少記 54 筆訊號（復跑後
+Variant B 從 732 → 786）、天氣站快照凍在 08-18、pf 帳本與乾跑 intent
+流全部沒跑。而且它是**在我查 JARVIS 橋接時偶然發現的**——沒有任何
+告警說「每小時的東西一天沒跑了」。
+
+**Root cause:**
+兩層。(a) 文字編輯工具對 Windows 批次檔的行尾沒有保護，而 `.bat` 是
+少數「行尾錯了就整個失效」的檔案格式；(b) 改完排程檔之後**沒有實際
+執行它一次**——測了 python 腳本本身、沒測呼叫它的那層。這正是
+[[2026-07-05 DailyCollect 排程指向舊路徑 96 天]] 的同款：排程面板
+顯示健康、實際工作早就死了，而且死在「呼叫層」不是「被呼叫層」。
+
+**Correct approach（已修）:**
+1. 行尾轉回 CRLF，直接 `cmd /c` 跑一次 bat 驗證 exit=0 且 CSV mtime 更新。
+2. 從此改任何 `.bat`／`.cmd` 之後，**必須立刻執行它一次**，不是只跑
+   它內部的 python。
+3. 排程健康的判準跟交易系統同一條：**看它產物的新鮮度**
+   （`sweep_shadow_log.csv` 的 mtime），不看 `State=Ready`。
+   `LastTaskResult=1` 要當紅燈，不是雜訊。
+
+**Rule:** 用文字編輯工具碰 Windows 批次檔之後，**先驗行尾再驗執行**
+（`python -c "print(open(p,'rb').read().count(b'\r\n'))"`，再 `cmd /c` 跑
+一次）。任何「每小時／每天」的排程，判斷它活著一律看**產物 mtime**，
+不看排程面板的狀態燈——面板顯示的是「有沒有被觸發」，不是「有沒有
+做完事」。

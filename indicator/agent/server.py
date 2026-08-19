@@ -605,6 +605,82 @@ def _sweep_status_payload() -> dict:
             "not financial advice."}
 
 
+_raid_signals_cache: dict = {"data": None, "ts": 0.0}
+_RAID_SIGNALS_CACHE_TTL_S = 120.0
+RAID_SIGNAL_MAX_AGE_H = 8          # HOLD window; older rows can't be acted on
+
+
+def _raid_signals_payload() -> dict:
+    """OPEN variant-B raid signals for the JARVIS follow bot (2026-08-19).
+
+    The bridge existed on the JARVIS side (RaidBot -> FLOW_RAID_URL) but
+    had no upstream to point at — this is that upstream.  Field names are
+    the shadow log's own (symbol / side / entry_px / atr / fill_ts /
+    level_kind), so the recorder stays the single source of truth and the
+    consumer needs no translation layer.  `side` only became available in
+    M2 (2026-08-18); rows without it are dropped rather than guessed —
+    a follow bot must never infer direction.
+
+    Recorder-only surface: it reports what the frozen recorder recorded.
+    No orders, no gate arithmetic, no account data.
+    """
+    import csv
+    import time as _t
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    log_path = root / "research" / "results" / "sweep_shadow_log.csv"
+    if not log_path.exists():
+        return {"error": "shadow log not present in this image"}
+    now = int(_t.time())
+    out = []
+    with log_path.open(newline="", encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            if r.get("status") != "OPEN" or r.get("variant_b") != "1":
+                continue
+            if r.get("side") not in ("LONG", "SHORT"):
+                continue          # pre-M2 row: never guess a direction
+            try:
+                fill_ts = int(r["fill_ts"])
+            except (KeyError, ValueError):
+                continue
+            if now - fill_ts > RAID_SIGNAL_MAX_AGE_H * 3600:
+                continue
+            out.append({
+                "symbol": r["symbol"], "side": r["side"],
+                "level_kind": r.get("level_kind", "swing"),
+                "fill_ts": fill_ts, "fill_utc": r.get("fill_utc", ""),
+                "entry_px": float(r["entry_px"]), "atr": float(r["atr"]),
+                "universe": r.get("universe", ""),
+                "pierce_atr": float(r.get("pierce_atr") or 0),
+            })
+    out.sort(key=lambda x: x["fill_ts"], reverse=True)
+    return {"list": out, "count": len(out),
+            "asof_utc": _t.strftime("%Y-%m-%d %H:%M:%S", _t.gmtime(now)),
+            "max_age_h": RAID_SIGNAL_MAX_AGE_H,
+            "mode": "shadow",
+            "disclaimer": "Forward shadow validation in progress — the "
+                          "strategy has not passed its gate. Not financial "
+                          "advice."}
+
+
+@mcp.custom_route("/public/raid-signals", methods=["GET"])
+async def public_raid_signals_route(request: Request) -> JSONResponse:
+    now = time.monotonic()
+    if (_raid_signals_cache["data"] is None
+            or now - _raid_signals_cache["ts"] > _RAID_SIGNALS_CACHE_TTL_S):
+        try:
+            data = await anyio.to_thread.run_sync(_raid_signals_payload)
+        except Exception as e:  # noqa: BLE001 — degrade to 503, never crash
+            data = {"error": f"raid signals unavailable: {type(e).__name__}"}
+        _raid_signals_cache["data"] = data
+        _raid_signals_cache["ts"] = now
+    payload = _raid_signals_cache["data"]
+    resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    resp.headers["Cache-Control"] = "public, max-age=120"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 _weather_cache: dict = {"data": None, "ts": 0.0}
 _WEATHER_CACHE_TTL_S = 300.0
 

@@ -81,6 +81,22 @@ def build_state(cur) -> PortfolioState:
                 "AND ts >= DATE_SUB(NOW(), INTERVAL 2 HOUR)")
     halted = int(cur.fetchone()["n"]) > 0
 
+    # 2026-08-19: equity itself is a halt condition.  The operator withdrew
+    # the account to ~$0 on 08-18 14:00 and the kill log went quiet (nothing
+    # left to trip a cap on), so the 2h kill-log window alone reported
+    # halted=False against a $0 account — a dry run must never size trades
+    # off an equity that cannot fund them.  Also covers a stale-snapshot
+    # feed: no fresh equity means no decision, not a decision on stale data.
+    if equity < 50.0:
+        halted = True
+    cur.execute("SELECT MAX(ts) m FROM v7_okx_balance_snapshots")
+    last_snap = cur.fetchone()["m"]
+    if last_snap is not None:
+        cur.execute("SELECT TIMESTAMPDIFF(HOUR, %s, UTC_TIMESTAMP()) h",
+                    (last_snap,))
+        if int(cur.fetchone()["h"] or 0) >= 3:
+            halted = True
+
     # Sweep's day-R from shadow rows closed today (UTC) — the strategy-layer
     # daily cap sees what the strategy actually did today, shadow or not.
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
