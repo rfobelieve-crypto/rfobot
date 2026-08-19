@@ -652,6 +652,14 @@ def _raid_signals_payload() -> dict:
                 "entry_px": float(r["entry_px"]), "atr": float(r["atr"]),
                 "universe": r.get("universe", ""),
                 "pierce_atr": float(r.get("pierce_atr") or 0),
+                # Echoed even though the filter above already guarantees
+                # them: RaidBot re-checks variant_b/status itself, and a
+                # consumer that defensively re-validates should be able to.
+                # Dropping them would make every row fail its check while
+                # the payload looked correct (found 2026-08-19 by diffing
+                # the consumer's rules against this payload, not by
+                # reading either side's prose).
+                "variant_b": "1", "status": "OPEN",
             })
     out.sort(key=lambda x: x["fill_ts"], reverse=True)
     return {"list": out, "count": len(out),
