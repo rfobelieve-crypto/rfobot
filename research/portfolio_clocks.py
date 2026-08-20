@@ -513,6 +513,31 @@ def main() -> int:
     else:
         errors.append(f"regime_attach rc={rca}")
 
+    # 2e-i ── freshness board summary (2026-08-20) ───────────────────────
+    # The unified board runs on its own 6-hourly schedule (it must not
+    # ride anything it monitors); this line is the weekly belt so a dead
+    # BOARD is also noticed — the watcher needs a watcher exactly once,
+    # and the weekly report is that once.
+    try:
+        import json as _fj
+        _fp = ROOT / "research" / "results" / "freshness_board.json"
+        _fb = _fj.loads(_fp.read_text(encoding="utf-8"))
+        _age = None
+        try:
+            _age = (now - datetime.strptime(
+                _fb["asof_utc"], "%Y-%m-%d %H:%M"
+            ).replace(tzinfo=timezone.utc)).total_seconds() / 3600
+        except Exception:
+            pass
+        _line = (f"freshness: {len(_fb.get('reds', []))} red / "
+                 f"{len(_fb.get('rows', []))} tracked"
+                 + (f" ({', '.join(_fb['reds'])})" if _fb.get("reds") else ""))
+        if _age is not None and _age > 12:
+            _line += f"  << BOARD ITSELF STALE ({_age:.0f}h) - check schedule"
+        lines.append(_line)
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"freshness_board: {e}")
+
     # 2f ── V7 entry-execution shadow refresh (frozen 2026-08-04) ────────
     # The forward counter only accumulates when the script runs; it had no
     # scheduler until 2026-08-08 (79h stale when caught). Weekly is enough:
