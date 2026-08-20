@@ -1,0 +1,32 @@
+{
+ "asof_utc": "2026-08-20 10:53",
+ "n_total": 850,
+ "states": {
+  "TRENDING": {
+   "n": 324,
+   "share": 0.3812,
+   "base_share": 0.4712,
+   "meanR": 0.061,
+   "sumR": 19.765,
+   "mdd": -17.422
+  },
+  "NEUTRAL": {
+   "n": 182,
+   "share": 0.2141,
+   "base_share": 0.2015,
+   "meanR": 0.0534,
+   "sumR": 9.718,
+   "mdd": -9.817
+  },
+  "RANGING": {
+   "n": 344,
+   "share": 0.4047,
+   "base_share": 0.3274,
+   "meanR": -0.0048,
+   "sumR": -1.635,
+   "mdd": -26.702
+  }
+ },
+ "reading": "insufficient for a reading (span 23d < 60d or RANGING CI spans zero) -- pattern so far: RANGING -0.0048 / TRENDING +0.0610, OPPOSITE of B-P9 -- reading deferred to verdict day",
+ "role": "Gate F attachment -- explanatory only, never a criterion"
+}

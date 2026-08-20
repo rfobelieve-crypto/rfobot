@@ -497,6 +497,22 @@ def main() -> int:
     else:
         errors.append(f"vol_target rc={rcv}")
 
+    # 2e-h ── Gate F regime attachment (registered 2026-08-20) ───────────
+    # Explanatory attachment for the n=1400 verdict, never a criterion.
+    # First run flagged the pattern to WATCH: the 23-day shadow window
+    # shows TRENDING (+0.061) beating RANGING (-0.005) — the OPPOSITE of
+    # the CI-grade B-P9 (2.5y backtest). Day-clustered CI spans zero, so
+    # no reading yet; if the inversion persists as the span grows, that
+    # conversation happens BEFORE verdict day, not on it.
+    rca, outa = run(["research/sweep_regime_attach.py"], 420)
+    if rca == 0:
+        keep = [ln.strip() for ln in outa.splitlines()
+                if "reading:" in ln or "CI95" in ln]
+        lines.append("gateF-regime: " + " | ".join(keep)[:300]
+                     if keep else "gateF-regime: no output")
+    else:
+        errors.append(f"regime_attach rc={rca}")
+
     # 2f ── V7 entry-execution shadow refresh (frozen 2026-08-04) ────────
     # The forward counter only accumulates when the script runs; it had no
     # scheduler until 2026-08-08 (79h stale when caught). Weekly is enough:
