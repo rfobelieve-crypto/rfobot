@@ -1187,6 +1187,19 @@ def raid_cohorts_feed():
 
         pro = {k: r for k, r in log.items()
                if str(r.get("exit_ts", "")).isdigit() and _fs(r) < int(r["exit_ts"])}
+        # 只算跟單機器人**實際會交易的宇宙**（core9，Gate F 的凍結籃子）。
+        #
+        # 2026-08-20 修：原本不分宇宙全算，於是產品端的變體選單顯示的統計
+        # 包含 added20 等機器人永遠不會碰的幣 —— 用戶照那些數字選變體，
+        # 選到的卻是另一個母體。實測差距不小且會改變排序：
+        #   全宇宙  B +0.0714(CI -0.0122)  C +0.1075(+0.0056)  D +0.1248(+0.0078)
+        #   core9   B +0.1039(CI +0.0057)  C +0.1580(+0.0409)  D +0.1497(-0.0484)
+        # D 在全宇宙看起來顯著、在 core9 不顯著 —— 差別足以讓人選錯。
+        # ?universe=all 可看全宇宙（研究用），預設一律 core9（產品用）。
+        want_u = (request.args.get("universe") or "core9").strip().lower()
+        if want_u != "all":
+            pro = {k: r for k, r in pro.items()
+                   if str(r.get("universe", "")).lower() == want_u}
         e_pred = _SE.variant_e_pred(pro)
         cohorts = {
             "A": lambda r: True,
@@ -1200,7 +1213,16 @@ def raid_cohorts_feed():
             s = _SE.gate_stats(pro, fn)
             out[name] = {"n": s.get("n_closed"), "meanR": s.get("mean_r"),
                          "ciLow": s.get("ci_low"), "wr": s.get("wr_pct")}
-        return jsonify({"basis": "prospective", "nRows": len(pro), "cohorts": out})
+        # 規則註冊日：C/D/E 是在看過部分資料之後才定義的觀察組，
+        # 「資料前瞻」(first_seen < exit) 不等於「規則前瞻」。把日期一併給
+        # 消費端，讓 UI 有辦法講清楚這條規則是什麼時候凍結的。
+        return jsonify({"basis": "prospective", "universe": want_u,
+                        "nRows": len(pro), "cohorts": out,
+                        "registered": {"A": "log-start", "B": "log-start",
+                                       "C": "2026-07-31", "D": "2026-08-01",
+                                       "E": "2026-08-02"},
+                        "note": "統計為資料前瞻（記錄時結果未知）；C/D/E 的規則"
+                                "本身註冊於上列日期，之前的樣本對該規則屬於樣本內。"})
     except Exception as e:  # noqa: BLE001
         return jsonify({"error": str(e)}), 500
 
