@@ -15,3 +15,8 @@ python research\pf_mirror.py >> research\results\sweep_shadow_run.log 2>&1
 REM 2026-08-18 M3: dry-run intent flow (fresh variant-B fills -> risk engine
 REM -> pf_intents with decisions). No orders; decisions are the deliverable.
 python research\pf_dry_intents.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-08-20: v7 veto-clock publish -- the cloud route cannot compute it
+REM (needs the local kline cache, not in the image); the site card sat at a
+REM build-time snapshot (asof 08-10, trigger 4/60 vs truth 34/60). Same
+REM off-cloud-recorder fix family as raid_signals_publish above.
+python research\v7_veto_publish.py >> research\results\sweep_shadow_run.log 2>&1

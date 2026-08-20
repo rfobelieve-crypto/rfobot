@@ -1865,10 +1865,23 @@ def research_v7_clock_api():
         return _js({"error": "research/ not present in this image"}), 501
     try:
         r = _sp.run([_sys.executable, str(script), "--clock"],
-                    capture_output=True, text=True, timeout=110, cwd=str(root))
+                    capture_output=True, text=True, timeout=110,
+                    encoding="utf-8", errors="replace", cwd=str(root))
         if r.returncode != 0 and not out.exists():
             return _js({"error": "clock failed",
                         "stderr": (r.stderr or "")[-800:]}), 500
+        if r.returncode != 0:
+            # 2026-08-20: on Railway the script ALWAYS fails (needs the
+            # local kline cache, not in the image), so this branch used to
+            # silently serve the build-time snapshot — the site card sat
+            # at asof 08-10 / 4/60 while the truth was 34/60. A stale
+            # answer must say it is stale (mistake.md 2026-07-05).
+            import json as _json
+            d = _json.loads(out.read_text(encoding="utf-8"))
+            d["stale"] = True
+            d["stale_reason"] = "clock script failed in this environment; " \
+                                "serving build-time snapshot"
+            return _js(d)
         return _sf(out, mimetype="application/json", max_age=0)
     except _sp.TimeoutExpired:
         if out.exists():          # stale beats nothing, but say so

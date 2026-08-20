@@ -510,13 +510,39 @@ _V7_CLOCK_CACHE_TTL_S = 600.0
 
 
 def _v7_clock_cached() -> dict | None:
-    """Adoption clock from the indicator service, cached 10 min. Returns
-    None on any failure so the caller can fall back to the shipped file."""
+    """Adoption clock, cached 10 min.  DB row first, origin second.
+
+    2026-08-20: the origin route (/research/v7-clock) shells out to a
+    script that needs the LOCAL kline cache — absent from the Railway
+    image — so in production it failed every request and silently served
+    the JSON committed at build time (the card sat at asof 08-10 /
+    trigger 4/60 while the truth was 34/60).  The local hourly train now
+    publishes the clock into `v7_veto_clock` (research/v7_veto_publish.py,
+    same off-cloud-recorder family as raid_signals_live); reading that row
+    is the boundary-compliant path.  The origin fetch remains only as a
+    fallback for environments without the table.
+    """
     import json as _j
     now = time.monotonic()
     if (_v7_clock_cache["data"] is not None
             and now - _v7_clock_cache["ts"] < _V7_CLOCK_CACHE_TTL_S):
         return _v7_clock_cache["data"]
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT payload FROM v7_veto_clock WHERE id=1")
+                row = cur.fetchone()
+        finally:
+            conn.close()
+        if row:
+            data = _j.loads(row["payload"])
+            _v7_clock_cache["data"] = data
+            _v7_clock_cache["ts"] = now
+            return data
+    except Exception:  # noqa: BLE001
+        pass
     raw = _fetch_origin_png(f"{INDICATOR_BASE_URL}/research/v7-clock",
                             INDICATOR_ADMIN_TOKEN)
     if not raw:

@@ -30,7 +30,11 @@ Files under `indicator/agent/` MUST NOT import, at any depth:
   the DB does not hold),
   `raid_signals_live` (follow-bot signal surface, 2026-08-20 — WRITTEN by
   `research/raid_signals_publish.py` hourly; replaces the in-image CSV
-  read, which was permanently stale because the recorder runs off-cloud)
+  read, which was permanently stale because the recorder runs off-cloud),
+  `v7_veto_clock` (adoption-trigger clock, 2026-08-20 — WRITTEN by
+  `research/v7_veto_publish.py` hourly; the cloud route could not compute
+  it (needs the local kline cache, not in the image) and silently served
+  the build-time snapshot — third instance of the off-cloud-recorder fix)
 - Pure-computation imports from `market_data.tasks.cancel_playbook_watcher`
   / `research.cancel_flow_analyze` (frozen feature definitions — read-only
   code path; the agent never calls their write/alert functions)
