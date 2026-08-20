@@ -17,7 +17,33 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+# ── Kline 來源鏈（2026-08-20）────────────────────────────────────────────
+# 為什麼需要備援：Railway 的出口 IP 被 Binance 擋（418 I'm a teapot），
+# fapi 的 klines/depth/aggTrades 全數失敗 → 回退到空快取 → 特徵建構在
+# feature_builder_live:58 崩成看不懂的 KeyError → update_cycle 每小時掛掉
+# → tracked_signals 從 2026-08-18 18:00 起沒有新訊號。追這條因果鏈花了六步，
+# 因為真正的原因（418）被埋在三層之下。
+#
+# 順序即優先序。前三個是 Binance 自己的鏡像，回傳格式完全相同（12 欄，
+# 含 taker_buy_* 與 trade_count —— 模型特徵要用，不能少）；最後的 Bybit
+# 只有 OHLCV，taker/trade_count 會是 NaN，是「有總比沒有好」的最後手段。
+# 可用 KLINE_SOURCES 環境變數覆寫（逗號分隔的名稱）。
 BINANCE_KLINES_URL = "https://fapi.binance.com/fapi/v1/klines"
+KLINE_SOURCES = [
+    # 合約，模型訓練用的就是這個 —— 唯一「不降級」的來源
+    ("binance-fapi",   "https://fapi.binance.com/fapi/v1/klines"),
+    # Binance 公開市場資料網域（不需金鑰、封鎖規則與 fapi 不同）。
+    # ⚠ 這是**現貨**資料：欄位齊全，但與合約有基差、量能結構也不同，
+    #   特徵分布會偏移。屬於降級來源。
+    ("binance-vision", "https://data-api.binance.vision/api/v3/klines"),
+    # 最後手段：只有 OHLCV，taker_buy_* 與 trade_count 全為 NaN
+    ("bybit-linear",   "https://api.bybit.com/v5/market/kline"),
+]
+# 非合約來源 → 日誌要明講降級，不能靜默替換
+DEGRADED_SOURCES = {"binance-vision", "bybit-linear"}
+# 這些欄位少了模型就跑不動，是「這份 kline 能不能用」的判準
+KLINE_REQUIRED_COLS = ["open", "high", "low", "close", "volume",
+                       "taker_buy_vol", "taker_buy_quote", "trade_count"]
 CG_BASE = "https://open-api-v4.coinglass.com/api"
 CG_API_KEY = os.environ.get("COINGLASS_API_KEY", "")
 
@@ -92,48 +118,110 @@ def _load_cache(name: str) -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def _klines_from_binance_shape(rows) -> pd.DataFrame:
+    """Binance 12 欄格式（fapi 與 data-api.binance.vision 完全相同）。"""
+    df = pd.DataFrame(rows, columns=[
+        "ts_open", "open", "high", "low", "close", "volume",
+        "close_time", "quote_vol", "trade_count", "taker_buy_vol",
+        "taker_buy_quote", "ignore",
+    ])
+    for c in ["open", "high", "low", "close", "volume",
+              "taker_buy_vol", "taker_buy_quote", "quote_vol"]:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    df["trade_count"] = pd.to_numeric(df["trade_count"], errors="coerce")
+    df["ts_open"] = pd.to_numeric(df["ts_open"])
+    return df
+
+
+def _klines_from_bybit(payload) -> pd.DataFrame:
+    """Bybit v5：[start, open, high, low, close, volume, turnover]，新的在前。
+
+    沒有 taker 買賣拆分與成交筆數 —— 那三個欄位補 NaN。模型會少三組特徵，
+    但總比整個 cycle 掛掉好；用到這一層時日誌會明講。
+    """
+    rows = (payload or {}).get("result", {}).get("list", []) or []
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows, columns=["ts_open", "open", "high", "low",
+                                     "close", "volume", "quote_vol"])
+    for c in ["open", "high", "low", "close", "volume", "quote_vol"]:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    df["ts_open"] = pd.to_numeric(df["ts_open"])
+    df["taker_buy_vol"] = np.nan
+    df["taker_buy_quote"] = np.nan
+    df["trade_count"] = np.nan
+    return df.iloc[::-1].reset_index(drop=True)      # 轉成舊→新
+
+
 def fetch_binance_klines(symbol: str = "BTCUSDT", interval: str = "1h",
                          limit: int = 500) -> pd.DataFrame:
-    """Fetch klines from Binance Futures REST API with retry."""
-    try:
-        resp = _retry_request("GET", BINANCE_KLINES_URL, params={
-            "symbol": symbol, "interval": interval, "limit": limit,
-        })
-        rows = resp.json()
+    """抓 1h kline，依 KLINE_SOURCES 逐一嘗試直到拿到可用的一份。
 
-        if not isinstance(rows, list) or len(rows) == 0:
-            logger.error("Binance klines: unexpected response format")
-            return _load_cache("binance_klines")
+    名字保留 fetch_binance_klines 是為了不動 20 幾個呼叫點；實際上它現在
+    是「多來源」抓取。任一來源成功就停，並記錄用的是哪一個 —— 降級到
+    Bybit（缺 taker 欄位）時必須看得出來，不能靜默降級。
+    """
+    want = [x.strip() for x in os.environ.get("KLINE_SOURCES", "").split(",") if x.strip()]
+    chain = [(n, u) for n, u in KLINE_SOURCES if not want or n in want]
+    if want:
+        chain.sort(key=lambda t: want.index(t[0]))
 
-        df = pd.DataFrame(rows, columns=[
-            "ts_open", "open", "high", "low", "close", "volume",
-            "close_time", "quote_vol", "trade_count", "taker_buy_vol",
-            "taker_buy_quote", "ignore",
-        ])
-        for c in ["open", "high", "low", "close", "volume",
-                   "taker_buy_vol", "taker_buy_quote", "quote_vol"]:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-        df["trade_count"] = pd.to_numeric(df["trade_count"], errors="coerce")
-        df["ts_open"] = pd.to_numeric(df["ts_open"])
-        df["dt"] = pd.to_datetime(df["ts_open"], unit="ms", utc=True)
-        df = df.set_index("dt").sort_index()
+    errors = []
+    for name, url in chain:
+        try:
+            if name == "bybit-linear":
+                resp = _retry_request("GET", url, params={
+                    "category": "linear", "symbol": symbol,
+                    "interval": "60" if interval == "1h" else interval,
+                    "limit": min(limit, 1000),
+                })
+                df = _klines_from_bybit(resp.json())
+            else:
+                resp = _retry_request("GET", url, params={
+                    "symbol": symbol, "interval": interval, "limit": limit,
+                })
+                rows = resp.json()
+                if not isinstance(rows, list) or len(rows) == 0:
+                    raise ValueError("unexpected response format")
+                df = _klines_from_binance_shape(rows)
 
-        # Drop the current incomplete bar
-        df = df.iloc[:-1]
+            if df.empty:
+                raise ValueError("empty frame")
+            df["dt"] = pd.to_datetime(df["ts_open"], unit="ms", utc=True)
+            df = df.set_index("dt").sort_index()
+            df = df.iloc[:-1]                       # 丟掉還沒收的那根
+            if df.empty or (df["close"] <= 0).any():
+                raise ValueError("invalid price data")
+            missing = [c for c in KLINE_REQUIRED_COLS if c not in df.columns]
+            if missing:
+                raise ValueError(f"missing columns: {missing}")
 
-        # Validate: prices should be positive
-        if (df["close"] <= 0).any():
-            logger.error("Binance klines: invalid price data detected")
-            return _load_cache("binance_klines")
+            _save_cache("binance_klines", df)
+            note = ""
+            if name in DEGRADED_SOURCES:
+                note = ("  ⚠ 降級來源"
+                        + ("：無 taker/trade_count 特徵"
+                           if df["taker_buy_vol"].isna().all()
+                           else "：現貨資料，與合約有基差"))
+            logger.info("Klines via %s: %d bars, %s ~ %s%s", name, len(df),
+                        df.index[0], df.index[-1], note)
+            return df
+        except Exception as e:
+            errors.append(f"{name}: {e}")
+            logger.warning("Kline source %s failed: %s", name, e)
 
-        _save_cache("binance_klines", df)
-        logger.info("Binance klines: %d bars, %s ~ %s",
-                     len(df), df.index[0], df.index[-1])
-        return df
-
-    except Exception as e:
-        logger.error("Binance klines failed after retries: %s", e)
-        return _load_cache("binance_klines")
+    logger.error("All kline sources failed — %s", " | ".join(errors))
+    cached = _load_cache("binance_klines")
+    if cached.empty or any(c not in cached.columns for c in KLINE_REQUIRED_COLS):
+        # 空的／形狀不對的快取回給呼叫端，只會在 feature_builder 裡炸成
+        # 看不懂的 KeyError（2026-08-20 實際發生，追了六步才找到 418）。
+        # 這裡直接講清楚：拿不到 kline，這個 cycle 不該繼續。
+        raise RuntimeError(
+            "無法取得 kline：所有來源皆失敗且無可用快取。"
+            f"（{' | '.join(errors)}）")
+    logger.warning("Falling back to cached klines (%d bars, 最後一根 %s)",
+                   len(cached), cached.index[-1] if len(cached) else "—")
+    return cached
 
 
 def _cg_fetch(path: str, exchange: str | None = None, symbol: str | None = None,
