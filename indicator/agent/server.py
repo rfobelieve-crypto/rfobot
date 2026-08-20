@@ -608,6 +608,11 @@ def _sweep_status_payload() -> dict:
 _raid_signals_cache: dict = {"data": None, "ts": 0.0}
 _RAID_SIGNALS_CACHE_TTL_S = 120.0
 RAID_SIGNAL_MAX_AGE_H = 8          # HOLD window; older rows can't be acted on
+# Frozen rule constants, mirrored from research/sweep_failure/sweep_core.py
+# (DIS / HOLD).  Published in the payload so followers size and exit from
+# ONE source of truth instead of hardcoding them client-side.
+RAID_STOP_ATR = 3.5
+RAID_HOLD_H = 8
 
 
 def _raid_signals_payload() -> dict:
@@ -645,11 +650,24 @@ def _raid_signals_payload() -> dict:
                 continue
             if now - fill_ts > RAID_SIGNAL_MAX_AGE_H * 3600:
                 continue
+            entry = float(r["entry_px"])
+            atr = float(r["atr"])
+            sgn = 1 if r["side"] == "LONG" else -1
+            stop_px = entry - sgn * RAID_STOP_ATR * atr
+            # Variant membership, computed HERE from the frozen predicates so
+            # a follower never re-implements them (A = unfiltered, B = shallow
+            # pierce, C = B and 1m close-back, D = C and high attack volume).
+            # E needs the whole log's causal median and is deliberately absent.
+            variants = ["A", "B"]
+            if str(r.get("flow_reject", "")) == "1":
+                variants.append("C")
+                if str(r.get("flow_vhigh", "")) == "1":
+                    variants.append("D")
             out.append({
                 "symbol": r["symbol"], "side": r["side"],
                 "level_kind": r.get("level_kind", "swing"),
                 "fill_ts": fill_ts, "fill_utc": r.get("fill_utc", ""),
-                "entry_px": float(r["entry_px"]), "atr": float(r["atr"]),
+                "entry_px": entry, "atr": atr,
                 "universe": r.get("universe", ""),
                 "pierce_atr": float(r.get("pierce_atr") or 0),
                 # Echoed even though the filter above already guarantees
@@ -660,11 +678,27 @@ def _raid_signals_payload() -> dict:
                 # the consumer's rules against this payload, not by
                 # reading either side's prose).
                 "variant_b": "1", "status": "OPEN",
+                "variants": variants,
+                # Position-sizing inputs (2026-08-20).  Followers must NOT
+                # hardcode the frozen constants: risk-based sizing needs the
+                # stop, and a client that bakes in 3.5 silently desyncs the
+                # day the rule changes.  size_base = (equity x risk_pct) /
+                # |entry - stop| keeps每筆風險固定, which is what the研究
+                # numbers (mean R) are denominated in — a fixed-notional
+                # client would carry 2.7x more risk on ADA than on BTC and
+                # its results could never be compared to the shadow ledger.
+                "stop_px": round(stop_px, 10),
+                "risk_frac": round(RAID_STOP_ATR * atr / entry, 6),
+                "hold_hours": RAID_HOLD_H,
             })
     out.sort(key=lambda x: x["fill_ts"], reverse=True)
     return {"list": out, "count": len(out),
             "asof_utc": _t.strftime("%Y-%m-%d %H:%M:%S", _t.gmtime(now)),
             "max_age_h": RAID_SIGNAL_MAX_AGE_H,
+            "rules": {"stop_atr_mult": RAID_STOP_ATR,
+                      "hold_hours": RAID_HOLD_H,
+                      "gate_variant": "B",
+                      "gate_universe": "core9"},
             "mode": "shadow",
             "disclaimer": "Forward shadow validation in progress — the "
                           "strategy has not passed its gate. Not financial "
