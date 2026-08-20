@@ -626,73 +626,64 @@ def _raid_signals_payload() -> dict:
     M2 (2026-08-18); rows without it are dropped rather than guessed —
     a follow bot must never infer direction.
 
+    Reads `raid_signals_live`, written hourly by
+    research/raid_signals_publish.py.  It used to read the shadow CSV
+    inside this image, which was 8 days stale because the recorder runs on
+    the operator machine — the endpoint returned 0 rows forever while
+    looking healthy (2026-08-20).  Same quant-persists/agent-selects shape
+    as weather_station; the agent computes nothing.
+
     Recorder-only surface: it reports what the frozen recorder recorded.
     No orders, no gate arithmetic, no account data.
     """
-    import csv
     import time as _t
-    from pathlib import Path
-    root = Path(__file__).resolve().parents[2]
-    log_path = root / "research" / "results" / "sweep_shadow_log.csv"
-    if not log_path.exists():
-        return {"error": "shadow log not present in this image"}
+    from shared.db import get_db_conn
     now = int(_t.time())
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT symbol, side, level_kind, fill_ts, fill_utc,"
+                " entry_px, atr, stop_px, risk_frac, pierce_atr, universe,"
+                " variants, updated_at FROM raid_signals_live"
+                " ORDER BY fill_ts DESC")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
     out = []
-    with log_path.open(newline="", encoding="utf-8") as f:
-        for r in csv.DictReader(f):
-            if r.get("status") != "OPEN" or r.get("variant_b") != "1":
-                continue
-            if r.get("side") not in ("LONG", "SHORT"):
-                continue          # pre-M2 row: never guess a direction
-            try:
-                fill_ts = int(r["fill_ts"])
-            except (KeyError, ValueError):
-                continue
-            if now - fill_ts > RAID_SIGNAL_MAX_AGE_H * 3600:
-                continue
-            entry = float(r["entry_px"])
-            atr = float(r["atr"])
-            sgn = 1 if r["side"] == "LONG" else -1
-            stop_px = entry - sgn * RAID_STOP_ATR * atr
-            # Variant membership, computed HERE from the frozen predicates so
-            # a follower never re-implements them (A = unfiltered, B = shallow
-            # pierce, C = B and 1m close-back, D = C and high attack volume).
-            # E needs the whole log's causal median and is deliberately absent.
-            variants = ["A", "B"]
-            if str(r.get("flow_reject", "")) == "1":
-                variants.append("C")
-                if str(r.get("flow_vhigh", "")) == "1":
-                    variants.append("D")
-            out.append({
-                "symbol": r["symbol"], "side": r["side"],
-                "level_kind": r.get("level_kind", "swing"),
-                "fill_ts": fill_ts, "fill_utc": r.get("fill_utc", ""),
-                "entry_px": entry, "atr": atr,
-                "universe": r.get("universe", ""),
-                "pierce_atr": float(r.get("pierce_atr") or 0),
-                # Echoed even though the filter above already guarantees
-                # them: RaidBot re-checks variant_b/status itself, and a
-                # consumer that defensively re-validates should be able to.
-                # Dropping them would make every row fail its check while
-                # the payload looked correct (found 2026-08-19 by diffing
-                # the consumer's rules against this payload, not by
-                # reading either side's prose).
-                "variant_b": "1", "status": "OPEN",
-                "variants": variants,
-                # Position-sizing inputs (2026-08-20).  Followers must NOT
-                # hardcode the frozen constants: risk-based sizing needs the
-                # stop, and a client that bakes in 3.5 silently desyncs the
-                # day the rule changes.  size_base = (equity x risk_pct) /
-                # |entry - stop| keeps每筆風險固定, which is what the研究
-                # numbers (mean R) are denominated in — a fixed-notional
-                # client would carry 2.7x more risk on ADA than on BTC and
-                # its results could never be compared to the shadow ledger.
-                "stop_px": round(stop_px, 10),
-                "risk_frac": round(RAID_STOP_ATR * atr / entry, 6),
-                "hold_hours": RAID_HOLD_H,
-            })
-    out.sort(key=lambda x: x["fill_ts"], reverse=True)
+    published = None
+    for r in rows:
+        fill_ts = int(r["fill_ts"])
+        if now - fill_ts > RAID_SIGNAL_MAX_AGE_H * 3600:
+            continue          # publisher may lag; never serve a stale signal
+        published = published or r["updated_at"]
+        out.append({
+            "symbol": r["symbol"], "side": r["side"],
+            "level_kind": r["level_kind"],
+            "fill_ts": fill_ts, "fill_utc": r["fill_utc"],
+            "entry_px": float(r["entry_px"]), "atr": float(r["atr"]),
+            "universe": r["universe"],
+            "pierce_atr": float(r["pierce_atr"] or 0),
+            # Echoed even though the publisher already guarantees them:
+            # RaidBot re-checks variant_b/status itself, and a consumer that
+            # defensively re-validates should be able to.  Dropping them made
+            # every row fail its check while the payload looked correct
+            # (2026-08-19, found by diffing the consumer's rules against the
+            # payload rather than reading either side's prose).
+            "variant_b": "1", "status": "OPEN",
+            "variants": [v for v in str(r["variants"]).split(",") if v],
+            # Sizing inputs: followers must NOT hardcode the frozen
+            # constants.  size_base = (equity x risk_pct) / |entry - stop|
+            # keeps per-trade risk fixed, which is the unit the research
+            # mean-R is denominated in; a fixed-notional client would carry
+            # 2.7x more risk on ADA than on BTC and could never be compared
+            # to the shadow ledger.
+            "stop_px": float(r["stop_px"]),
+            "risk_frac": float(r["risk_frac"]),
+            "hold_hours": RAID_HOLD_H,
+        })
     return {"list": out, "count": len(out),
+            "published_utc": str(published) if published else None,
             "asof_utc": _t.strftime("%Y-%m-%d %H:%M:%S", _t.gmtime(now)),
             "max_age_h": RAID_SIGNAL_MAX_AGE_H,
             "rules": {"stop_atr_mult": RAID_STOP_ATR,

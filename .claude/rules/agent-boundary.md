@@ -27,7 +27,10 @@ Files under `indicator/agent/` MUST NOT import, at any depth:
   `weather_station` (survival-layer snapshot, 2026-08-17 — WRITTEN by
   `research/weather_station_publish.py` on the quant side; the agent
   never computes battery states itself, that would need kline history
-  the DB does not hold)
+  the DB does not hold),
+  `raid_signals_live` (follow-bot signal surface, 2026-08-20 — WRITTEN by
+  `research/raid_signals_publish.py` hourly; replaces the in-image CSV
+  read, which was permanently stale because the recorder runs off-cloud)
 - Pure-computation imports from `market_data.tasks.cancel_playbook_watcher`
   / `research.cancel_flow_analyze` (frozen feature definitions — read-only
   code path; the agent never calls their write/alert functions)
