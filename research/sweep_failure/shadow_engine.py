@@ -54,9 +54,43 @@ try:
 except Exception:
     pass
 
-CACHE = HERE / ".cache"
-LOG = Path(__file__).resolve().parents[2] / "research/results/sweep_shadow_log.csv"
-BASE = "https://api.binance.com/api/v3/klines"
+# ── 資料落點（2026-08-20 上雲）────────────────────────────────────────────
+# SWEEP_DATA_DIR 設定時（Railway volume，例如 /data/sweep）：cache 與凍結帳本
+# 都放 volume —— 容器層是暫存的，寫進去等於每次部署歸零。第一次啟動時從
+# image 內建的 repo 副本播種，之後只 append。沒設環境變數 = 本機原行為。
+#
+# 帳本是「由 K 線決定性重算」的（同一根 bar 序列跑幾次都得到同一批 key），
+# 所以播種副本比較舊也會自我補齊 —— 代價只是補齊列的 first_seen 較晚，
+# 不計入 prospective 子集（誠實的一次性成本）。
+_DATA_DIR = os.environ.get("SWEEP_DATA_DIR", "").strip()
+if _DATA_DIR:
+    _root = Path(_DATA_DIR)
+    CACHE = _root / ".cache"
+    LOG = _root / "sweep_shadow_log.csv"
+    _repo_log = Path(__file__).resolve().parents[2] / "research/results/sweep_shadow_log.csv"
+    _repo_cache = HERE / ".cache"
+    try:
+        _root.mkdir(parents=True, exist_ok=True)
+        CACHE.mkdir(parents=True, exist_ok=True)
+        if not LOG.exists() and _repo_log.exists():
+            import shutil
+            shutil.copy2(_repo_log, LOG)
+            print(f"seeded log from repo copy ({_repo_log.stat().st_size} bytes)")
+        if _repo_cache.exists():
+            import shutil
+            for _f in _repo_cache.glob("*.csv"):
+                _t = CACHE / _f.name
+                if not _t.exists():
+                    shutil.copy2(_f, _t)
+    except Exception as _e:  # noqa: BLE001
+        print(f"SWEEP_DATA_DIR seed failed: {_e}")
+else:
+    CACHE = HERE / ".cache"
+    LOG = Path(__file__).resolve().parents[2] / "research/results/sweep_shadow_log.csv"
+# 主源 + 鏡像：Railway 出口 IP 會被 Binance 擋（fapi 實測 418）；
+# data-api.binance.vision 是官方公開資料域，回應形狀完全相同。
+BASE = os.environ.get("SWEEP_KLINES_BASE", "https://api.binance.com/api/v3/klines")
+BASE_FALLBACK = "https://data-api.binance.vision/api/v3/klines"
 FREEZE_TS = int(datetime(2026, 7, 28, tzinfo=timezone.utc).timestamp())
 SCEN_A = {"entry": 7.0, "texit": 3.0, "sexit": 10.0}
 
@@ -259,11 +293,18 @@ def _bootstrap(sym: str, p: Path) -> Path | None:
     rows, start = [], BOOTSTRAP_START_S * 1000
     try:
         while True:
-            req = urllib.request.Request(
-                f"{BASE}?symbol={sym}USDT&interval=1h&startTime={start}&limit=1000",
-                headers={"User-Agent": "sweep-shadow/1.0"})
-            with urllib.request.urlopen(req, timeout=30) as r:
-                d = json.loads(r.read().decode())
+            d = None
+            for _base in (BASE, BASE_FALLBACK):
+                try:
+                    req = urllib.request.Request(
+                        f"{_base}?symbol={sym}USDT&interval=1h&startTime={start}&limit=1000",
+                        headers={"User-Agent": "sweep-shadow/1.0"})
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        d = json.loads(r.read().decode())
+                    break
+                except Exception:  # noqa: BLE001
+                    if _base == BASE_FALLBACK:
+                        raise
             if not d:
                 break
             now_ms = int(time.time() * 1000)
@@ -301,11 +342,20 @@ def refresh(sym: str) -> Path | None:
     last = rows[-1][0]
     got = []
     try:
-        req = urllib.request.Request(
-            f"{BASE}?symbol={sym}USDT&interval=1h&startTime={(last + 3600) * 1000}"
-            f"&limit=1000", headers={"User-Agent": "sweep-shadow/1.0"})
-        with urllib.request.urlopen(req, timeout=20) as r:
-            d = json.loads(r.read().decode())
+        d = None
+        for _base in (BASE, BASE_FALLBACK):
+            try:
+                req = urllib.request.Request(
+                    f"{_base}?symbol={sym}USDT&interval=1h&startTime={(last + 3600) * 1000}"
+                    f"&limit=1000", headers={"User-Agent": "sweep-shadow/1.0"})
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    d = json.loads(r.read().decode())
+                break
+            except Exception as _e:  # noqa: BLE001
+                if _base == BASE_FALLBACK:
+                    raise
+        if d is None:
+            raise RuntimeError("no kline source reachable")
         now_ms = int(time.time() * 1000)
         for k in d:
             if int(k[6]) > now_ms:      # close_time in the future = live bar

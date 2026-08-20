@@ -39,7 +39,9 @@ sys.path.insert(0, str(ROOT / "research" / "sweep_failure"))
 
 import sweep_core as SC                                    # noqa: E402
 
-CACHE = ROOT / "research" / "sweep_failure" / ".cache"
+# SWEEP_DATA_DIR 設定時（雲端 volume）cache 在那裡 —— 跟 shadow_engine 同規則
+_DD = __import__("os").environ.get("SWEEP_DATA_DIR", "").strip()
+CACHE = (Path(_DD) / ".cache") if _DD else ROOT / "research" / "sweep_failure" / ".cache"
 CORE9 = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "LINK", "AVAX"]
 WINDOW = 720          # 30d of 1h bars
 Z_MID, Z_TREND = 1.0, 2.0

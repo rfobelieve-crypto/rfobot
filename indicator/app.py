@@ -3451,6 +3451,19 @@ def _run_sweep_shadow():
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:  # noqa: BLE001
         logging.getLogger(__name__).exception("sweep_shadow_run_failed")
+    # 記帳後緊接發布（2026-08-20 上雲）：本機 bat 的同一條鏈 —— 訊號進 MySQL、
+    # 天氣站快照更新。少了這兩步，雲端引擎寫的帳本永遠到不了消費端，
+    # bus factor 還是 1（本機關機 = 訊號斷）。
+    for pub in ("raid_signals_publish.py", "weather_station_publish.py"):
+        ps = root / "research" / pub
+        if not ps.exists():
+            continue
+        try:
+            subprocess.run([_sys.executable, str(ps)], cwd=str(root),
+                           timeout=300, check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:  # noqa: BLE001
+            logging.getLogger(__name__).exception("sweep_publish_failed pub=%s", pub)
 
 
 def start_scheduler():

@@ -41,7 +41,9 @@ except Exception:
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-LOG = ROOT / "research" / "results" / "sweep_shadow_log.csv"
+# 與 shadow_engine 同一條 SWEEP_DATA_DIR 規則（上雲時帳本在 volume 上）
+_DD = __import__("os").environ.get("SWEEP_DATA_DIR", "").strip()
+LOG = (Path(_DD) / "sweep_shadow_log.csv") if _DD     else ROOT / "research" / "results" / "sweep_shadow_log.csv"
 MAX_AGE_H = 8
 STOP_ATR = 3.5      # mirrors sweep_core.DIS
 HOLD_H = 8          # mirrors sweep_core.HOLD
