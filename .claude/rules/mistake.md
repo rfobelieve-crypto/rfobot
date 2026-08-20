@@ -1477,6 +1477,29 @@ WF OOS 的 `pred_ret` 是每個 fold 的子模型產生的，每個 fold 只用�
 
 ---
 
+## 2026-08-20: bash 雙引號把 .bat 附加行裡的 \v \r 吃成控制字元——「改完立刻執行一次」規矩當場抓到（avoided）
+
+**What happened:**
+往 `shadow_engine.bat` 附加 v7_veto_publish 那行時，為了避開 08-19 的
+CRLF 坑，特地用 python 以 bytes + `\r\n` 附加——但 python 程式碼是包在
+**bash 雙引號的 `python -c "..."`** 裡传的。bash 在雙引號內先吃一層
+反斜線：`\\\\v` → python 看到 `\\v` → bytes 裡是**垂直定位符 0x0B**，
+`\\r` 同理變 CR。落到 .bat 的是 `python research␋7_veto_publish.py >>
+research␍esults\...`——cmd 報「系統找不到指定的路徑」。
+
+**為什麼沒釀災**：08-19 立的規矩「改任何 .bat 之後必須立刻整支執行
+一次、看產物不看狀態燈」當場執行了——log 尾巴沒有預期的發布行，兩分鐘
+內定位到壞行。壞的只有新附加的最後一行，既有班車不受影響。
+
+**Rule:** 要把含反斜線路徑的內容寫進檔案，**不要經過 bash 雙引號的
+`python -c`**——寫成 .py 檔再執行（零 shell 轉義層），或在 python 字串裡
+用 forward slash / `chr()` 組合。`\v`、`\r`、`\n`、`\t`、`\f` 開頭的
+Windows 路徑段（`\results`、`\v7_...`、`\tasks`）是高危組合。08-19 規矩
+補充版：**「執行一次」的判準是產物內容（log 末行是不是新步驟的輸出），
+不只是 exit code**——這次 bat 整體 exit 0，死的只有最後一行。
+
+---
+
 ## 2026-08-19: 用 Edit 工具改 .bat 把 CRLF 換成 LF，每小時記帳排程靜默死了 29 小時
 
 **What happened:**
