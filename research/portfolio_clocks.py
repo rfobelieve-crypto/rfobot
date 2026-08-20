@@ -405,6 +405,98 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         errors.append(f"crowd_battery: {e}")
 
+    # 2e-e ── correlation budget (§0.52, 2026-08-20) ─────────────────────
+    # All three live strategies (V7 4h mean reversion, sweep-failure
+    # exhaustion, the grid) harvest mean reversion.  If that is true they
+    # are one risk factor in three costumes, and a one-way market does not
+    # take one of them down -- it takes all three on the same days.  Full
+    # history, core9, taker 5bps: mean-rev archetypes correlate +0.50 with
+    # each other and NEGATIVELY with the trend family (RSI vs Donchian
+    # -0.65), and the grid proxy loses 8.5x more per bar in TRENDING than
+    # RANGING.  This line tracks the number that would move first: the
+    # family's internal correlation on a trailing 30d window.  Rising
+    # correlation = the book is concentrating, regardless of P&L.
+    try:
+        # Self-contained on purpose: 2e-c defines _bars/_cb_sc inside its
+        # own try, so leaning on them would make this block fail whenever
+        # that one does (mistake.md 2026-08-01 -- a patch referencing a
+        # name bound in a sibling branch).
+        from research.crowd_battery import pos_mr as _p_mr
+        from research.crowd_battery2 import pos_bb_mr as _p_bb
+        from research.crowd_battery3 import pos_grid as _p_gr
+        from research.survival_cards import CACHE as _cc, SC as _cs
+        _w = _cs.load_csv(str(_cc / "BTCUSDT_1h.csv"))[-1440:]  # 60d
+        _c = [b[_cs.C] for b in _w]
+
+        def _ser(_pos):
+            _o, _pv = [], 0.0
+            for _i in range(len(_c) - 1):
+                _p = float(_pos[_i])
+                _o.append(_p * (_c[_i + 1] / _c[_i] - 1)
+                          - abs(_p - _pv) * 5.0 / 1e4)
+                _pv = _p
+            return _o
+
+        def _cor(_a, _b):
+            _n = min(len(_a), len(_b))
+            _ma = sum(_a[:_n]) / _n
+            _mb = sum(_b[:_n]) / _n
+            _va = sum((x - _ma) ** 2 for x in _a[:_n]) ** 0.5
+            _vb = sum((x - _mb) ** 2 for x in _b[:_n]) ** 0.5
+            if _va == 0 or _vb == 0:
+                return 0.0
+            return sum((_a[i] - _ma) * (_b[i] - _mb)
+                       for i in range(_n)) / (_va * _vb)
+
+        _fam = {"rsi": _ser(_p_mr(_w)), "grid": _ser(_p_gr(_w)),
+                "bb": _ser(_p_bb(_w))}
+        _ps = [_cor(_fam["rsi"], _fam["grid"]), _cor(_fam["rsi"], _fam["bb"]),
+               _cor(_fam["grid"], _fam["bb"])]
+        _avg = sum(_ps) / len(_ps)
+        _ln = (f"correlation budget (60d, BTC): mean-rev family internal r "
+               f"{_avg:+.2f} (rsi/grid {_ps[0]:+.2f}, rsi/bb {_ps[1]:+.2f}, "
+               f"grid/bb {_ps[2]:+.2f}) | full-history ref +0.50")
+        # Concentration alert, not a performance alert: three same-family
+        # strategies sized as if independent is a portfolio error whether
+        # or not they happen to be making money this month.
+        if _avg > 0.60:
+            _ln += "  << family concentrating - no diversification (§0.52)"
+        lines.append(_ln)
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"corr_budget: {e}")
+
+    # 2e-f ── ADX de-size rule shadow (§0.52, verdict due ~2026-09-16) ───
+    # Display only until the forward window reaches 30 days -- the scorer
+    # refuses to render a verdict before that on its own (sweep fills
+    # cluster in time, so a 3-day window is one episode, not 131 samples).
+    # First run 2026-08-20 had PRE and POST disagreeing on the SIGN of the
+    # TRENDING effect, which is the thing to watch here, not the P&L.
+    rcd, outd = run(["research/adx_desize_shadow.py"], 420)
+    if rcd == 0:
+        keep = [ln.strip() for ln in outd.splitlines()
+                if "POST-FREEZE" in ln or "VERDICT" in ln
+                or "INSUFFICIENT" in ln or "blind null" in ln]
+        lines.append("adx-desize (§0.52): " + " | ".join(keep)[:320]
+                     if keep else "adx-desize: no output")
+    else:
+        errors.append(f"adx_desize rc={rcd}")
+
+    # 2e-g ── vol-targeting shadow (§0.53, verdict due ~2026-09-19+) ─────
+    # The continuous counterpart to 2e-f's binary ADX de-size; frozen
+    # 2026-08-20, so every fill before that date is in-sample reference.
+    # Display only. The line to watch is the POST block and whether the
+    # in-sample pattern (beats null on MDD, loses to null on return)
+    # repeats forward -- §0.53 pre-committed that repeating it fails V-P2.
+    rcv, outv = run(["research/vol_target_shadow.py"], 500)
+    if rcv == 0:
+        keep = [ln.strip() for ln in outv.splitlines()
+                if "POST-FREEZE" in ln or "VERDICT" in ln
+                or "INSUFFICIENT" in ln or "V-P3" in ln]
+        lines.append("vol-target (§0.53): " + " | ".join(keep)[:320]
+                     if keep else "vol-target: no output")
+    else:
+        errors.append(f"vol_target rc={rcv}")
+
     # 2f ── V7 entry-execution shadow refresh (frozen 2026-08-04) ────────
     # The forward counter only accumulates when the script runs; it had no
     # scheduler until 2026-08-08 (79h stale when caught). Weekly is enough:

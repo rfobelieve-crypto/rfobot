@@ -57,6 +57,11 @@ def latest_signal() -> dict[str, Any]:
                 {"feature": "post_absorb_breakout", "shap": 0.0198},
             ],
             "model_version": "v7-dual-2026-06",
+            "published_utc": _now_iso(),
+            "signal_age_hours": 0.5,
+            "upstream_last_bar": "2026-07-07T00:00:00+00:00",
+            "upstream_age_minutes": 30.0,
+            "upstream_live": True,
             "disclaimer": DISCLAIMER,
             "_source": "seed",
         }
@@ -69,6 +74,16 @@ def latest_signal() -> dict[str, Any]:
                 "FROM tracked_signals ORDER BY signal_time DESC LIMIT 1"
             )
             row = cur.fetchone()
+            # Upstream liveness, read in the same round-trip. A consumer
+            # holding only signal_time cannot tell "the model is running
+            # and simply has not fired" from "the model died three days
+            # ago" — this feed returns the same last-known signal, with
+            # the same HTTP 200, in both cases. tracked_signals only gets
+            # a row when a signal FIRES; indicator_history gets one every
+            # bar, so it is the honest liveness witness. Same failure mode
+            # the raid feed already guards with published_utc (2026-08-20).
+            cur.execute("SELECT MAX(dt) AS last_bar FROM indicator_history")
+            bar_row = cur.fetchone() or {}
     finally:
         conn.close()
     if not row:
@@ -88,6 +103,17 @@ def latest_signal() -> dict[str, Any]:
                     drivers.append({"feature": item[0], "shap": item[1]})
         except (json.JSONDecodeError, TypeError):
             pass
+    now = datetime.now(timezone.utc)
+    sig_dt = row.get("signal_time")
+    last_bar = bar_row.get("last_bar")
+    # DB datetimes are naive UTC; make them comparable without shifting.
+    age_h = round((now - sig_dt.replace(tzinfo=timezone.utc)).total_seconds() / 3600.0, 2) \
+        if sig_dt else None
+    bar_age_min = round((now - last_bar.replace(tzinfo=timezone.utc)).total_seconds() / 60.0, 1) \
+        if last_bar else None
+    # One bar per hour; 150 min tolerates a late cycle without crying wolf.
+    upstream_live = bar_age_min is not None and bar_age_min <= 150
+
     return {
         "signal_time": row["signal_time"].isoformat() if row.get("signal_time") else None,
         "direction": row.get("direction"),
@@ -97,6 +123,12 @@ def latest_signal() -> dict[str, Any]:
         "entry_price": _f(row.get("entry_price")),
         "top_drivers": drivers,
         "model_version": row.get("model_version"),
+        # ── liveness (see comment at the indicator_history query above) ──
+        "published_utc": _now_iso(),
+        "signal_age_hours": age_h,
+        "upstream_last_bar": last_bar.isoformat() if last_bar else None,
+        "upstream_age_minutes": bar_age_min,
+        "upstream_live": upstream_live,
         "disclaimer": DISCLAIMER,
         "_source": "live",
     }
