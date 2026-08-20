@@ -130,8 +130,94 @@ def build_payload() -> dict:
             {"id": "liq_bounce", "label_zh": "清算搶反彈",
              "label_en": "Liq-bounce hunters", "value": _liq_bounce_state(btc)},
         ],
+        # ── reefing (縮帆, §0.52/§0.53, added 2026-08-20) ────────────────
+        # The station's RESPONSE arm: the gauges above measure the wind,
+        # this block says how much sail the pre-registered rules would
+        # carry right now.  Status is "preregistered" until the forward
+        # verdicts land — the site must render it as 預註冊·forward累積中,
+        # never as an active rule (研究結論上牆必須標狀態, CLAUDE.md).
+        # Ratios and dates only; no sizes, no dollars.
+        "reefing": _reefing_block(btc, adx_btc),
         "cadence": "hourly",
         "disclaimer": "Research display only. Not financial advice.",
+    }
+
+
+def _reefing_block(btc_bars, adx_btc: str) -> dict:
+    """Current would-be weights of the frozen reefing rules + verdict clocks.
+
+    Weights come from the same frozen §0.53 machinery the scorer replays
+    (vol_target_shadow.weight_series) — one implementation, no drift
+    between what the site shows and what the verdict will be judged on.
+    """
+    from datetime import date
+
+    try:
+        from research.vol_target_shadow import weight_series
+        w_btc = None
+        ws = weight_series(btc_bars)
+        if ws:
+            w_btc = list(ws.values())[-1]
+        w_all, n = 0.0, 0
+        for sym in CORE9:
+            fp = CACHE / f"{sym}USDT_1h.csv"
+            if not fp.exists():
+                continue
+            s = weight_series(SC.load_csv(str(fp)))
+            if s:
+                w_all += list(s.values())[-1]
+                n += 1
+        w_core9 = round(w_all / n, 3) if n else None
+    except Exception:
+        w_btc = w_core9 = None
+
+    try:
+        from research.crowd_battery import pos_mr
+        from research.crowd_battery2 import pos_bb_mr
+        from research.crowd_battery3 import pos_grid as _pg
+        w = btc_bars[-1440:]
+        c = [b[SC.C] for b in w]
+
+        def ser(pos):
+            o, pv = [], 0.0
+            for i in range(len(c) - 1):
+                p = float(pos[i])
+                o.append(p * (c[i + 1] / c[i] - 1) - abs(p - pv) * 5e-4)
+                pv = p
+            return o
+
+        def cor(a, b):
+            k = min(len(a), len(b))
+            ma, mb = sum(a[:k]) / k, sum(b[:k]) / k
+            va = sum((x - ma) ** 2 for x in a[:k]) ** .5
+            vb = sum((x - mb) ** 2 for x in b[:k]) ** .5
+            return 0.0 if va == 0 or vb == 0 else sum(
+                (a[i] - ma) * (b[i] - mb) for i in range(k)) / (va * vb)
+
+        fam = [ser(pos_mr(w)), ser(_pg(w)), ser(pos_bb_mr(w))]
+        prs = [cor(fam[0], fam[1]), cor(fam[0], fam[2]), cor(fam[1], fam[2])]
+        corr60 = round(sum(prs) / 3, 2)
+    except Exception:
+        corr60 = None
+
+    today = date.today()
+    return {
+        "status": "preregistered",          # site: 預註冊·forward累積中
+        "label_zh": "縮帆", "label_en": "Reefing",
+        "note_zh": "不預測風暴，只在風大時收帆——風控研究線，未生效",
+        "note_en": "reduce sail when the wind is up; pre-registered, not live",
+        "vol_target_w_btc": round(w_btc, 3) if w_btc is not None else None,
+        "vol_target_w_core9": w_core9,
+        "adx_desize_now": "x0.5" if adx_btc == "TRENDING" else "x1.0",
+        "mr_family_corr_60d": corr60,
+        "clocks": [
+            {"id": "adx_desize", "label_zh": "ADX 減碼判決",
+             "due": "2026-09-16",
+             "days_left": max(0, (date(2026, 9, 16) - today).days)},
+            {"id": "vol_target", "label_zh": "vol targeting 判決",
+             "due": "2026-09-19",
+             "days_left": max(0, (date(2026, 9, 19) - today).days)},
+        ],
     }
 
 
