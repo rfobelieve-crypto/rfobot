@@ -165,6 +165,15 @@ async def public_signal_feed(request: Request) -> JSONResponse:
             "confidence": full.get("confidence"),
             "regime": full.get("regime"),
             "entry_price": full.get("entry_price"),
+            # Liveness passthrough. Without these a consumer cannot tell a
+            # quiet market from a dead upstream — both look like "same
+            # signal as last poll, HTTP 200". These say nothing about how
+            # the model thinks, so they stay inside the public scope.
+            "published_utc": full.get("published_utc"),
+            "signal_age_hours": full.get("signal_age_hours"),
+            "upstream_last_bar": full.get("upstream_last_bar"),
+            "upstream_age_minutes": full.get("upstream_age_minutes"),
+            "upstream_live": full.get("upstream_live"),
             "disclaimer": full.get("disclaimer"),
         }
         _feed_cache["ts"] = now
@@ -565,7 +574,14 @@ def _sweep_status_payload() -> dict:
             ("E", "E 三面板盤感（OI↓∧CVD順破∧清算高）",
              lambda r: _ep(r) and (r.get("first_seen_utc") or "") >= "2026-08-02")):
         st = SE.gate_stats(log, pred)
-        cohorts.append({"key": key, "label_zh": zh, **st})
+        # core9 並列（2026-08-20）：跟單機器人**只交易 core9**，但這張表原本
+        # 不分 universe 全算，把 added20 也算進去 —— 產品端照這些數字選變體，
+        # 選到的卻是另一個母體。實測差距足以改變排序：D 在全樣本顯著、
+        # 在 core9 不顯著；R∧V 全樣本 CI-low +0.070、core9 −0.113。
+        # 不動 gate 的算術（那是凍結的時鐘），只並列出來讓人自己比。
+        st9 = SE.gate_stats(log, lambda r, _p=pred: _p(r)
+                            and str(r.get("universe", "")) == "core9")
+        cohorts.append({"key": key, "label_zh": zh, **st, "core9": st9})
     combo_zh = {
         "R∧V": "放量刺、縮回來", "R∧Q": "縮回＋確認掃止損",
         "R∧V∧Q": "三重確認（歷史最肥）", "R∧快": "五分鐘搶完就跑",
@@ -576,8 +592,12 @@ def _sweep_status_payload() -> dict:
         # forward_only: 組合是看著 07-28→08-02 的列挑出來的，那段是挑選期
         # 資料 —— 拿它給被挑出來的組合打分是自我證成（R∧Q 看板 +0.82，
         # 真前瞻 n=4 CI −0.206）。網站只呈現註冊後的列。
-        st = SE.gate_stats(log, CW.forward_only(pred))
-        combos.append({"key": name, "label_zh": combo_zh.get(name, ""), **st})
+        fwd = CW.forward_only(pred)
+        st = SE.gate_stats(log, fwd)
+        st9 = SE.gate_stats(log, lambda r, _f=fwd: _f(r)
+                            and str(r.get("universe", "")) == "core9")
+        combos.append({"key": name, "label_zh": combo_zh.get(name, ""),
+                       **st, "core9": st9})
     try:
         clocks = queries.public_research_clocks()
     except Exception:  # noqa: BLE001
@@ -599,6 +619,9 @@ def _sweep_status_payload() -> dict:
     return {"gate": gate, "recent": recent, "asof_utc": asof,
             "v7_filters": v7f,
             "cohorts": cohorts, "combos": combos, "clocks": clocks,
+            "universes": {"default": "all（core9 + added20）",
+                          "core9": "跟單機器人實際交易的凍結籃子 —— "
+                                   "產品端要看的是這一組"},
             "watchlist_registered": CW.REGISTERED,
             "mode": "shadow", "disclaimer":
             "Forward shadow validation in progress — not a live strategy, "
