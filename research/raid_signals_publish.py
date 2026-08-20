@@ -11,10 +11,20 @@ Fix is the path weather_station already proved: the quant side PERSISTS,
 the agent only SELECTs.  This publisher rides the hourly SweepShadow batch
 right after the recorder refreshes the log.
 
-Only OPEN, variant-B, side-bearing rows within the HOLD window are
-published; the table is replaced wholesale each run so a signal that
-closed or aged out simply disappears.  Variant membership (A/B/C/D) is
-computed here from the frozen predicates so no consumer re-implements them.
+Only OPEN, side-bearing rows within the HOLD window are published; the
+table is replaced wholesale each run so a signal that closed or aged out
+simply disappears.  Membership is computed here from the frozen predicates
+so no consumer re-implements them, and shipped as one comma list:
+
+  A/B/C/D   the cohort ladder (D subset-of C subset-of B subset-of A)
+  R / RV    the frozen watchlist combos (registered 2026-08-02) — these do
+            NOT require the shallow-pierce condition, so they are not a
+            subset of B.  Until 2026-08-20 this publisher dropped every
+            variant_b != 1 row, which made R and RV unreachable downstream:
+            a consumer asking for R would silently receive only B and-R = C.
+
+Publishing non-B rows changes nothing for existing consumers: a bot asking
+for "B" still only matches rows whose list contains B.
 """
 from __future__ import annotations
 
@@ -65,7 +75,7 @@ def collect() -> list[tuple]:
     rows = []
     with LOG.open(newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
-            if r.get("status") != "OPEN" or r.get("variant_b") != "1":
+            if r.get("status") != "OPEN":
                 continue
             if r.get("side") not in ("LONG", "SHORT"):
                 continue
@@ -80,11 +90,22 @@ def collect() -> list[tuple]:
             if not (entry > 0 and atr > 0):
                 continue
             sgn = 1 if r["side"] == "LONG" else -1
-            variants = ["A", "B"]
-            if str(r.get("flow_reject", "")) == "1":
-                variants.append("C")
-                if str(r.get("flow_vhigh", "")) == "1":
-                    variants.append("D")
+            is_b = str(r.get("variant_b", "")) == "1"
+            is_r = str(r.get("flow_reject", "")) == "1"
+            is_v = str(r.get("flow_vhigh", "")) == "1"
+            variants = ["A"]
+            if is_b:
+                variants.append("B")
+                if is_r:
+                    variants.append("C")
+                    if is_v:
+                        variants.append("D")
+            # 組合不套 B：R 是「有縮回就算」，RV 是「放量刺＋縮回來」。
+            # 它們跟 C/D 的差別正是少了淺穿越那道門，所以會涵蓋 B 以外的列。
+            if is_r:
+                variants.append("R")
+                if is_v:
+                    variants.append("RV")
             rows.append((
                 r["symbol"], r["side"], r.get("level_kind", "swing"),
                 fill_ts, r.get("fill_utc", ""), entry, atr,
