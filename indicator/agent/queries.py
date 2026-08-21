@@ -62,6 +62,7 @@ def latest_signal() -> dict[str, Any]:
             "upstream_last_bar": "2026-07-07T00:00:00+00:00",
             "upstream_age_minutes": 30.0,
             "upstream_live": True,
+            "pred_sign": 1,
             "disclaimer": DISCLAIMER,
             "_source": "seed",
         }
@@ -82,7 +83,14 @@ def latest_signal() -> dict[str, Any]:
             # a row when a signal FIRES; indicator_history gets one every
             # bar, so it is the honest liveness witness. Same failure mode
             # the raid feed already guards with published_utc (2026-08-20).
-            cur.execute("SELECT MAX(dt) AS last_bar FROM indicator_history")
+            # Latest bar + the SIGN of its raw prediction. The sign (one
+            # bit, magnitude withheld) powers the conviction-decay exit on
+            # the product side — the §0.51 attribution's main positive
+            # contributor (+20bps), absent from the follow bot until now.
+            # Frozen semantics live in okx/executor.py: strictly <0 / >0
+            # against the held side, 0 never counts, 2 consecutive bars.
+            cur.execute("SELECT dt AS last_bar, pred_return_4h AS pr "
+                        "FROM indicator_history ORDER BY dt DESC LIMIT 1")
             bar_row = cur.fetchone() or {}
     finally:
         conn.close()
@@ -129,6 +137,12 @@ def latest_signal() -> dict[str, Any]:
         "upstream_last_bar": last_bar.isoformat() if last_bar else None,
         "upstream_age_minutes": bar_age_min,
         "upstream_live": upstream_live,
+        # 1-bit direction of the latest bar's raw prediction (see the
+        # indicator_history query above). Sign only — no magnitude, no
+        # cutoffs; stays inside the "direction + confidence" public scope.
+        "pred_sign": (0 if bar_row.get("pr") is None
+                      else (1 if float(bar_row["pr"]) > 0
+                            else -1 if float(bar_row["pr"]) < 0 else 0)),
         "disclaimer": DISCLAIMER,
         "_source": "live",
     }
