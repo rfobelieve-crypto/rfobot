@@ -127,6 +127,7 @@ C/D**，事後挑統計量最好的變體正是預註冊要擋的事。
 |---|---|
 | 策略分工、風控階段、override 紀錄、網站呈現面 | **本檔（CLAUDE.md）** |
 | 名詞白話解釋（含地形層、池子四種） | `docs/GLOSSARY.md` |
+| DB 45 表目錄（writer/reader/新鮮度） | `docs/DB_REGISTRY.md`（`research/gen_db_registry.py` 重生成）|
 | 流動性獵取全貌（變體/配方/評分/上線路徑） | `docs/RAID_PLAYBOOK.md` |
 | V7 本體架構細節（資料層→模型→推論） | `docs/系統架構說明書.md` |
 | 多策略組合風控設計 | `docs/PORTFOLIO_RISK_FRAMEWORK.md` |
