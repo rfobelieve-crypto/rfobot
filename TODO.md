@@ -176,6 +176,15 @@ shadow_engine 裡已鋪好 `SWEEP_DATA_DIR`/`SWEEP_KLINES_BASE`，本次補齊
 `RAILWAY_DOCKERFILE_PATH=Dockerfile.research`、`TRAIN_PHASE=parallel`）、
 volume `research-train-volume` @ /data、MySQL 引用變數五枚。
 
+**#2 同供應商雙儲存（2026-08-21 當日完成）**：盤點發現雙儲存本體已在
+先前修復中統一（backfill_all_parquet 與 backfill_historical_alt 都寫
+market_data/raw_data，14 個小時級檔全部健康 1d 內）；實質殘留＝兩個
+從未被排程的日頻檔死 130 天。處置：**F&G 復活**（`refresh_fng.py` 接
+daily_collect step1.6，全歷史冪等重寫，已跑通至 2026-08-21 值 71——
+保留原因：縮帆 phase-2 註冊候選，vol 控制後增量 +0.080/9 幣）；
+**ETF 退役**（NO-GO 特徵＋不在部署 136＋不在 git，檔案歸檔至
+research/results/retired/）。看板 coinglass 列轉綠。
+
 **五弱點隊列（2026-08-21 使用者定調「一個一個修」）**：#1 班車上雲
 （本節，進行中）→ #2 同供應商雙儲存退役 → #3 DB 表目錄 → #4 秘密管理
 → #5 慢性小病（編碼/CRLF/散落參數）。
