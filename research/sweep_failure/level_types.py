@@ -53,7 +53,9 @@ except Exception:
     pass
 
 OUT = Path(__file__).resolve().parents[2] / "research/results/sweep_level_types.json"
-CACHE = HERE / ".cache"
+# 與 shadow_engine 同一條 SWEEP_DATA_DIR 規則（上雲時 kline cache 在 volume）
+_DD = os.environ.get("SWEEP_DATA_DIR", "").strip()
+CACHE = (Path(_DD) / ".cache") if _DD else HERE / ".cache"
 COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "LINK", "AVAX",
          "TRX", "DOT", "LTC", "UNI", "ATOM", "ETC", "NEAR", "APT", "FIL",
          "ARB", "OP", "INJ", "SUI", "AAVE", "ICP", "ALGO", "VET", "HBAR",

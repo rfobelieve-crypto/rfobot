@@ -20,3 +20,7 @@ REM (needs the local kline cache, not in the image); the site card sat at a
 REM build-time snapshot (asof 08-10, trigger 4/60 vs truth 34/60). Same
 REM off-cloud-recorder fix family as raid_signals_publish above.
 python research\v7_veto_publish.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-08-21: cloud-train parity check (weakness-#1 migration) -- compares
+REM the local ledger hash vs the cloud recorder's train_parity row. Log-only;
+REM 7 consecutive MATCH days unlock the cutover (rule frozen in the script).
+python research\train_parity_check.py >> research\results\sweep_shadow_run.log 2>&1

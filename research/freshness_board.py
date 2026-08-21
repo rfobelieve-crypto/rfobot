@@ -93,6 +93,9 @@ REGISTRY = [
     ("okx balance snapshots", "db",
      "v7_okx_balance_snapshots:ts", 1.5,
      "executor WS alive — the aliveness signal per mistake 2026-07-28"),
+    ("cloud train parity", "db",
+     "train_parity:updated_at", 2.5,
+     "cloud recorder alive (weakness-#1 migration; RED until service up)"),
     # -- daily --
     ("coinglass parquets", "glob",
      "market_data/raw_data/cg_*.parquet", 48.0,

@@ -1,0 +1,29 @@
+# Cloud hourly train (research/cloud_train.py) — the shadow recorder and
+# its DB publishers, moved off the laptop (2026-08-21, data-eng weakness #1).
+#
+# State lives on a Railway volume mounted at SWEEP_DATA_DIR (default /data):
+# the frozen shadow ledger (Gate F evidence) and the 29-coin kline cache.
+# The image carries a repo copy of both purely as SEED material —
+# shadow_engine copies them into the volume on first boot, then the volume
+# is the only truth (build-time-snapshot family, mistake.md 2026-08-20).
+#
+# TRAIN_PHASE=parallel (default): recorder + parity row only, laptop stays
+# authority. TRAIN_PHASE=authority: full train with publishers. Never run
+# authority while the laptop bat still runs shadow_engine.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.indicator.txt .
+RUN pip install --no-cache-dir -r requirements.indicator.txt
+
+COPY indicator/ ./indicator/
+COPY shared/ ./shared/
+COPY market_data/ ./market_data/
+COPY research/ ./research/
+
+ENV PYTHONUNBUFFERED=1 \
+    SWEEP_DATA_DIR=/data \
+    SWEEP_KLINES_BASE=https://data-api.binance.vision/api/v3/klines
+
+CMD ["python", "research/cloud_train.py"]

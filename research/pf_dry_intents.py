@@ -35,7 +35,11 @@ from indicator.portfolio.ledger import (  # noqa: E402
 from indicator.portfolio.limits import default_limits  # noqa: E402
 from indicator.portfolio.risk_engine import decide  # noqa: E402
 
-LOG = ROOT / "research" / "results" / "sweep_shadow_log.csv"
+# 與 shadow_engine 同一條 SWEEP_DATA_DIR 規則（上雲時帳本在 volume）
+import os as _os
+_DD = _os.environ.get("SWEEP_DATA_DIR", "").strip()
+LOG = (Path(_DD) / "sweep_shadow_log.csv") if _DD \
+    else ROOT / "research" / "results" / "sweep_shadow_log.csv"
 FRESH_WINDOW_S = 2 * 3600       # engine runs hourly; look back 2h for safety
 DIS = 3.5                        # frozen disaster-stop mult (sweep_core)
 

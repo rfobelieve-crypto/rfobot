@@ -153,6 +153,33 @@ A-P1/P2/P3 的數字一個都還沒產生。
 只顯示不告警。若到期時 PRE/POST 仍然反向，判 FAIL 收掉——不改檔位、
 不換 ADX 門檻、不延長窗口再試。
 
+### 0.56 班車上雲（2026-08-21 啟動）——數據工程五弱點 #1，cutover 規則先凍結
+
+**目標**：每小時班車（shadow recorder＋三 publisher＋pf 流）從這台筆電
+遷到 Railway `research-train` 服務（`Dockerfile.research`＋`cloud_train.py`，
+volume `/data`，Binance 走 data-api.binance.vision 鏡像——前人在
+shadow_engine 裡已鋪好 `SWEEP_DATA_DIR`/`SWEEP_KLINES_BASE`，本次補齊
+`level_types`/`pf_dry_intents` 兩個沒認 volume 的消費端）。
+
+**兩段式切換（帳本是 Gate F 證據，絕不允許兩個 recorder 同時寫）**：
+- **parallel（現在）**：雲端只跑 shadow_engine 進自己的 volume＋每小時
+  發 `train_parity` 列（CLOSED 列數＋key hash）；筆電班車仍是 authority，
+  每小時跑 `train_parity_check.py` 比對並落 log；新鮮度看板新增
+  「cloud train parity」列盯雲端車活著
+- **cutover 條件（現在凍結，達標才動）**：**連續 7 天 MATCH** → 筆電
+  bat 降級為 puller-only、雲端 `TRAIN_PHASE=authority` 接管全部 publisher。
+  持續 MISMATCH＝分歧未解釋，封鎖切換
+- 帳本種子＝git 內 repo 副本（決定性重算會自我補齊，補齊列 first_seen
+  較晚不計入 prospective——誠實的一次性成本，shadow_engine 註解原文）
+
+**Railway 資源（已建）**：service `research-train`（GitHub main 自動部署、
+`RAILWAY_DOCKERFILE_PATH=Dockerfile.research`、`TRAIN_PHASE=parallel`）、
+volume `research-train-volume` @ /data、MySQL 引用變數五枚。
+
+**五弱點隊列（2026-08-21 使用者定調「一個一個修」）**：#1 班車上雲
+（本節，進行中）→ #2 同供應商雙儲存退役 → #3 DB 表目錄 → #4 秘密管理
+→ #5 慢性小病（編碼/CRLF/散落參數）。
+
 ### 0.55 統一產物新鮮度看板（2026-08-20 上線）——四次同族病的族滅工程
 
 `research/freshness_board.py`＋獨立 Windows 排程 `FreshnessBoard`（每
