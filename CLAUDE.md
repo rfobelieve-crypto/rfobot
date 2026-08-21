@@ -168,6 +168,20 @@ C/D**，事後挑統計量最好的變體正是預註冊要擋的事。
 | 2026-07-24 | 資本再加碼 $1218.44（第 6 次 override）| **已被 07-28 取代** |
 | 2026-07-25 | conviction_decay 上線，0 shadow 樣本 | 生效（`OKX_CONVICTION_DECAY_BARS=2`）|
 | 2026-07-28 | **基準回落 $274**（第二次手動爆倉後；非 override）| **現行基準** |
+| 2026-08-21 | **執行面遷移 Bitget（jarvis 產品端）**——OKX executor 維持停機、不再重啟 | **生效（見下）** |
+
+**執行面遷移（2026-08-21 使用者決定）**：「我現在不從 OKX 接了，主要都用
+Bitget」。V7 的真錢執行從 flow_system 的 OKX executor 遷到 **jarvis 產品端
+（V7Bot on Bitget，訊號走 `/public/signal-feed`，sizing 鎖預算×2 =
+V1.20.2 修法）**。後果：(a) OKX executor **維持 CAP-2 HALT 停機狀態即可**，
+不做基準 override、不清 ENTRY_PAUSED——kill switch 與對帳照跑，帳上 $776
+是使用者資金調度範疇；(b) **Gate B 的 OKX 軌凍結在 21 筆**，執行驗證的
+證據來源改為 jarvis 帳本（`raid_trades.jsonl`／V7 perf，產品端 CLAUDE.md
+本來就定位它回答「執行管道撐不撐得住」）；(c) `v7_okx_positions` 停止增長，
+網站 track-record 的 live 區塊語意隨之凍結（顯示層待議，非急件）；
+(d) 風控後果：真錢 V7 現在跑在 jarvis 的軟停損上（60s 輪詢、無交易所端
+條件單、部署有 1-2 分鐘盲區）——交易所端 plan order 的優先級因此上升，
+已列於 `../jarvis/風控_同向上限_規格.md`。
 
 **讀法**：資本基準只認最後一條（$274）。leverage 只認 2026-06-06 那條
 （有效 2x，10x 只是保證金設定）。歷史章節裡的美元數字（$100 / $197 /
