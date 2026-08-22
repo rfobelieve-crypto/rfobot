@@ -225,8 +225,12 @@ def main() -> int:
                         sent = True
                         break
                     time.sleep(60)
-            if not sent:
-                print("[WARN] freshness alert NOT delivered:", msg)
+            # Success must leave a trace too — during the 08-21/22 outage
+            # the log could not answer "did the alert deliver?" because
+            # success printed nothing. An alert channel whose delivery is
+            # unverifiable is itself a silent-failure surface.
+            print(("alert DELIVERED: " if sent
+                   else "[WARN] freshness alert NOT delivered: ") + msg)
         except Exception as e:  # noqa: BLE001
             print("[WARN] freshness alert failed:", e)
 
