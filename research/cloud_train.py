@@ -89,14 +89,22 @@ def publish_parity() -> None:
         log("parity: no ledger yet")
         return
     keys = []
+    per_sym: dict[str, int] = {}
     with open(p, newline="", encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
             if r.get("status") == "CLOSED":
                 keys.append(f"{r.get('symbol')}|{r.get('fill_ts')}|"
                             f"{r.get('level_kind')}|{r.get('net_r')}")
+                sym = str(r.get("symbol"))
+                per_sym[sym] = per_sym.get(sym, 0) + 1
     keys.sort()
     digest = hashlib.md5("\n".join(keys).encode()).hexdigest()
+    # per-symbol counts (2026-08-24): a bare hash says THAT the sides differ,
+    # never WHERE. The first real mismatch was a constant 6 rows and needed a
+    # manual cache audit to even start localising — a gauge must carry its
+    # own diagnosis.
     payload = {"rows_closed": len(keys), "key_hash": digest,
+               "per_symbol": per_sym,
                "phase": PHASE,
                "asof_utc": datetime.now(timezone.utc).strftime(
                    "%Y-%m-%d %H:%M:%S")}
