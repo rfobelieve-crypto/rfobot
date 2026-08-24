@@ -31,6 +31,11 @@ Files under `indicator/agent/` MUST NOT import, at any depth:
   `raid_signals_live` (follow-bot signal surface, 2026-08-20 — WRITTEN by
   `research/raid_signals_publish.py` hourly; replaces the in-image CSV
   read, which was permanently stale because the recorder runs off-cloud),
+  `raid_pending_levels` (ARMED-but-unfilled levels, 2026-08-24 — WRITTEN by
+  `research/raid_pending_publish.py` hourly. The signals feed reports fills
+  that already happened, costing a batch consumer 0.1328 R/trade (158% of
+  variant B's edge, TODO §0.57); this table lets the consumer fill AT the
+  level the backtest assumes),
   `v7_veto_clock` (adoption-trigger clock, 2026-08-20 — WRITTEN by
   `research/v7_veto_publish.py` hourly; the cloud route could not compute
   it (needs the local kline cache, not in the image) and silently served

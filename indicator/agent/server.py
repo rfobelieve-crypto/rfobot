@@ -767,6 +767,89 @@ async def public_raid_signals_route(request: Request) -> JSONResponse:
     return resp
 
 
+_raid_pending_cache: dict = {"data": None, "ts": 0.0}
+_RAID_PENDING_CACHE_TTL_S = 30.0     # armed levels are time-critical
+
+
+def _raid_pending_payload() -> dict:
+    """Armed-but-unfilled raid levels — the §0.57 fix surface.
+
+    Why this exists next to /public/raid-signals: that feed reports fills
+    that ALREADY happened, so a batch consumer acts 65-342 min late and
+    enters after the edge has been spent (measured: 0.1328 R/trade, 158%
+    of variant B's frozen edge — research/sweep_realizable.py). This feed
+    reports levels that are ARMED: the sweep has occurred, the retest has
+    not. A consumer watching its own price feed fills AT trigger_px, which
+    is the price the frozen backtest assumes.
+
+    Consumption contract: enter when price touches trigger_px in the
+    direction implied by `side`, size off `risk_frac`, stop at `stop_px`,
+    abandon after `expires_ts`. Variants stop at A/B by construction (C/D
+    need 1m flow measured at the fill, which does not exist while the level
+    is only armed). Rows vanish once filled or expired — an empty list is a
+    normal market state, not an outage; check `asof_utc` for liveness.
+    """
+    from shared.db import get_db_conn
+    import time as _t
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT symbol, side, level_kind, sweep_ts, sweep_utc, "
+                "trigger_px, stop_px, atr, risk_frac, pierce_atr, variants, "
+                "expires_ts, universe, updated_at "
+                "FROM raid_pending_levels ORDER BY sweep_ts DESC")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    now = int(_t.time())
+    out, newest = [], None
+    for r in rows:
+        if int(r["expires_ts"]) <= now:
+            continue                      # never serve an expired invitation
+        newest = max(newest or r["updated_at"], r["updated_at"])
+        out.append({
+            "symbol": r["symbol"], "side": r["side"],
+            "level_kind": r["level_kind"],
+            "sweep_ts": int(r["sweep_ts"]), "sweep_utc": r["sweep_utc"],
+            "trigger_px": float(r["trigger_px"]),
+            "stop_px": float(r["stop_px"]), "atr": float(r["atr"]),
+            "risk_frac": float(r["risk_frac"]),
+            "pierce_atr": float(r["pierce_atr"]),
+            "variants": [v for v in str(r["variants"]).split(",") if v],
+            "expires_ts": int(r["expires_ts"]),
+            "expires_in_min": round((int(r["expires_ts"]) - now) / 60),
+            "universe": r["universe"],
+        })
+    return {
+        "list": out, "count": len(out),
+        "asof_utc": str(newest) if newest else None,
+        "rules": {"stop_atr": RAID_STOP_ATR, "hold_h": RAID_HOLD_H,
+                  "entry": "touch trigger_px", "variants_available": ["A", "B"]},
+        "mode": "shadow",
+        "disclaimer": "Forward shadow validation in progress — not a live "
+                      "strategy, not financial advice.",
+    }
+
+
+@mcp.custom_route("/public/raid-pending", methods=["GET"])
+async def public_raid_pending_route(request: Request) -> JSONResponse:
+    now = time.monotonic()
+    if (_raid_pending_cache["data"] is None
+            or now - _raid_pending_cache["ts"] > _RAID_PENDING_CACHE_TTL_S):
+        try:
+            data = await anyio.to_thread.run_sync(_raid_pending_payload)
+        except Exception as e:  # noqa: BLE001 — degrade, never crash
+            data = {"error": f"raid pending unavailable: {type(e).__name__}"}
+        _raid_pending_cache["data"] = data
+        _raid_pending_cache["ts"] = now
+    payload = _raid_pending_cache["data"]
+    resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    resp.headers["Cache-Control"] = "public, max-age=30"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 _weather_cache: dict = {"data": None, "ts": 0.0}
 _WEATHER_CACHE_TTL_S = 300.0
 
