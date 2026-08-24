@@ -14,7 +14,7 @@ Role and non-role, stated up front:
     have opposite follow-ups, and without this attachment they print the
     same FAIL line.
   - Pre-committed reading, so verdict day cannot bend it:
-      RANGING meanR > 0 and TRENDING meanR < 0  -> "regime headwind" note
+      RANGING meanR > 0 and TREND_UP meanR < 0  -> "regime headwind" note
       RANGING meanR <= 0                        -> "edge dead in its home
                                                     regime" note
     Neither note reopens the gate; a regime-headwind FAIL still fails.
@@ -56,7 +56,16 @@ from research.crowd_battery2 import adx_state              # noqa: E402
 LOG = ROOT / "research" / "results" / "sweep_shadow_log.csv"
 CACHE = ROOT / "research" / "sweep_failure" / ".cache"
 OUT = ROOT / "research" / "results" / "sweep_regime_attach.json"
-STATES = ("TRENDING", "NEUTRAL", "RANGING")
+STATES = ("TREND_UP", "TREND_DOWN", "NEUTRAL", "RANGING")
+
+# Directional axis added 2026-08-24 (§0.54b, product-side prompted).
+# ADX alone averages two populations that behave nothing alike: on variant
+# B, full history, TREND_DOWN scores +0.112R (8/9 coins, CI clear of zero)
+# — as good as RANGING's home turf — while TREND_UP scores +0.012R (4/9,
+# CI spans zero). "TRENDING is a headwind" was hiding that. A trend cell is
+# split by the sign of the concurrent 24h return: realised move, no new
+# threshold invented.
+TREND_LOOKBACK_H = 24
 
 
 def max_drawdown(seq):
@@ -86,21 +95,34 @@ def main() -> int:
         return 1
 
     adx: dict[str, dict[int, str]] = {}
+    ret24: dict[str, dict[int, float]] = {}
     base_mix: dict[str, int] = defaultdict(int)
     for s in sorted({x["sym"] for x in rows}):
         fp = CACHE / f"{s}USDT_1h.csv"
         if fp.exists():
-            adx[s] = adx_state(SC.load_csv(str(fp)))
-            for v in adx[s].values():
-                base_mix[v] += 1
+            bars = SC.load_csv(str(fp))
+            adx[s] = adx_state(bars)
+            c = [b[SC.C] for b in bars]
+            ret24[s] = {bars[i][0]: (c[i] / c[i - TREND_LOOKBACK_H] - 1)
+                        for i in range(TREND_LOOKBACK_H, len(bars))}
+            for hour, v in adx[s].items():
+                if v != "TRENDING":
+                    base_mix[v] += 1
+                else:
+                    r = ret24[s].get(hour)
+                    base_mix["TREND_UP" if (r or 0) > 0 else "TREND_DOWN"] += 1
 
     by_state: dict[str, list[float]] = defaultdict(list)
     unlabelled = 0
     for x in rows:
-        lab = adx.get(x["sym"], {}).get(x["ts"] // 3600 * 3600)
+        hour = x["ts"] // 3600 * 3600
+        lab = adx.get(x["sym"], {}).get(hour)
         if lab is None:
             unlabelled += 1
             continue
+        if lab == "TRENDING":
+            r24 = ret24.get(x["sym"], {}).get(hour)
+            lab = "TREND_UP" if (r24 or 0) > 0 else "TREND_DOWN"
         by_state[lab].append(x["r"])
 
     span = (datetime.fromtimestamp(rows[0]["ts"], timezone.utc).date(),
@@ -137,10 +159,14 @@ def main() -> int:
     import random
     random.seed(7)
 
-    def day_cluster_ci(state):
+    def day_cluster_ci(state):  # noqa: D401
         by_day = defaultdict(list)
         for x in rows:
-            lab = adx.get(x["sym"], {}).get(x["ts"] // 3600 * 3600)
+            hour = x["ts"] // 3600 * 3600
+            lab = adx.get(x["sym"], {}).get(hour)
+            if lab == "TRENDING":
+                r24 = ret24.get(x["sym"], {}).get(hour)
+                lab = "TREND_UP" if (r24 or 0) > 0 else "TREND_DOWN"
             if lab == state:
                 by_day[x["ts"] // 86400].append(x["r"])
         days = list(by_day.values())
@@ -160,11 +186,11 @@ def main() -> int:
         print(f"\nRANGING day-clustered CI95 [{ci[0]:+.4f}, {ci[1]:+.4f}] "
               f"({ci[2]} trading days)")
     rg = out_states["RANGING"]["meanR"]
-    tr = out_states["TRENDING"]["meanR"]
+    tr = out_states.get("TREND_UP", {}).get("meanR")
     if span_days < 60 or ci is None or (ci[0] < 0 < ci[1]):
         note = (f"insufficient for a reading (span {span_days:.0f}d < 60d "
                 f"or RANGING CI spans zero) -- pattern so far: RANGING "
-                f"{rg:+.4f} / TRENDING {tr:+.4f}, "
+                f"{rg:+.4f} / TREND_UP {tr:+.4f}, "
                 f"{'OPPOSITE of B-P9' if (rg or 0) < (tr or 0) else 'consistent with B-P9'}"
                 " -- reading deferred to verdict day")
     elif rg is not None and rg > 0 and tr is not None and tr < 0:

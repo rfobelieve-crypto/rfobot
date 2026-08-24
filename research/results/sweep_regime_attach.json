@@ -1,32 +1,40 @@
 {
- "asof_utc": "2026-08-20 10:53",
- "n_total": 850,
+ "asof_utc": "2026-08-24 04:06",
+ "n_total": 1035,
  "states": {
-  "TRENDING": {
-   "n": 324,
-   "share": 0.3812,
-   "base_share": 0.4712,
-   "meanR": 0.061,
-   "sumR": 19.765,
-   "mdd": -17.422
+  "TREND_UP": {
+   "n": 310,
+   "share": 0.2995,
+   "base_share": 0.2196,
+   "meanR": -0.1906,
+   "sumR": -59.092,
+   "mdd": -80.853
+  },
+  "TREND_DOWN": {
+   "n": 166,
+   "share": 0.1604,
+   "base_share": 0.2525,
+   "meanR": 0.1019,
+   "sumR": 16.92,
+   "mdd": -5.532
   },
   "NEUTRAL": {
-   "n": 182,
-   "share": 0.2141,
-   "base_share": 0.2015,
-   "meanR": 0.0534,
-   "sumR": 9.718,
+   "n": 191,
+   "share": 0.1845,
+   "base_share": 0.201,
+   "meanR": 0.0535,
+   "sumR": 10.224,
    "mdd": -9.817
   },
   "RANGING": {
-   "n": 344,
-   "share": 0.4047,
-   "base_share": 0.3274,
-   "meanR": -0.0048,
-   "sumR": -1.635,
+   "n": 368,
+   "share": 0.3556,
+   "base_share": 0.3268,
+   "meanR": 0.0013,
+   "sumR": 0.488,
    "mdd": -26.702
   }
  },
- "reading": "insufficient for a reading (span 23d < 60d or RANGING CI spans zero) -- pattern so far: RANGING -0.0048 / TRENDING +0.0610, OPPOSITE of B-P9 -- reading deferred to verdict day",
+ "reading": "insufficient for a reading (span 27d < 60d or RANGING CI spans zero) -- pattern so far: RANGING +0.0013 / TRENDING -0.1906, consistent with B-P9 -- reading deferred to verdict day",
  "role": "Gate F attachment -- explanatory only, never a criterion"
 }

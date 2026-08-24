@@ -1,0 +1,43 @@
+{
+ "RANGING": {
+  "n": 822,
+  "meanR": 0.1013,
+  "sumR": 83.3,
+  "ci95": [
+   0.0541,
+   0.1464
+  ],
+  "breadth": "9/9"
+ },
+ "NEUTRAL": {
+  "n": 504,
+  "meanR": 0.0939,
+  "sumR": 47.3,
+  "ci95": [
+   0.0349,
+   0.1552
+  ],
+  "breadth": "8/9"
+ },
+ "TREND_UP": {
+  "n": 494,
+  "meanR": 0.0124,
+  "sumR": 6.1,
+  "ci95": [
+   -0.047,
+   0.0742
+  ],
+  "breadth": "4/9"
+ },
+ "TREND_DOWN": {
+  "n": 576,
+  "meanR": 0.1116,
+  "sumR": 64.3,
+  "ci95": [
+   0.047,
+   0.1798
+  ],
+  "breadth": "8/9"
+ },
+ "reading": "directional axis CONFIRMED on variant B \u2014 the attachment must report TREND_UP / TREND_DOWN separately, and Gate F's verdict cites all three"
+}
