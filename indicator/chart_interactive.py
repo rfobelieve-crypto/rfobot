@@ -15,7 +15,8 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
+def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200,
+                             theme: str = "dark") -> str:
     """Render interactive chart using TradingView Lightweight Charts. Returns HTML."""
     sig = ind.tail(last_n).copy()
     sig = sig.dropna(subset=["open", "high", "low", "close"])
@@ -243,6 +244,17 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         mag_pct_h = 0
         conf_pct = 10
 
+    # Theme palette (2026-08-24). product-site is dark; the jarvis client
+    # is light (--bg #f4f2ee) and a dark chart punched a black hole into a
+    # cream page. Only the chrome changes — candle/signal colours stay put
+    # so the same chart reads identically in both skins.
+    if str(theme).lower() == "light":
+        c_bg, c_card, c_grid = "#ffffff", "#faf9f7", "#e5e2dc"
+        c_text, c_title, c_body_text = "#6b6f76", "#191a1c", "#191a1c"
+    else:
+        c_bg, c_card, c_grid = "#0d1117", "#161b22", "#1c222b"
+        c_text, c_title, c_body_text = "#7a828e", "#ffffff", "#b0b8c4"
+
     html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -252,13 +264,13 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ background: #0d1117; color: #b0b8c4; font-family: -apple-system, sans-serif; overflow: hidden; }}
+  body {{ background: {c_bg}; color: {c_body_text}; font-family: -apple-system, sans-serif; overflow: hidden; }}
   #header {{
-    padding: 8px 12px; font-size: 12px; color: #7a828e;
+    padding: 8px 12px; font-size: 12px; color: {c_text};
     display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid #1c222b;
+    border-bottom: 1px solid {c_grid};
   }}
-  #header .title {{ color: #fff; font-weight: 600; font-size: 13px; }}
+  #header .title {{ color: {c_title}; font-weight: 600; font-size: 13px; }}
   #header .info {{ color: #58a6ff; }}
   .chart-label {{
     position: absolute; left: 4px; top: 2px; font-size: 10px;
@@ -298,10 +310,10 @@ const markers = {json.dumps(markers)};
 const hasMag = {'true' if has_mag else 'false'};
 const hasRegime = {'true' if has_regime else 'false'};
 
-const BG = '#0d1117';
-const CARD = '#161b22';
-const GRID = '#1c222b';
-const TEXT = '#7a828e';
+const BG = '{c_bg}';
+const CARD = '{c_card}';
+const GRID = '{c_grid}';
+const TEXT = '{c_text}';
 
 const headerH = 36;
 const footerH = 24;

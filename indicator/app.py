@@ -1047,7 +1047,10 @@ def live_chart():
             return "<h3>Chart not ready</h3>", 503
         chart_df = indicator_df.dropna(subset=["open", "high", "low", "close"])
         last_n = request.args.get("n", 200, type=int)
-        html = render_interactive_chart(chart_df, last_n=last_n)
+        # theme=light for the jarvis client (cream UI); default stays dark
+        # for product-site and every existing consumer (2026-08-24).
+        theme = request.args.get("theme", "dark", type=str)
+        html = render_interactive_chart(chart_df, last_n=last_n, theme=theme)
         return Response(html, mimetype="text/html")
     except Exception as e:
         logger.exception("live-chart error: %s", e)

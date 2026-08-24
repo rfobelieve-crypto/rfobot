@@ -372,19 +372,21 @@ async def public_chart_route(request: Request) -> Response:
         _v7_chart_cache, _V7_CHART_CACHE_TTL_S, f"{INDICATOR_BASE_URL}/chart-dark")
 
 
-# Light-background twin (2026-08-24). product-site is dark, the jarvis
-# client is light (--bg #f4f2ee) — serving it the dark PNG punched two
-# black holes into a cream page. Same bytes-relay posture, different
-# origin route; the origin renders both variants each cycle anyway
-# (indicator/app.py `chart_png` / `chart_png_dark`), so this costs nothing.
-_v7_chart_light_cache: dict = {"bytes": None, "ts": 0.0}
+# Light-theme twin of the INTERACTIVE chart (2026-08-24). product-site is
+# dark, the jarvis client is light (--bg #f4f2ee) — the dark chart punched
+# a black hole into a cream page. Only the chrome differs (bg/grid/text);
+# candles and signal markers keep the same colours so both skins read the
+# same. A static PNG was tried first and rejected: the user wants the
+# interactive chart, the fix was the palette and the framing, not the
+# medium.
+_v7_live_chart_light_cache: dict = {"bytes": None, "ts": 0.0}
 
 
-@mcp.custom_route("/public/chart-light", methods=["GET"])
-async def public_chart_light_route(request: Request) -> Response:
-    return await _proxy_png(
-        _v7_chart_light_cache, _V7_CHART_CACHE_TTL_S,
-        f"{INDICATOR_BASE_URL}/chart")
+@mcp.custom_route("/public/live-chart-light", methods=["GET"])
+async def public_live_chart_light_route(request: Request) -> Response:
+    return await _proxy_html(
+        _v7_live_chart_light_cache, _V7_LIVE_CHART_CACHE_TTL_S,
+        f"{INDICATOR_BASE_URL}/live-chart?theme=light")
 
 
 # Cancel-flow chart's origin (/research/cancel-flow) RE-RENDERS from scratch
