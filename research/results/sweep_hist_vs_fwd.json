@@ -1,0 +1,52 @@
+{
+ "backtest": {
+  "n": 2331,
+  "meanR": 0.0856
+ },
+ "forward": {
+  "n": 342,
+  "meanR": -0.0102
+ },
+ "gap": -0.0958,
+ "cells": {
+  "TREND_UP": {
+   "hist_n": 477,
+   "hist_meanR": 0.0221,
+   "fwd_n": 93,
+   "fwd_meanR": -0.2254,
+   "within_gap": -0.2475,
+   "hist_share": 0.2046,
+   "fwd_share": 0.2719
+  },
+  "TREND_DOWN": {
+   "hist_n": 570,
+   "hist_meanR": 0.1076,
+   "fwd_n": 37,
+   "fwd_meanR": 0.157,
+   "within_gap": 0.0495,
+   "hist_share": 0.2445,
+   "fwd_share": 0.1082
+  },
+  "NEUTRAL": {
+   "hist_n": 491,
+   "hist_meanR": 0.1011,
+   "fwd_n": 57,
+   "fwd_meanR": -0.0491,
+   "within_gap": -0.1502,
+   "hist_share": 0.2106,
+   "fwd_share": 0.1667
+  },
+  "RANGING": {
+   "hist_n": 793,
+   "hist_meanR": 0.0983,
+   "fwd_n": 155,
+   "fwd_meanR": 0.0933,
+   "within_gap": -0.005,
+   "hist_share": 0.3402,
+   "fwd_share": 0.4532
+  }
+ },
+ "forward_at_hist_mix": 0.0137,
+ "hist_at_forward_mix": 0.0791,
+ "reading": "WITHIN-CELL DECAY dominates \u2014 the same regime cells pay materially less than they did historically; re-weighting does not rescue it"
+}
