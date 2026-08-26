@@ -36,6 +36,13 @@ Files under `indicator/agent/` MUST NOT import, at any depth:
   that already happened, costing a batch consumer 0.1328 R/trade (158% of
   variant B's edge, TODO §0.57); this table lets the consumer fill AT the
   level the backtest assumes),
+  `raid_outcomes` (CLOSED signal outcomes, 2026-08-26 — WRITTEN by
+  `research/raid_outcomes_publish.py` hourly. The live feed carries only
+  OPEN rows, so an outcome was never published: a follower could log
+  "the slot cap blocked this one" and never learn what it would have
+  done. Scoring their realised fills against research-side numbers
+  instead is the asymmetry that made blocked signals read 4.3x better,
+  TODO §0.62 — this table puts both arms on one ruler),
   `prereg_clocks` (pre-registration board, 2026-08-26 — WRITTEN by
   `research/prereg_publish.py` hourly. The open hypotheses and their
   progress lived only in TODO.md sections and per-clock scripts, so from

@@ -1,9 +1,9 @@
 {
- "asof_utc": "2026-08-26 09:29",
+ "asof_utc": "2026-08-26 10:55",
  "rows": [
   {
    "name": "bat-train heartbeat",
-   "age_h": 0.1,
+   "age_h": 0.0,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -11,7 +11,7 @@
   },
   {
    "name": "sweep shadow log",
-   "age_h": 0.1,
+   "age_h": 0.8,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -19,7 +19,7 @@
   },
   {
    "name": "kline caches",
-   "age_h": 0.4,
+   "age_h": 0.8,
    "max_h": 3.5,
    "ok": true,
    "detail": "BTCUSDT_1h.csv",
@@ -27,7 +27,7 @@
   },
   {
    "name": "weather station row",
-   "age_h": 0.1,
+   "age_h": 0.7,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -35,7 +35,7 @@
   },
   {
    "name": "raid signals row",
-   "age_h": 0.1,
+   "age_h": 0.7,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -43,15 +43,23 @@
   },
   {
    "name": "v7 veto clock row",
-   "age_h": 0.1,
+   "age_h": 0.8,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
    "note": "site trigger countdown (build-time-snapshot family)"
   },
   {
+   "name": "raid outcomes row",
+   "age_h": 0.0,
+   "max_h": 2.5,
+   "ok": true,
+   "detail": "",
+   "note": "skip-vs-taken scoring surface; silent staleness = consumer silently scores against stale outcomes"
+  },
+  {
    "name": "prereg board row",
-   "age_h": 0.1,
+   "age_h": 0.8,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -59,7 +67,7 @@
   },
   {
    "name": "indicator bars",
-   "age_h": 1.5,
+   "age_h": 1.9,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -75,7 +83,7 @@
   },
   {
    "name": "cloud train parity",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -83,7 +91,7 @@
   },
   {
    "name": "coinglass parquets",
-   "age_h": 13.5,
+   "age_h": 14.9,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_oi_1h.parquet",
@@ -91,7 +99,7 @@
   },
   {
    "name": "daily collect log",
-   "age_h": 13.5,
+   "age_h": 14.9,
    "max_h": 30.0,
    "ok": true,
    "detail": "",
@@ -99,7 +107,7 @@
   },
   {
    "name": "portfolio clocks",
-   "age_h": 0.8,
+   "age_h": 2.3,
    "max_h": 195.0,
    "ok": true,
    "detail": "",
@@ -107,7 +115,7 @@
   },
   {
    "name": "tracked signals",
-   "age_h": 14.5,
+   "age_h": 15.9,
    "max_h": 336.0,
    "ok": true,
    "detail": "",

@@ -33,3 +33,9 @@ REM progress + settled verdicts). Progress only -- every verdict keeps
 REM its single owning scorer, so nothing here can drift from the number
 REM that actually decides. See TODO 0.61.
 python research\prereg_publish.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-08-26 (TODO 0.62): publish CLOSED outcomes. The live feed only
+REM carries OPEN signals, so a follower could log 'the slot cap blocked
+REM this one' but never find out what it would have done -- and scoring
+REM their real fills against research numbers is the asymmetry that made
+REM blocked signals look 4.3x better. Same ruler on both arms.
+python research\raid_outcomes_publish.py >> research\results\sweep_shadow_run.log 2>&1

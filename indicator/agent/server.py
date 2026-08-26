@@ -871,6 +871,88 @@ async def public_raid_pending_route(request: Request) -> JSONResponse:
     return resp
 
 
+_raid_out_cache: dict = {"data": None, "ts": 0.0}
+_RAID_OUT_CACHE_TTL_S = 300.0
+
+
+def _raid_outcomes_payload() -> dict:
+    """CLOSED signal outcomes — so a consumer can score what it SKIPPED.
+
+    The live feed only carries OPEN signals, so until now an outcome was
+    never published: a follower could log "slot cap blocked this one" but
+    had no way to find out what it would have done. Comparing their
+    realised fills against research-side numbers instead is precisely the
+    scoring asymmetry that manufactured the "blocked signals were 4.3x
+    better" reading (TODO §0.62) — same ruler on both arms is the point.
+
+    Boundary: SELECT only; rows are written by
+    research/raid_outcomes_publish.py on the quant side.
+    """
+    from shared.db import get_db_conn
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT symbol, side, level_kind, fill_ts, fill_utc, "
+                "entry_px, atr, exit_ts, gross_r, net_r, stopped, "
+                "regime_cell, universe, variants, updated_at "
+                "FROM raid_outcomes ORDER BY fill_ts DESC")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    out, newest = [], None
+    for r in rows:
+        newest = max(newest or r["updated_at"], r["updated_at"])
+        out.append({
+            "symbol": r["symbol"], "side": r["side"],
+            "level_kind": r["level_kind"],
+            "fill_ts": int(r["fill_ts"]), "fill_utc": r["fill_utc"],
+            # entry_px IS the level price: the shadow engine runs SLIP=0.
+            # This is the join key for anything seen via /raid-pending,
+            # where the consumer has trigger_px but no reliable fill_ts.
+            "entry_px": float(r["entry_px"]), "atr": float(r["atr"]),
+            "exit_ts": int(r["exit_ts"]),
+            "gross_r": float(r["gross_r"]), "net_r": float(r["net_r"]),
+            "stopped": bool(r["stopped"]),
+            "regime_cell": r.get("regime_cell") or "",
+            "universe": r["universe"],
+            "variants": [v for v in str(r["variants"]).split(",") if v],
+        })
+    return {
+        "list": out, "count": len(out),
+        "asof_utc": str(newest) if newest else None,
+        "join": {
+            "from_signals": ["symbol", "level_kind", "fill_ts"],
+            "from_pending": ["symbol", "level_kind", "entry_px≈trigger_px"],
+            "note": "fill_ts is the fill BAR's close, not the moment price "
+                    "touched — do not join a pending level on it",
+        },
+        "scoring": "shadow ledger: level fill, no execution cost. Compare "
+                   "skipped-vs-taken on THIS ruler for both arms, never "
+                   "realised fills against these.",
+        "disclaimer": "Forward shadow validation in progress — not a live "
+                      "strategy, not financial advice.",
+    }
+
+
+@mcp.custom_route("/public/raid-outcomes", methods=["GET"])
+async def public_raid_outcomes_route(request: Request) -> JSONResponse:
+    now = time.monotonic()
+    if (_raid_out_cache["data"] is None
+            or now - _raid_out_cache["ts"] > _RAID_OUT_CACHE_TTL_S):
+        try:
+            data = await anyio.to_thread.run_sync(_raid_outcomes_payload)
+        except Exception as e:  # noqa: BLE001 — degrade, never crash
+            data = {"error": f"raid outcomes unavailable: {type(e).__name__}"}
+        _raid_out_cache["data"] = data
+        _raid_out_cache["ts"] = now
+    payload = _raid_out_cache["data"]
+    resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 _prereg_cache: dict = {"data": None, "ts": 0.0}
 _PREREG_CACHE_TTL_S = 300.0
 

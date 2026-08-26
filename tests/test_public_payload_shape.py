@@ -43,6 +43,9 @@ EXEMPT = {
     "_raid_signals_payload": {
         "updated_at": "aggregated into asof_utc, not per row",
     },
+    "_raid_outcomes_payload": {
+        "updated_at": "aggregated into asof_utc, not per row",
+    },
     "_weather_payload": {
         "payload": "JSON blob; json.loads'd and its contents are the payload",
         "updated_at": "aggregated into asof_utc, not per row",
@@ -52,12 +55,25 @@ BUILDERS = list(EXEMPT)
 
 
 def _select_columns(fn: ast.FunctionDef) -> set[str]:
-    """Columns named in the function's SQL SELECT ... FROM."""
-    sql = " ".join(
-        n.value for n in ast.walk(fn)
-        if isinstance(n, ast.Constant) and isinstance(n.value, str)
-    )
-    m = re.search(r"SELECT\s+(.*?)\s+FROM\s", sql, re.I | re.S)
+    """Columns named in the function's SQL SELECT ... FROM.
+
+    Each string constant is examined ON ITS OWN. Python merges adjacent
+    string literals into a single Constant, so a multi-line query is one
+    node and needs no stitching — whereas joining every constant in the
+    function (the first version here) let prose from the return dict land
+    between fragments, and the regex happily spanned it. That produced a
+    "column list" made of sentences, which is how this guard announced
+    itself when the raid-outcomes endpoint was added (2026-08-26). Loud,
+    but wrong; a fragile instrument is still an instrument to fix.
+    """
+    m = None
+    for n in ast.walk(fn):
+        if not (isinstance(n, ast.Constant) and isinstance(n.value, str)):
+            continue
+        hit = re.search(r"SELECT\s+(.*?)\s+FROM\s", n.value, re.I | re.S)
+        if hit:
+            m = hit
+            break
     if not m:
         return set()
     cols = set()
