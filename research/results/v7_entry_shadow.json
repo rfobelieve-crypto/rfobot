@@ -11,31 +11,31 @@
  "by_tier": [
   {
    "tier": "Moderate",
-   "n": 1373,
-   "mkt_bps": -8.44,
-   "grid_bps": -6.93,
-   "diff_bps": 1.51,
-   "entry_imp_bps": -0.24,
-   "fill_rate": 0.585,
-   "h1_diff_bps": 2.33,
-   "h2_diff_bps": 0.7,
-   "halves_agree": true,
-   "n_forward": 14,
-   "forward_diff_bps": 3.03
+   "n": 1414,
+   "mkt_bps": -8.04,
+   "grid_bps": -6.76,
+   "diff_bps": 1.28,
+   "entry_imp_bps": -0.45,
+   "fill_rate": 0.577,
+   "h1_diff_bps": 2.58,
+   "h2_diff_bps": -0.02,
+   "halves_agree": false,
+   "n_forward": 55,
+   "forward_diff_bps": -4.08
   },
   {
    "tier": "Strong",
-   "n": 770,
-   "mkt_bps": 4.38,
-   "grid_bps": 4.74,
-   "diff_bps": 0.36,
-   "entry_imp_bps": -1.48,
-   "fill_rate": 0.61,
-   "h1_diff_bps": 5.13,
-   "h2_diff_bps": -4.42,
+   "n": 811,
+   "mkt_bps": 3.81,
+   "grid_bps": 4.23,
+   "diff_bps": 0.42,
+   "entry_imp_bps": -1.38,
+   "fill_rate": 0.599,
+   "h1_diff_bps": 2.95,
+   "h2_diff_bps": -2.1,
    "halves_agree": false,
-   "n_forward": 4,
-   "forward_diff_bps": 22.06
+   "n_forward": 45,
+   "forward_diff_bps": 3.47
   }
  ]
 }

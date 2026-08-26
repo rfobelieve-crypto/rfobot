@@ -45,6 +45,11 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
+# repo root too: _regime_cells imports research.crowd_battery2, and when the
+# scheduler runs `python research\sweep_failure\shadow_engine.py` the only
+# path Python adds is the SCRIPT's directory — cwd is not on sys.path. That
+# made the §0.59 regime annotation fail silently-but-logged on every run.
+sys.path.insert(0, str(HERE.parents[1]))
 os.environ["SLIP"] = "0"          # gross engine; bps costs applied here
 import sweep_core as SC            # noqa: E402
 import level_types as LT           # noqa: E402  (same trade fn = no drift)

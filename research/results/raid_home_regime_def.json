@@ -1,0 +1,107 @@
+{
+ "RANGING": {
+  "hist_n": 793,
+  "hist_R": 0.0983,
+  "breadth": "9/9",
+  "hist_ci": [
+   0.0503,
+   0.1455
+  ],
+  "fwd_n": 155,
+  "fwd_R": 0.0933,
+  "C1": true,
+  "C2": true,
+  "C3": true,
+  "member": true
+ },
+ "TREND_DOWN": {
+  "hist_n": 570,
+  "hist_R": 0.1076,
+  "breadth": "8/9",
+  "hist_ci": [
+   0.0401,
+   0.1778
+  ],
+  "fwd_n": 39,
+  "fwd_R": 0.158,
+  "C1": true,
+  "C2": true,
+  "C3": true,
+  "member": true,
+  "fwd_top_coin_share": 0.468,
+  "fwd_top_day_share": 0.648,
+  "fragile": true
+ },
+ "NEUTRAL": {
+  "hist_n": 491,
+  "hist_R": 0.1011,
+  "breadth": "8/9",
+  "hist_ci": [
+   0.0398,
+   0.165
+  ],
+  "fwd_n": 59,
+  "fwd_R": -0.0346,
+  "C1": false,
+  "C2": true,
+  "C3": true,
+  "member": false
+ },
+ "TREND_UP": {
+  "hist_n": 477,
+  "hist_R": 0.0221,
+  "breadth": "5/9",
+  "hist_ci": [
+   -0.0415,
+   0.0861
+  ],
+  "fwd_n": 93,
+  "fwd_R": -0.2254,
+  "C1": false,
+  "C2": true,
+  "C3": false,
+  "member": false
+ },
+ "sensitivity": {
+  "union_if_added_worth_zero": 0.0745,
+  "ranging_only": 0.0933,
+  "extra_signal_pct": 25.2
+ },
+ "members": [
+  "RANGING",
+  "TREND_DOWN"
+ ],
+ "fragile": [
+  "TREND_DOWN"
+ ],
+ "forward_options": {
+  "RANGING 單格（現行規格）": {
+   "n": 155,
+   "meanR": 0.0933,
+   "ci": [
+    -0.0208,
+    0.1947
+   ],
+   "share": 0.448
+  },
+  "RANGING ∪ TREND_DOWN（判準選出）": {
+   "n": 194,
+   "meanR": 0.1063,
+   "ci": [
+    0.003,
+    0.2028
+   ],
+   "share": 0.561
+  },
+  "不濾（全體）": {
+   "n": 346,
+   "meanR": -0.0069,
+   "ci": [
+    -0.1161,
+    0.0968
+   ],
+   "share": 1.0
+  }
+ },
+ "verdict": "home_regime = RANGING ∪ TREND_DOWN，但 TREND_DOWN 標記 FRAGILE"
+}

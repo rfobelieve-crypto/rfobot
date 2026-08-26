@@ -4,10 +4,10 @@
   "meanR": 0.0856
  },
  "forward": {
-  "n": 342,
-  "meanR": -0.0102
+  "n": 346,
+  "meanR": -0.0069
  },
- "gap": -0.0958,
+ "gap": -0.0925,
  "cells": {
   "TREND_UP": {
    "hist_n": 477,
@@ -16,25 +16,25 @@
    "fwd_meanR": -0.2254,
    "within_gap": -0.2475,
    "hist_share": 0.2046,
-   "fwd_share": 0.2719
+   "fwd_share": 0.2688
   },
   "TREND_DOWN": {
    "hist_n": 570,
    "hist_meanR": 0.1076,
-   "fwd_n": 37,
-   "fwd_meanR": 0.157,
-   "within_gap": 0.0495,
+   "fwd_n": 39,
+   "fwd_meanR": 0.158,
+   "within_gap": 0.0505,
    "hist_share": 0.2445,
-   "fwd_share": 0.1082
+   "fwd_share": 0.1127
   },
   "NEUTRAL": {
    "hist_n": 491,
    "hist_meanR": 0.1011,
-   "fwd_n": 57,
-   "fwd_meanR": -0.0491,
-   "within_gap": -0.1502,
+   "fwd_n": 59,
+   "fwd_meanR": -0.0346,
+   "within_gap": -0.1357,
    "hist_share": 0.2106,
-   "fwd_share": 0.1667
+   "fwd_share": 0.1705
   },
   "RANGING": {
    "hist_n": 793,
@@ -43,10 +43,10 @@
    "fwd_meanR": 0.0933,
    "within_gap": -0.005,
    "hist_share": 0.3402,
-   "fwd_share": 0.4532
+   "fwd_share": 0.448
   }
  },
- "forward_at_hist_mix": 0.0137,
- "hist_at_forward_mix": 0.0791,
+ "forward_at_hist_mix": 0.017,
+ "hist_at_forward_mix": 0.0793,
  "reading": "WITHIN-CELL DECAY dominates \u2014 the same regime cells pay materially less than they did historically; re-weighting does not rescue it"
 }

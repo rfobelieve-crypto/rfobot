@@ -9,6 +9,10 @@ REM 2026-08-20: publish live raid signals to MySQL for the follow-bot
 REM endpoint. The agent used to read the CSV baked into its image, which
 REM is only as fresh as the last git push (it was 8 days stale).
 python research\raid_signals_publish.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-08-24 (TODO 0.57): publish ARMED levels, not just filled signals.
+REM Batch-publishing fills costs 0.1328 R/trade (158% of variant B's edge)
+REM -- the consumer must learn a level is armed BEFORE the retest.
+python research\raid_pending_publish.py >> research\results\sweep_shadow_run.log 2>&1
 REM 2026-08-18 M1: unified ledger mirror (v7_okx_positions -> pf_positions,
 REM idempotent upsert, zero live-code change). See TODO §0.5.
 python research\pf_mirror.py >> research\results\sweep_shadow_run.log 2>&1

@@ -1,0 +1,411 @@
+freshness board — 2026-08-20 11:19 UTC
+artifact                    age   limit  status
+bat-train heartbeat         1.2h    2.5h  ok
+sweep shadow log            1.3h    2.5h  ok
+kline caches                1.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           1.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+coinglass parquets       3094.4h   48.0h  RED  <-- STALE-DATA guard threshold; stalest file reported  [cg_etf_flow_daily.parquet]
+daily collect log          15.3h   30.0h  ok
+portfolio clocks           81.8h  195.0h  ok
+tracked signals             6.3h  336.0h  ok
+
+1 red / 12 tracked: coinglass parquets
+freshness board — 2026-08-20 17:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         7.2h    2.5h  RED  <-- hourly train ran at all (29h outage family)
+sweep shadow log            7.3h    2.5h  RED  <-- frozen shadow accounting
+kline caches                7.3h    3.5h  RED  <-- stalest coin of the 29; feeds every regime instrument  [BTCUSDT_1h.csv]
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           7.2h    2.5h  RED  <-- site trigger countdown (build-time-snapshot family)
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+coinglass parquets       3100.4h   48.0h  RED  <-- STALE-DATA guard threshold; stalest file reported  [cg_etf_flow_daily.parquet]
+daily collect log          21.3h   30.0h  ok
+portfolio clocks           87.8h  195.0h  ok
+tracked signals             2.3h  336.0h  ok
+
+5 red / 12 tracked: bat-train heartbeat, sweep shadow log, kline caches, v7 veto clock row, coinglass parquets
+freshness board — 2026-08-20 23:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat        13.2h    2.5h  RED  <-- hourly train ran at all (29h outage family)
+sweep shadow log           13.3h    2.5h  RED  <-- frozen shadow accounting
+kline caches               13.3h    3.5h  RED  <-- stalest coin of the 29; feeds every regime instrument  [BTCUSDT_1h.csv]
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row          13.2h    2.5h  RED  <-- site trigger countdown (build-time-snapshot family)
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+coinglass parquets       3106.4h   48.0h  RED  <-- STALE-DATA guard threshold; stalest file reported  [cg_etf_flow_daily.parquet]
+daily collect log           3.3h   30.0h  ok
+portfolio clocks           93.8h  195.0h  ok
+tracked signals             3.3h  336.0h  ok
+
+5 red / 12 tracked: bat-train heartbeat, sweep shadow log, kline caches, v7 veto clock row, coinglass parquets
+freshness board — 2026-08-21 05:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat        19.2h    2.5h  RED  <-- hourly train ran at all (29h outage family)
+sweep shadow log           19.3h    2.5h  RED  <-- frozen shadow accounting
+kline caches               19.3h    3.5h  RED  <-- stalest coin of the 29; feeds every regime instrument  [BTCUSDT_1h.csv]
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row          19.2h    2.5h  RED  <-- site trigger countdown (build-time-snapshot family)
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+coinglass parquets       3112.4h   48.0h  RED  <-- STALE-DATA guard threshold; stalest file reported  [cg_etf_flow_daily.parquet]
+daily collect log           9.3h   30.0h  ok
+portfolio clocks           99.8h  195.0h  ok
+tracked signals             1.3h  336.0h  ok
+
+5 red / 12 tracked: bat-train heartbeat, sweep shadow log, kline caches, v7 veto clock row, coinglass parquets
+freshness board — 2026-08-21 11:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat        25.2h    2.5h  RED  <-- hourly train ran at all (29h outage family)
+sweep shadow log           25.3h    2.5h  RED  <-- frozen shadow accounting
+kline caches               25.3h    3.5h  RED  <-- stalest coin of the 29; feeds every regime instrument  [BTCUSDT_1h.csv]
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row          25.2h    2.5h  RED  <-- site trigger countdown (build-time-snapshot family)
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+coinglass parquets       3118.4h   48.0h  RED  <-- STALE-DATA guard threshold; stalest file reported  [cg_etf_flow_daily.parquet]
+daily collect log          15.3h   30.0h  ok
+portfolio clocks          105.8h  195.0h  ok
+tracked signals             7.3h  336.0h  ok
+
+5 red / 12 tracked: bat-train heartbeat, sweep shadow log, kline caches, v7 veto clock row, coinglass parquets
+freshness board — 2026-08-21 17:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         2.3h    2.5h  ok
+sweep shadow log            2.3h    2.5h  ok
+kline caches                2.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           2.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          2.2h   48.0h  ok
+daily collect log           2.1h   30.0h  ok
+portfolio clocks          111.8h  195.0h  ok
+tracked signals             5.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-21 23:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         8.3h    2.5h  RED  <-- hourly train ran at all (29h outage family)
+sweep shadow log            8.3h    2.5h  RED  <-- frozen shadow accounting
+kline caches                8.3h    3.5h  RED  <-- stalest coin of the 29; feeds every regime instrument  [BTCUSDT_1h.csv]
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           8.3h    2.5h  RED  <-- site trigger countdown (build-time-snapshot family)
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          3.3h   48.0h  ok
+daily collect log           3.3h   30.0h  ok
+portfolio clocks          117.8h  195.0h  ok
+tracked signals             4.3h  336.0h  ok
+
+4 red / 13 tracked: bat-train heartbeat, sweep shadow log, kline caches, v7 veto clock row
+freshness board — 2026-08-22 05:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat        14.3h    2.5h  RED  <-- hourly train ran at all (29h outage family)
+sweep shadow log           14.3h    2.5h  RED  <-- frozen shadow accounting
+kline caches               14.3h    3.5h  RED  <-- stalest coin of the 29; feeds every regime instrument  [BTCUSDT_1h.csv]
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row          14.3h    2.5h  RED  <-- site trigger countdown (build-time-snapshot family)
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          9.3h   48.0h  ok
+daily collect log           9.3h   30.0h  ok
+portfolio clocks          123.8h  195.0h  ok
+tracked signals             4.3h  336.0h  ok
+
+4 red / 13 tracked: bat-train heartbeat, sweep shadow log, kline caches, v7 veto clock row
+freshness board — 2026-08-22 11:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat        20.3h    2.5h  RED  <-- hourly train ran at all (29h outage family)
+sweep shadow log           20.3h    2.5h  RED  <-- frozen shadow accounting
+kline caches               20.3h    3.5h  RED  <-- stalest coin of the 29; feeds every regime instrument  [BTCUSDT_1h.csv]
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row          20.3h    2.5h  RED  <-- site trigger countdown (build-time-snapshot family)
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets         15.3h   48.0h  ok
+daily collect log          15.3h   30.0h  ok
+portfolio clocks          129.8h  195.0h  ok
+tracked signals             3.3h  336.0h  ok
+
+4 red / 13 tracked: bat-train heartbeat, sweep shadow log, kline caches, v7 veto clock row
+freshness board — 2026-08-22 17:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row          MISSING    2.5h  RED  <-- follow-bot signal surface
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets         21.3h   48.0h  ok
+daily collect log          21.3h   30.0h  ok
+portfolio clocks          135.8h  195.0h  ok
+tracked signals             1.3h  336.0h  ok
+
+1 red / 13 tracked: raid signals row
+alert DELIVERED: Freshness board transition:
+  RED: raid signals row (age MISSING, limit 2h) — follow-bot signal surface
+  recovered: bat-train heartbeat
+  recovered: kline caches
+  recovered: sweep shadow log
+  recovered: v7 veto clock row
+freshness board — 2026-08-22 23:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          3.3h   48.0h  ok
+daily collect log           3.3h   30.0h  ok
+portfolio clocks          141.8h  195.0h  ok
+tracked signals             7.3h  336.0h  ok
+
+0 red / 13 tracked
+alert DELIVERED: Freshness board transition:
+  recovered: raid signals row
+freshness board — 2026-08-23 05:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          9.3h   48.0h  ok
+daily collect log           9.3h   30.0h  ok
+portfolio clocks          147.8h  195.0h  ok
+tracked signals            13.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-23 11:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets         15.3h   48.0h  ok
+daily collect log          15.3h   30.0h  ok
+portfolio clocks          153.8h  195.0h  ok
+tracked signals            19.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-23 17:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets         21.3h   48.0h  ok
+daily collect log          21.3h   30.0h  ok
+portfolio clocks          159.8h  195.0h  ok
+tracked signals             2.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-23 23:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          3.3h   48.0h  ok
+daily collect log           3.3h   30.0h  ok
+portfolio clocks          165.8h  195.0h  ok
+tracked signals             8.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-24 05:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          9.3h   48.0h  ok
+daily collect log           9.3h   30.0h  ok
+portfolio clocks            3.8h  195.0h  ok
+tracked signals             1.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-24 11:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets         15.3h   48.0h  ok
+daily collect log          15.3h   30.0h  ok
+portfolio clocks            9.8h  195.0h  ok
+tracked signals             7.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-24 17:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets         21.3h   48.0h  ok
+daily collect log          21.3h   30.0h  ok
+portfolio clocks           15.8h  195.0h  ok
+tracked signals            13.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-24 23:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          3.3h   48.0h  ok
+daily collect log           3.3h   30.0h  ok
+portfolio clocks           21.8h  195.0h  ok
+tracked signals            19.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-25 05:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          9.3h   48.0h  ok
+daily collect log           9.3h   30.0h  ok
+portfolio clocks           27.8h  195.0h  ok
+tracked signals            25.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-25 11:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets         15.3h   48.0h  ok
+daily collect log          15.3h   30.0h  ok
+portfolio clocks           33.8h  195.0h  ok
+tracked signals             2.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-25 17:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets         21.3h   48.0h  ok
+daily collect log          21.3h   30.0h  ok
+portfolio clocks           39.8h  195.0h  ok
+tracked signals             4.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-25 23:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          3.3h   48.0h  ok
+daily collect log           3.3h   30.0h  ok
+portfolio clocks           45.8h  195.0h  ok
+tracked signals             4.3h  336.0h  ok
+
+0 red / 13 tracked
+freshness board — 2026-08-26 05:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          9.3h   48.0h  ok
+daily collect log           9.3h   30.0h  ok
+portfolio clocks           51.8h  195.0h  ok
+tracked signals            10.3h  336.0h  ok
+
+0 red / 13 tracked

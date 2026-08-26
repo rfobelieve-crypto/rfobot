@@ -1,0 +1,16 @@
+2026-08-20 09:55:05,390 [INFO] indicator.app: Update cycle starting...
+2026-08-20 09:55:05,561 [INFO] indicator.inference: IndicatorEngine v7 (dual-model, dir_type=regression) loaded: direction=136 features, magnitude=76 features, 300 mag-warmup, 0 dir-warmup, decoding=rolling_percentile top=0.05
+2026-08-20 09:55:07,977 [INFO] shared.db: DB pool initialized (size=5, filled=5)
+2026-08-20 09:55:08,280 [INFO] indicator.app: pred_buffer_rehydrate: 200 live preds for model_version=2026-08-08T20:59:07 (warmup needs 100)
+2026-08-20 09:55:08,369 [INFO] indicator.app: Loaded parquet history: 4245 bars, 2025-10-17 13:00:00+00:00 ~ 2026-04-12 09:00:00+00:00
+2026-08-20 09:55:08,992 [INFO] indicator.app: MySQL backfill: added 3034 rows (total: 7279)
+2026-08-20 09:55:08,996 [ERROR] indicator.app: Update cycle failed
+Traceback (most recent call last):
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\indicator\app.py", line 362, in update_cycle
+    indicator_df.index = indicator_df.index.as_unit("ns")
+AttributeError: 'DatetimeIndex' object has no attribute 'as_unit'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\indicator\app.py", line 362, in update_cycle
+    indicator_df.index = indicator_df.index.as_unit("ns")
+AttributeError: 'DatetimeIndex' object has no attribute 'as_unit'

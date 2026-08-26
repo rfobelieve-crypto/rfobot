@@ -823,6 +823,10 @@ def _raid_pending_payload() -> dict:
             "risk_frac": float(r["risk_frac"]),
             "pierce_atr": float(r["pierce_atr"]),
             "variants": [v for v in str(r["variants"]).split(",") if v],
+            # evaluated at the SWEEP bar (the consumer's actionable moment);
+            # the research ledger tags the FILL bar, so the two can differ by
+            # a label. Deliberate — see 獵取_regime濾網模擬_規格 §二.
+            "regime_cell": r.get("regime_cell") or "",
             "expires_ts": int(r["expires_ts"]),
             "expires_in_min": round((int(r["expires_ts"]) - now) / 60),
             "universe": r["universe"],
@@ -834,7 +838,15 @@ def _raid_pending_payload() -> dict:
                   "entry": "touch trigger_px", "variants_available": ["A", "B"],
                   "regime_cells": ["RANGING", "TREND_UP", "TREND_DOWN",
                                    "NEUTRAL"],
-                  "home_regime": "RANGING"},
+                  # TODO §0.59b: was the string "RANGING"; the selection
+                  # criterion that produced §0.59 admits TWO cells, and the
+                  # single-cell form was a leftover from the undirected ADX
+                  # framing §0.54b already overturned. Shape is now a LIST —
+                  # a consumer still doing `=== "RANGING"` fails loudly
+                  # (blocks everything) rather than silently keeping the old
+                  # rule, which is the intended failure mode.
+                  "home_regime": ["RANGING", "TREND_DOWN"],
+                  "home_regime_spec": "0.59b"},
         "mode": "shadow",
         "disclaimer": "Forward shadow validation in progress — not a live "
                       "strategy, not financial advice.",
