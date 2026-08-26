@@ -165,9 +165,60 @@ FIELDS = ["symbol", "universe", "level_kind", "first_seen_utc", "fill_ts",
           # frozen detection (swept high -> SHORT, swept low -> LONG).
           # Old rows carry "" and are deterministically backfilled on
           # later passes; gate arithmetic never reads it.
-          "side"]
+          "side",
+          # §0.59 prospective columns (2026-08-26). §0.58 showed the forward
+          # decay sits almost entirely in the NON-home regime cells while
+          # RANGING held; the proposed filter (enter only in RANGING) and
+          # the paired exit variant (fail_fast) therefore need to be scored
+          # on genuinely NEW fills. Without these columns the verdict day
+          # would have to retro-compute them — which is exactly the
+          # "prospective values, not retro-computed" rule the flow columns
+          # above were added under.
+          #   regime_cell  frozen ADX(14) 25/20 label at the fill hour,
+          #                TRENDING split by sign of the concurrent 24h
+          #                return: RANGING / TREND_UP / TREND_DOWN /
+          #                NEUTRAL (§0.49d + §0.54b, no new parameter)
+          # fail_fast is deliberately NOT annotated here: exit_variants
+          # .entries() omits the `last_exit` non-overlap constraint that
+          # sweep_core enforces (it is internally paired, so overlap costs
+          # it nothing), which means its fills are a DIFFERENT population.
+          # Joining its R onto these rows by fill_ts silently mismatches
+          # entries — first attempt produced -0.196R against +0.014R from
+          # the paired run, i.e. a wrong sign. The verdict-day fail_fast
+          # score comes from exit_by_regime.py, which stays paired.
+          "regime_cell"]
 
 FLOW_BACKFILL_PER_RUN = 40      # cap 1m-kline fetch work per hourly run
+
+
+def _regime_cells(bars):
+    """fill_ts -> frozen regime cell for §0.59.
+
+    adx_state (§0.49d winner) with the §0.54b direction split. Pure
+    time-indexed lookup — no entry population involved, so unlike a
+    cross-file exit annotation this cannot mismatch fills. Failures
+    degrade to blank; this must never break the frozen recorder.
+    """
+    cell = {}
+    try:
+        from research.crowd_battery2 import adx_state
+        c = [b[SC.C] for b in bars]
+        adx = adx_state(bars)
+        LB = 24
+        for i in range(LB, len(bars)):
+            ts = bars[i][0]
+            lab = adx.get(ts // 3600 * 3600)
+            if lab is None:
+                continue
+            if lab == "RANGING":
+                cell[ts] = "RANGING"
+            elif lab != "TRENDING":
+                cell[ts] = "NEUTRAL"
+            else:
+                cell[ts] = "TREND_UP" if c[i] / c[i - LB] - 1 > 0 else "TREND_DOWN"
+    except Exception as e:  # noqa: BLE001
+        print(f"  [WARN] regime annotation failed: {e}")
+    return cell
 
 
 def fetch_1m_window(sym: str, start_s: int, end_s: int) -> dict[int, tuple]:
@@ -797,6 +848,9 @@ def main() -> int:
                 continue
             bars = SC.load_csv(str(p))
             last_ts = bars[-1][0]
+            # §0.59 annotation tables, one pass per symbol. Pure reads of
+            # frozen definitions — nothing below feeds gate arithmetic.
+            cellmap = _regime_cells(bars)
             # one source of truth per kind: the frozen engine for swing,
             # the shared level engine for the time-defined pools. Tuples carry
             # (kind, fill_ts, exit_ts, gross, net, pierce, lvl, atr, stopped);
@@ -833,6 +887,12 @@ def main() -> int:
                     new += 1
                 if not row.get("side"):
                     row["side"] = side   # deterministic backfill of old rows
+                # §0.59: deterministic from klines, so old rows fill in on
+                # later passes exactly like `side` did. Only rows whose
+                # fill_ts is on/after the rule's registration date count as
+                # evidence — the verdict filters on that, not on presence.
+                if not row.get("regime_cell"):
+                    row["regime_cell"] = cellmap.get(fill_ts, "")
                 row.update({
                     "status": "CLOSED" if done else "OPEN",
                     "exit_ts": exit_ts if done else "",

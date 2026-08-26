@@ -399,6 +399,19 @@ fail_fast 管「進了主場之後怎麼走」——後者在主場獨立有效
 `fail_fast`@RANGING 是其中最乾淨的（兩半同號＋7/9 廣度），但**最乾淨
 不等於已證明**。與 §0.59 主規則同批用新樣本驗證。
 
+**記帳已就緒（2026-08-26）**：`shadow_engine` 新增 `regime_cell` 欄位
+（凍結 ADX 四格，純時間查表），新 fills 從此帶著 regime 標籤落盤——
+不必等判決日回頭重算（「前瞻值而非回算值」的既有規矩）。
+驗證：凍結算術一字未動（n=1118、meanR −0.0224，改動前後同值）。
+
+**踩到並修掉的一個坑（值得記）**：原本想把 `fail_fast` 的 R 也標進
+同一列，結果標出 **−0.196R**，與 paired 重測的 **+0.014R** 反號。查
+儀器發現 `exit_variants.entries()` **沒有** sweep_core 的 `last_exit`
+非重疊約束（它自己內部 paired 所以無妨），兩邊的 fills 是**不同母體**，
+用 fill_ts 對接等於錯配。**已移除該欄位**；判決日的 fail_fast 分數一律
+由 `exit_by_regime.py` 產生（它全程 paired）。教訓同 mistake.md
+2026-08-02：跨檔案貼標籤前先問「兩邊的母體是同一個嗎」。
+
 **判決日要回答的三件事**（同一批新樣本，一次跑完）：
 1. RANGING-only 的 meanR 是否 > 全體，差 ≥+0.05R（R-P1/P2/P3）
 2. RANGING-only ∧ fail_fast 是否 > RANGING-only（追加）
