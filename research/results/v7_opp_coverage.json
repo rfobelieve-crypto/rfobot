@@ -1,0 +1,45 @@
+{
+ "span_days": 12.2,
+ "cells": {
+  "RANGING": {
+   "bars": 98,
+   "strong_down": 13,
+   "any_down": 26,
+   "strong_rate": 13.27,
+   "any_rate": 26.53,
+   "mean_wait_bars": 3.8
+  },
+  "TREND_UP": {
+   "bars": 130,
+   "strong_down": 2,
+   "any_down": 3,
+   "strong_rate": 1.54,
+   "any_rate": 2.31,
+   "mean_wait_bars": 43.3
+  },
+  "TREND_DOWN": {
+   "bars": 17,
+   "strong_down": 3,
+   "any_down": 6,
+   "strong_rate": 17.65,
+   "any_rate": 35.29,
+   "mean_wait_bars": 2.8
+  },
+  "NEUTRAL": {
+   "bars": 49,
+   "strong_down": 6,
+   "any_down": 9,
+   "strong_rate": 12.24,
+   "any_rate": 18.37,
+   "mean_wait_bars": 5.4
+  }
+ },
+ "verdict": "**擔心成立**：即使放寬到任何反向讀數，上升段仍明顯偏低——多單在上升趨勢裡實質只剩 3×ATR 移動停損一道出場，而 conviction_decay 沒有隨遷移帶過來。",
+ "trend_up_vs_median": 0.087,
+ "live_exits": [
+  "trail(3xATR)",
+  "opp(any reverse)",
+  "time"
+ ],
+ "conviction_decay_migrated": false
+}
