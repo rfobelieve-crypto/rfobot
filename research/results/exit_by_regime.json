@@ -1,0 +1,278 @@
+{
+ "RANGING": {
+  "n": 1108,
+  "baseline": 0.0907,
+  "variants": {
+   "trail_2atr": {
+    "delta": 0.0013,
+    "coins_pos": "5/9",
+    "h1": -0.0047,
+    "h2": 0.0077,
+    "both_halves_same_sign": false
+   },
+   "trail_1atr": {
+    "delta": -0.0041,
+    "coins_pos": "3/9",
+    "h1": -0.0115,
+    "h2": 0.0039,
+    "both_halves_same_sign": false
+   },
+   "half_at_1r": {
+    "delta": -0.0007,
+    "coins_pos": "5/9",
+    "h1": -0.0048,
+    "h2": 0.0036,
+    "both_halves_same_sign": false
+   },
+   "hold_12": {
+    "delta": -0.0203,
+    "coins_pos": "3/9",
+    "h1": -0.0227,
+    "h2": -0.0177,
+    "both_halves_same_sign": true
+   },
+   "hold_4": {
+    "delta": -0.0006,
+    "coins_pos": "3/9",
+    "h1": -0.0156,
+    "h2": 0.0155,
+    "both_halves_same_sign": false
+   },
+   "fail_fast": {
+    "delta": 0.0138,
+    "coins_pos": "7/9",
+    "h1": 0.0091,
+    "h2": 0.0189,
+    "both_halves_same_sign": true
+   },
+   "giveback": {
+    "delta": 0.0003,
+    "coins_pos": "4/9",
+    "h1": -0.0074,
+    "h2": 0.0085,
+    "both_halves_same_sign": false
+   },
+   "pool_target": {
+    "delta": -0.0059,
+    "coins_pos": "2/9",
+    "h1": -0.0078,
+    "h2": -0.0039,
+    "both_halves_same_sign": true
+   },
+   "pool_ladder": {
+    "delta": -0.004,
+    "coins_pos": "1/9",
+    "h1": -0.0051,
+    "h2": -0.0028,
+    "both_halves_same_sign": true
+   }
+  }
+ },
+ "TREND_UP": {
+  "n": 782,
+  "baseline": 0.0232,
+  "variants": {
+   "trail_2atr": {
+    "delta": -0.0057,
+    "coins_pos": "1/9",
+    "h1": -0.0111,
+    "h2": -0.0005,
+    "both_halves_same_sign": true
+   },
+   "trail_1atr": {
+    "delta": -0.0064,
+    "coins_pos": "2/9",
+    "h1": -0.0089,
+    "h2": -0.004,
+    "both_halves_same_sign": true
+   },
+   "half_at_1r": {
+    "delta": -0.0007,
+    "coins_pos": "5/9",
+    "h1": -0.0027,
+    "h2": 0.0012,
+    "both_halves_same_sign": false
+   },
+   "hold_12": {
+    "delta": 0.0026,
+    "coins_pos": "4/9",
+    "h1": -0.0107,
+    "h2": 0.0156,
+    "both_halves_same_sign": false
+   },
+   "hold_4": {
+    "delta": 0.026,
+    "coins_pos": "7/9",
+    "h1": 0.0428,
+    "h2": 0.0096,
+    "both_halves_same_sign": true
+   },
+   "fail_fast": {
+    "delta": 0.0107,
+    "coins_pos": "5/9",
+    "h1": 0.0274,
+    "h2": -0.0056,
+    "both_halves_same_sign": false
+   },
+   "giveback": {
+    "delta": -0.0053,
+    "coins_pos": "4/9",
+    "h1": -0.0071,
+    "h2": -0.0036,
+    "both_halves_same_sign": true
+   },
+   "pool_target": {
+    "delta": 0.0015,
+    "coins_pos": "4/9",
+    "h1": 0.0031,
+    "h2": -0.0001,
+    "both_halves_same_sign": false
+   },
+   "pool_ladder": {
+    "delta": 0.0016,
+    "coins_pos": "4/9",
+    "h1": 0.0033,
+    "h2": -0.0,
+    "both_halves_same_sign": false
+   }
+  }
+ },
+ "TREND_DOWN": {
+  "n": 878,
+  "baseline": 0.138,
+  "variants": {
+   "trail_2atr": {
+    "delta": -0.0104,
+    "coins_pos": "3/9",
+    "h1": -0.0061,
+    "h2": -0.0145,
+    "both_halves_same_sign": true
+   },
+   "trail_1atr": {
+    "delta": -0.0072,
+    "coins_pos": "4/9",
+    "h1": -0.0031,
+    "h2": -0.0112,
+    "both_halves_same_sign": true
+   },
+   "half_at_1r": {
+    "delta": -0.006,
+    "coins_pos": "2/9",
+    "h1": 0.0007,
+    "h2": -0.0126,
+    "both_halves_same_sign": false
+   },
+   "hold_12": {
+    "delta": 0.0161,
+    "coins_pos": "6/9",
+    "h1": -0.0077,
+    "h2": 0.0394,
+    "both_halves_same_sign": false
+   },
+   "hold_4": {
+    "delta": 0.0118,
+    "coins_pos": "4/9",
+    "h1": 0.0053,
+    "h2": 0.0182,
+    "both_halves_same_sign": true
+   },
+   "fail_fast": {
+    "delta": -0.0062,
+    "coins_pos": "6/9",
+    "h1": -0.0008,
+    "h2": -0.0116,
+    "both_halves_same_sign": true
+   },
+   "giveback": {
+    "delta": -0.0101,
+    "coins_pos": "4/9",
+    "h1": -0.0054,
+    "h2": -0.0148,
+    "both_halves_same_sign": true
+   },
+   "pool_target": {
+    "delta": -0.0067,
+    "coins_pos": "3/9",
+    "h1": -0.0044,
+    "h2": -0.0089,
+    "both_halves_same_sign": true
+   },
+   "pool_ladder": {
+    "delta": -0.0036,
+    "coins_pos": "2/9",
+    "h1": -0.0025,
+    "h2": -0.0047,
+    "both_halves_same_sign": true
+   }
+  }
+ },
+ "NEUTRAL": {
+  "n": 693,
+  "baseline": 0.111,
+  "variants": {
+   "trail_2atr": {
+    "delta": -0.0052,
+    "coins_pos": "2/9",
+    "h1": -0.014,
+    "h2": 0.004,
+    "both_halves_same_sign": false
+   },
+   "trail_1atr": {
+    "delta": -0.0097,
+    "coins_pos": "2/9",
+    "h1": -0.015,
+    "h2": -0.0042,
+    "both_halves_same_sign": true
+   },
+   "half_at_1r": {
+    "delta": -0.0076,
+    "coins_pos": "2/9",
+    "h1": -0.0056,
+    "h2": -0.0096,
+    "both_halves_same_sign": true
+   },
+   "hold_12": {
+    "delta": -0.002,
+    "coins_pos": "5/9",
+    "h1": -0.0035,
+    "h2": -0.0005,
+    "both_halves_same_sign": true
+   },
+   "hold_4": {
+    "delta": 0.0055,
+    "coins_pos": "3/9",
+    "h1": 0.0048,
+    "h2": 0.0062,
+    "both_halves_same_sign": true
+   },
+   "fail_fast": {
+    "delta": 0.0002,
+    "coins_pos": "5/9",
+    "h1": 0.0014,
+    "h2": -0.0011,
+    "both_halves_same_sign": false
+   },
+   "giveback": {
+    "delta": -0.0068,
+    "coins_pos": "1/9",
+    "h1": -0.009,
+    "h2": -0.0045,
+    "both_halves_same_sign": true
+   },
+   "pool_target": {
+    "delta": -0.0081,
+    "coins_pos": "1/9",
+    "h1": -0.0094,
+    "h2": -0.0067,
+    "both_halves_same_sign": true
+   },
+   "pool_ladder": {
+    "delta": -0.0034,
+    "coins_pos": "4/9",
+    "h1": -0.0049,
+    "h2": -0.0018,
+    "both_halves_same_sign": true
+   }
+  }
+ }
+}
