@@ -86,6 +86,9 @@ REGISTRY = [
     ("v7 veto clock row", "db",
      "v7_veto_clock:updated_at", 2.5,
      "site trigger countdown (build-time-snapshot family)"),
+    ("prereg board row", "db",
+     "prereg_clocks:updated_at", 2.5,
+     "site research-progress board; a frozen board reads as 'no progress'"),
     # -- the cloud indicator service --
     ("indicator bars", "db",
      "indicator_history:dt", 2.5,
