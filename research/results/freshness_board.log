@@ -428,3 +428,45 @@ portfolio clocks            2.7h  195.0h  ok
 tracked signals            16.3h  336.0h  ok
 
 0 red / 15 tracked
+freshness board — 2026-08-26 17:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           6.4h    2.5h  RED  <-- skip-vs-taken scoring surface; silent staleness = consumer s
+prereg board row            0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets         21.3h   48.0h  ok
+daily collect log          21.3h   30.0h  ok
+portfolio clocks            8.7h  195.0h  ok
+tracked signals             2.3h  336.0h  ok
+
+1 red / 15 tracked: raid outcomes row
+alert DELIVERED: Freshness board transition:
+  RED: raid outcomes row (age 6.4h, limit 2h) — skip-vs-taken scoring surface; silent staleness = consumer silently scores against stale outcomes
+freshness board — 2026-08-26 23:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets          3.3h   48.0h  ok
+daily collect log           3.3h   30.0h  ok
+portfolio clocks           14.7h  195.0h  ok
+tracked signals             1.3h  336.0h  ok
+
+0 red / 15 tracked
+alert DELIVERED: Freshness board transition:
+  recovered: raid outcomes row
