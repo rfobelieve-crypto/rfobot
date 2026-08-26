@@ -1,0 +1,10 @@
+{
+ "symbol": "BTC",
+ "px": 78011.65,
+ "frozen_live_band": 1,
+ "ref_all_live_band": 3,
+ "ref_latest_only": 2,
+ "price_overlap": 64,
+ "frozen_prices": 64,
+ "ref_prices": 100
+}

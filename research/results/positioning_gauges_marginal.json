@@ -1,0 +1,65 @@
+{
+ "G1 群眾槓桿水位": {
+  "best": "MID 中性",
+  "worst": "LOW 低槓桿",
+  "gap": 0.0854,
+  "gap_ci": [
+   -0.0515,
+   0.2226
+  ],
+  "within_ranging": -0.0214,
+  "within_trending": 0.1624,
+  "overlap_ranging_pct": 37.3
+ },
+ "G2 大戶vs散戶分歧": {
+  "best": "大戶更空頭",
+  "worst": "一致",
+  "gap": 0.077,
+  "gap_ci": [
+   -0.0706,
+   0.225
+  ],
+  "within_ranging": 0.0357,
+  "within_trending": 0.0652,
+  "overlap_ranging_pct": 24.0
+ },
+ "G3 資金費率極端": {
+  "best": "正常",
+  "worst": "極端正",
+  "gap": 0.0984,
+  "gap_ci": [
+   -0.0537,
+   0.2514
+  ],
+  "within_ranging": 0.098,
+  "within_trending": 0.0835,
+  "overlap_ranging_pct": 37.5
+ },
+ "G4 清算強度": {
+  "best": "平靜",
+  "worst": "BURST 爆量",
+  "gap": 0.148,
+  "gap_ci": [
+   0.0342,
+   0.2674
+  ],
+  "within_ranging": 0.272,
+  "within_trending": 0.1038,
+  "overlap_ranging_pct": 37.9
+ },
+ "G5 現貨溢價": {
+  "best": "折價",
+  "worst": "溢價",
+  "gap": 0.0658,
+  "gap_ci": [
+   -0.0723,
+   0.2105
+  ],
+  "within_ranging": 0.1457,
+  "within_trending": -0.0733,
+  "overlap_ranging_pct": 35.6
+ },
+ "survivors": [
+  "G4 清算強度"
+ ]
+}
