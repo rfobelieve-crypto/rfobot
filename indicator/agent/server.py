@@ -725,6 +725,12 @@ def _raid_signals_payload() -> dict:
             # payload rather than reading either side's prose).
             "variant_b": "1", "status": "OPEN",
             "variants": [v for v in str(r["variants"]).split(",") if v],
+            # §0.59 (2026-08-26): frozen ADX cell at the SWEEP bar — the
+            # moment a consumer can act on. RANGING is the mechanism's home
+            # regime; the pre-registered filter enters only there. Scored
+            # at the FILL bar in the ledger instead (1-8h later, label can
+            # move) — product validates the pipeline, ledger decides edge.
+            "regime_cell": r.get("regime_cell") or "",
             # Sizing inputs: followers must NOT hardcode the frozen
             # constants.  size_base = (equity x risk_pct) / |entry - stop|
             # keeps per-trade risk fixed, which is the unit the research
@@ -797,7 +803,7 @@ def _raid_pending_payload() -> dict:
             cur.execute(
                 "SELECT symbol, side, level_kind, sweep_ts, sweep_utc, "
                 "trigger_px, stop_px, atr, risk_frac, pierce_atr, variants, "
-                "expires_ts, universe, updated_at "
+                "regime_cell, expires_ts, universe, updated_at "
                 "FROM raid_pending_levels ORDER BY sweep_ts DESC")
             rows = cur.fetchall()
     finally:
@@ -825,7 +831,10 @@ def _raid_pending_payload() -> dict:
         "list": out, "count": len(out),
         "asof_utc": str(newest) if newest else None,
         "rules": {"stop_atr": RAID_STOP_ATR, "hold_h": RAID_HOLD_H,
-                  "entry": "touch trigger_px", "variants_available": ["A", "B"]},
+                  "entry": "touch trigger_px", "variants_available": ["A", "B"],
+                  "regime_cells": ["RANGING", "TREND_UP", "TREND_DOWN",
+                                   "NEUTRAL"],
+                  "home_regime": "RANGING"},
         "mode": "shadow",
         "disclaimer": "Forward shadow validation in progress — not a live "
                       "strategy, not financial advice.",

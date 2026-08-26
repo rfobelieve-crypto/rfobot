@@ -51,6 +51,8 @@ except Exception:
 import level_types as LT  # noqa: E402
 import sweep_core as SC  # noqa: E402
 
+from research.crowd_battery2 import adx_state  # noqa: E402
+
 _DD = os.environ.get("SWEEP_DATA_DIR", "").strip()
 CACHE = (Path(_DD) / ".cache") if _DD else (
     ROOT / "research" / "sweep_failure" / ".cache")
@@ -71,6 +73,7 @@ CREATE TABLE IF NOT EXISTS raid_pending_levels (
   risk_frac   DECIMAL(12,8) NOT NULL,
   pierce_atr  DECIMAL(12,6) NOT NULL,
   variants    VARCHAR(32)   NOT NULL,
+  regime_cell VARCHAR(12)   NOT NULL DEFAULT '',
   expires_ts  BIGINT        NOT NULL,
   universe    VARCHAR(16)   NOT NULL,
   updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -122,7 +125,15 @@ def armed_levels(bars):
     h = [b[SC.H] for b in bars]
     lo = [b[SC.L] for b in bars]
     a = SC.atr14(bars)
+    c = [b[SC.C] for b in bars]
     last_ts = bars[-1][0]
+    # §0.59: the frozen ADX(14) 25/20 cell with the §0.54b direction split,
+    # evaluated AT THE SWEEP BAR — that is the moment a consumer can act on.
+    # The shadow log scores the cell at the FILL bar instead (1-8h later, so
+    # the label can move); that difference is intentional and harmless: the
+    # product side validates the pipeline, the ledger decides the edge.
+    adx = adx_state(bars)
+    LB = 24
     out = []
     for j, kd, lvl, kind in sweep_events(bars):
         if a[j] is None or a[j] == 0:
@@ -138,7 +149,17 @@ def armed_levels(bars):
         A = a[j]
         d = -kd                            # trade direction
         risk = SC.DIS * A
+        lab = adx.get(bars[j][0] // 3600 * 3600)
+        if lab is None or j < LB:
+            cell = ""
+        elif lab == "RANGING":
+            cell = "RANGING"
+        elif lab != "TRENDING":
+            cell = "NEUTRAL"
+        else:
+            cell = "TREND_UP" if c[j] / c[j - LB] - 1 > 0 else "TREND_DOWN"
         out.append({
+            "regime_cell": cell,
             "sweep_ts": bars[j][0], "kd": kd, "lvl": lvl, "kind": kind,
             "atr": A, "side": "LONG" if d == 1 else "SHORT",
             "stop_px": lvl - d * risk,
@@ -170,7 +191,8 @@ def main() -> int:
                 f"{datetime.fromtimestamp(x['sweep_ts'], timezone.utc):%Y-%m-%d %H:%M}",
                 round(x["lvl"], 8), round(x["stop_px"], 8),
                 round(x["atr"], 8), round(x["risk_frac"], 8),
-                round(x["pierce"], 6), variants, int(x["expires_ts"]), "core9"))
+                round(x["pierce"], 6), variants, x.get("regime_cell", ""),
+                int(x["expires_ts"]), "core9"))
 
     from shared.db import get_db_conn
     conn = get_db_conn()
@@ -184,8 +206,9 @@ def main() -> int:
                 cur.executemany(
                     "INSERT IGNORE INTO raid_pending_levels (symbol, side, "
                     "level_kind, sweep_ts, sweep_utc, trigger_px, stop_px, "
-                    "atr, risk_frac, pierce_atr, variants, expires_ts, "
-                    "universe) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    "atr, risk_frac, pierce_atr, variants, regime_cell, "
+                    "expires_ts, universe) VALUES "
+                    "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                     rows)
         conn.commit()
     finally:
