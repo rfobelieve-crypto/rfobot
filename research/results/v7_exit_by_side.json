@@ -1,0 +1,129 @@
+{
+ "baseline_by_side": {
+  "LONG": {
+   "n": 18,
+   "wr": 66.66666666666666,
+   "bps": 0.41975649076561566,
+   "hold": 16.22222222222222,
+   "opp_share": 61.111111111111114
+  },
+  "SHORT": {
+   "n": 17,
+   "wr": 64.70588235294117,
+   "bps": 0.5391506386347396,
+   "hold": 13.764705882352942,
+   "opp_share": 58.82352941176471
+  }
+ },
+ "by_variant": {
+  "opp_strong": {
+   "LONG": {
+    "delta_bps": -19.153119023581386,
+    "n": 14,
+    "n_base": 18,
+    "h1": null,
+    "h2": null,
+    "both_halves_same_sign": false
+   },
+   "SHORT": {
+    "delta_bps": -9.30772445862307,
+    "n": 15,
+    "n_base": 17,
+    "h1": null,
+    "h2": null,
+    "both_halves_same_sign": false
+   }
+  },
+  "opp_2bar": {
+   "LONG": {
+    "delta_bps": -24.88459111117605,
+    "n": 17,
+    "n_base": 18,
+    "h1": null,
+    "h2": null,
+    "both_halves_same_sign": false
+   },
+   "SHORT": {
+    "delta_bps": -37.01224224988407,
+    "n": 15,
+    "n_base": 17,
+    "h1": null,
+    "h2": null,
+    "both_halves_same_sign": false
+   }
+  },
+  "trail_2x": {
+   "LONG": {
+    "delta_bps": -4.180876152166447,
+    "n": 19,
+    "n_base": 18,
+    "h1": -6.9,
+    "h2": null,
+    "both_halves_same_sign": false
+   },
+   "SHORT": {
+    "delta_bps": -9.965282556823858,
+    "n": 22,
+    "n_base": 17,
+    "h1": null,
+    "h2": null,
+    "both_halves_same_sign": false
+   }
+  },
+  "trail_4x": {
+   "LONG": {
+    "delta_bps": -8.758087918592015,
+    "n": 17,
+    "n_base": 18,
+    "h1": -4.2,
+    "h2": null,
+    "both_halves_same_sign": false
+   },
+   "SHORT": {
+    "delta_bps": -15.656496094769413,
+    "n": 16,
+    "n_base": 17,
+    "h1": null,
+    "h2": null,
+    "both_halves_same_sign": false
+   }
+  },
+  "no_opp": {
+   "LONG": {
+    "delta_bps": 14.476745233144001,
+    "n": 12,
+    "n_base": 18,
+    "h1": null,
+    "h2": null,
+    "both_halves_same_sign": false
+   },
+   "SHORT": {
+    "delta_bps": -31.67775043191786,
+    "n": 11,
+    "n_base": 17,
+    "h1": null,
+    "h2": null,
+    "both_halves_same_sign": false
+   }
+  },
+  "be_after_1atr": {
+   "LONG": {
+    "delta_bps": -25.322311424365846,
+    "n": 22,
+    "n_base": 18,
+    "h1": -53.1,
+    "h2": null,
+    "both_halves_same_sign": false
+   },
+   "SHORT": {
+    "delta_bps": -54.09425788535335,
+    "n": 27,
+    "n_base": 17,
+    "h1": null,
+    "h2": null,
+    "both_halves_same_sign": false
+   }
+  }
+ },
+ "verdict": "**統計力不足，不出判讀**（多 n=18／空 n=17，門檻 40）。每半不足 10 筆時兩半同號檢查依建構必然失敗——一個什麼都通不過的檢定，不是「沒有效果」的證據。另注：本 harness 的 OOS 窗結束於解碼修法之前，**無法測到 §0.63 提出的那個機制**。"
+}

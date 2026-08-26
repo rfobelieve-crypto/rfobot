@@ -1,0 +1,36 @@
+{
+ "RANGING": {
+  "bars": 1953,
+  "up": 64,
+  "down": 125,
+  "up_rate_pct": 3.277,
+  "down_rate_pct": 6.4,
+  "down_share_pct": 66.1
+ },
+ "TREND_UP": {
+  "bars": 1622,
+  "up": 77,
+  "down": 99,
+  "up_rate_pct": 4.747,
+  "down_rate_pct": 6.104,
+  "down_share_pct": 56.2
+ },
+ "TREND_DOWN": {
+  "bars": 1718,
+  "up": 154,
+  "down": 128,
+  "up_rate_pct": 8.964,
+  "down_rate_pct": 7.451,
+  "down_share_pct": 45.4
+ },
+ "NEUTRAL": {
+  "bars": 1481,
+  "up": 77,
+  "down": 91,
+  "up_rate_pct": 5.199,
+  "down_rate_pct": 6.144,
+  "down_share_pct": 54.2
+ },
+ "verdict": "餓死**不成立**：上升段的 DOWN 開火率沒有偏低，解碼如設計般在適應。多單的出場問題若存在，成因在別處",
+ "trend_up_down_rate_vs_median": 0.954
+}

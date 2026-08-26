@@ -409,3 +409,22 @@ portfolio clocks           51.8h  195.0h  ok
 tracked signals            10.3h  336.0h  ok
 
 0 red / 13 tracked
+freshness board — 2026-08-26 11:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.3h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           0.4h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+coinglass parquets         15.3h   48.0h  ok
+daily collect log          15.3h   30.0h  ok
+portfolio clocks            2.7h  195.0h  ok
+tracked signals            16.3h  336.0h  ok
+
+0 red / 15 tracked
