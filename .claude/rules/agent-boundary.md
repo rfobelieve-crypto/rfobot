@@ -36,6 +36,13 @@ Files under `indicator/agent/` MUST NOT import, at any depth:
   that already happened, costing a batch consumer 0.1328 R/trade (158% of
   variant B's edge, TODO §0.57); this table lets the consumer fill AT the
   level the backtest assumes),
+  `prereg_clocks` (pre-registration board, 2026-08-26 — WRITTEN by
+  `research/prereg_publish.py` hourly. The open hypotheses and their
+  progress lived only in TODO.md sections and per-clock scripts, so from
+  outside the site it looked like nothing was running while five clocks
+  accumulated. The board shows PROGRESS ONLY; every verdict keeps its
+  single owning scorer, so no number here can drift from the one that
+  decides),
   `v7_veto_clock` (adoption-trigger clock, 2026-08-20 — WRITTEN by
   `research/v7_veto_publish.py` hourly; the cloud route could not compute
   it (needs the local kline cache, not in the image) and silently served

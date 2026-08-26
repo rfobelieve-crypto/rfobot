@@ -871,6 +871,62 @@ async def public_raid_pending_route(request: Request) -> JSONResponse:
     return resp
 
 
+_prereg_cache: dict = {"data": None, "ts": 0.0}
+_PREREG_CACHE_TTL_S = 300.0
+
+
+def _prereg_payload() -> dict:
+    """Read the pre-registration board the quant system persists hourly.
+
+    Boundary note: SELECT only. Progress is computed by
+    research/prereg_publish.py on the quant side, which has the frozen
+    ledger and the clock files; recomputing it here would need data the
+    DB does not hold (agent-boundary.md).
+
+    Surface: hypotheses, gates, counts, dates and verdict labels. No
+    sizes, no dollars, no model internals — this is the research process
+    made visible, not the positions.
+    """
+    import json as _json
+    from shared.db import get_db_conn
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT payload, updated_at FROM prereg_clocks "
+                        "WHERE id = 1")
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return {"error": "pre-registration board not yet published"}
+    data = _json.loads(row["payload"])
+    data["asof_utc"] = str(row["updated_at"])
+    return data
+
+
+@mcp.custom_route("/public/prereg-clocks", methods=["GET"])
+async def public_prereg_route(request: Request) -> JSONResponse:
+    """Open pre-registrations and their progress, plus settled verdicts.
+
+    Exists because the discipline was invisible from outside: five clocks
+    running, each only observable by executing a script.
+    """
+    now = time.monotonic()
+    if (_prereg_cache["data"] is None
+            or now - _prereg_cache["ts"] > _PREREG_CACHE_TTL_S):
+        try:
+            data = await anyio.to_thread.run_sync(_prereg_payload)
+        except Exception as e:  # noqa: BLE001 — degrade to 503, never crash
+            data = {"error": f"prereg board unavailable: {type(e).__name__}"}
+        _prereg_cache["data"] = data
+        _prereg_cache["ts"] = now
+    payload = _prereg_cache["data"]
+    resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 _weather_cache: dict = {"data": None, "ts": 0.0}
 _WEATHER_CACHE_TTL_S = 300.0
 

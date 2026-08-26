@@ -28,3 +28,8 @@ REM 2026-08-21: cloud-train parity check (weakness-#1 migration) -- compares
 REM the local ledger hash vs the cloud recorder's train_parity row. Log-only;
 REM 7 consecutive MATCH days unlock the cutover (rule frozen in the script).
 python research\train_parity_check.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-08-26: publish the pre-registration board (open hypotheses +
+REM progress + settled verdicts). Progress only -- every verdict keeps
+REM its single owning scorer, so nothing here can drift from the number
+REM that actually decides. See TODO 0.61.
+python research\prereg_publish.py >> research\results\sweep_shadow_run.log 2>&1
