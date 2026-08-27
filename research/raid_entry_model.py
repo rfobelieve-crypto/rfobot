@@ -97,12 +97,36 @@ from research.crowd_battery2 import adx_state              # noqa: E402
 from research.liquidity_map_check import swing_levels, first_hit  # noqa: E402
 
 CACHE = ROOT / "research" / "sweep_failure" / ".cache"
-OUT = ROOT / "research" / "results" / "raid_entry_model.json"
+def _out():
+    return ROOT / "research" / "results" / f"raid_entry_model_{CONFIG}.json"
 CORE9 = {"BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "LINK", "AVAX"}
 HOME = {"RANGING", "TREND_DOWN"}                 # §0.59b
 PIERCE_B = 0.25
 LB = 24
 random.seed(71)
+
+# ── CONFIGS, all three declared 2026-08-27 BEFORE the second run ────────
+# The first run tested exactly one architecture and its failure was used to
+# close the family. That is the mirror of the error guarded against all
+# night: a false NEGATIVE from a single configuration. Two more are tested,
+# each a design change with an a-priori reason rather than a knob:
+#
+#   base     what ran first: primary = variant B, model competes with the
+#            regime filter
+#   compose  primary = variant B AND home regime. This is what meta-
+#            labelling actually prescribes — the secondary model refines a
+#            primary rule, it does not race it. Setting them against each
+#            other was an architecture error, not a finding.
+#   recent   train only on the trailing 12 months before the cutoff. §0.58
+#            measured that within-cell decay accounts for 75% of the
+#            forward gap, so a model fitted on 2024 data is being taught a
+#            relationship that has since changed. Justified by a measured
+#            property, not by a result.
+#
+# THREE configs total and no more. Because three were tried, the survivor
+# needs the forward lift over regime to be POSITIVE, not merely level.
+CONFIG = (sys.argv[1] if len(sys.argv) > 1 else "base")
+assert CONFIG in ("base", "compose", "recent"), CONFIG
 
 FEATURES = [
     "pierce_atr",        # sweep depth — the variant-B filter, as continuous
@@ -268,10 +292,15 @@ def main() -> int:
     for s in syms:
         ev += extract(s)
     ev.sort(key=lambda x: x["ts"])
+    if CONFIG == "compose":
+        # primary rule now includes the regime filter, so BOTH training and
+        # scoring live inside the home regime and the baseline to beat is
+        # the regime filter's own number.
+        ev = [x for x in ev if x["cell"] in HOME]
     if len(ev) < 1000:
         raise SystemExit(f"only {len(ev)} events — check extraction")
 
-    print("§0.70 獵取進場 meta-model —— 判準跑數之前凍結")
+    print(f"§0.70 獵取進場 meta-model —— 配置 **{CONFIG}**")
     print(f"  母體 {len(ev)} 個事件、{len(syms)} 幣、"
           f"{datetime.fromtimestamp(ev[0]['ts'], timezone.utc):%Y-%m}"
           f" → {datetime.fromtimestamp(ev[-1]['ts'], timezone.utc):%Y-%m}")
@@ -307,6 +336,8 @@ def main() -> int:
         a0, a1 = edges[k], edges[k + 1]
         te = np.where((ts >= a0) & (ts < a1))[0]
         tr = np.where((ex < a0 - EMB))[0]
+        if CONFIG == "recent":
+            tr = tr[ts[tr] >= a0 - 365 * 86400]
         if len(te) < 60 or len(tr) < 500:
             continue
         m = XGBClassifier(**params).fit(X[tr], y[tr])
@@ -370,6 +401,8 @@ def main() -> int:
     FREEZE = int(datetime(2026, 7, 28, tzinfo=timezone.utc).timestamp())
     print("\n── (c) 前瞻留出：訓練只用 FREEZE 之前，評分只用之後 ──")
     tr = np.where(ex < FREEZE)[0]
+    if CONFIG == "recent":
+        tr = tr[ts[tr] >= FREEZE - 365 * 86400]
     te = np.where(ts >= FREEZE)[0]
     fwd = None
     if len(te) >= 100 and len(tr) >= 1000:
@@ -434,7 +467,7 @@ def main() -> int:
     for f, g in imp.items():
         print(f"    {f:<22} {g:.4f}")
 
-    OUT.write_text(json.dumps({
+    _out().write_text(json.dumps({
         "n_events": len(ev), "features": FEATURES,
         "baseline_all": b1, "baseline_regime": b3,
         "folds": folds, "lift_vs_regime": [round(x, 4) for x in lift_home],

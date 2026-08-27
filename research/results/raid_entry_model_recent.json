@@ -1,0 +1,241 @@
+{
+ "n_events": 8272,
+ "features": [
+  "pierce_atr",
+  "sweep_range_atr",
+  "sweep_close_pos",
+  "sweep_vol_z",
+  "atr_pct",
+  "approach_atr",
+  "hour_utc",
+  "dow",
+  "regime_code",
+  "ret24_atr",
+  "side",
+  "level_age_bars",
+  "pools_ahead_3atr",
+  "dist_next_pool_atr"
+ ],
+ "baseline_all": {
+  "label": "B1 全進",
+  "n": 8272,
+  "meanR": 0.0755,
+  "wr": 57.4,
+  "ci": [
+   0.0533,
+   0.0998
+  ],
+  "breadth": "9/9",
+  "established": true
+ },
+ "baseline_regime": {
+  "label": "B3 §0.59 regime 濾網",
+  "n": 5016,
+  "meanR": 0.0763,
+  "wr": 56.8,
+  "ci": [
+   0.0493,
+   0.104
+  ],
+  "breadth": "8/9",
+  "established": true
+ },
+ "folds": [
+  {
+   "n_test": 621,
+   "n_model": 453,
+   "all": 0.054391007529831906,
+   "model": 0.09242834513436463,
+   "home": 0.018702789907098807
+  },
+  {
+   "n_test": 640,
+   "n_model": 423,
+   "all": 0.062250563062433144,
+   "model": 0.10544196007379912,
+   "home": 0.07078387870993932
+  },
+  {
+   "n_test": 680,
+   "n_model": 395,
+   "all": 0.13039556641326083,
+   "model": 0.18434887379951237,
+   "home": 0.12104185507888976
+  },
+  {
+   "n_test": 597,
+   "n_model": 355,
+   "all": 0.08118810391146478,
+   "model": 0.13354904308686072,
+   "home": 0.07011815111053187
+  },
+  {
+   "n_test": 569,
+   "n_model": 403,
+   "all": 0.129363633145969,
+   "model": 0.18518706584117017,
+   "home": 0.13657667687129355
+  },
+  {
+   "n_test": 599,
+   "n_model": 399,
+   "all": 0.038821555363957386,
+   "model": 0.12570682441282452,
+   "home": 0.01853991445242228
+  },
+  {
+   "n_test": 653,
+   "n_model": 447,
+   "all": 0.08603997317256934,
+   "model": 0.09328358826468104,
+   "home": 0.09784195513334222
+  },
+  {
+   "n_test": 604,
+   "n_model": 432,
+   "all": 0.06329415633553383,
+   "model": 0.07819511698271704,
+   "home": 0.12400751398153277
+  }
+ ],
+ "lift_vs_regime": [
+  0.0737,
+  0.0347,
+  0.0633,
+  0.0634,
+  0.0486,
+  0.1072,
+  -0.0046,
+  -0.0458
+ ],
+ "lift_ci": [
+  0.0106,
+  0.0709
+ ],
+ "leave_coins_out": [
+  {
+   "held": [
+    "AAVE",
+    "ARB",
+    "BNB",
+    "ETC",
+    "ICP",
+    "NEAR",
+    "SUI",
+    "XRP"
+   ],
+   "all": 0.09241262875365847,
+   "model": 0.14206979446912993,
+   "home": 0.09743115549476604,
+   "n": 2352,
+   "n_model": 1688
+  },
+  {
+   "held": [
+    "ADA",
+    "ATOM",
+    "BTC",
+    "ETH",
+    "INJ",
+    "OP",
+    "TRX"
+   ],
+   "all": 0.08288143038595833,
+   "model": 0.1238431075516505,
+   "home": 0.08899601579212447,
+   "n": 1867,
+   "n_model": 1375
+  },
+  {
+   "held": [
+    "ALGO",
+    "AVAX",
+    "DOGE",
+    "FIL",
+    "LINK",
+    "SAND",
+    "UNI"
+   ],
+   "all": 0.0579115394215594,
+   "model": 0.09852178093945793,
+   "home": 0.057480399048655935,
+   "n": 2038,
+   "n_model": 1655
+  },
+  {
+   "held": [
+    "APT",
+    "AXS",
+    "DOT",
+    "HBAR",
+    "LTC",
+    "SOL",
+    "VET"
+   ],
+   "all": 0.06676397814807972,
+   "model": 0.10423448774376266,
+   "home": 0.05891600925452337,
+   "n": 2015,
+   "n_model": 1545
+  }
+ ],
+ "forward_holdout": {
+  "all": {
+   "label": "  前瞻 · 全進",
+   "n": 250,
+   "meanR": 0.004,
+   "wr": 58.8,
+   "ci": [
+    -0.1087,
+    0.1083
+   ],
+   "breadth": "5/9",
+   "established": false
+  },
+  "model": {
+   "label": "  前瞻 · 模型取",
+   "n": 173,
+   "meanR": 0.0339,
+   "wr": 60.1,
+   "ci": [
+    -0.1055,
+    0.1569
+   ],
+   "breadth": "6/9",
+   "established": false
+  },
+  "home": {
+   "label": "  前瞻 · regime 濾網",
+   "n": 147,
+   "meanR": 0.1147,
+   "wr": 65.3,
+   "ci": [
+    0.0185,
+    0.2096
+   ],
+   "breadth": "6/9",
+   "established": false
+  },
+  "lift_vs_all": 0.0299,
+  "lift_vs_home": -0.0808
+ },
+ "gates": {
+  "per_fold_mean": true,
+  "frac_pos": true,
+  "ci": true,
+  "leave_coins_out": true,
+  "forward_holdout": false
+ },
+ "passed": false,
+ "verdict": "**回測四關過，但前瞻留出未過** —— 模型學到的關係在 FREEZE 之後不成立，與 §0.58 的格內衰退一致。回測世界的 lift 不可外推",
+ "importance": {
+  "sweep_close_pos": 0.1431,
+  "sweep_range_atr": 0.0926,
+  "approach_atr": 0.0801,
+  "hour_utc": 0.077,
+  "atr_pct": 0.0741,
+  "sweep_vol_z": 0.0719,
+  "dow": 0.0711,
+  "pierce_atr": 0.0672
+ }
+}
