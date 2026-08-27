@@ -1,0 +1,135 @@
+{
+ "n": 40766,
+ "by_kind": {
+  "pdh_pdl": 10274,
+  "session": 20851,
+  "swing": 8268,
+  "pwh_pwl": 1373
+ },
+ "features": [
+  "pierce",
+  "kind_code",
+  "level_age_bars",
+  "sweep_range_atr",
+  "sweep_close_pos",
+  "sweep_vol_z",
+  "atr_pct",
+  "approach_atr",
+  "hour_utc",
+  "dow",
+  "regime_code",
+  "ret24_atr",
+  "side",
+  "confluence_kinds",
+  "pools_ahead_3atr",
+  "dist_next_pool_atr"
+ ],
+ "baselines": {
+  "all": {
+   "label": "B1 全進",
+   "n": 40766,
+   "meanR": 0.0633,
+   "wr": 56.1,
+   "ci": [
+    0.0462,
+    0.0798
+   ],
+   "breadth": "9/9",
+   "established": true
+  },
+  "regime": {
+   "label": "B3 §0.59 regime 濾網",
+   "n": 24253,
+   "meanR": 0.064,
+   "wr": 55.8,
+   "ci": [
+    0.0435,
+    0.0831
+   ],
+   "breadth": "9/9",
+   "established": true
+  },
+  "confluence": {
+   "label": "B4 §0.71b 堆疊≤1",
+   "n": 23142,
+   "meanR": 0.024,
+   "wr": 52.6,
+   "ci": [
+    0.0082,
+    0.0397
+   ],
+   "breadth": "9/9",
+   "established": true
+  }
+ },
+ "lifts": [
+  0.064,
+  0.0154,
+  0.0555,
+  0.0791,
+  0.0932,
+  0.0604,
+  0.0161,
+  0.0075
+ ],
+ "lift_ci": [
+  0.0275,
+  0.0688
+ ],
+ "forward": {
+  "all": {
+   "label": "  前瞻 · 全進",
+   "n": 1175,
+   "meanR": -0.0145,
+   "wr": 55.4,
+   "ci": [
+    -0.1252,
+    0.0783
+   ],
+   "breadth": "3/9",
+   "established": false
+  },
+  "model": {
+   "label": "  前瞻 · 模型取",
+   "n": 782,
+   "meanR": 0.0463,
+   "wr": 60.7,
+   "ci": [
+    -0.0791,
+    0.1632
+   ],
+   "breadth": "7/9",
+   "established": false
+  },
+  "baseline": {
+   "label": "  前瞻 · B3 §0.59 reg",
+   "n": 652,
+   "meanR": 0.0531,
+   "wr": 58.4,
+   "ci": [
+    -0.0133,
+    0.1134
+   ],
+   "breadth": "7/9",
+   "established": false
+  },
+  "lift": -0.0068
+ },
+ "gates": {
+  "per_fold": true,
+  "frac_pos": true,
+  "ci": true,
+  "forward": false
+ },
+ "verdict": "**未過** —— 記為負結果。母體已是權威口徑，v1 的四個範圍錯誤都已排除",
+ "importance": {
+  "sweep_close_pos": 0.1391,
+  "confluence_kinds": 0.1355,
+  "level_age_bars": 0.0976,
+  "sweep_range_atr": 0.0807,
+  "pierce": 0.0632,
+  "approach_atr": 0.0566,
+  "atr_pct": 0.0562,
+  "dow": 0.0529
+ }
+}
