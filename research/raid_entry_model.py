@@ -93,6 +93,7 @@ except Exception:
     pass
 
 import sweep_core as SC                                    # noqa: E402
+import level_types as LT                                   # noqa: E402
 from research.crowd_battery2 import adx_state              # noqa: E402
 from research.liquidity_map_check import swing_levels, first_hit  # noqa: E402
 
@@ -145,6 +146,12 @@ FEATURES = [
     "level_age_bars",    # bars from pool creation to sweep
     "pools_ahead_3atr",  # D5 survived three terrain gates: density ahead
     "dist_next_pool_atr",  # D2: the wall in front
+    # Added 2026-08-27 AFTER §0.71b, which is the only candidate all night
+    # that separated: how many OTHER pool families (session / PDH-PDL /
+    # PWH-PWL) sit on this exact price. 1 kind scored +0.1112, 2+ scored
+    # +0.0610, stable across three tolerances. The existing pool features
+    # look AHEAD of the level; none of them look AT it.
+    "confluence_kinds",
 ]
 REGIME_CODE = {"RANGING": 0, "TREND_UP": 1, "TREND_DOWN": 2, "NEUTRAL": 3}
 
@@ -170,6 +177,11 @@ def extract(sym: str) -> list[dict]:
     pools = [(est, price, side, first_hit(bars, est, price, side))
              for est, price, side in swing_levels(bars)]
     pools.sort()
+    # the OTHER families, for the §0.71b confluence feature (0.10 ATR — the
+    # middle of the three tolerances that all agreed; not selected from them)
+    others = [(est, price, side, first_hit(bars, est, price, side), kind)
+              for kind, items in LT.build_levels(bars).items()
+              for est, price, side in items]
 
     # sweep events keyed by level so a trade can find the bar it came from
     sw_by_lvl = defaultdict(list)
@@ -218,6 +230,11 @@ def extract(sym: str) -> list[dict]:
             if abs(p - lvl) < 1e-9 and hit == j:
                 est_bar = est
                 break
+        want = 1 if d == -1 else -1
+        conf = len({k for est2, p2, s2, hit2, k in others
+                    if s2 == want and est2 <= j
+                    and (hit2 is None or hit2 >= j)
+                    and abs(p2 - lvl) <= 0.10 * Aj})
         dt = datetime.fromtimestamp(bars[j][0], timezone.utc)
         out.append({
             "sym": sym, "ts": int(fill_ts), "exit_ts": int(exit_ts),
@@ -235,6 +252,7 @@ def extract(sym: str) -> list[dict]:
             "level_age_bars": (j - est_bar) if est_bar is not None else -1,
             "pools_ahead_3atr": sum(1 for x in dists if x <= 3.0),
             "dist_next_pool_atr": dists[0] if dists else 99.0,
+            "confluence_kinds": conf,
         })
     return out
 
@@ -309,8 +327,11 @@ def main() -> int:
     print("── 三條基準線 ──")
     b1 = arm(ev, "B1 全進")
     b3 = arm([x for x in ev if x["cell"] in HOME], "B3 §0.59 regime 濾網")
+    b4 = arm([x for x in ev if x["confluence_kinds"] <= 1],
+             "B4 §0.71b 只取堆疊≤1 種")
     show(b1)
     show(b3)
+    show(b4)
     print(f"\n  B3 − B1 = {b3['meanR'] - b1['meanR']:+.4f}R  "
           f"← **模型要贏的是這個差**\n")
 
