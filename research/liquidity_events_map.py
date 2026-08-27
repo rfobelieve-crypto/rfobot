@@ -138,7 +138,7 @@ def main() -> int:
 
     # ── chart ────────────────────────────────────────────────────────────
     dts = [datetime.fromtimestamp(b[0], timezone.utc) for b in bars[lo_i:]]
-    fig, ax = plt.subplots(figsize=(20, 10), facecolor="#11141a")
+    fig, ax = plt.subplots(figsize=(20, 10.6), facecolor="#11141a")
     ax.set_facecolor("#11141a")
     w = 0.012
     for d, b in zip(dts, bars[lo_i:]):
@@ -157,6 +157,7 @@ def main() -> int:
     # its triangle appeared with nothing attached.
     traded_px = {round(e["lvl"], 8) for e in events}
     live = 0
+    tags: list[tuple[float, str]] = []
     for kind, items in lv.items():
         for est, price, side in items:
             if est >= n:
@@ -174,11 +175,16 @@ def main() -> int:
             if hit is None:
                 live += 1
             ax.hlines(price, x0, x1, colors=COLORS[kind],
-                      lw=(2.0 if is_traded else (1.3 if hit is None else 0.6)),
+                      lw=(2.2 if is_traded else (1.0 if hit is None else 0.5)),
                       linestyles="-" if hit is None else (0, (3, 3)),
                       alpha=(1.0 if is_traded
-                             else (0.9 if hit is None else 0.3)),
+                             else (0.55 if hit is None else 0.16)),
                       zorder=4 if is_traded else 2)
+            # price tag on the right edge for pools still resting — those
+            # are the only ones price can still act on, and reading one off
+            # the y-axis by eye is what made the first version hard to check
+            if hit is None and not is_traded:
+                tags.append((price, COLORS[kind]))
 
     # A pivot is only CONFIRMED PIVOT bars after its extreme, so its line
     # starts 10 bars to the right of the peak a reader is looking at. That
@@ -211,6 +217,21 @@ def main() -> int:
             if k in traded_px and (k not in est_of or est > est_of[k][0]):
                 est_of[k] = (est, kind)
 
+    # Right-edge price tags, thinned so they cannot collide. The first
+    # version stacked five labels on top of each other above 82k — a label
+    # that cannot be read is worse than no label, because it still costs
+    # the reader a glance.
+    span = (y_hi - y_lo) or 1.0
+    min_gap = span * 0.016
+    last_y = None
+    for price, col in sorted(tags, reverse=True):
+        if last_y is not None and abs(price - last_y) < min_gap:
+            continue
+        last_y = price
+        ax.annotate(f"{price:,.0f}", (dts[-1], price),
+                    xytext=(7, 0), textcoords="offset points",
+                    va="center", fontsize=6.5, color=col, alpha=0.8)
+
     for e in events:
         jx = dts[e["j"] - lo_i] if e["j"] >= lo_i else dts[0]
         fx = dts[e["fill"] - lo_i]
@@ -232,7 +253,18 @@ def main() -> int:
         ax.plot(fx, e["lvl"], marker="o", ms=8 if big else 5, color=col,
                 mec="#11141a", mew=0.8, zorder=6)
         ax.plot([jx, fx], [e["lvl"], e["lvl"]], color=col,
-                lw=2.0 if big else 1.0, alpha=0.55, zorder=5)
+                lw=2.6 if big else 1.2, alpha=0.6, zorder=5)
+        # the two numbers that decide whether an event is even eligible and
+        # what it did — reading them off the console while looking at the
+        # picture was the slow part of verifying this chart
+        ax.annotate(f"{'B' if big else '·'} {e['pierce']:.2f}ATR  "
+                    f"R{e['R']:+.2f}",
+                    (fx, e["lvl"]), xytext=(9, -11 if e["side"] == "SHORT" else 7),
+                    textcoords="offset points", fontsize=7.5,
+                    color=col, weight="bold" if big else "normal",
+                    zorder=8,
+                    bbox=dict(boxstyle="square,pad=0.22", fc="#11141a",
+                              ec="none", alpha=0.82))
 
     ax.axhline(px, color="#c9d1d9", lw=0.8, ls=":", alpha=0.7, zorder=7)
     handles = [plt.Line2D([], [], color=COLORS[k], lw=2, label=LABEL[k])
@@ -250,9 +282,10 @@ def main() -> int:
         plt.Line2D([], [], marker="x", color="#e8c547", ls="", ms=6,
                    label="× = 擺盪極值（線在其右 10 根才確認）"),
     ]
-    leg = ax.legend(handles=handles, loc="upper left", framealpha=0.3,
-                    facecolor="#11141a", edgecolor="#30363d", fontsize=9,
-                    ncol=2)
+    leg = ax.legend(handles=handles, loc="upper center",
+                    bbox_to_anchor=(0.5, -0.09), framealpha=0.0,
+                    facecolor="#11141a", edgecolor="none", fontsize=8.5,
+                    ncol=4, handlelength=1.8, columnspacing=1.6)
     for t in leg.get_texts():
         t.set_color("#c9d1d9")
     ax.set_ylim(y_lo, y_hi)
@@ -266,7 +299,7 @@ def main() -> int:
         s.set_color("#30363d")
     ax.grid(alpha=0.12, color="#8b949e", lw=0.5)
     fig.autofmt_xdate()
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0.05, 0.965, 1))   # room for tags + legend
     out = OUTDIR / f"liquidity_events_{sym}.png"
     fig.savefig(out, dpi=125, facecolor=fig.get_facecolor())
     print(f"\nwritten {out}")
