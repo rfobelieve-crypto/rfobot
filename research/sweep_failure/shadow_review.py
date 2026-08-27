@@ -735,7 +735,14 @@ def main() -> int:
                             "position": "belowBar" if t["side"] == "LONG" else "aboveBar",
                             "shape": "arrowUp" if t["side"] == "LONG" else "arrowDown",
                             "color": mk_col,
-                            "text": tag + "·" + KIND_ZH[t["kind"]]})
+                            # pierce on the marker, not only in the table
+                            # below (2026-08-27): a grey A event is grey
+                            # BECAUSE its pierce exceeded 0.25 ATR, and
+                            # having to scroll to the table to learn that
+                            # breaks the read. Two decimals is enough to
+                            # see how far from the threshold it sat.
+                            "text": (tag + "·" + KIND_ZH[t["kind"]]
+                                     + f"·{t['pierce']:.2f}")})
         if t["exit_ts"] and t["exit_ts"] >= t0:
             win = (t["net"] or 0) > 0
             markers.append({"time": t["exit_ts"] + TZ, "position": "inBar",
