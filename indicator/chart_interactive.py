@@ -302,6 +302,11 @@ const BG = '#0d1117';
 const CARD = '#161b22';
 const GRID = '#1c222b';
 const TEXT = '#7a828e';
+// ?bare=1 — embedded-card mode (jarvis client): no gridlines, and vertical
+// touch drags pass through to the host page so the phone can scroll past
+// the chart (horizontal pan/pinch still work). Same convention as the
+// liquidity chart's bare mode.
+const BARE = new URLSearchParams(location.search).get('bare') === '1';
 
 const headerH = 36;
 const footerH = 24;
@@ -320,8 +325,13 @@ function makeChart(container, height, opts) {{
     width: window.innerWidth,
     height: height,
     layout: {{ background: {{ color: BG }}, textColor: TEXT, fontSize: 10 }},
-    grid: {{ vertLines: {{ color: GRID }}, horzLines: {{ color: GRID }} }},
+    grid: {{ vertLines: {{ color: GRID, visible: !BARE }},
+             horzLines: {{ color: GRID, visible: !BARE }} }},
     crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
+    handleScroll: {{ mouseWheel: true, pressedMouseMove: true,
+                     horzTouchDrag: true, vertTouchDrag: !BARE }},
+    handleScale: {{ mouseWheel: true, pinch: true,
+                    axisPressedMouseMove: true }},
     timeScale: {{
       timeVisible: true, secondsVisible: false,
       borderColor: GRID,
@@ -480,14 +490,23 @@ chartSeriesPairs.forEach(([srcChart], idx) => {{
 }});
 
 // ── Resize ──
+// Recompute every pane (regime included — it was missing here, so entering
+// fullscreen used to reallocate the other panes around a stale strip) and
+// keep the container divs in step with the canvases.
 window.addEventListener('resize', () => {{
   const totalH2 = window.innerHeight - headerH - footerH;
-  const newConfH = Math.round(totalH2 * 0.{conf_pct:02d});
-  const newPriceH = Math.round(totalH2 * 0.{price_pct:02d});
-  const newMagH = hasMag ? Math.round(totalH2 * 0.{mag_pct_h:02d}) : 0;
-  confChart.resize(window.innerWidth, newConfH);
-  priceChart.resize(window.innerWidth, newPriceH);
-  if (magChart) magChart.resize(window.innerWidth, newMagH);
+  const panes = [
+    ['chart-conf', confChart, Math.round(totalH2 * 0.{conf_pct:02d})],
+    ['chart-regime', regimeChart, hasRegime ? Math.round(totalH2 * 0.{regime_pct:02d}) : 0],
+    ['chart-price', priceChart, Math.round(totalH2 * 0.{price_pct:02d})],
+    ['chart-mag', magChart, hasMag ? Math.round(totalH2 * 0.{mag_pct_h:02d}) : 0],
+  ];
+  for (const [id, chart, h] of panes) {{
+    if (!chart || !h) continue;
+    const el = document.getElementById(id);
+    if (el) el.style.height = h + 'px';
+    chart.resize(window.innerWidth, h);
+  }}
 }});
 </script>
 </body>
