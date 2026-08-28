@@ -30,7 +30,15 @@ th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5),th:nth-child(10)
 .b{color:var(--up)} .win{color:var(--up)} .loss{color:var(--down)} .open{color:var(--accent)} .dim{color:var(--muted)}
 details{padding:8px 16px 14px;font-size:11px;color:var(--muted);line-height:1.8}
 summary{cursor:pointer;user-select:none}
-</style></head><body>
+/* bare 模式在 CSS 層生效(2026-08-28 使用者:切變體時累積圖閃一下)。
+   之前的隱藏跑在頁尾 JS,整頁先渲染再藏 = 閃爍;class 在 head 就掛上,
+   曲線與表格根本不進渲染樹。 */
+html.bare body>*:not(#c){display:none!important}
+html.bare #c{height:96vh!important}
+html.bare body{margin:0}
+</style>
+<script>if(new URLSearchParams(location.search).get('bare')==='1')document.documentElement.classList.add('bare');</script>
+</head><body>
 <div id="hdr"><b>BTCUSDT</b><span class="tag">永續 1H · Shadow 流動性地圖</span><span class="tag">300h</span><span class="tag">UTC+8</span><span class="check">對帳: 重演算 116 筆 forward, 116 筆與 shadow log 一致, netR 對齊 113/113 ✓</span></div>
 <div style='padding:0 16px'><table style='max-width:560px'><thead><tr><th>帳本（本幣）</th><th>平倉 / 持倉</th><th>勝率</th><th>ΣnetR</th></tr></thead><tbody><tr><td>本幣全部 (A)</td><td>113 / 3</td><td>59%</td><td class='win'>+8.28</td></tr><tr><td>變體B 淺穿越</td><td>31 / 0</td><td>58%</td><td class='win'>+4.34</td></tr><tr><td>變體C ＋收回</td><td>23 / 0</td><td>57%</td><td class='win'>+2.73</td></tr><tr><td>變體D ＋量能</td><td>11 / 0</td><td>36%</td><td class='loss'>-0.80</td></tr><tr><td>變體E 三面板</td><td>24 / 0</td><td>71%</td><td class='win'>+8.13</td></tr></tbody></table></div><div class='sub'>全籃29幣：B 進度 1218/1400 · 均netR -0.015 · CI低緣·日聚類 -0.114 · 累積中</div><div class='sub'><b>變體A</b>=原始版·波段池·無濾網（Gate F 正式軌道）　<b>變體B</b>=四種池＋淺穿越≤0.25ATR（預註冊 forward 中，表格 B 欄）　<b>變體C</b>=B∧收回內側✓（1m 價格收回確認，表格 C 欄）　<b>變體D</b>=C∧量能高（訂單流組合配方，量能高=高於該幣自身歷史中位，表格 D 欄）　<b>變體E</b>=BTC·OI↓∧CVD順破∧清算爆量高＝操作者三面板「當下」讀法</div><div class='sub'>凍結後 forward · 情境A成本 · 波段 28筆 Σ+2.83 · 時段 49筆 Σ+6.86 · 昨日 33筆 Σ-2.05 · 上週 3筆 Σ+0.64 · log截至 2026-08-28 08:05 UTC</div>
 <div class="legend">
@@ -88,9 +96,7 @@ for(const g of [{"c": "#f6465d", "w": 1, "st": 2, "pts": [{"time": 1787907600, "
   ls.setData(g.pts);
 }
 if(_q.get('bare')==='1'){
-  for(const el of document.body.children){ if(el.id!=='c') el.style.display='none'; }
-  document.getElementById('c').style.height='96vh';
-  document.body.style.margin='0';
+  // 隱藏已由 head 的 CSS class 處理(防閃爍);這裡只做圖表本身的選項
   chart.applyOptions({grid:{vertLines:{visible:false},horzLines:{visible:false}}});
   chart.applyOptions({watermark:{visible:true,text:'BTCUSDT · shadow'+(_v?' · 變體'+_v:''),color:'rgba(234,236,239,0.045)',fontSize:42}});
   // 尺寸跟著容器活(2026-08-28 使用者截圖:全螢幕後圖擠在上 2/3、下面

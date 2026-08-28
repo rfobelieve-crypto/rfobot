@@ -399,7 +399,15 @@ th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5),th:nth-child(10)
 .b{{color:var(--up)}} .win{{color:var(--up)}} .loss{{color:var(--down)}} .open{{color:var(--accent)}} .dim{{color:var(--muted)}}
 details{{padding:8px 16px 14px;font-size:11px;color:var(--muted);line-height:1.8}}
 summary{{cursor:pointer;user-select:none}}
-</style></head><body>
+/* bare 模式在 CSS 層生效(2026-08-28 使用者:切變體時累積圖閃一下)。
+   之前的隱藏跑在頁尾 JS,整頁先渲染再藏 = 閃爍;class 在 head 就掛上,
+   曲線與表格根本不進渲染樹。 */
+html.bare body>*:not(#c){{display:none!important}}
+html.bare #c{{height:96vh!important}}
+html.bare body{{margin:0}}
+</style>
+<script>if(new URLSearchParams(location.search).get('bare')==='1')document.documentElement.classList.add('bare');</script>
+</head><body>
 <div id="hdr"><b>{sym}USDT</b><span class="tag">永續 1H · Shadow 流動性地圖</span><span class="tag">{hours}h</span><span class="tag">UTC+8</span><span class="check">{check}</span></div>
 {perf}
 <div class="legend">
@@ -457,9 +465,7 @@ for(const g of {levels}){{
   ls.setData(g.pts);
 }}
 if(_q.get('bare')==='1'){{
-  for(const el of document.body.children){{ if(el.id!=='c') el.style.display='none'; }}
-  document.getElementById('c').style.height='96vh';
-  document.body.style.margin='0';
+  // 隱藏已由 head 的 CSS class 處理(防閃爍);這裡只做圖表本身的選項
   chart.applyOptions({{grid:{{vertLines:{{visible:false}},horzLines:{{visible:false}}}}}});
   chart.applyOptions({{watermark:{{visible:true,text:'{sym}USDT · shadow'+(_v?' · 變體'+_v:''),color:'rgba(234,236,239,0.045)',fontSize:42}}}});
   // 尺寸跟著容器活(2026-08-28 使用者截圖:全螢幕後圖擠在上 2/3、下面
