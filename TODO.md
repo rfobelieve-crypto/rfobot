@@ -397,6 +397,24 @@ Entropy/Hyperliquid vs Lighter/trade.xyz，量 `premium_bps = (A/B − 1)×1e4`
 - 該 repo 一次 commit / 零 issue：**下單程式碼要逐行審**（滑價符號 bug 的
   先例——「看起來扣了成本」騙過所有人）
 
+**錄製已上線（2026-08-28 18:30 起）＋判準先凍結**
+
+- **場館發現**：Entropy 不是 crypto 所——上市 6 個標的全是**股票/私募永續**
+  （io:OAI＝OpenAI、io:ANTH＝Anthropic、SNDK、IONQ、NBIS、EWY）。
+  「盤後預言機制度不同」是溢價主要來源；OAI/ANTH 連公開市價的錨都沒有
+- **首錄配對**：SNDK vs lighter-rh（README 自己的例子；兩邊 taker 0 bps
+  **當場驗證為真**）。首兩分鐘：溢價 mean −1.4 bps、std 0.6、buy 側瞬間
+  可成交空間最高 +1.38 bps——**中線不在零**，README 的頭號警告當場應驗
+- **耐久化**：`run_recorder.bat`（30 秒重啟迴圈）＋使用者啟動資料夾
+  （schtasks 要管理員權限，改走 Startup）＋ freshness board 監控
+  （1h 上限——**靜默斷錄 = 一週資料白等**）
+- **本機補丁**（clone 內，未推遠端）：6 處 `open()` 補 `encoding="utf-8"`
+  （cp950 家族）、Windows 無 `add_signal_handler` 的 fallback
+- **判準（跑滿 7 天之前凍結，不看資料調）**：錄滿 ≥7 個完整天後，
+  存在一個扣費後往返 ≥1 bps 的門檻帶、平均每天觸發 ≥10 次、且
+  **前後兩半皆成立** → 進工程閘門討論；否則本線關閉。
+  帶寬不掃描——用 analyze.py 的 p90 建議值起步
+
 **階段閘門（依 CLAUDE.md 既有紀律）**
 1. **現在可做**：`--record-only` 錄兩邊掛單簿（零憑證、零錢、零風險）
    → `analyze.py` 量扣費後溢價分佈 → 有肉/沒肉,一兩週結案

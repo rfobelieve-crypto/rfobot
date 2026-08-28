@@ -102,6 +102,9 @@ REGISTRY = [
     ("cloud train parity", "db",
      "train_parity:updated_at", 2.5,
      "cloud recorder alive (weakness-#1 migration; RED until service up)"),
+    ("arb recorder (§0.75)", "file",
+     "../entropy-arb/logs/minutes.csv", 1.0,
+     "two-venue premium recording; silence = the week of data quietly stops"),
     # -- daily --
     ("coinglass parquets", "glob",
      "market_data/raw_data/cg_*.parquet", 48.0,
