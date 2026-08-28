@@ -436,10 +436,28 @@ R∧V 放量刺縮回(+0.165/n390)　R∧Q 縮回＋確認掃止損(+0.199/n202)
 const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0b0e11'}},textColor:'#848e9c',fontSize:11}},grid:{{vertLines:{{color:'#151a21'}},horzLines:{{color:'#151a21'}}}},rightPriceScale:{{borderColor:'#1e242d'}},timeScale:{{timeVisible:true,secondsVisible:false,rightOffset:3,borderColor:'#1e242d'}},watermark:{{visible:true,text:'{sym}USDT · shadow',color:'rgba(234,236,239,0.045)',fontSize:42}}}});
 const cs=chart.addCandlestickSeries({{upColor:'#0ecb81',downColor:'#f6465d',borderVisible:false,wickUpColor:'#0ecb81',wickDownColor:'#f6465d'}});
 cs.setData({candles});
-cs.setMarkers({markers});
+// per-account view (2026-08-28): ?variant=A|B|C|D|R|RV keeps only that
+// variant's entries/exits; POOL layers carry no `v` and always draw, so the
+// liquidity positions are identical for every account — only the trade
+// overlay narrows. ?bare=1 strips the page to the chart itself. Filtering
+// is client-side on the SAME cached HTML: one render serves everyone.
+const _q=new URLSearchParams(location.search);
+const _v=(_q.get('variant')||'').toUpperCase();
+const _want=_v==='RV'?'V':_v;
+const _keep=o=>!_want||!o.v||o.v.includes(_want);
+cs.setMarkers(({markers}).filter(_keep));
 for(const g of {levels}){{
+  if(!_keep(g))continue;
   const ls=chart.addLineSeries({{color:g.c,lineWidth:g.w,lineStyle:g.st,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false}});
   ls.setData(g.pts);
+}}
+if(_q.get('bare')==='1'){{
+  for(const el of document.body.children){{ if(el.id!=='c') el.style.display='none'; }}
+  document.getElementById('c').style.height='96vh';
+  document.body.style.margin='0';
+  chart.applyOptions({{watermark:{{visible:true,text:'{sym}USDT · shadow'+(_v?' · 變體'+_v:''),color:'rgba(234,236,239,0.045)',fontSize:42}}}});
+  chart.resize(document.body.clientWidth, document.getElementById('c').clientHeight);
+  chart.timeScale().fitContent();
 }}
 chart.timeScale().fitContent();
 function eqPane(id,data){{
@@ -722,16 +740,27 @@ def main() -> int:
         tier = tier_of(t, fl_t)
         is_e = bool(fl_t) and _epred(fl_t)
         tag = tier + ("+E" if is_e else "")
+        # variant charset for the client-side per-account filter
+        # (2026-08-28): every variant this trade BELONGS to, as single
+        # chars so String.includes() works (RV -> 'V'). Ladder semantics
+        # mirror raid_signals_publish exactly — one definition, not two.
+        _rej = fl_t.get("flow_reject") == "1"
+        _vh = fl_t.get("flow_vhigh") == "1"
+        vs = ("A" + ("B" if t["b"] else "")
+              + ("C" if t["b"] and _rej else "")
+              + ("D" if t["b"] and _rej and _vh else "")
+              + ("R" if _rej else "") + ("V" if _rej and _vh else ""))
         line_col = (GREEN if t["side"] == "LONG" else RED) if t["b"] else GREY
         mk_col = (GREY if tier == "A" else AMBER if tier == "D" else line_col)
         end = (t["exit_ts"] or now_ts)
         if end >= t0:                      # off-window lines would stretch
             o_ts = clamp(t["origin_ts"])   # fitContent past the 48h view
             levels.append({"c": line_col, "w": 2 if t["b"] else 1, "st": 0,
+                           "v": vs,
                            "pts": [{"time": o_ts + TZ, "value": t["lvl"]},
                                    {"time": end + TZ, "value": t["lvl"]}]})
         if t["fill_ts"] >= t0:
-            markers.append({"time": t["fill_ts"] + TZ,
+            markers.append({"time": t["fill_ts"] + TZ, "v": vs,
                             "position": "belowBar" if t["side"] == "LONG" else "aboveBar",
                             "shape": "arrowUp" if t["side"] == "LONG" else "arrowDown",
                             "color": mk_col,
@@ -746,7 +775,7 @@ def main() -> int:
         if t["exit_ts"] and t["exit_ts"] >= t0:
             win = (t["net"] or 0) > 0
             markers.append({"time": t["exit_ts"] + TZ, "position": "inBar",
-                            "shape": "circle",
+                            "shape": "circle", "v": vs,
                             "color": "#0ecb81" if win else "#f6465d",
                             "text": tag})
         f8 = datetime.fromtimestamp(t["fill_ts"] + TZ, timezone.utc)
