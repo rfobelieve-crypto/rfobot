@@ -755,8 +755,11 @@ def main() -> int:
         end = (t["exit_ts"] or now_ts)
         if end >= t0:                      # off-window lines would stretch
             o_ts = clamp(t["origin_ts"])   # fitContent past the 48h view
+            # The LINE is the level's POSITION and stays for every account
+            # ("流動性獵取位置每個帳戶圖表都相同" — the operator caught an
+            # A-grade short's line vanishing from the B view, 2026-08-28).
+            # Only the MARKERS (entries/exits) carry `v` and get filtered.
             levels.append({"c": line_col, "w": 2 if t["b"] else 1, "st": 0,
-                           "v": vs,
                            "pts": [{"time": o_ts + TZ, "value": t["lvl"]},
                                    {"time": end + TZ, "value": t["lvl"]}]})
         if t["fill_ts"] >= t0:
