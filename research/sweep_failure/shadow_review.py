@@ -462,8 +462,22 @@ if(_q.get('bare')==='1'){{
   document.body.style.margin='0';
   chart.applyOptions({{grid:{{vertLines:{{visible:false}},horzLines:{{visible:false}}}}}});
   chart.applyOptions({{watermark:{{visible:true,text:'{sym}USDT · shadow'+(_v?' · 變體'+_v:''),color:'rgba(234,236,239,0.045)',fontSize:42}}}});
-  chart.resize(document.body.clientWidth, document.getElementById('c').clientHeight);
+  // 尺寸跟著容器活(2026-08-28 使用者截圖:全螢幕後圖擠在上 2/3、下面
+  // 空白)。載入時 resize 一次是定死的,iframe 進全螢幕/轉橫向後內部
+  // 圖表不知道 —— autoSize 讓 lightweight-charts 自己盯容器。
+  chart.applyOptions({{autoSize:true}});
+  window.addEventListener('resize',()=>{{
+    chart.resize(document.body.clientWidth, document.getElementById('c').clientHeight);
+  }});
   chart.timeScale().fitContent();
+  // 正在看哪個變體,印在圖上(全螢幕時卡片的按鈕列被蓋掉,圖要自己
+  // 說明自己)。深底白字,在深淺兩種配色下都讀得到。
+  if(_v){{
+    const _t=document.createElement('div');
+    _t.textContent='獵取 · 變體 '+_v+' 視角';
+    _t.style.cssText='position:fixed;top:8px;left:10px;z-index:9;font:12px/1.7 system-ui;color:#fff;background:rgba(11,14,17,.6);padding:2px 12px;border-radius:4px;pointer-events:none';
+    document.body.appendChild(_t);
+  }}
 }}
 chart.timeScale().fitContent();
 function eqPane(id,data){{
