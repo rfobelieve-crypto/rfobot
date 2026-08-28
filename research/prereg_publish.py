@@ -172,6 +172,26 @@ def build():
             "note": "成交在時間上高度集中，短窗等於一個行情段落不是一批樣本",
         },
     ]
+    # §0.75 arb clock: minutes recorded, from the third-party clone's CSV
+    arb_min = 0
+    try:
+        with open(ROOT.parent / "entropy-arb" / "logs" / "minutes.csv",
+                  encoding="utf-8") as fh:
+            arb_min = max(0, sum(1 for _ in fh) - 1)
+    except Exception:
+        pass
+    open_items.append({
+        "id": "0.75", "line": "套利（第四線）", "title": "兩場館溢價錄製",
+        "hypothesis": "SNDK 在 Entropy 與 Robinhood 鏈之間的溢價，扣費後有可交易的肉",
+        "why": "新場館=定價未磨平+零費率補貼期；Entropy 全是股票/私募永續（含 OpenAI/Anthropic）",
+        "registered": "2026-08-28", "source": "count",
+        "n": arb_min, "gate_n": 7 * 1440,
+        "days": round(_days_since(datetime(2026, 8, 28, 10, 28,
+                                           tzinfo=timezone.utc)), 1),
+        "gate_days": 7,
+        "note": "判準已凍結（≥1bps 帶、日均≥10 次、兩半皆成立）；只錄不交易，"
+                "下單路徑未經審計前不碰錢",
+    })
     settled = [
         # 2026-08-27 的一整輪:十二個候選、兩份 TradingView 指標、
         # 依預註冊零個過關。全部列出——只顯示存活者的看板是在對「過程」說謊。
