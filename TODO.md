@@ -380,6 +380,11 @@ no_cap 死。**出場沒有 alpha，只有紀律財**——meta 出場那次挖�
 
 ### 0.75 兩場館永續套利（entropy-arb 型）——第四條策略線，錄資料階段（2026-08-28 登記）
 
+> **本線的家在 `research/arb/`（2026-08-28 使用者要求與交易策略分開）**：
+> README 載明隔離規則（永不 import 交易路徑、資金獨立、只共用兩個顯示
+> 看板）、五條件偵察表、戰場帳本。判決程式 = `research/arb/premium_verdict.py`。
+> 本節保留為登記與風險清單的原始紀錄。
+
 **來源**：使用者研究了 `your-quantguy/entropy-arb`（兩場館 perp 套利：
 Entropy/Hyperliquid vs Lighter/trade.xyz，量 `premium_bps = (A/B − 1)×1e4`
 偏離中線超過門檻就雙腿對鎖，等收斂平倉）。使用者：「我是想做一個這個」。

@@ -1,6 +1,20 @@
 {
- "minutes": 10,
- "days": 0.01,
+ "minutes": 203,
+ "days": 0.14,
  "gate_days": 7,
- "gate_met": false
+ "gate_met": false,
+ "interim": {
+  "sell": {
+   "p90_bps": 5.58,
+   "band_bps": 5.58,
+   "fires": 21,
+   "fires_per_day": 149.0
+  },
+  "buy": {
+   "p90_bps": 9.647,
+   "band_bps": 9.647,
+   "fires": 21,
+   "fires_per_day": 149.0
+  }
+ }
 }
