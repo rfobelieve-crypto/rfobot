@@ -191,9 +191,74 @@ FIELDS = ["symbol", "universe", "level_kind", "first_seen_utc", "fill_ts",
           # entries — first attempt produced -0.196R against +0.014R from
           # the paired run, i.e. a wrong sign. The verdict-day fail_fast
           # score comes from exit_by_regime.py, which stays paired.
-          "regime_cell"]
+          "regime_cell",
+          # §0.71b prospective column (2026-08-28). How many OTHER pool
+          # families had a live, unswept level within 0.10 ATR of this
+          # level AT ITS SWEEP BAR. Counted at the sweep bar, not the fill
+          # bar — the sweep itself takes out co-located levels, so a
+          # fill-bar count excludes exactly what it is meant to measure
+          # (the §0.71c instrument bug: 158 confluent events became 5).
+          # Recorded, not judged: the candidate FAILED its pre-registration
+          # on backtest data (pooled +0.0178 < 0.03, families 2/4) but the
+          # three measurable families agreed in sign, so the verdict-day
+          # question needs forward values — and forward values only exist
+          # if they are recorded from today (the regime_cell rule).
+          "confluence_kinds"]
 
 FLOW_BACKFILL_PER_RUN = 40      # cap 1m-kline fetch work per hourly run
+
+
+def _confluence_counter(bars):
+    """(kind, lvl, atr, fill_idx) -> count of OTHER families at the sweep bar.
+
+    Degrades to None on any failure — this annotation must never break the
+    frozen recorder (same contract as _regime_cells). All lookups are
+    price-bisected; the batch first-hit is the tested one
+    (tests/test_first_hits_batch.py, reverse-proven).
+    """
+    try:
+        from bisect import bisect_left, bisect_right
+
+        from research.confluence_all_families import first_hits_batch
+        from research.liquidity_map_check import swing_levels
+        fam = {k: list(v) for k, v in LT.build_levels(bars).items()}
+        fam["swing"] = swing_levels(bars)
+        live, own = {}, {}
+        for k, items in fam.items():
+            hits = first_hits_batch(bars, items)
+            arr = sorted((p, est, sd, hh)
+                         for (est, p, sd), hh in zip(items, hits))
+            live[k] = (arr, [x[0] for x in arr])
+            byp = {}
+            for (est, pr, sd), hh in zip(items, hits):
+                if hh is not None:
+                    byp.setdefault(round(pr, 8), []).append(hh)
+            own[k] = byp
+
+        def count(kind, lvl, atr, fill_idx, side_long):
+            cand = [hh for hh in own.get(kind, {}).get(round(lvl, 8), [])
+                    if fill_idx - SC.W <= hh < fill_idx]
+            if not cand or not atr or atr <= 0:
+                return ""
+            jsw = max(cand)
+            want = 1 if not side_long else -1
+            tol = 0.10 * atr
+            c = 0
+            for k2, (arr, keys) in live.items():
+                if k2 == kind:
+                    continue
+                a0 = bisect_left(keys, lvl - tol)
+                a1 = bisect_right(keys, lvl + tol)
+                for p2, est2, s2, h2 in arr[a0:a1]:
+                    if (s2 == want and est2 <= jsw
+                            and (h2 is None or h2 >= jsw)):
+                        c += 1
+                        break
+            return c
+        return count
+    except Exception as e:  # noqa: BLE001
+        print(f"  [WARN] confluence annotation failed: {e}")
+        return None
 
 
 def _regime_cells(bars):
@@ -856,6 +921,8 @@ def main() -> int:
             # §0.59 annotation tables, one pass per symbol. Pure reads of
             # frozen definitions — nothing below feeds gate arithmetic.
             cellmap = _regime_cells(bars)
+            confcnt = _confluence_counter(bars)
+            bar_idx = {b[0]: i for i, b in enumerate(bars)}
             # one source of truth per kind: the frozen engine for swing,
             # the shared level engine for the time-defined pools. Tuples carry
             # (kind, fill_ts, exit_ts, gross, net, pierce, lvl, atr, stopped);
@@ -898,6 +965,12 @@ def main() -> int:
                 # evidence — the verdict filters on that, not on presence.
                 if not row.get("regime_cell"):
                     row["regime_cell"] = cellmap.get(fill_ts, "")
+                # 0 is a legitimate count, so test for absence, not falsiness
+                if row.get("confluence_kinds") in (None, "") and confcnt:
+                    fi = bar_idx.get(fill_ts)
+                    if fi is not None:
+                        row["confluence_kinds"] = confcnt(
+                            kind, lvl, atr, fi, side == "LONG")
                 row.update({
                     "status": "CLOSED" if done else "OPEN",
                     "exit_ts": exit_ts if done else "",
