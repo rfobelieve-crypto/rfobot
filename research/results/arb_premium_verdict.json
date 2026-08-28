@@ -1,20 +1,32 @@
 {
- "minutes": 203,
- "days": 0.14,
+ "minutes": 259,
+ "days": 0.18,
  "gate_days": 7,
  "gate_met": false,
  "interim": {
   "sell": {
-   "p90_bps": 5.58,
-   "band_bps": 5.58,
-   "fires": 21,
-   "fires_per_day": 149.0
+   "p90_bps": 7.059,
+   "band_bps": 7.059,
+   "fires": 26,
+   "fires_per_day": 142.9
   },
   "buy": {
-   "p90_bps": 9.647,
-   "band_bps": 9.647,
-   "fires": 21,
-   "fires_per_day": 149.0
+   "p90_bps": 11.548,
+   "band_bps": 11.548,
+   "fires": 26,
+   "fires_per_day": 142.9
+  },
+  "depth_sell": {
+   "instrumented_min": 2,
+   "fat_prints": 1,
+   "fat_median_notional_usd": 49.0,
+   "fat_stale_gt5s": 0
+  },
+  "depth_buy": {
+   "instrumented_min": 2,
+   "fat_prints": 1,
+   "fat_median_notional_usd": 11.0,
+   "fat_stale_gt5s": 0
   }
  }
 }

@@ -43,20 +43,100 @@ NET_BPS_MIN = 1.0
 FIRES_PER_DAY_MIN = 10.0
 
 
+def _f(r, k):
+    try:
+        return float(r[k])
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
 def load():
+    """Read the rotated pre-instrument file plus the current one.
+
+    2026-08-28 the recorder gained depth/staleness columns; its own header
+    guard rotated the first 230+ minutes to minutes.csv.old. Both belong to
+    the same 7-day window. Pre-instrument rows have None for the new fields
+    and are excluded from size/staleness statistics only.
+    """
     rows = []
-    with open(CSV, newline="", encoding="utf-8") as fh:
-        for r in csv.DictReader(fh):
-            try:
-                rows.append({
-                    "ts": int(r["minute_ts"]),
-                    "sell_max": float(r["sell_edge_max_bps"]),
-                    "buy_max": float(r["buy_edge_max_bps"]),
-                    "n": int(r["samples"]),
-                })
-            except (ValueError, KeyError):
-                continue
+    for fp in (Path(str(CSV) + ".old"), CSV):
+        if not fp.exists():
+            continue
+        with open(fp, newline="", encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                try:
+                    rows.append({
+                        "ts": int(r["minute_ts"]),
+                        "prem": float(r["premium_mean_bps"]),
+                        "sell_max": float(r["sell_edge_max_bps"]),
+                        "buy_max": float(r["buy_edge_max_bps"]),
+                        "n": int(r["samples"]),
+                        "sell_ntl": _f(r, "sell_max_notional_usd"),
+                        "sell_age": _f(r, "sell_max_age_s"),
+                        "buy_ntl": _f(r, "buy_max_notional_usd"),
+                        "buy_age": _f(r, "buy_max_age_s"),
+                    })
+                except (ValueError, KeyError):
+                    continue
+    rows.sort(key=lambda x: x["ts"])
     return rows
+
+
+# ── convergence (registered 2026-08-28, after 230 min ≈ 3% of the window;
+#    a TIGHTENING amendment, disclosed in TODO §0.75) ─────────────────────
+# A persistent one-sided gap is not capturable: entering the position only
+# pays when the gap CLOSES. So the verdict additionally requires that the
+# premium, once it deviates from its rolling midline beyond the band,
+# actually comes back: >=70% of deviation episodes must return to within
+# half the band inside 240 minutes. Fail => the "edge" is structural
+# offset / drift, and the line closes regardless of how fat it looks.
+MIDLINE_WIN = 360          # minutes of trailing median for the midline
+CONV_RETURN_FRAC = 0.5     # "converged" = back within band*this
+CONV_MAX_MIN = 240
+CONV_PASS_FRAC = 0.70
+
+
+def convergence(rows, band_bps):
+    import statistics as st
+    prems = [x["prem"] for x in rows]
+    episodes, i, n = [], MIDLINE_WIN, len(rows)
+    while i < n:
+        mid = st.median(prems[i - MIDLINE_WIN:i])
+        dev = prems[i] - mid
+        if abs(dev) >= band_bps:
+            sign = 1 if dev > 0 else -1
+            j = i + 1
+            while j < n:
+                if sign * (prems[j] - mid) <= band_bps * CONV_RETURN_FRAC:
+                    break
+                j += 1
+            mins = (rows[j]["ts"] - rows[i]["ts"]) / 60 if j < n else None
+            episodes.append(mins)
+            i = j + 1
+        else:
+            i += 1
+    if not episodes:
+        return {"episodes": 0}
+    ok = sum(1 for m in episodes if m is not None and m <= CONV_MAX_MIN)
+    med = st.median([m for m in episodes if m is not None] or [float("inf")])
+    return {"episodes": len(episodes), "converged_4h": ok,
+            "frac": round(ok / len(episodes), 2),
+            "median_minutes": round(med, 1) if med != float("inf") else None,
+            "passed": ok / len(episodes) >= CONV_PASS_FRAC}
+
+
+def instrument_stats(rows, side):
+    """Depth + staleness at the fat prints — instrumented rows only."""
+    ins = [x for x in rows if x[f"{side}_ntl"] is not None]
+    if not ins:
+        return None
+    fat = sorted(ins, key=lambda x: -x[f"{side}_max"])[:max(1, len(ins) // 10)]
+    ntl = sorted(x[f"{side}_ntl"] for x in fat)
+    stale = sum(1 for x in fat if (x[f"{side}_age"] or 0) > 5)
+    return {"instrumented_min": len(ins),
+            "fat_prints": len(fat),
+            "fat_median_notional_usd": round(ntl[len(ntl) // 2], 0),
+            "fat_stale_gt5s": stale}
 
 
 def side_stats(rows, key):
@@ -94,6 +174,21 @@ def main() -> int:
             print(f"    sell 側 p90 可成交空間 {s['p90_bps']:+.2f} bps")
             print(f"    buy  側 p90 可成交空間 {b['p90_bps']:+.2f} bps")
             res["interim"] = {"sell": s, "buy": b}
+            if len(rows) > MIDLINE_WIN + 30:
+                for lab, st_ in (("sell", s), ("buy", b)):
+                    c = convergence(rows, st_["band_bps"])
+                    res["interim"][f"conv_{lab}"] = c
+                    if c.get("episodes"):
+                        print(f"    {lab} 帶偏離事件 {c['episodes']} 次、"
+                              f"4h 內收斂 {c['converged_4h']} 次"
+                              f"（中位 {c['median_minutes']} 分）")
+            for lab in ("sell", "buy"):
+                ins = instrument_stats(rows, lab)
+                if ins:
+                    res["interim"][f"depth_{lab}"] = ins
+                    print(f"    {lab} 最肥時刻的盤口深度中位 "
+                          f"${ins['fat_median_notional_usd']:,.0f}"
+                          f"｜卡價(>5s) {ins['fat_stale_gt5s']}/{ins['fat_prints']}")
         print(f"\n  → 閘門未達，**不出判決**。零費率＋看起來很肥的半天資料"
               f"正是最誘人提早開獎的組合——判準凍結的意義就在此刻。")
         OUT.write_text(json.dumps(res, indent=1, ensure_ascii=False),
@@ -109,16 +204,27 @@ def main() -> int:
     for key, lab in (("sell_max", "sell"), ("buy_max", "buy")):
         full = side_stats(rows, key)
         h = [side_stats(hh, key) for hh in halves]
+        conv = convergence(rows, full["band_bps"])
+        ins = instrument_stats(rows, lab)
         passed = (full["band_bps"] >= NET_BPS_MIN
                   and full["fires_per_day"] >= FIRES_PER_DAY_MIN
                   and all(x["fires_per_day"] >= FIRES_PER_DAY_MIN
-                          and x["band_bps"] >= NET_BPS_MIN for x in h))
-        verdict_sides[lab] = {"full": full, "halves": h, "passed": passed}
+                          and x["band_bps"] >= NET_BPS_MIN for x in h)
+                  and bool(conv.get("passed")))
+        verdict_sides[lab] = {"full": full, "halves": h,
+                              "convergence": conv, "depth": ins,
+                              "passed": passed}
         ok_any = ok_any or passed
+        cs = (f"收斂 {conv['frac']*100:.0f}%（門檻 {CONV_PASS_FRAC*100:.0f}%）"
+              if conv.get("episodes") else "收斂事件 0（不可判）")
         print(f"  {lab}: 帶 {full['band_bps']:.2f} bps、"
               f"{full['fires_per_day']:.1f} 次/天、"
-              f"兩半 {h[0]['fires_per_day']:.1f}/{h[1]['fires_per_day']:.1f}"
-              f" → {'✓' if passed else '✗'}")
+              f"兩半 {h[0]['fires_per_day']:.1f}/{h[1]['fires_per_day']:.1f}、"
+              f"{cs} → {'✓' if passed else '✗'}")
+        if ins:
+            print(f"        最肥時刻深度中位 ${ins['fat_median_notional_usd']:,.0f}"
+                  f"｜卡價(>5s) {ins['fat_stale_gt5s']}/{ins['fat_prints']}"
+                  f"（供工程閘門評估，不進本判準）")
     v = ("**過閘** —— 進工程閘門討論（審計下單路徑、統一風控、資金拆分）。"
          "注意這只證明溢價存在，不證明抓得到它。"
          if ok_any else
