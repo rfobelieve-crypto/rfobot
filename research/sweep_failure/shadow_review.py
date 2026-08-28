@@ -455,6 +455,7 @@ if(_q.get('bare')==='1'){{
   for(const el of document.body.children){{ if(el.id!=='c') el.style.display='none'; }}
   document.getElementById('c').style.height='96vh';
   document.body.style.margin='0';
+  chart.applyOptions({{grid:{{vertLines:{{visible:false}},horzLines:{{visible:false}}}}}});
   chart.applyOptions({{watermark:{{visible:true,text:'{sym}USDT · shadow'+(_v?' · 變體'+_v:''),color:'rgba(234,236,239,0.045)',fontSize:42}}}});
   chart.resize(document.body.clientWidth, document.getElementById('c').clientHeight);
   chart.timeScale().fitContent();

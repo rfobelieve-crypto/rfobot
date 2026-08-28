@@ -1,5 +1,5 @@
 {
- "asof_utc": "2026-08-27 23:20",
+ "asof_utc": "2026-08-28 05:20",
  "rows": [
   {
    "name": "bat-train heartbeat",
@@ -91,7 +91,7 @@
   },
   {
    "name": "coinglass parquets",
-   "age_h": 3.3,
+   "age_h": 9.3,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_oi_1h.parquet",
@@ -99,7 +99,7 @@
   },
   {
    "name": "daily collect log",
-   "age_h": 3.3,
+   "age_h": 9.3,
    "max_h": 30.0,
    "ok": true,
    "detail": "",
@@ -107,7 +107,7 @@
   },
   {
    "name": "portfolio clocks",
-   "age_h": 38.7,
+   "age_h": 44.7,
    "max_h": 195.0,
    "ok": true,
    "detail": "",
@@ -115,7 +115,7 @@
   },
   {
    "name": "tracked signals",
-   "age_h": 1.3,
+   "age_h": 4.3,
    "max_h": 336.0,
    "ok": true,
    "detail": "",
