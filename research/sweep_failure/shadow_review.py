@@ -445,7 +445,12 @@ const _q=new URLSearchParams(location.search);
 const _v=(_q.get('variant')||'').toUpperCase();
 const _want=_v==='RV'?'V':_v;
 const _keep=o=>!_want||!o.v||o.v.includes(_want);
-cs.setMarkers(({markers}).filter(_keep));
+// 過濾視角下拿掉等級字母(2026-08-28 使用者:「邏輯太亂,用戶看不懂」)。
+// 你選了 B,留下來的每一筆就都是 B —— 字母標的是 B 階梯等級,跟所選
+// 變體可以不同(R 視角會出現 A),對終端用戶是雜訊。研究端完整頁
+// (無 variant 參數)保留字母,那裡要對照表格。
+const _detag=m=>(_want&&m.v&&m.text)?{{...m,text:m.text.replace(/^[A-D](\+E)?(·|$)/,'')}}:m;
+cs.setMarkers(({markers}).filter(_keep).map(_detag));
 for(const g of {levels}){{
   if(!_keep(g))continue;
   const ls=chart.addLineSeries({{color:g.c,lineWidth:g.w,lineStyle:g.st,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false}});

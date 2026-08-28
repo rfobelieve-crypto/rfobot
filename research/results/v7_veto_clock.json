@@ -22,16 +22,16 @@
   },
   "moderate": {
    "tier": "Moderate",
-   "kept_wr": 45.9,
+   "kept_wr": 46.3,
    "veto_wr": 44.2,
-   "gap_pp": 1.8,
-   "n_kept": 135,
+   "gap_pp": 2.2,
+   "n_kept": 136,
    "n_veto": 77,
-   "since_trigger": 66,
+   "since_trigger": 67,
    "trigger_target": 60,
    "gap_threshold_pp": 8.0,
    "since_trigger_fired": 67
   }
  },
- "asof_utc": "2026-08-28 06:06"
+ "asof_utc": "2026-08-28 08:06"
 }
