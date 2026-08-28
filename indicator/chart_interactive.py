@@ -302,10 +302,11 @@ const BG = '#0d1117';
 const CARD = '#161b22';
 const GRID = '#1c222b';
 const TEXT = '#7a828e';
-// ?bare=1 — embedded-card mode (jarvis client): no gridlines, and vertical
-// touch drags pass through to the host page so the phone can scroll past
-// the chart (horizontal pan/pinch still work). Same convention as the
-// liquidity chart's bare mode.
+// ?bare=1 — embedded-card mode (jarvis client): no gridlines. Gesture
+// handling is TradingView-style in every mode (2026-08-29 user request):
+// the chart owns ALL touch drags — vertical drag pans the price scale
+// (which turns off auto-scale, exactly like TV), kinetic fling on touch,
+// axis drag rescales, double-click anywhere snaps back to auto-fit.
 const BARE = new URLSearchParams(location.search).get('bare') === '1';
 
 const headerH = 36;
@@ -329,15 +330,31 @@ function makeChart(container, height, opts) {{
              horzLines: {{ color: GRID, visible: !BARE }} }},
     crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
     handleScroll: {{ mouseWheel: true, pressedMouseMove: true,
-                     horzTouchDrag: true, vertTouchDrag: !BARE }},
+                     horzTouchDrag: true, vertTouchDrag: true }},
     handleScale: {{ mouseWheel: true, pinch: true,
-                    axisPressedMouseMove: true }},
+                    axisPressedMouseMove: true,
+                    axisDoubleClickReset: true }},
+    kineticScroll: {{ touch: true, mouse: false }},
     timeScale: {{
       timeVisible: true, secondsVisible: false,
-      borderColor: GRID,
+      borderColor: GRID, rightOffset: 5,
     }},
     rightPriceScale: {{ borderColor: GRID, minimumWidth: AXIS_W_DEFAULT }},
     ...opts,
+  }});
+  // TV-style snap-back: after a vertical pan parks the price scale in
+  // manual mode, double-click (desktop) or double-tap (touch) anywhere on
+  // the pane re-enables auto-fit. axisDoubleClickReset only covers the
+  // axis strip, which is unreachable on most phones.
+  const resetScale = () => {{
+    try {{ chart.priceScale('right').applyOptions({{ autoScale: true }}); }} catch (e) {{}}
+  }};
+  el.addEventListener('dblclick', resetScale);
+  let lastTap = 0;
+  el.addEventListener('touchend', () => {{
+    const t = Date.now();
+    if (t - lastTap < 300) resetScale();
+    lastTap = t;
   }});
   return chart;
 }}

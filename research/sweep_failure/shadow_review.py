@@ -441,7 +441,9 @@ R∧V 放量刺縮回(+0.165/n390)　R∧Q 縮回＋確認掃止損(+0.199/n202)
 成本=情境A（進場7／時間出場3／停損10 bps） · 網址參數：&hours=12-2160 · &live=60 自動更新
 </details>
 <script>
-const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0b0e11'}},textColor:'#848e9c',fontSize:11}},grid:{{vertLines:{{color:'#151a21'}},horzLines:{{color:'#151a21'}}}},rightPriceScale:{{borderColor:'#1e242d'}},timeScale:{{timeVisible:true,secondsVisible:false,rightOffset:3,borderColor:'#1e242d'}},watermark:{{visible:true,text:'{sym}USDT · shadow',color:'rgba(234,236,239,0.045)',fontSize:42}}}});
+const chart=LightweightCharts.createChart(document.getElementById('c'),{{layout:{{background:{{color:'#0b0e11'}},textColor:'#848e9c',fontSize:11}},grid:{{vertLines:{{color:'#151a21'}},horzLines:{{color:'#151a21'}}}},rightPriceScale:{{borderColor:'#1e242d'}},timeScale:{{timeVisible:true,secondsVisible:false,rightOffset:5,borderColor:'#1e242d'}},handleScroll:{{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:true}},handleScale:{{mouseWheel:true,pinch:true,axisPressedMouseMove:true,axisDoubleClickReset:true}},kineticScroll:{{touch:true,mouse:false}},watermark:{{visible:true,text:'{sym}USDT · shadow',color:'rgba(234,236,239,0.045)',fontSize:42}}}});
+// TV 式回正:垂直拖曳會把價格軸切到手動模式,雙擊/雙點任意處回到自動貼合
+(()=>{{const el=document.getElementById('c');const rs=()=>{{try{{chart.priceScale('right').applyOptions({{autoScale:true}})}}catch(e){{}}}};el.addEventListener('dblclick',rs);let lt=0;el.addEventListener('touchend',()=>{{const t=Date.now();if(t-lt<300)rs();lt=t}});}})();
 const cs=chart.addCandlestickSeries({{upColor:'#0ecb81',downColor:'#f6465d',borderVisible:false,wickUpColor:'#0ecb81',wickDownColor:'#f6465d'}});
 cs.setData({candles});
 // per-account view (2026-08-28): ?variant=A|B|C|D|R|RV keeps only that
