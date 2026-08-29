@@ -173,13 +173,16 @@ def build():
         },
     ]
     # §0.75 arb clock: minutes recorded, from the third-party clone's CSV
+    # count BOTH files: the 2026-08-28 instrument upgrade rotated the first
+    # 257 minutes to minutes.csv.old — same window, same clock.
     arb_min = 0
-    try:
-        with open(ROOT.parent / "entropy-arb" / "logs" / "minutes.csv",
-                  encoding="utf-8") as fh:
-            arb_min = max(0, sum(1 for _ in fh) - 1)
-    except Exception:
-        pass
+    for _fn in ("minutes.csv.old", "minutes.csv"):
+        try:
+            with open(ROOT.parent / "entropy-arb" / "logs" / _fn,
+                      encoding="utf-8") as fh:
+                arb_min += max(0, sum(1 for _ in fh) - 1)
+        except Exception:
+            pass
     open_items.append({
         "id": "0.75", "line": "套利（第四線）", "title": "兩場館溢價錄製",
         "hypothesis": "SNDK 在 Entropy 與 Robinhood 鏈之間的溢價，扣費後有可交易的肉",

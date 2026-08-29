@@ -1,5 +1,5 @@
 {
- "asof_utc": "2026-08-28 11:20",
+ "asof_utc": "2026-08-28 23:20",
  "rows": [
   {
    "name": "bat-train heartbeat",
@@ -51,7 +51,7 @@
   },
   {
    "name": "raid outcomes row",
-   "age_h": 0.2,
+   "age_h": 1.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -99,7 +99,7 @@
   },
   {
    "name": "coinglass parquets",
-   "age_h": 15.3,
+   "age_h": 3.3,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_oi_1h.parquet",
@@ -107,7 +107,7 @@
   },
   {
    "name": "daily collect log",
-   "age_h": 15.3,
+   "age_h": 3.3,
    "max_h": 30.0,
    "ok": true,
    "detail": "",
@@ -115,7 +115,7 @@
   },
   {
    "name": "portfolio clocks",
-   "age_h": 50.7,
+   "age_h": 62.7,
    "max_h": 195.0,
    "ok": true,
    "detail": "",
@@ -123,7 +123,7 @@
   },
   {
    "name": "tracked signals",
-   "age_h": 10.3,
+   "age_h": 6.3,
    "max_h": 336.0,
    "ok": true,
    "detail": "",
