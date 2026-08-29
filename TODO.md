@@ -378,6 +378,18 @@ no_cap 死。**出場沒有 alpha，只有紀律財**——meta 出場那次挖�
 ——需要他們匯出逐筆（open/close 時間、幣、方向、淨損益），已在磨坊裁示
 §三寫明格式，等他們送。
 
+### 0.78 磨坊逐筆匯出管道（2026-08-29 兩端落地，等一顆 token）
+
+配置 v1（2026-08-29）把磨坊標為「20% 學費、無資料不可最優化」。管道
+已通：產品端 V1.51.4 `/api/u/export/fills`（RESEARCH_EXPORT_TOKEN 保護、
+只讀 fills.jsonl、src 按現行 cid 規則重算）＋研究端 `research/
+mill_ingest.py`（FIFO 配對成含費回合，合成資料已知答案驗證過）。
+**卡在使用者一步**：Railway（jarvis）設 `RESEARCH_EXPORT_TOKEN`，
+flow_system `.env` 設 `MILL_EXPORT_URL/TOKEN/UID` 同值。
+資料到手 → 首輪體檢（每回合淨益/勝率/費用佔比）→ 貼 regime 四格標籤
+→ Kelly → **配置 v2**（磨坊那欄從佔位變計算值）。
+誠實註記：08-24 前的列 cid 缺失、歸屬不可靠，統計只用可靠列。
+
 ### 0.75 兩場館永續套利（entropy-arb 型）——第四條策略線，錄資料階段（2026-08-28 登記）
 
 > **本線的家在 `research/arb/`（2026-08-28 使用者要求與交易策略分開）**：
