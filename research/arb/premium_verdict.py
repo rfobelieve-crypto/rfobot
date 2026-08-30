@@ -18,7 +18,7 @@ FROZEN GATE (written before more than two minutes of data existed):
   candidate band is analyze.py's suggestion methodology (p90 of executable
   room), applied identically to both halves.
 
-Progress source: ../entropy-arb/logs/minutes.csv (outside this repo — the
+Progress source: ../entropy-arb/logs/<pair>/minutes.csv (outside this repo — the
 third-party clone carries the recorder; THIS repo carries the judgment).
 """
 from __future__ import annotations
@@ -35,9 +35,30 @@ try:
 except Exception:
     pass
 
-CSV = ROOT.parent / "entropy-arb" / "logs" / "minutes.csv"
+LOGS = ROOT.parent / "entropy-arb" / "logs"
 OUT = ROOT / "research" / "results" / "arb_premium_verdict.json"
-START = datetime(2026, 8, 28, 10, 28, tzinfo=timezone.utc)   # first minute
+
+# ── recording family (registered 2026-08-30, TODO §0.75) ───────────────────
+# One frozen gate, applied to EVERY pair, ALL pairs reported — the family is
+# not a menu to pick the best-looking member from (variant C/D lesson).
+# START = first recorded minute (SNDK fixed at registration; the others take
+# their own first row, so each clock runs 7 days from its own start).
+# BTC is the CONTROL pair: two deep zero-fee books, band expected ~0. If BTC
+# ever shows a fat band the instrument is broken, not the market (mistake.md
+# 2026-07-29: run a new instrument on data whose answer is known first).
+# io:OAI and io:EWY were registered and found DELISTED on Entropy at first
+# connect (2026-08-30 22:30Z; meta still lists them, isDelisted=true) —
+# dropped before any row. Delisting risk on these venues is real.
+PAIRS = [
+    # id,    csv subpath,        leg A,             leg B,                  note
+    ("SNDK", "minutes.csv",      "Entropy io:SNDK", "lighter-rh SNDK",      "stock perp (original)"),
+    ("NBIS", "NBIS/minutes.csv", "Entropy io:NBIS", "lighter NBIS",         "stock perp"),
+    ("ANTH", "ANTH/minutes.csv", "Entropy io:ANTH", "lighter-rh ANTHROPIC", "private-co perp, no spot anchor"),
+    ("BTC",  "BTC/minutes.csv",  "HL BTC",          "lighter-rh BTC",       "CONTROL - band expected ~0"),
+    ("ZEC",  "ZEC/minutes.csv",  "HL ZEC",          "lighter-rh ZEC",       "thin crypto"),
+    ("NEAR", "NEAR/minutes.csv", "HL NEAR",         "lighter-rh NEAR",      "thin crypto"),
+]
+FIXED_START = {"SNDK": datetime(2026, 8, 28, 10, 28, tzinfo=timezone.utc)}
 GATE_DAYS = 7
 NET_BPS_MIN = 1.0
 FIRES_PER_DAY_MIN = 10.0
@@ -50,7 +71,7 @@ def _f(r, k):
         return None
 
 
-def load():
+def load(CSV):
     """Read the rotated pre-instrument file plus the current one.
 
     2026-08-28 the recorder gained depth/staleness columns; its own header
@@ -152,49 +173,61 @@ def side_stats(rows, key):
             "fires": fires, "fires_per_day": round(fires / days, 1)}
 
 
-def main() -> int:
-    if not CSV.exists():
-        print("§0.75 時鐘：錄製檔不存在 —— freshness board 應該已經在響")
-        return 1
-    rows = load()
-    now = datetime.now(timezone.utc)
-    days = (now - START).total_seconds() / 86400
-    print("§0.75 兩場館套利時鐘（判準 2026-08-28 凍結）")
-    print(f"  配對 SNDK · Entropy vs lighter-rh（taker 0+0 bps）")
-    print(f"  已錄 {len(rows)} 分鐘｜經過 {days:.1f}／{GATE_DAYS} 天")
+def capturable_usd_per_day(side, ins):
+    """REPORT-ONLY (not in the gate): fires/day x band x depth at the fat
+    prints. Registered 2026-08-30 after SNDK's interim showed $200-400 books:
+    a pair can pass the statistical gate and still be worth cents. This
+    number decides whether a PASS is worth engineering, never whether it
+    passes."""
+    if not side or not ins or ins.get("fat_median_notional_usd") is None:
+        return None
+    return round(side["fires_per_day"] * side["band_bps"] / 1e4
+                 * ins["fat_median_notional_usd"], 2)
 
-    res = {"minutes": len(rows), "days": round(days, 2),
-           "gate_days": GATE_DAYS, "gate_met": days >= GATE_DAYS}
+
+def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
+    CSV = LOGS / csv_sub
+    res = {"pair": pid, "legs": f"{leg_a} vs {leg_b}", "note": note}
+    if not CSV.exists():
+        print(f"\n[{pid}] {leg_a} vs {leg_b} —— 錄製檔不存在（freshness board 應該在響）")
+        res["status"] = "missing"
+        return res
+    rows = load(CSV)
+    if not rows:
+        print(f"\n[{pid}] {leg_a} vs {leg_b} —— 尚無資料列")
+        res["status"] = "empty"
+        return res
+    start = FIXED_START.get(pid) or datetime.fromtimestamp(rows[0]["ts"], tz=timezone.utc)
+    days = (now - start).total_seconds() / 86400
+    print(f"\n[{pid}] {leg_a} vs {leg_b}（{note}）")
+    print(f"  已錄 {len(rows)} 分鐘｜起 {start:%m-%d %H:%M}Z｜經過 {days:.1f}／{GATE_DAYS} 天")
+    res.update({"minutes": len(rows), "start_utc": start.strftime("%Y-%m-%d %H:%M"),
+                "days": round(days, 2), "gate_days": GATE_DAYS,
+                "gate_met": days >= GATE_DAYS})
     if days < GATE_DAYS:
-        # interim observation only, and only the distribution — no verdict
         if len(rows) >= 60:
             s = side_stats(rows, "sell_max")
             b = side_stats(rows, "buy_max")
-            print(f"\n  期中觀察（**不是判決**）：")
-            print(f"    sell 側 p90 可成交空間 {s['p90_bps']:+.2f} bps")
-            print(f"    buy  側 p90 可成交空間 {b['p90_bps']:+.2f} bps")
             res["interim"] = {"sell": s, "buy": b}
+            print(f"  期中（**不是判決**）：sell p90 {s['p90_bps']:+.2f} bps｜buy p90 {b['p90_bps']:+.2f} bps")
             if len(rows) > MIDLINE_WIN + 30:
                 for lab, st_ in (("sell", s), ("buy", b)):
                     c = convergence(rows, st_["band_bps"])
                     res["interim"][f"conv_{lab}"] = c
                     if c.get("episodes"):
-                        print(f"    {lab} 帶偏離事件 {c['episodes']} 次、"
-                              f"4h 內收斂 {c['converged_4h']} 次"
-                              f"（中位 {c['median_minutes']} 分）")
-            for lab in ("sell", "buy"):
+                        print(f"    {lab} 帶偏離 {c['episodes']} 次、4h 內收斂 {c['converged_4h']} 次（中位 {c['median_minutes']} 分）")
+            for lab, st_ in (("sell", s), ("buy", b)):
                 ins = instrument_stats(rows, lab)
                 if ins:
                     res["interim"][f"depth_{lab}"] = ins
-                    print(f"    {lab} 最肥時刻的盤口深度中位 "
-                          f"${ins['fat_median_notional_usd']:,.0f}"
-                          f"｜卡價(>5s) {ins['fat_stale_gt5s']}/{ins['fat_prints']}")
-        print(f"\n  → 閘門未達，**不出判決**。零費率＋看起來很肥的半天資料"
-              f"正是最誘人提早開獎的組合——判準凍結的意義就在此刻。")
-        OUT.write_text(json.dumps(res, indent=1, ensure_ascii=False),
-                       encoding="utf-8")
-        return 0
-
+                    cap = capturable_usd_per_day(st_, ins)
+                    res["interim"][f"capturable_usd_per_day_{lab}"] = cap
+                    print(f"    {lab} 最肥時刻深度中位 ${ins['fat_median_notional_usd']:,.0f}"
+                          f"｜卡價(>5s) {ins['fat_stale_gt5s']}/{ins['fat_prints']}"
+                          f"｜可捕獲 ≈ ${cap}/天（報告用，不進判準）")
+        res["status"] = "accumulating"
+        print("  → 閘門未達，不出判決。")
+        return res
     # ── verdict path ────────────────────────────────────────────────────
     mid = rows[len(rows) // 2]["ts"]
     halves = ([r for r in rows if r["ts"] < mid],
@@ -211,28 +244,47 @@ def main() -> int:
                   and all(x["fires_per_day"] >= FIRES_PER_DAY_MIN
                           and x["band_bps"] >= NET_BPS_MIN for x in h)
                   and bool(conv.get("passed")))
+        cap = capturable_usd_per_day(full, ins)
         verdict_sides[lab] = {"full": full, "halves": h,
                               "convergence": conv, "depth": ins,
+                              "capturable_usd_per_day": cap,
                               "passed": passed}
         ok_any = ok_any or passed
         cs = (f"收斂 {conv['frac']*100:.0f}%（門檻 {CONV_PASS_FRAC*100:.0f}%）"
               if conv.get("episodes") else "收斂事件 0（不可判）")
-        print(f"  {lab}: 帶 {full['band_bps']:.2f} bps、"
-              f"{full['fires_per_day']:.1f} 次/天、"
-              f"兩半 {h[0]['fires_per_day']:.1f}/{h[1]['fires_per_day']:.1f}、"
-              f"{cs} → {'✓' if passed else '✗'}")
+        mark = "✓" if passed else "✗"
+        print(f"  {lab}: 帶 {full['band_bps']:.2f} bps、{full['fires_per_day']:.1f} 次/天、"
+              f"兩半 {h[0]['fires_per_day']:.1f}/{h[1]['fires_per_day']:.1f}、{cs} → {mark}")
         if ins:
             print(f"        最肥時刻深度中位 ${ins['fat_median_notional_usd']:,.0f}"
                   f"｜卡價(>5s) {ins['fat_stale_gt5s']}/{ins['fat_prints']}"
-                  f"（供工程閘門評估，不進本判準）")
-    v = ("**過閘** —— 進工程閘門討論（審計下單路徑、統一風控、資金拆分）。"
-         "注意這只證明溢價存在，不證明抓得到它。"
-         if ok_any else
-         "**關線** —— 扣費後的可成交空間撐不起門檻；一週結案，成本≈零。")
-    print(f"\n判決：{v}")
-    res.update({"sides": verdict_sides, "verdict": v})
-    OUT.write_text(json.dumps(res, indent=1, ensure_ascii=False),
-                   encoding="utf-8")
+                  f"｜可捕獲 ≈ ${cap}/天（供工程閘門評估，不進本判準）")
+    if pid == "BTC" and ok_any:
+        v = "**對照組亮了** —— BTC 兩邊深簿零費率不該有帶；先查儀器，不是查市場。"
+    elif ok_any:
+        v = ("**過閘** —— 進工程閘門討論（審計下單路徑、統一風控、資金拆分）。"
+             "注意這只證明溢價存在，不證明抓得到它；看可捕獲美元再決定值不值得。")
+    else:
+        v = "**關線** —— 扣費後的可成交空間撐不起門檻；一週結案，成本≈零。"
+    print(f"  判決：{v}")
+    res.update({"status": "verdict", "sides": verdict_sides, "verdict": v})
+    return res
+
+
+def main() -> int:
+    now = datetime.now(timezone.utc)
+    print("§0.75 兩場館套利時鐘（判準 2026-08-28 凍結；家族 2026-08-30 登記，同一判準、全報不挑）")
+    out = {"asof_utc": now.strftime("%Y-%m-%d %H:%M"), "gate_days": GATE_DAYS,
+           "pairs": {}}
+    for pid, sub, a, b, note in PAIRS:
+        out["pairs"][pid] = score_pair(pid, sub, a, b, note, now)
+    # backward-compatible top level = the original SNDK clock
+    sn = out["pairs"].get("SNDK", {})
+    for k in ("minutes", "days", "gate_met", "interim", "sides", "verdict"):
+        if k in sn:
+            out[k] = sn[k]
+    print("\n  零費率＋看起來很肥的半天資料正是最誘人提早開獎的組合——判準凍結的意義就在此刻。")
+    OUT.write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8")
     return 0
 
 
