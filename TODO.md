@@ -164,8 +164,14 @@ decay 催辦（08-30）共三件在產品端佇列。
 3. **jarvis 半邊**：審計請求 11 問已交
    （`../jarvis/研究端資安審計請求_20260831.md`），**#A 用戶 key 五問
    最優先**；含簽章驗證對接規格（降級告警：見過簽章後消失=攻擊形狀）。
-4. **使用者動作項**：Railway agent 服務與 jarvis 各設同值
-   `SIGNAL_SIGNING_KEY`；GitHub/Railway/Vercel/交易所帳號開 MFA。
+4. **使用者動作項（2026-08-31 列入待辦，未完成前簽章不生效）**：
+   - [ ] **設金鑰**：Railway 的 agent-mcp 服務與 jarvis 服務各設**同值**
+     `SIGNAL_SIGNING_KEY`（≥16 字隨機字串，例如 `openssl rand -hex 24`
+     產一顆）。設完簽章立即生效；jarvis 收到審計文件後補驗證端
+   - [ ] **帳號 MFA**：GitHub、Railway、Vercel、Bitget／OKX 全開——
+     這層任何程式碼都替代不了。
+   檢查方式：金鑰設好後 `curl -sI <agent>/public/signal-feed | grep
+   X-Signal-Signature` 有標頭即生效。
 
 ### 0.79 模型 maintenance refresh —— **到期 2026-10-07**（2026-08-30 排定）
 
