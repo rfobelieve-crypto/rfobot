@@ -248,6 +248,7 @@ def build():
          "text": "三個方向性檢定全滅，bar 級的方向領先主張到此為止。"
                  "唯一存活的是波動預測，但系統沒有旋鈕接得住。"},
     ]
+    _flag_verdict_due(open_items)
     return {
         "asof_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         "open": open_items, "settled": settled,
@@ -256,6 +257,26 @@ def build():
         "disclaimer": "Forward validation in progress — research status "
                       "only, not a live strategy, not financial advice.",
     }
+
+
+def _flag_verdict_due(items):
+    """2026-08-31: a full clock must announce itself.  Variant C (§0.44) sat
+    at n>=400 for ~9 days and the Moderate clock (§0.491) for 4 days with no
+    verdict recorded — the board showed progress but nothing said "the gate
+    is met, judge it".  An open clock whose sample gate (and time gate, when
+    one exists) is met gets verdict_due=True; the site can badge it and the
+    hourly log line prints ⚠VERDICT-DUE."""
+    for c in items:
+        try:
+            n_ok = (c.get("gate_n") is not None and c.get("n") is not None
+                    and c["n"] >= c["gate_n"])
+            d_ok = c.get("gate_days") is None or (
+                c.get("days") is not None and c["days"] >= c["gate_days"])
+            if n_ok and d_ok:
+                c["verdict_due"] = True
+        except Exception:
+            pass
+    return items
 
 
 def main() -> int:
@@ -283,6 +304,7 @@ def main() -> int:
     print(f"prereg_clocks published: {len(o)} open, "
           f"{len(payload['settled'])} settled | "
           + " | ".join(f"{x['id']}:{x['n']}/{x['gate_n']}"
+                         + (" ⚠VERDICT-DUE" if x.get("verdict_due") else "")
                        for x in o if x["gate_n"]))
     return 0
 
