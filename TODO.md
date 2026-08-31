@@ -145,8 +145,27 @@ decay 催辦（08-30）共三件在產品端佇列。
 5. **訊號生成端與 Web 端**：不同服務但同一個 Railway 帳號／同一 MySQL
    ——「分離」只到 process 級，帳號級未分離。
 規劃時的既有資產：agent-boundary（唯讀邊界、CI 強制）、公開面規則
-（不出金額/內部）、admin token guard（2026-07-06）。**待使用者發起再規劃，
-本節只存前置答案。**
+（不出金額/內部）、admin token guard（2026-07-06）。
+
+**實作完成（2026-08-31，flow_system 半邊）**：
+1. **訊號完整性**：(a) 四條可執行 feed（signal-feed／raid-signals／
+   raid-pending／raid-outcomes）加 `X-Signal-Signature: v1=<HMAC-SHA256>`
+   回應簽章（`indicator/agent/security.py`，金鑰 env `SIGNAL_SIGNING_KEY`
+   ≥16 字，未設則無標頭不破壞消費者）；(b) **tracked_signals 雜湊鏈**
+   （`research/signal_audit_chain.py`→`signal_audit_chain` 表，2,248 節
+   已建、`--verify` 全鏈完整；每小時班車自動延鏈）——歷史被改會斷鏈，
+   「這不是我發的」可證。誠實界定：鏈只蓋發布時不變欄位（correct/
+   actual_return 是 4h 後回填，設計如此）。
+2. **防批量竊取／撞庫**：全部 21 條 `/public/*` 路由掛每 IP 滑動窗
+   速率限制（120/分，login/register/waitlist 收緊到 10/分），
+   **結構性測試強制**（`tests/test_agent_security.py`：新增 public 路由
+   漏掛守衛即紅，反向證明過——facade 守衛同款）；歷史窗口既有上限
+   200 筆維持。
+3. **jarvis 半邊**：審計請求 11 問已交
+   （`../jarvis/研究端資安審計請求_20260831.md`），**#A 用戶 key 五問
+   最優先**；含簽章驗證對接規格（降級告警：見過簽章後消失=攻擊形狀）。
+4. **使用者動作項**：Railway agent 服務與 jarvis 各設同值
+   `SIGNAL_SIGNING_KEY`；GitHub/Railway/Vercel/交易所帳號開 MFA。
 
 ### 0.79 模型 maintenance refresh —— **到期 2026-10-07**（2026-08-30 排定）
 

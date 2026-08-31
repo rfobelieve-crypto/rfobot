@@ -37,6 +37,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from indicator.agent import queries
+from indicator.agent import security
 
 mcp = FastMCP("rfobot-orderflow")
 
@@ -155,6 +156,9 @@ _FEED_CACHE_TTL_S = 30.0
 
 @mcp.custom_route("/public/signal-feed", methods=["GET"])
 async def public_signal_feed(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     now = time.monotonic()
     if _feed_cache["data"] is None or now - _feed_cache["ts"] > _FEED_CACHE_TTL_S:
         full = await anyio.to_thread.run_sync(queries.latest_signal)
@@ -182,6 +186,7 @@ async def public_signal_feed(request: Request) -> JSONResponse:
         }
         _feed_cache["ts"] = now
     resp = JSONResponse(_feed_cache["data"])
+    security.attach_signature(resp, _feed_cache["data"])
     resp.headers["Cache-Control"] = "public, max-age=30"
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
@@ -195,6 +200,9 @@ _TRACK_RECORD_CACHE_TTL_S = 120.0
 
 @mcp.custom_route("/public/track-record", methods=["GET"])
 async def public_track_record_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     now = time.monotonic()
     if (_track_record_cache["data"] is None
             or now - _track_record_cache["ts"] > _TRACK_RECORD_CACHE_TTL_S):
@@ -214,6 +222,9 @@ async def public_track_record_route(request: Request) -> JSONResponse:
 # anyway for parity with the GET routes above.
 @mcp.custom_route("/public/waitlist", methods=["POST"])
 async def public_waitlist_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     try:
         body = await request.json()
     except Exception:
@@ -240,6 +251,9 @@ _HISTORY_CACHE_TTL_S = 60.0
 
 @mcp.custom_route("/public/signal-history", methods=["GET"])
 async def public_signal_history_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     now = time.monotonic()
     if _history_cache["data"] is None or now - _history_cache["ts"] > _HISTORY_CACHE_TTL_S:
         data = await anyio.to_thread.run_sync(queries.public_signal_history, 50)
@@ -256,6 +270,9 @@ async def public_signal_history_route(request: Request) -> JSONResponse:
 # hashed server-side (see queries.py), never returned or logged.
 @mcp.custom_route("/public/register", methods=["POST"])
 async def public_register_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     try:
         body = await request.json()
     except Exception:
@@ -271,6 +288,9 @@ async def public_register_route(request: Request) -> JSONResponse:
 
 @mcp.custom_route("/public/login", methods=["POST"])
 async def public_login_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     try:
         body = await request.json()
     except Exception:
@@ -368,6 +388,9 @@ _V7_CHART_CACHE_TTL_S = 300.0  # matches the ~hourly bar cadence with margin
 
 @mcp.custom_route("/public/chart", methods=["GET"])
 async def public_chart_route(request: Request) -> Response:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     return await _proxy_png(
         _v7_chart_cache, _V7_CHART_CACHE_TTL_S, f"{INDICATOR_BASE_URL}/chart-dark")
 
@@ -401,6 +424,9 @@ _V7_ACCUM_I_CACHE_TTL_S = 900.0
 
 @mcp.custom_route("/public/v7-accum-i", methods=["GET"])
 async def public_v7_accum_i_route(request: Request) -> Response:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     return await _proxy_html(
         _v7_accum_i_cache, _V7_ACCUM_I_CACHE_TTL_S,
         f"{INDICATOR_BASE_URL}/research/v7-accum-i", token=INDICATOR_ADMIN_TOKEN)
@@ -408,6 +434,9 @@ async def public_v7_accum_i_route(request: Request) -> Response:
 
 @mcp.custom_route("/public/v7-accum", methods=["GET"])
 async def public_v7_accum_route(request: Request) -> Response:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     return await _proxy_png(
         _v7_accum_cache, _V7_ACCUM_CACHE_TTL_S,
         f"{INDICATOR_BASE_URL}/research/v7-accum", token=INDICATOR_ADMIN_TOKEN)
@@ -415,6 +444,9 @@ async def public_v7_accum_route(request: Request) -> Response:
 
 @mcp.custom_route("/public/cancel-flow-chart", methods=["GET"])
 async def public_cancel_flow_chart_route(request: Request) -> Response:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     return await _proxy_png(
         _cancel_chart_cache, _CANCEL_CHART_CACHE_TTL_S,
         f"{INDICATOR_BASE_URL}/research/cancel-flow", token=INDICATOR_ADMIN_TOKEN)
@@ -431,6 +463,9 @@ _CANCEL_STATS_CACHE_TTL_S = 60.0
 
 @mcp.custom_route("/public/cancel-flow-stats", methods=["GET"])
 async def public_cancel_flow_stats_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     now = time.monotonic()
     if (_cancel_stats_cache["data"] is None
             or now - _cancel_stats_cache["ts"] > _CANCEL_STATS_CACHE_TTL_S):
@@ -457,6 +492,9 @@ _V7_LIVE_CHART_CACHE_TTL_S = 60.0
 
 @mcp.custom_route("/public/live-chart", methods=["GET"])
 async def public_live_chart_route(request: Request) -> Response:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     return await _proxy_html(
         _v7_live_chart_cache, _V7_LIVE_CHART_CACHE_TTL_S,
         f"{INDICATOR_BASE_URL}/live-chart")
@@ -472,6 +510,9 @@ _CANCEL_CHART_I_CACHE_TTL_S = 120.0
 
 @mcp.custom_route("/public/cancel-flow-chart-i", methods=["GET"])
 async def public_cancel_flow_chart_i_route(request: Request) -> Response:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     return await _proxy_html(
         _cancel_chart_i_cache, _CANCEL_CHART_I_CACHE_TTL_S,
         f"{INDICATOR_BASE_URL}/research/cancel-flow-i?hours=48",
@@ -499,6 +540,9 @@ _LIQ_MAP_CACHE_TTL_S = 300.0
 
 @mcp.custom_route("/public/liquidity-map", methods=["GET"])
 async def public_liquidity_map_route(request: Request) -> Response:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     return await _proxy_html(
         _liq_map_cache, _LIQ_MAP_CACHE_TTL_S,
         f"{INDICATOR_BASE_URL}/research/shadow-review?symbol=BTC&hours=2160",
@@ -757,6 +801,9 @@ def _raid_signals_payload() -> dict:
 
 @mcp.custom_route("/public/raid-signals", methods=["GET"])
 async def public_raid_signals_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     now = time.monotonic()
     if (_raid_signals_cache["data"] is None
             or now - _raid_signals_cache["ts"] > _RAID_SIGNALS_CACHE_TTL_S):
@@ -768,6 +815,7 @@ async def public_raid_signals_route(request: Request) -> JSONResponse:
         _raid_signals_cache["ts"] = now
     payload = _raid_signals_cache["data"]
     resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    security.attach_signature(resp, payload)
     resp.headers["Cache-Control"] = "public, max-age=120"
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
@@ -855,6 +903,9 @@ def _raid_pending_payload() -> dict:
 
 @mcp.custom_route("/public/raid-pending", methods=["GET"])
 async def public_raid_pending_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     now = time.monotonic()
     if (_raid_pending_cache["data"] is None
             or now - _raid_pending_cache["ts"] > _RAID_PENDING_CACHE_TTL_S):
@@ -866,6 +917,7 @@ async def public_raid_pending_route(request: Request) -> JSONResponse:
         _raid_pending_cache["ts"] = now
     payload = _raid_pending_cache["data"]
     resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    security.attach_signature(resp, payload)
     resp.headers["Cache-Control"] = "public, max-age=30"
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
@@ -937,6 +989,9 @@ def _raid_outcomes_payload() -> dict:
 
 @mcp.custom_route("/public/raid-outcomes", methods=["GET"])
 async def public_raid_outcomes_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     now = time.monotonic()
     if (_raid_out_cache["data"] is None
             or now - _raid_out_cache["ts"] > _RAID_OUT_CACHE_TTL_S):
@@ -948,6 +1003,7 @@ async def public_raid_outcomes_route(request: Request) -> JSONResponse:
         _raid_out_cache["ts"] = now
     payload = _raid_out_cache["data"]
     resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    security.attach_signature(resp, payload)
     resp.headers["Cache-Control"] = "public, max-age=300"
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
@@ -988,6 +1044,9 @@ def _prereg_payload() -> dict:
 
 @mcp.custom_route("/public/prereg-clocks", methods=["GET"])
 async def public_prereg_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     """Open pre-registrations and their progress, plus settled verdicts.
 
     Exists because the discipline was invisible from outside: five clocks
@@ -1040,6 +1099,9 @@ def _weather_payload() -> dict:
 
 @mcp.custom_route("/public/weather-station", methods=["GET"])
 async def public_weather_station_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     """Crowd-strategy weather station for the site dashboard — which
     popular-strategy crowds the market is feeding/starving, with each
     gauge's evidence tier.  States and ratios only; no sizes, no dollars,
@@ -1062,6 +1124,9 @@ async def public_weather_station_route(request: Request) -> JSONResponse:
 
 @mcp.custom_route("/public/sweep-status", methods=["GET"])
 async def public_sweep_status_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     now = time.monotonic()
     if (_sweep_status_cache["data"] is None
             or now - _sweep_status_cache["ts"] > _SWEEP_STATUS_CACHE_TTL_S):
@@ -1084,6 +1149,9 @@ _LIVE_STATUS_CACHE_TTL_S = 60.0
 
 @mcp.custom_route("/public/live-status", methods=["GET"])
 async def public_live_status_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
     """V7/OKX execution surface for the site dashboard — percentages,
     directions and timing only (queries.public_live_status keeps sizes and
     dollar equity out of the public layer)."""

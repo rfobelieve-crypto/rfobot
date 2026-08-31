@@ -44,3 +44,5 @@ REM (user: charts must mark real entries/exits; v7_okx_positions froze
 REM 08-11 at the Bitget migration). Same export token as the mill
 REM pipeline (TODO 0.78); env unset = printed skip, never a bat failure.
 python research\v7_product_trades_publish.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-08-31 (TODO 0.83): extend the tamper-evident signal hash chain
+python research\signal_audit_chain.py >> research\results\sweep_shadow_run.log 2>&1
