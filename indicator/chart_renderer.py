@@ -221,6 +221,8 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100, *, dark: bool = False) ->
     try:
         from indicator.okx.state import (
             fetch_okx_positions_for_chart as fetch_positions_for_chart)
+        from indicator.v7_product_trades import (
+            fetch_v7_product_trades_for_chart)
         bar_idx = {}
         for _ib, _tb in enumerate(sig.index):
             _key = _tb.tz_convert("UTC").tz_localize(None).replace(
@@ -228,7 +230,11 @@ def render_chart(ind: pd.DataFrame, last_n: int = 100, *, dark: bool = False) ->
             bar_idx[_key] = _ib
         _win_start = sig.index[0].tz_convert("UTC").tz_localize(None)
         _win_end = sig.index[-1].tz_convert("UTC").tz_localize(None)
-        for p in fetch_positions_for_chart(_win_start, _win_end):
+        # OKX era (frozen 2026-08-11) + jarvis/Bitget era (v7_product_trades,
+        # pulled hourly from the product ledger) — one overlay, two sources.
+        _live = (list(fetch_positions_for_chart(_win_start, _win_end))
+                 + list(fetch_v7_product_trades_for_chart(_win_start, _win_end)))
+        for p in _live:
             ekey = pd.Timestamp(p["entry_time"]).replace(
                 minute=0, second=0, microsecond=0)
             ei = bar_idx.get(ekey)

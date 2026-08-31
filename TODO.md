@@ -69,6 +69,30 @@ n=122，同向且相隔 ≤6h 視為同串）：**69% 的 Strong 落在 ≥2 根
   機制：連續小時的特徵幾乎相同、4h 窗口重疊 3h——**是同一個投票人重複
   投票，不是多個獨立投票**；與 08-24「極端預測不是更好的預測」同一件事。
 
+### 0.81 V7 圖表補真實進出場（2026-08-31，使用者指出圖上沒標）
+
+**病因**：兩張 V7 圖的 live 疊層讀 `v7_okx_positions`，該表凍在 08-11
+（執行面遷 Bitget，CLAUDE.md 08-21）——之後的真實進出場只存在 jarvis 的
+`{userDir}/v7_trades.jsonl`（08-25 起，`v7bot._trade`），圖上自然是空的。
+另註：**08-11→08-25 有真實的記錄空窗**（產品端當時還沒有逐筆帳本），
+這段圖上就是沒有，不補不假造。
+
+**修法（照 §0.78 磨坊管道的形，兩端分工同款）**：
+- 產品端：請開 `/api/u/export/v7`（鏡像 `/export/fills`，同一顆
+  RESEARCH_EXPORT_TOKEN，只讀原樣回傳）——規格請求
+  `../jarvis/研究端請求_V7逐筆匯出_20260831.md`
+- 研究端（已落地）：`research/v7_product_trades_publish.py` 每小時拉
+  （掛 shadow_engine.bat）→ 事件配對成回合（已知答案自測 PASS）→
+  upsert `v7_product_trades` → `indicator/v7_product_trades.py` 供圖
+- 兩張圖（`chart_renderer.py`／`chart_interactive.py`，圖表同步規則）
+  改為 **OKX 時代（21 筆）＋ Bitget 時代聯集**疊層；產品端表不存在或
+  拉取失敗一律回空清單，圖照畫（overlay 永不弄壞圖）
+- 網站與 TG 走同一個 render 端點，部署即同步，無需另改
+
+**現況卡點**：`.env` 的 MILL_EXPORT_* 已設值，打 `/export/v7` 回 401
+（端點未上，fallthrough 到登入檢查）——**等產品端上 `/export/v7`**，
+上了之後下一班車自動接通，圖表自動長出 Bitget 時代的進出場。
+
 ### 0.79 模型 maintenance refresh —— **到期 2026-10-07**（2026-08-30 排定）
 
 現行 direction 模型 2026-08-08 部署（`indicator/model_version.py:

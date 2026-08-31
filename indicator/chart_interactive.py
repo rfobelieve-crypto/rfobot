@@ -160,10 +160,15 @@ def render_interactive_chart(ind: pd.DataFrame, last_n: int = 200) -> str:
         try:
             from indicator.okx.state import (
                 fetch_okx_positions_for_chart as fetch_positions_for_chart)
+            from indicator.v7_product_trades import (
+                fetch_v7_product_trades_for_chart)
             win_start = sig.index[0].tz_convert("UTC").tz_localize(None)
             win_end = sig.index[-1].tz_convert("UTC").tz_localize(None)
             first_ts, last_ts_c = candle_data[0]["time"], candle_data[-1]["time"]
-            for p in fetch_positions_for_chart(win_start, win_end):
+            _live = (list(fetch_positions_for_chart(win_start, win_end))
+                     + list(fetch_v7_product_trades_for_chart(win_start,
+                                                              win_end)))
+            for p in _live:
                 d = p["direction"]
                 e_ts = int(pd.Timestamp(p["entry_time"]).tz_localize("UTC")
                            .timestamp()) + 8 * 3600
