@@ -602,15 +602,16 @@ def update_cycle() -> dict:
                 icon = "\U0001f534\u25bc" if is_strong else "\U0001f534\u25bd"  # 🔴▼ / 🔴▽
                 label = "STRONG BEARISH" if is_strong else "MODERATE BEARISH"
 
-            # Dual-gate mag tier — mirrors chart_renderer triangle-size and
-            # PNG caption badge so the alert text matches the visual.
+            # Dual-gate mag tier — text only since 2026-09-01 (產品端請求_
+            # 移除警報幅度徽章: badge symbols dropped, numbers kept; triangle
+            # sizing in the charts is out of scope and unchanged).
             #   mag_pct >= 90 -> 🔥 (extra-large / upsized triangle, fire badge)
             #   mag_pct 80-90 -> 🎯 (regular triangle, target badge if Strong)
             #   mag_pct < 80  -> ⚠️ Mag Weak (downsized triangle, no badge)
             if mag_pct >= 90:
-                mag_tier_line = f"\n\U0001f525 Mag Strong (p{mag_pct:.0f})"
+                mag_tier_line = f"\nMag Strong (p{mag_pct:.0f})"
             elif mag_pct >= 80:
-                mag_tier_line = f"\n\U0001f3af Mag Solid (p{mag_pct:.0f})"
+                mag_tier_line = f"\nMag Solid (p{mag_pct:.0f})"
             else:
                 mag_tier_line = f"\n⚠️ Mag Weak (p{mag_pct:.0f})"
 
@@ -2462,9 +2463,9 @@ def indicator_performance():
             # caused /perf to silently fail once the first "<p80" row
             # appeared in the breakdown).
             priority = [
-                ("Strong",   "p90+",   "🔥", "Strong + ≥p90"),
-                ("Strong",   "p80-90", "🎯", "Strong + p80-90"),
-                ("Moderate", "p90+",   "🎯", "Moderate + ≥p90"),
+                ("Strong",   "p90+",   " ·", "Strong + ≥p90"),
+                ("Strong",   "p80-90", " ·", "Strong + p80-90"),
+                ("Moderate", "p90+",   " ·", "Moderate + ≥p90"),
                 ("Strong",   "p<80",   " ·", "Strong + p&lt;80"),
                 ("Moderate", "p80-90", " ·", "Moderate + p80-90"),
                 ("Moderate", "p<80",   " ·", "Moderate + p&lt;80"),

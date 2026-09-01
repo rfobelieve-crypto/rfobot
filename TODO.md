@@ -164,6 +164,13 @@ decay 催辦（08-30）共三件在產品端佇列。
 3. **jarvis 半邊**：審計請求 11 問已交
    （`../jarvis/研究端資安審計請求_20260831.md`），**#A 用戶 key 五問
    最優先**；含簽章驗證對接規格（降級告警：見過簽章後消失=攻擊形狀）。
+   **09-01 進度**：產品端自主出了 **V1.57.0 實盤安全批#1**（模式互斥
+   守衛四處補齊、/admin/stop-all kill switch 補全 raid/v7/surf、admin
+   XSS 雙層修、admin/RESEARCH_EXPORT_TOKEN 改 timing-safe 比對、cookie
+   Secure、註冊節流 env 化）——方向與審計請求一致。**尚欠**：11 問
+   正式回覆（尤其 #A key 五問）、feed 簽章驗證端（src 尚無
+   X-Signal-Signature 引用）。順帶：decay 已補回（V1.56.0 照規格逐條、
+   雙模式、快照續數）、用戶自身進出場已上圖（V1.55.0）。
 4. **使用者動作項（2026-08-31 列入待辦，未完成前簽章不生效）**：
    - [ ] **設金鑰**：Railway 的 agent-mcp 服務與 jarvis 服務各設**同值**
      `SIGNAL_SIGNING_KEY`（≥16 字隨機字串，例如 `openssl rand -hex 24`
