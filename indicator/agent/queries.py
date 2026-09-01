@@ -42,6 +42,32 @@ def _now_iso() -> str:
 
 # ── Tool 1: current signal ─────────────────────────────────────────────
 
+def public_arb_status() -> dict[str, Any]:
+    """§0.75 arbitrage family — read the row research/arb_publish.py writes.
+
+    Single-row SELECT on `arb_status`; no computation here (premium_verdict
+    is the single owning scorer). Dollar figures are stripped by the writer,
+    so this cannot leak them by accident.
+    """
+    if _seed_mode():
+        return {"asof_utc": "2026-09-01 00:00", "pairs": [],
+                "disclaimer": DISCLAIMER, "_source": "seed"}
+    from shared.db import get_db_conn
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT payload, checked_at FROM arb_status WHERE id=1")
+            row = cur.fetchone()
+        if not row:
+            return {"error": "no arb status row yet"}
+        data = json.loads(row["payload"])
+        ca = row.get("checked_at")
+        data["published_utc"] = ca.strftime("%Y-%m-%dT%H:%M:%SZ") if ca else None
+        return data
+    finally:
+        conn.close()
+
+
 def _data_state() -> str:
     """Feature-pipeline health, read from the quant side's state table.
 

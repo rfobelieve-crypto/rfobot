@@ -51,3 +51,8 @@ REM schedule at all — the JSON that will碰 the 09-04 verdict was 2 days
 REM stale, and nothing said so (same shape as 0.86: exists locally,
 REM never reaches the surface). Refuses to judge before the gate.
 python research\arb\premium_verdict.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-09-01: publish the arb family to MySQL for the site (0.75).
+REM The recorder runs off-cloud, so a cloud route cannot compute this
+REM -- 4th instance of that fix family. Money figures stripped by the
+REM writer; the public page carries percentages and time only.
+python research\arb_publish.py >> research\results\sweep_shadow_run.log 2>&1

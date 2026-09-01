@@ -43,6 +43,12 @@ Files under `indicator/agent/` MUST NOT import, at any depth:
   done. Scoring their realised fills against research-side numbers
   instead is the asymmetry that made blocked signals read 4.3x better,
   TODO §0.62 — this table puts both arms on one ruler),
+  `arb_status` (§0.75 arbitrage family, 2026-09-01 — WRITTEN by
+  `research/arb_publish.py` hourly. The recorder runs off-cloud on the
+  operator's machine, so a cloud route cannot compute this; dollar figures
+  (book depth, capturable USD/day) are stripped by the writer so the public
+  page carries percentages, direction and time only, per CLAUDE.md's
+  public-surface rule),
   `prereg_clocks` (pre-registration board, 2026-08-26 — WRITTEN by
   `research/prereg_publish.py` hourly. The open hypotheses and their
   progress lived only in TODO.md sections and per-clock scripts, so from

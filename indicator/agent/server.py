@@ -1045,6 +1045,40 @@ def _prereg_payload() -> dict:
     return data
 
 
+_arb_cache: dict = {"data": None, "ts": 0.0}
+_ARB_CACHE_TTL_S = 300.0
+
+
+def _arb_payload() -> dict:
+    """§0.75 arbitrage family status, written hourly by research/
+    arb_publish.py (the recorder runs off-cloud, so a route that computed
+    this itself would serve a build-time snapshot — fourth instance of that
+    fix family). Money figures are stripped on the writer side; this route
+    only relays. Read-only, agent-boundary safe."""
+    return queries.public_arb_status()
+
+
+@mcp.custom_route("/public/arb-status", methods=["GET"])
+async def public_arb_status_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
+    now = time.monotonic()
+    if (_arb_cache["data"] is None
+            or now - _arb_cache["ts"] > _ARB_CACHE_TTL_S):
+        try:
+            data = await anyio.to_thread.run_sync(_arb_payload)
+        except Exception as e:  # noqa: BLE001 — degrade, never crash
+            data = {"error": f"arb status unavailable: {type(e).__name__}"}
+        _arb_cache["data"] = data
+        _arb_cache["ts"] = now
+    payload = _arb_cache["data"]
+    resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 @mcp.custom_route("/public/prereg-clocks", methods=["GET"])
 async def public_prereg_route(request: Request) -> JSONResponse:
     _rl = security.rate_gate(request)
