@@ -47,6 +47,7 @@ def _ensure_table():
                     `regime` VARCHAR(30) DEFAULT '',
                     `mag_pct_200` DOUBLE DEFAULT NULL,
                     `model_version` VARCHAR(40) DEFAULT NULL,
+                    `data_state` VARCHAR(16) DEFAULT NULL,
                     `exit_price` DOUBLE DEFAULT NULL,
                     `actual_return_4h` DOUBLE DEFAULT NULL,
                     `correct` TINYINT DEFAULT NULL,
@@ -60,6 +61,12 @@ def _ensure_table():
             for col_name, col_def in (
                 ("mag_pct_200", "DOUBLE DEFAULT NULL"),
                 ("model_version", "VARCHAR(40) DEFAULT NULL"),
+                # 2026-09-01 (§0.85): upstream data health AT FIRE TIME.
+                # A verdict must be able to exclude signals born while the
+                # feature pipeline was degraded — without this stamp the
+                # research side cannot tell a clean sample from a polluted
+                # one after the fact (the outage is invisible in hindsight).
+                ("data_state", "VARCHAR(16) DEFAULT NULL"),
             ):
                 cur.execute("""
                     SELECT COUNT(*) AS n FROM information_schema.columns
@@ -96,10 +103,20 @@ def _ensure_table():
         conn.close()
 
 
+def _live_data_state() -> str:
+    """Upstream data health at fire time (§0.85). Never raises: an unknown
+    state must not stop a signal from being recorded."""
+    try:
+        from indicator.data_degradation import load_state
+        return load_state()[0]
+    except Exception:
+        return "UNKNOWN"
+
+
 def record_signal(signal_time: datetime, direction: str, strength: str,
                   p_up: float, mag_pred: float, confidence: float,
                   entry_price: float, regime: str = "", shap_json: str = "",
-                  mag_pct_200: float = None):
+                  mag_pct_200: float = None, data_state: str = None):
     """Record a Strong or Moderate directional signal.
 
     mag_pct_200: rolling 200-bar percentile of |mag_pred| at signal time.
@@ -126,14 +143,15 @@ def record_signal(signal_time: datetime, direction: str, strength: str,
                 INSERT IGNORE INTO `{TABLE}`
                     (signal_time, direction, strength, p_up, mag_pred,
                      confidence, entry_price, regime, shap_top, mag_pct_200,
-                     model_version)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     model_version, data_state)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 signal_time.strftime("%Y-%m-%d %H:%M:%S"),
                 direction, strength, float(p_up), float(mag_pred),
                 float(confidence), float(entry_price), regime, shap_json or None,
                 float(mag_pct_200) if mag_pct_200 is not None else None,
                 get_current_model_version(),
+                (data_state or _live_data_state()),
             ))
         conn.commit()
         logger.info("%s signal recorded: %s %s @ $%.0f conf=%.0f mag_p=%s",

@@ -72,6 +72,26 @@ def test_classify(failed, total, expect):
     assert dg.classify(failed, total) == expect
 
 
+# ── 2b. criticality weighting (2026-09-01: counting endpoints alone is the
+#        wrong metric — funding/oi each feed ~20 derived features) ────────
+
+def test_one_critical_endpoint_is_already_degraded():
+    assert dg.classify(1, 24, ["funding"]) == dg.STATE_DEGRADED
+    assert dg.classify(1, 24, ["oi"]) == dg.STATE_DEGRADED
+
+
+def test_two_critical_endpoints_are_an_outage_even_if_22_are_up():
+    assert dg.classify(2, 24, ["funding", "oi"]) == dg.STATE_OUTAGE
+
+
+def test_peripheral_endpoints_do_not_trip_the_weighting():
+    assert dg.classify(2, 24, ["coinbase_premium", "liq_agg"]) == dg.STATE_OK
+
+
+def test_count_rule_still_applies_without_critical_names():
+    assert dg.classify(3, 24, ["a", "b", "c"]) == dg.STATE_DEGRADED
+
+
 # ── 3. state machine, including the recovery silence ─────────────────────
 
 def test_outage_then_recovery_silence_then_ok():
@@ -146,6 +166,18 @@ def test_assess_flags_suppression_on_outage(monkeypatch):
 
 
 # ── 6. the merge tolerance is actually wired into the feature builder ────
+
+def test_signal_writer_stamps_data_state():
+    """§0.85 #1: a verdict must be able to exclude signals fired while the
+    pipeline was degraded — the outage is invisible in hindsight without
+    this stamp."""
+    import pathlib
+    src = (pathlib.Path(__file__).parent.parent / "indicator"
+           / "signal_tracker.py").read_text(encoding="utf-8")
+    assert "data_state" in src and "_live_data_state" in src
+    assert "(\"data_state\", \"VARCHAR(16) DEFAULT NULL\")" in src, (
+        "additive migration for data_state must exist")
+
 
 def test_feature_builder_passes_tolerance():
     import pathlib

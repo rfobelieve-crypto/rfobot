@@ -38,6 +38,8 @@ import argparse
 import json
 import sys
 import time
+
+import pandas as pd
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -120,10 +122,23 @@ REGISTRY = [
     ("arb recorder NEAR (§0.75)", "file",
      "../entropy-arb/logs/NEAR/minutes.csv", 1.0,
      "§0.75 family 2026-08-30: HL vs lighter-rh, thin"),
-    ("arb scanner (§0.75b)", "glob",
+    # "glob" = stalest match (right when every file must stay fresh). The
+    # scanner ROTATES daily, so yesterday's file is stale BY DESIGN — the
+    # stalest rule makes this row permanently red, which trains the
+    # operator to ignore the channel (the exact failure this board exists
+    # to prevent). "glob_newest" asks the real question: is the CURRENT
+    # file being written?
+    ("arb scanner (§0.75b)", "glob_newest",
      "../entropy-arb/logs/scan/scan_*.csv", 0.5,
      "cross-venue REST scanner, ~2 min cycle over ~110 pairs"),
     # -- daily --
+    # 2026-09-01 (§0.85): mtime answers "is the writer running"; content
+    # age answers "is the data moving".  During an upstream outage those
+    # diverge — the collector keeps rewriting files whose newest row never
+    # advances (2026-08-01 precedent: schedule green, parquet stale).
+    ("coinglass parquet CONTENT", "parquet_content",
+     "market_data/raw_data/cg_*.parquet", 48.0,
+     "last DATA row age of the stalest CG parquet — mtime lies in an outage"),
     ("coinglass parquets", "glob",
      "market_data/raw_data/cg_*.parquet", 48.0,
      "STALE-DATA guard threshold; stalest file reported"),
@@ -146,6 +161,57 @@ def age_file(rel: str) -> float | None:
     if not p.exists():
         return None
     return (time.time() - p.stat().st_mtime) / H
+
+
+def age_glob_newest(pattern: str):
+    """Age of the NEWEST match — for rotating files (daily scan_YYYYMMDD.csv)
+    where older members are stale by design."""
+    import glob as _glob
+    import os as _os
+    files = _glob.glob(pattern)
+    if not files:
+        return None, "no files"
+    newest = max(files, key=lambda f: _os.path.getmtime(f))
+    return ((time.time() - _os.path.getmtime(newest)) / H,
+            _os.path.basename(newest))
+
+
+def age_parquet_content(pattern: str):
+    """Age of the LAST DATA ROW in the stalest matching parquet, in hours.
+
+    Reads the newest timestamp INSIDE each file rather than its mtime, so
+    an upstream outage that keeps the writer alive (fresh mtime, frozen
+    content) still goes red. Failure to read a file is skipped, not
+    fatal — this is a monitor, it must not become the thing that breaks.
+    """
+    import glob as _glob
+    import os as _os
+    files = _glob.glob(pattern)
+    if not files:
+        return None, "no files"
+    worst_age, worst_name = None, "?"
+    for f in files:
+        try:
+            df = pd.read_parquet(f)
+            if df.empty:
+                age = 1e9
+            else:
+                idx = df.index
+                if not isinstance(idx, pd.DatetimeIndex):
+                    cand = [c for c in df.columns
+                            if pd.api.types.is_datetime64_any_dtype(df[c])]
+                    if not cand:
+                        continue
+                    idx = pd.DatetimeIndex(df[cand[0]])
+                last = idx.max()
+                if last.tzinfo is None:
+                    last = last.tz_localize("UTC")
+                age = (pd.Timestamp.now(tz="UTC") - last).total_seconds() / 3600
+        except Exception:
+            continue
+        if worst_age is None or age > worst_age:
+            worst_age, worst_name = age, _os.path.basename(f)
+    return worst_age, worst_name
 
 
 def age_glob(pattern: str) -> tuple[float | None, str]:
@@ -192,6 +258,10 @@ def main() -> int:
             age = age_file(target)
         elif kind == "glob":
             age, detail = age_glob(target)
+        elif kind == "parquet_content":
+            age, detail = age_parquet_content(target)
+        elif kind == "glob_newest":
+            age, detail = age_glob_newest(target)
         else:
             age = age_db(target, conn) if conn else None
         ok = age is not None and age <= max_h
@@ -242,6 +312,7 @@ def main() -> int:
         msg = "\n".join(msg_lines)
         try:
             import os
+
             from indicator.okx.alerter import send_critical
             chat = (os.environ.get("TG_ALERT_CHAT_ID")
                     or os.environ.get("TG_CRITICAL_CHAT_ID") or "")

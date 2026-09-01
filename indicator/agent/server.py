@@ -178,6 +178,9 @@ async def public_signal_feed(request: Request) -> JSONResponse:
             "upstream_last_bar": full.get("upstream_last_bar"),
             "upstream_age_minutes": full.get("upstream_age_minutes"),
             "upstream_live": full.get("upstream_live"),
+            # §0.85: lets a consumer tell "quiet market" from "upstream
+            # feature pipeline degraded — signals deliberately withheld".
+            "data_state": full.get("data_state"),
             # 1-bit sign of the latest bar's raw prediction — powers the
             # product side's conviction-decay exit (§0.51 attribution's
             # main positive contributor). Sign only; magnitude withheld.

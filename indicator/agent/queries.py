@@ -42,6 +42,27 @@ def _now_iso() -> str:
 
 # ── Tool 1: current signal ─────────────────────────────────────────────
 
+def _data_state() -> str:
+    """Feature-pipeline health, read from the quant side's state table.
+
+    Read-only single-row SELECT — no import of the trading/inference path
+    (agent-boundary.md). Unknown on any error: a consumer must not be told
+    "OK" just because this lookup failed.
+    """
+    try:
+        conn = _conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT state FROM data_degradation_state "
+                            "WHERE id=1")
+                row = cur.fetchone()
+            return str(row["state"]) if row else "UNKNOWN"
+        finally:
+            conn.close()
+    except Exception:
+        return "UNKNOWN"
+
+
 def latest_signal() -> dict[str, Any]:
     if _seed_mode():
         return {
@@ -62,6 +83,7 @@ def latest_signal() -> dict[str, Any]:
             "upstream_last_bar": "2026-07-07T00:00:00+00:00",
             "upstream_age_minutes": 30.0,
             "upstream_live": True,
+            "data_state": "OK",
             "pred_sign": 1,
             "disclaimer": DISCLAIMER,
             "_source": "seed",
@@ -137,6 +159,14 @@ def latest_signal() -> dict[str, Any]:
         "upstream_last_bar": last_bar.isoformat() if last_bar else None,
         "upstream_age_minutes": bar_age_min,
         "upstream_live": upstream_live,
+        # Upstream FEATURE-PIPELINE health (§0.85, 2026-09-01). Distinct
+        # from upstream_live, which only says "a bar arrived recently".
+        # During a Coinglass outage the indicator service stops PUBLISHING
+        # signals, so a consumer sees "no new signal" — indistinguishable
+        # from a quiet market. This field names the difference:
+        # OK / DEGRADED / OUTAGE / RECOVERING (read-only from the state
+        # table the quant side writes; agent-boundary safe).
+        "data_state": _data_state(),
         # 1-bit direction of the latest bar's raw prediction (see the
         # indicator_history query above). Sign only — no magnitude, no
         # cutoffs; stays inside the "direction + confidence" public scope.

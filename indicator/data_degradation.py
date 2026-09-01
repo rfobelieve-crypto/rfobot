@@ -58,6 +58,14 @@ CG_MERGE_TOLERANCE = os.environ.get("CG_MERGE_TOLERANCE", "6h")
 DEGRADED_MIN_FAILED = 3          # a few flaky endpoints = degraded
 OUTAGE_FRACTION = 0.5            # half or more down = outage
 
+# Counting endpoints is the WRONG metric on its own (2026-09-01 review):
+# `funding` and `oi` each feed ~20 derived features, so losing one of them
+# hurts more than losing three peripheral feeds. These are weighted: any
+# one of them empty is DEGRADED on its own, two or more is an OUTAGE —
+# regardless of how many endpoints are up in total.
+CRITICAL_ENDPOINTS = ("funding", "oi", "oi_agg", "taker")
+CRITICAL_OUTAGE_MIN = 2
+
 # Bars of silence after recovery. 24 = one day of hourly bars: enough for
 # the 4h-horizon labels and the short rolling windows to clear the frozen
 # stretch. Deliberately NOT tuned — a swept value here would be a
@@ -70,13 +78,20 @@ STATE_OUTAGE = "OUTAGE"
 STATE_RECOVERING = "RECOVERING"
 
 
-def classify(n_failed: int, n_total: int) -> str:
-    """Pure function — the whole policy, testable without a DB."""
+def classify(n_failed: int, n_total: int, failed_names=None) -> str:
+    """Pure function — the whole policy, testable without a DB.
+
+    Two axes: raw count, and criticality. One critical endpoint down is
+    already DEGRADED even when 23 of 24 are up.
+    """
     if n_total <= 0:
+        return STATE_OUTAGE
+    crit = [f for f in (failed_names or []) if f in CRITICAL_ENDPOINTS]
+    if len(crit) >= CRITICAL_OUTAGE_MIN:
         return STATE_OUTAGE
     if n_failed >= max(1, int(round(n_total * OUTAGE_FRACTION))):
         return STATE_OUTAGE
-    if n_failed >= DEGRADED_MIN_FAILED:
+    if n_failed >= DEGRADED_MIN_FAILED or crit:
         return STATE_DEGRADED
     return STATE_OK
 
@@ -176,7 +191,7 @@ def assess(cg_status: dict) -> dict:
     try:
         failed = [k for k, v in (cg_status or {}).items() if v.get("empty")]
         n_total = len(cg_status or {})
-        observed = classify(len(failed), n_total)
+        observed = classify(len(failed), n_total, failed)
         prev_state, prev_left = load_state()
         state, left = next_state(prev_state, prev_left, observed)
         save_state(state, left, len(failed), n_total, failed)
@@ -206,6 +221,9 @@ def alert_text(res: dict) -> str | None:
         return None
     st, prev = res["state"], res["prev_state"]
     if st in (STATE_DEGRADED, STATE_OUTAGE):
+        _crit = [f for f in res.get("failed", []) if f in CRITICAL_ENDPOINTS]
+        if _crit:
+            logger.warning("critical CG endpoints down: %s", _crit)
         return (f"🟠 DATA {st}: Coinglass {res['n_failed']}/{res['n_total']} "
                 f"endpoints down ({', '.join(res['failed'][:6])})\n"
                 f"Signals suppressed; exits/kill checks unaffected.\n"
