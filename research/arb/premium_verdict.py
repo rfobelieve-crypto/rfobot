@@ -173,7 +173,7 @@ def side_stats(rows, key):
             "fires": fires, "fires_per_day": round(fires / days, 1)}
 
 
-def capturable_usd_per_day(side, ins):
+def capturable_usd_per_day(side, ins, conv=None):
     """REPORT-ONLY (not in the gate): fires/day x band x depth at the fat
     prints. Registered 2026-08-30 after SNDK's interim showed $200-400 books:
     a pair can pass the statistical gate and still be worth cents. This
@@ -181,6 +181,19 @@ def capturable_usd_per_day(side, ins):
     passes."""
     if not side or not ins or ins.get("fat_median_notional_usd") is None:
         return None
+    # 2026-09-01 — THE CONTROL PAIR EARNED ITS KEEP. BTC (two deep zero-fee
+    # books, band expected ~0) reported the family's LARGEST capturable
+    # number, $97.8/day.  The data was real: HL quotes BTC a persistent
+    # 3-5 bps above the Robinhood chain, positive in 100% of minutes.  But
+    # its convergence column read `episodes: 0` — the premium never
+    # deviates from its own rolling midline because it IS the midline: a
+    # structural offset, not a spread that comes back.  You can lock it in
+    # and never get paid.  The GATE was right (no convergence, no pass);
+    # this REPORT metric was wrong, because band x fires x depth counts a
+    # permanent offset as money.  Gated on convergence now: "fat but never
+    # closes" is the most seductive way for this line to lose money.
+    if conv is not None and not conv.get("passed"):
+        return 0.0
     return round(side["fires_per_day"] * side["band_bps"] / 1e4
                  * ins["fat_median_notional_usd"], 2)
 
@@ -220,8 +233,12 @@ def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
                 ins = instrument_stats(rows, lab)
                 if ins:
                     res["interim"][f"depth_{lab}"] = ins
-                    cap = capturable_usd_per_day(st_, ins)
+                    cap = capturable_usd_per_day(
+                        st_, ins, res["interim"].get(f"conv_{lab}"))
                     res["interim"][f"capturable_usd_per_day_{lab}"] = cap
+                    if cap == 0.0:
+                        print(f"    {lab} 帶存在但**不收斂**（結構性偏移，"
+                              f"不是會回來的價差）→ 可捕獲記 0")
                     print(f"    {lab} 最肥時刻深度中位 ${ins['fat_median_notional_usd']:,.0f}"
                           f"｜卡價(>5s) {ins['fat_stale_gt5s']}/{ins['fat_prints']}"
                           f"｜可捕獲 ≈ ${cap}/天（報告用，不進判準）")
@@ -244,7 +261,7 @@ def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
                   and all(x["fires_per_day"] >= FIRES_PER_DAY_MIN
                           and x["band_bps"] >= NET_BPS_MIN for x in h)
                   and bool(conv.get("passed")))
-        cap = capturable_usd_per_day(full, ins)
+        cap = capturable_usd_per_day(full, ins, conv)
         verdict_sides[lab] = {"full": full, "halves": h,
                               "convergence": conv, "depth": ins,
                               "capturable_usd_per_day": cap,

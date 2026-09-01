@@ -46,3 +46,8 @@ REM pipeline (TODO 0.78); env unset = printed skip, never a bat failure.
 python research\v7_product_trades_publish.py >> research\results\sweep_shadow_run.log 2>&1
 REM 2026-08-31 (TODO 0.83): extend the tamper-evident signal hash chain
 python research\signal_audit_chain.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-09-01: refresh the arb verdict file (TODO 0.75). It had NO
+REM schedule at all — the JSON that will碰 the 09-04 verdict was 2 days
+REM stale, and nothing said so (same shape as 0.86: exists locally,
+REM never reaches the surface). Refuses to judge before the gate.
+python research\arb\premium_verdict.py >> research\results\sweep_shadow_run.log 2>&1

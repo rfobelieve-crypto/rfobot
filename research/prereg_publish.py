@@ -172,17 +172,28 @@ def build():
             "note": "成交在時間上高度集中，短窗等於一個行情段落不是一批樣本",
         },
     ]
-    # §0.75 arb clock: minutes recorded, from the third-party clone's CSV
-    # count BOTH files: the 2026-08-28 instrument upgrade rotated the first
-    # 257 minutes to minutes.csv.old — same window, same clock.
-    arb_min = 0
-    for _fn in ("minutes.csv.old", "minutes.csv"):
+    # §0.75 arb clock: minutes recorded, from the third-party clone's CSV.
+    # Count BOTH files for the primary pair: the 2026-08-28 instrument
+    # upgrade rotated the first 257 minutes to minutes.csv.old — same
+    # window, same clock.
+    # 2026-09-01: the line became a FAMILY (5 more pairs registered 08-30,
+    # TODO §0.75) but this counter still showed only SNDK, so from outside
+    # the site the extra recorders did not exist. The gate stays SNDK's
+    # (its clock started first and its verdict day is 09-04); the family
+    # count rides along in the note so the board stops understating the
+    # line — same shape as §0.86: work that exists but never surfaces.
+    def _count_csv(*parts) -> int:
         try:
-            with open(ROOT.parent / "entropy-arb" / "logs" / _fn,
+            with open(ROOT.parent.joinpath("entropy-arb", "logs", *parts),
                       encoding="utf-8") as fh:
-                arb_min += max(0, sum(1 for _ in fh) - 1)
+                return max(0, sum(1 for _ in fh) - 1)
         except Exception:
-            pass
+            return 0
+
+    arb_min = _count_csv("minutes.csv.old") + _count_csv("minutes.csv")
+    _fam = {p: _count_csv(p, "minutes.csv")
+            for p in ("NBIS", "ANTH", "BTC", "ZEC", "NEAR")}
+    _fam_live = {k: v for k, v in _fam.items() if v > 0}
     open_items.append({
         "id": "0.75", "line": "套利（第四線）", "title": "兩場館溢價錄製",
         "hypothesis": "SNDK 在 Entropy 與 Robinhood 鏈之間的溢價，扣費後有可交易的肉",
@@ -192,8 +203,12 @@ def build():
         "days": round(_days_since(datetime(2026, 8, 28, 10, 28,
                                            tzinfo=timezone.utc)), 1),
         "gate_days": 7,
-        "note": "判準已凍結（≥1bps 帶、日均≥10 次、兩半皆成立）；只錄不交易，"
-                "下單路徑未經審計前不碰錢",
+        "note": ("判準已凍結（≥1bps 帶、日均≥10 次、兩半皆成立）；只錄不交易，"
+                 "下單路徑未經審計前不碰錢"
+                 + (f"｜同判準的家族還有 {len(_fam_live)} 個配對在錄"
+                    f"（{'、'.join(_fam_live)}，各約 "
+                    f"{min(_fam_live.values())//60} 小時），"
+                    f"含 BTC 對照組——全部報告不挑" if _fam_live else "")),
     })
     settled = [
         # 2026-08-27 的一整輪:十二個候選、兩份 TradingView 指標、
