@@ -786,6 +786,22 @@ V7 或撤單流只要有**使用者看得到**的改動（新圖表、新指令�
 Vercel，分支是 **master** 不是 main）、**兩個 Telegram bot**。純研究腳本 /
 後端管線改動不適用。
 
+**網站文章（writeups）的管線與它的斷點（2026-09-01 補）**：`/writeups` 的
+內容**不是**手寫進網站的，它走這條線——
+
+```
+Desktop/linkedin_posts/*.docx        ← 授權格式（人寫的）
+  → assets/extract_for_site.py 的 ARTICLES 清單（**手動加一筆**）
+  → python assets/extract_for_site.py  → assets/site_writeups.json
+  → 複製到 ../product-site/content/writeups.json（封面圖進 public/writeups/）
+  → npm run build 驗證 → push origin **master**
+```
+
+**中間那個「手動加一筆」是實際發生過的斷點**：2026-09-01 發現 ep5/6/7
+三篇 docx 早就寫完、躺了六週沒上站，因為沒人把它們加進清單，而**網站看
+起來完全正常**（見 mistake.md 同日）。所以：**寫完一篇 docx 的當下就走完
+整條線**，不要留到「之後一起發」——那個「之後」沒有任何東西會提醒。
+
 ## 對外網站呈現面（product-site，2026-08-02 盤點）
 
 網站是三條策略**唯一的對外展示層**。資料一律走 agent-mcp 的 `/public/*`
