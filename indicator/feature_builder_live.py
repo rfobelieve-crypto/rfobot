@@ -691,6 +691,12 @@ def _inject_alt_historical(df: pd.DataFrame) -> None:
             logger.info("DVOL merged: 8 cols + spread")
 
 
+try:                                  # staleness limit for CG merges
+    from indicator.data_degradation import CG_MERGE_TOLERANCE as _CG_TOLERANCE
+except Exception:                      # guard module optional at import time
+    _CG_TOLERANCE = "6h"
+
+
 def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
     """Inject Coinglass features into df (in-place). Native 1h, use merge_asof."""
 
@@ -706,9 +712,18 @@ def _inject_coinglass(df: pd.DataFrame, cg_data: dict[str, pd.DataFrame]):
                 # Force same datetime precision (pandas 2.x preserves original unit)
                 left["dt"] = left["dt"].astype("datetime64[ns, UTC]")
                 right["dt"] = right["dt"].astype("datetime64[ns, UTC]")
+                # Staleness limit (2026-09-01): without a tolerance,
+                # merge_asof carries the last CG value forward FOREVER, so a
+                # multi-day outage feeds the model frozen constants — diffs
+                # become exactly 0 and z-scores drift to extremes as the
+                # rolling std collapses.  Past the tolerance the feature is
+                # NaN instead: XGBoost has a trained default branch for NaN
+                # and none for "frozen for three days".
+                # See indicator/data_degradation.py.
                 merged = pd.merge_asof(
                     left, right,
                     left_on="dt", right_on="dt", direction="backward",
+                    tolerance=pd.Timedelta(_CG_TOLERANCE),
                 ).set_index("dt")
                 df[target] = merged[target]
             else:

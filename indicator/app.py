@@ -436,6 +436,34 @@ def update_cycle() -> dict:
         if cg_fail == len(cg_status):
             logger.error("ALL Coinglass endpoints failed — many CG features will be NaN")
 
+        # 1b. Upstream-degradation guard (2026-09-01, indicator/
+        # data_degradation.py).  67% of the direction features are cg_*, and
+        # an outage is SILENT: cached parquet + merge_asof carry the last
+        # value forward, so diffs become 0 and z-scores drift to extremes.
+        # The recovery bar is worse still — a multi-day jump lands in one
+        # bar, and an extreme pred is a Strong signal by construction of
+        # rolling-percentile decoding.  So: alert on state change, and
+        # suppress signal publication while degraded AND for a silence
+        # window after recovery (same remedy as the 2026-08-11 retrain
+        # warm-up).  Never raises — the hot path must survive a broken guard.
+        _degrade = {"state": "OK", "suppress": False}
+        try:
+            from indicator import data_degradation as _dg
+            _degrade = _dg.assess(cg_status)
+            _msg = _dg.alert_text(_degrade)
+            if _msg:
+                try:
+                    _send_telegram_text(_msg)
+                except Exception as _e:
+                    logger.warning("degradation alert send failed: %s", _e)
+            with _lock:
+                _state["data_degradation"] = {
+                    k: _degrade.get(k) for k in
+                    ("state", "observed", "recovery_left", "n_failed",
+                     "n_total", "suppress", "asof")}
+        except Exception as _e:
+            logger.warning("degradation guard skipped: %s", _e)
+
         # 2. Build features for ALL fetched bars
         features = build_live_features(klines, cg_data, depth=depth, aggtrades=aggtrades,
                                        options_data=options_data,
@@ -539,6 +567,23 @@ def update_cycle() -> dict:
             _state["error"] = None
 
         # 7. Send to Telegram
+        # Degradation gate (see 1b): while the upstream is down — or during
+        # the post-recovery silence — a "signal" is an artefact of frozen or
+        # jumped features, and the product side would trade it with real
+        # money.  Charts/persistence above already ran; only publication is
+        # withheld, and the reason is logged so the silence is never
+        # mistaken for a quiet market.
+        if _degrade.get("suppress"):
+            logger.warning("SIGNAL SUPPRESSED — data state=%s (%d/%d CG "
+                           "endpoints failed, recovery_left=%s)",
+                           _degrade.get("state"), _degrade.get("n_failed", 0),
+                           _degrade.get("n_total", 0),
+                           _degrade.get("recovery_left"))
+            with _lock:
+                _state["last_update"] = datetime.now(timezone.utc).isoformat()
+                _state["status"] = f"ok (signal suppressed: {_degrade.get('state')})"
+            return
+
         direction = str(last_row.get("pred_direction", "?"))
         conf = float(last_row["confidence_score"]) if not _is_nan(last_row.get("confidence_score")) else 0
         strength = str(last_row.get("strength_score", "Weak"))
