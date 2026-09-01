@@ -129,6 +129,9 @@ REGISTRY = [
     ("arb recorder NEAR (§0.75)", "file",
      "../entropy-arb/logs/NEAR/minutes.csv", 1.0,
      "§0.75 family 2026-08-30: HL vs lighter-rh, thin"),
+    ("arb recorder HYPE (§0.75)", "file",
+     "../entropy-arb/logs/HYPE/minutes.csv", 1.0,
+     "§0.75 family 2026-09-01: largest funding gap in the snapshot"),
     # "glob" = stalest match (right when every file must stay fresh). The
     # scanner ROTATES daily, so yesterday's file is stale BY DESIGN — the
     # stalest rule makes this row permanently red, which trains the

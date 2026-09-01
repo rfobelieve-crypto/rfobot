@@ -55,6 +55,7 @@ PAIRS = [
     ("NBIS", "NBIS/minutes.csv", "Entropy io:NBIS", "lighter NBIS",         "stock perp"),
     ("ANTH", "ANTH/minutes.csv", "Entropy io:ANTH", "lighter-rh ANTHROPIC", "private-co perp, no spot anchor"),
     ("BTC",  "BTC/minutes.csv",  "HL BTC",          "lighter-rh BTC",       "CONTROL - band expected ~0"),
+    ("HYPE", "HYPE/minutes.csv", "HL HYPE",         "lighter-rh HYPE",      "thin crypto; largest funding gap on 09-01"),
     ("ZEC",  "ZEC/minutes.csv",  "HL ZEC",          "lighter-rh ZEC",       "thin crypto"),
     ("NEAR", "NEAR/minutes.csv", "HL NEAR",         "lighter-rh NEAR",      "thin crypto"),
 ]
@@ -80,7 +81,12 @@ def load(CSV):
     and are excluded from size/staleness statistics only.
     """
     rows = []
-    for fp in (Path(str(CSV) + ".old"), CSV):
+    # 2026-09-01: rotations are now TIMESTAMPED (minutes.csv.<ts>.old) so a
+    # second schema change cannot overwrite the first one's file. Glob every
+    # rotation, oldest first, then the live file — the clock is the union.
+    import glob as _glob
+    _olds = sorted(_glob.glob(str(CSV) + "*.old"))
+    for fp in [Path(x) for x in _olds] + [CSV]:
         if not fp.exists():
             continue
         with open(fp, newline="", encoding="utf-8") as fh:
@@ -96,6 +102,10 @@ def load(CSV):
                         "sell_age": _f(r, "sell_max_age_s"),
                         "buy_ntl": _f(r, "buy_max_notional_usd"),
                         "buy_age": _f(r, "buy_max_age_s"),
+                        # 2026-09-01 funding columns (blank on pre-patch rows)
+                        "f_e": _f(r, "fund_entropy_bps8h"),
+                        "f_h": _f(r, "fund_hedge_bps8h"),
+                        "f_d": _f(r, "fund_diff_bps8h"),
                     })
                 except (ValueError, KeyError):
                     continue
@@ -158,6 +168,33 @@ def instrument_stats(rows, side):
             "fat_prints": len(fat),
             "fat_median_notional_usd": round(ntl[len(ntl) // 2], 0),
             "fat_stale_gt5s": stale}
+
+
+def funding_stats(rows):
+    """Carry side of the ledger (2026-09-01).
+
+    The price spread pays only if it CONVERGES; the funding differential
+    pays for HOLDING. MOB's own Delta-Neutral card says as much ("the
+    funding spread is the return"). A snapshot cannot tell a stable carry
+    from a number that flips daily, so this reports the distribution and
+    the sign stability of diff = hedge - entropy (bps per 8h), plus the
+    annualised median. REPORT ONLY — no gate, no verdict: the frozen
+    2026-08-28 criteria are about the price spread and do not get amended
+    after the fact to cover a second payoff (that would be exactly the
+    post-hoc gate change the pre-registration exists to forbid).
+    """
+    vals = [r["f_d"] for r in rows if r.get("f_d") is not None]
+    if len(vals) < 30:
+        return None
+    vals_sorted = sorted(vals)
+    med = vals_sorted[len(vals_sorted) // 2]
+    pos = sum(1 for v in vals if v > 0) / len(vals)
+    return {"n": len(vals),
+            "median_bps_8h": round(med, 4),
+            "p10_bps_8h": round(vals_sorted[int(0.1 * len(vals_sorted))], 4),
+            "p90_bps_8h": round(vals_sorted[int(0.9 * len(vals_sorted))], 4),
+            "frac_positive": round(pos, 3),
+            "annualised_pct_at_median": round(med / 1e4 * 3 * 365 * 100, 2)}
 
 
 def side_stats(rows, key):
@@ -242,6 +279,14 @@ def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
                     print(f"    {lab} 最肥時刻深度中位 ${ins['fat_median_notional_usd']:,.0f}"
                           f"｜卡價(>5s) {ins['fat_stale_gt5s']}/{ins['fat_prints']}"
                           f"｜可捕獲 ≈ ${cap}/天（報告用，不進判準）")
+            f = funding_stats(rows)
+            if f:
+                res["interim"]["funding"] = f
+                print(f"    carry：資金費率差中位 {f['median_bps_8h']:+.3f} bps/8h"
+                      f"（年化 {f['annualised_pct_at_median']:+.1f}%）"
+                      f"｜同號比例 {f['frac_positive']*100:.0f}%"
+                      f"｜p10/p90 {f['p10_bps_8h']:+.2f}/{f['p90_bps_8h']:+.2f}"
+                      f"（n={f['n']}，報告用，不進判準）")
         res["status"] = "accumulating"
         print("  → 閘門未達，不出判決。")
         return res
