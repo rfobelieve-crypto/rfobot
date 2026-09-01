@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 # merge_asof staleness limit for Coinglass columns.
 CG_MERGE_TOLERANCE = os.environ.get("CG_MERGE_TOLERANCE", "6h")
 
-# Endpoint-failure thresholds (out of ~24 CG endpoints).
+# Endpoint-failure thresholds (CG_ENDPOINTS has 14 entries).
 DEGRADED_MIN_FAILED = 3          # a few flaky endpoints = degraded
 OUTAGE_FRACTION = 0.5            # half or more down = outage
 
@@ -133,6 +133,15 @@ def _ensure_table(cur) -> None:
             n_failed INT NOT NULL DEFAULT 0,
             n_total INT NOT NULL DEFAULT 0,
             failed_names TEXT NULL,
+            -- checked_at is written EXPLICITLY every cycle; updated_at only
+            -- moves when a value actually changes.  MySQL's ON UPDATE
+            -- CURRENT_TIMESTAMP does NOT fire when the new values are
+            -- identical to the old ones, so a healthy guard writing "OK, 0
+            -- failed" every hour leaves updated_at frozen at the last state
+            -- CHANGE — which reads exactly like a dead guard (2026-09-01:
+            -- it said 10:19 while the cycle had run at 13:00).  Liveness
+            -- needs its own column, always written.
+            checked_at DATETIME NULL,
             updated_at DATETIME NOT NULL
                 DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
@@ -166,13 +175,20 @@ def save_state(state: str, recovery_left: int, n_failed: int,
         try:
             with conn.cursor() as cur:
                 _ensure_table(cur)
+                try:                       # additive migration
+                    cur.execute("SELECT checked_at FROM "
+                                "data_degradation_state LIMIT 1")
+                except Exception:
+                    cur.execute("ALTER TABLE data_degradation_state "
+                                "ADD COLUMN checked_at DATETIME NULL")
                 cur.execute(
                     "INSERT INTO data_degradation_state (id, state, "
-                    "recovery_left, n_failed, n_total, failed_names) "
-                    "VALUES (1,%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE "
+                    "recovery_left, n_failed, n_total, failed_names, "
+                    "checked_at) "
+                    "VALUES (1,%s,%s,%s,%s,%s,NOW()) ON DUPLICATE KEY UPDATE "
                     "state=VALUES(state), recovery_left=VALUES(recovery_left), "
                     "n_failed=VALUES(n_failed), n_total=VALUES(n_total), "
-                    "failed_names=VALUES(failed_names)",
+                    "failed_names=VALUES(failed_names), checked_at=NOW()",
                     (state, int(recovery_left), int(n_failed), int(n_total),
                      ",".join(failed_names or [])[:2000]))
             conn.commit()

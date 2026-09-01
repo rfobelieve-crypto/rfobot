@@ -95,6 +95,13 @@ REGISTRY = [
      "prereg_clocks:updated_at", 2.5,
      "site research-progress board; a frozen board reads as 'no progress'"),
     # -- the cloud indicator service --
+    # The degradation guard's own liveness (2026-09-01). It writes
+    # checked_at every cycle even when nothing changed — a guard that only
+    # stamps state CHANGES looks dead whenever the system is healthy, which
+    # is exactly when you need to trust it.
+    ("degradation guard", "db",
+     "data_degradation_state:checked_at", 2.5,
+     "§0.85 guard ran this cycle (not just: state last changed)"),
     ("indicator bars", "db",
      "indicator_history:dt", 2.5,
      "V7 inference alive (the honest liveness witness)"),
