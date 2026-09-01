@@ -113,6 +113,36 @@ def test_short_key_refused(monkeypatch):
     assert security.sign({"a": 1}) is None
 
 
+def test_attach_signature_signs_body_bytes(monkeypatch):
+    """The signature target is the raw body — the exact bytes a verifier
+    receives — never a canonical re-serialization (Python/JS float
+    divergence: 100.0 vs 100 would break day one)."""
+    import hashlib as _hl
+    import hmac as _hm
+    monkeypatch.setenv("SIGNAL_SIGNING_KEY", "test-key-0123456789abcdef")
+
+    class FakeResp:
+        body = b'{"confidence":100.0,"direction":"UP"}'
+        headers = {}
+    r = FakeResp()
+    security.attach_signature(r)
+    want = _hm.new(b"test-key-0123456789abcdef", FakeResp.body,
+                   _hl.sha256).hexdigest()
+    assert r.headers["X-Signal-Signature"] == f"v1={want}"
+    assert "X-Signal-Signature" in r.headers["Access-Control-Expose-Headers"]
+
+
+def test_attach_signature_keyless_noop(monkeypatch):
+    monkeypatch.delenv("SIGNAL_SIGNING_KEY", raising=False)
+
+    class FakeResp:
+        body = b"{}"
+        headers = {}
+    r = FakeResp()
+    security.attach_signature(r)
+    assert "X-Signal-Signature" not in r.headers
+
+
 def test_actionable_feeds_attach_signature():
     src = SERVER.read_text(encoding="utf-8")
     assert src.count("security.attach_signature(") >= 4, (

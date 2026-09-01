@@ -131,9 +131,29 @@ def sign(payload) -> str | None:
         return None
 
 
-def attach_signature(resp, payload) -> None:
-    """Add X-Signal-Signature to an already-built response (no-op keyless)."""
-    s = sign(payload)
+def sign_bytes(body: bytes) -> str | None:
+    """HMAC-SHA256 over raw bytes. None when no key is configured."""
+    k = _key()
+    if k is None or not isinstance(body, (bytes, bytearray)):
+        return None
+    try:
+        return hmac.new(k, bytes(body), hashlib.sha256).hexdigest()
+    except Exception:
+        return None
+
+
+def attach_signature(resp, payload=None) -> None:
+    """Add X-Signal-Signature over the response's RAW BODY BYTES.
+
+    2026-09-01 (product-side review question): the signature target is the
+    exact bytes on the wire, NOT a canonical re-serialization. A canonical
+    scheme dies on day one to Python/JS float divergence (json.dumps(100.0)
+    -> "100.0", JSON.stringify(100.0) -> "100") and unicode-escaping
+    differences. The verifier simply HMACs the body it received and
+    compares — no re-encoding on either side. `payload` is kept in the
+    signature only for call-site compatibility; the body is authoritative.
+    """
+    s = sign_bytes(getattr(resp, "body", None))
     if s:
         resp.headers["X-Signal-Signature"] = f"v1={s}"
         # the header must survive CORS for a browser-side verifier
