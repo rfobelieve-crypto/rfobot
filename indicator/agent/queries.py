@@ -68,6 +68,35 @@ def public_arb_status() -> dict[str, Any]:
         conn.close()
 
 
+def public_ops_board() -> dict[str, Any]:
+    """Scheduled checks + their verdicts — written by research/
+    ops_board_publish.py. Read-only single row; no computation here.
+
+    Exists because the schedule lived in four disconnected places (Task
+    Scheduler, a .bat, the freshness board, a folder of reports), so
+    "is everything running and what did it decide" could only be answered
+    on the operator's own machine.
+    """
+    if _seed_mode():
+        return {"asof_utc": "2026-09-02 00:00", "jobs": [],
+                "freshness": {"rows": [], "reds": []}, "revalidations": [],
+                "disclaimer": DISCLAIMER, "_source": "seed"}
+    from shared.db import get_db_conn
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT payload, checked_at FROM ops_board WHERE id=1")
+            row = cur.fetchone()
+        if not row:
+            return {"error": "no ops board row yet"}
+        data = json.loads(row["payload"])
+        ca = row.get("checked_at")
+        data["published_utc"] = ca.strftime("%Y-%m-%dT%H:%M:%SZ") if ca else None
+        return data
+    finally:
+        conn.close()
+
+
 def _data_state() -> str:
     """Feature-pipeline health, read from the quant side's state table.
 

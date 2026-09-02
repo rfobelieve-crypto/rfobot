@@ -1045,6 +1045,36 @@ def _prereg_payload() -> dict:
     return data
 
 
+_ops_cache: dict = {"data": None, "ts": 0.0}
+_OPS_CACHE_TTL_S = 300.0
+
+
+@mcp.custom_route("/public/ops-board", methods=["GET"])
+async def public_ops_board_route(request: Request) -> JSONResponse:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
+    # Scheduled checks, artifact freshness, and every revalidation verdict.
+    # The operational record the site had no surface for: aliveness is
+    # judged by artifact age (never a scheduler's status light), and every
+    # monthly verdict is listed — including the ones that refused to judge
+    # on stale data. Read-only relay of ops_board_publish.py's row.
+    now = time.monotonic()
+    if (_ops_cache["data"] is None
+            or now - _ops_cache["ts"] > _OPS_CACHE_TTL_S):
+        try:
+            data = await anyio.to_thread.run_sync(queries.public_ops_board)
+        except Exception as e:  # noqa: BLE001 — degrade, never crash
+            data = {"error": f"ops board unavailable: {type(e).__name__}"}
+        _ops_cache["data"] = data
+        _ops_cache["ts"] = now
+    payload = _ops_cache["data"]
+    resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 _arb_cache: dict = {"data": None, "ts": 0.0}
 _ARB_CACHE_TTL_S = 300.0
 

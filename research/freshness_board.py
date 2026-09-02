@@ -91,6 +91,9 @@ REGISTRY = [
     ("raid outcomes row", "db",
      "raid_outcomes:updated_at", 2.5,
      "skip-vs-taken scoring surface; silent staleness = consumer silently scores against stale outcomes"),
+    ("ops board row", "db",
+     "ops_board:checked_at", 2.5,
+     "operations surface (schedule + revalidation history) for the site"),
     ("arb status row", "db",
      "arb_status:checked_at", 2.5,
      "§0.75 family surface for the site (off-cloud recorder -> DB -> agent)"),
@@ -158,6 +161,25 @@ REGISTRY = [
     ("daily collect log", "file",
      "research/results/daily_collect.log", 30.0,
      "04:00 daily task heartbeat"),
+    # 2026-09-02: the board never watched ITSELF. If the 6-hourly task
+    # stopped, every row below would freeze at its last good value and the
+    # panel would keep showing green — the exact failure this file exists
+    # to catch, applied to the file itself (quis custodiet). Its own JSON
+    # output is the artifact.
+    ("freshness board self", "file",
+     "research/results/freshness_board.json", 7.0,
+     "the board's own 6-hourly run — nothing else watches the watchman"),
+    # -- monthly --
+    # The revalidation is the only periodic check of the model's SCALE
+    # (rank metrics are blind to level drift — mistake.md 2026-08-08, which
+    # went unnoticed for three months). 35 days = one month plus slack.
+    # glob_newest, not glob: reports ACCUMULATE, so the stalest match is
+    # June's and always will be. Same trap as the arb scanner's daily
+    # rotation (2026-09-01) — "stalest" is right only when every file must
+    # stay fresh.
+    ("revalidation report", "glob_newest",
+     "research/results/dual_model/quarterly_revalidation_*.md", 840.0,
+     "monthly model revalidation actually produced a report"),
     # -- weekly --
     ("portfolio clocks", "file",
      "research/results/portfolio_clocks.log", 195.0,

@@ -56,3 +56,7 @@ REM The recorder runs off-cloud, so a cloud route cannot compute this
 REM -- 4th instance of that fix family. Money figures stripped by the
 REM writer; the public page carries percentages and time only.
 python research\arb_publish.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-09-02: operations board -- every scheduled check and every
+REM revalidation verdict on one public surface (the schedule lived in
+REM four disconnected places until now).
+python research\ops_board_publish.py >> research\results\sweep_shadow_run.log 2>&1

@@ -43,6 +43,9 @@ Files under `indicator/agent/` MUST NOT import, at any depth:
   done. Scoring their realised fills against research-side numbers
   instead is the asymmetry that made blocked signals read 4.3x better,
   TODO §0.62 — this table puts both arms on one ruler),
+  `ops_board` (scheduled checks + revalidation history, 2026-09-02 —
+  WRITTEN by `research/ops_board_publish.py` hourly; aliveness is artifact
+  age, never a scheduler light),
   `arb_status` (§0.75 arbitrage family, 2026-09-01 — WRITTEN by
   `research/arb_publish.py` hourly. The recorder runs off-cloud on the
   operator's machine, so a cloud route cannot compute this; dollar figures
