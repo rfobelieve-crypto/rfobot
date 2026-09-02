@@ -114,6 +114,40 @@ def main() -> int:
     log(f"- Spearman IC = {ic:+.4f}  (baseline {BASELINE_IC:+.2f})")
     log(f"- n_oos = {len(oos)}\n")
 
+    # ── 1b. Signal-to-noise ratio, WITH its null floor ───────────────────
+    # SNR = Var(mu)/Var(eps) = R²/(1-R²), computed straight from the
+    # pred-vs-realised correlation (no latent-variable estimation needed
+    # when you have the predictions). Reported ONLY alongside a shuffle
+    # null: an SNR without its floor is worse than no number — the rolling
+    # mean estimator commonly recommended for this returns ~1/(k+1) on pure
+    # noise (4.8% at k=20), which is larger than this edge. Registered
+    # 2026-09-02; see research/snr_monitor.py for the full rationale.
+    # This is a TIMING diagnostic (its numerator is the variance of the
+    # conditional expectation), never a sizing input.
+    try:
+        from research.snr_monitor import snr_from_corr, shuffle_null
+        _p = oos["pred_ret"].to_numpy(float)
+        _y = oos["y"].to_numpy(float)
+        _snr_p = snr_from_corr(float(np.corrcoef(_p, _y)[0, 1]))
+        _snr_s = snr_from_corr(float(pd.Series(_p).corr(pd.Series(_y),
+                                                        method="spearman")))
+        _null = shuffle_null(_p, _y, n=200)
+        log("## 1b. Signal-to-noise (with shuffle null)")
+        log(f"- SNR(Pearson)  = {_snr_p*100:.3f}%")
+        log(f"- SNR(Spearman) = {_snr_s*100:.3f}%")
+        log(f"- shuffle null: mean {_null['mean']*100:.3f}% / "
+            f"p95 {_null['p95']*100:.3f}% / p99 {_null['p99']*100:.3f}%")
+        if max(_snr_p, _snr_s) <= _null["p99"]:
+            log("- → BELOW the shuffle null's p99 — this reading is not "
+                "evidence on its own")
+            flags.append("SNR at/below shuffle null p99")
+        else:
+            log("- → above the null, edge present but thin (expected: this "
+                "is a 4h direction edge, not a mispricing)")
+        log("")
+    except Exception as _e:
+        log("## 1b. Signal-to-noise — UNAVAILABLE: " + str(_e)[:100])
+
     # ── 2. Recent IC decay ───────────────────────────────────────────────
     log("## 2. Recent IC decay (concept-drift check)")
     by_month = []
