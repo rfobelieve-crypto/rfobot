@@ -1,0 +1,15 @@
+{
+  "variant": "A",
+  "universe": "core9",
+  "freeze": "2026-07-28",
+  "n": 292,
+  "gate_n": 1400,
+  "mean_r": 0.0446,
+  "wr": 59.9,
+  "ci_low": -0.0897,
+  "ci_high": 0.1713,
+  "pos": 5,
+  "pos_of": 9,
+  "status": "accumulating",
+  "asof_utc": "2026-09-02T11:16:35Z"
+}

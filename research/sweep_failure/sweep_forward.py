@@ -116,6 +116,7 @@ try:
 except Exception:
     pass
 
+import json                        # noqa: E402
 import math                        # noqa: E402
 import random                      # noqa: E402
 
@@ -254,10 +255,30 @@ def main() -> int:
         print(f"  pool   n={st['n']:>4}  meanR={st['mean']:+8.4f}  WR={st['wr']:.0f}%  "
               f"clustered-CI95[{lo:+.4f},{hi:+.4f}]  positive {pos}/9")
         if ts0 == FREEZE_TS:
+            at_floor = st['n'] >= GATE_N
+            status = ('PASS' if (at_floor and lo > 0 and pos >= 6)
+                      else 'FAIL' if at_floor else 'accumulating')
             print(f"\n  Gate F progress: n={st['n']}/{GATE_N}"
                   f"  |  clustered CI-low>0: {'YES' if lo > 0 else 'no'}"
                   f"  |  >=6/9 positive: {'YES' if pos >= 6 else 'no'}"
-                  f"  ->  {'PASS' if (st['n'] >= GATE_N and lo > 0 and pos >= 6) else 'accumulating'}")
+                  f"  ->  {status}")
+            # 2026-09-02: this scorer OWNS the formal-track (variant A) number.
+            # The prereg board reads this artifact instead of re-counting the
+            # CSV itself (mistake.md 2026-08-26: a second implementation
+            # silently disagrees). Refreshes only when this script runs
+            # (monthly on the 5th, or by hand) -- the board says so.
+            out = Path(__file__).resolve().parents[1] / "results" / "sweep_forward_gate.json"
+            art = {
+                "variant": "A", "universe": "core9", "freeze": "2026-07-28",
+                "n": int(st["n"]), "gate_n": GATE_N,
+                "mean_r": round(float(st["mean"]), 4), "wr": round(float(st["wr"]), 1),
+                "ci_low": round(float(lo), 4), "ci_high": round(float(hi), 4),
+                "pos": int(pos), "pos_of": len(SYMS), "status": status,
+                "asof_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+            with open(out, "w", encoding="utf-8", newline="\n") as fh:
+                json.dump(art, fh, ensure_ascii=False, indent=2)
+            print(f"  artifact -> {out}")
     return 0
 
 

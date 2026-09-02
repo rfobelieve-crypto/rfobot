@@ -76,6 +76,10 @@ def _n_gate_f(rows):
     docstring warns about, committed inside the file that warns about it.
     If this number ever stops matching the hourly log's B-row, THIS is
     wrong, not the log.
+
+    2026-09-02: variant B was judged FAIL at n=1428 and moved to the settled
+    list, so this count no longer drives an open row. Kept as the log-parity
+    reference; do not resurrect the open row from it.
     """
     return sum(1 for r in rows if r.get("variant_b") == "1"
                and r.get("status") == "CLOSED")
@@ -111,6 +115,7 @@ def build():
     rows = _shadow_rows()
     q2 = _json("v7_regime_q2_clock.json") or {}
     veto = _json("v7_veto_clock.json") or {}
+    gf = _json("sweep_forward_gate.json") or {}   # variant A, owned by sweep_forward.py
     open_items = [
         {
             "id": "0.59", "line": "流動性獵取", "title": "regime 進場濾網",
@@ -142,14 +147,24 @@ def build():
             "note": "看板主數字是已結算的；剛開火的訊號要等約 4 小時才會動",
         },
         {
-            "id": "Gate F", "line": "流動性獵取", "title": "變體 B 前瞻驗證",
-            "hypothesis": "掃單失敗的 edge 在前瞻樣本上仍為正",
-            "why": "回測的 t=8.27 是滑價符號寫反造成的假象，修正後只剩 t=3.35",
-            "registered": "2026-07-28", "source": "count",
-            "n": _n_gate_f(rows), "gate_n": 1400,
+            # 2026-09-02: variant B judged FAIL (see settled). The formal track
+            # (variant A, no filter, core9, frozen 2026-07-28) is what is still
+            # running. Its number comes from the sweep_forward.py artifact --
+            # that scorer owns it, this file only displays it; it refreshes when
+            # the scorer runs (monthly on the 5th or by hand), not hourly.
+            "id": "Gate F·A", "line": "流動性獵取",
+            "title": "正式軌道前瞻驗證（無濾網·core9）",
+            "hypothesis": "掃單失敗的 edge 在前瞻樣本上仍為正（規則凍結 2026-07-28）",
+            "why": "變體 B（＋淺穿越濾網）09-02 判 FAIL，濾網路線作廢；只剩無濾網的正式軌道",
+            "registered": "2026-07-28", "source": "json",
+            "n": gf.get("n", 0), "gate_n": gf.get("gate_n", 1400),
             "days": round(_days_since(datetime(2026, 7, 28, tzinfo=timezone.utc)), 1),
             "gate_days": None,
-            "note": "判決日附件必須分格報告——主場失效與非主場拖累的後續不同",
+            "ci_low": gf.get("ci_low"), "mean_r": gf.get("mean_r"),
+            "pos": gf.get("pos"), "pos_of": gf.get("pos_of"),
+            "scored_at": gf.get("asof_utc"),
+            "note": "數字由判決程式每月 5 號（或手動）計分時產出，不是每小時更新；"
+                    "約 8 筆/天，1400 筆預計 2027-01 中到期",
         },
         {
             "id": "0.52", "line": "縮帆（風控）", "title": "ADX 趨勢環境減碼",
@@ -316,6 +331,12 @@ def build():
          "verdict": "已定案", "tone": "warn",
          "text": "近期訊號準度下滑，拆解後組成效應僅 −0.1pp、格內效應 −6.3pp。"
                  "主場不但沒退還變好，崩的是非主場——與獵取同構。"},
+        {"id": "Gate F", "line": "流動性獵取", "title": "變體 B 前瞻驗證 FAIL",
+         "verdict": "已陣亡", "tone": "dead",
+         "text": "2026-09-02 判決（n=1428/1400）：日聚類 CI 下緣 −0.094、"
+                 "meanR −0.010、勝率 55.8%、15/29 幣正 → FAIL。"
+                 "C（767/400）、D（371/400）建立在 B 之上，連坐作廢。"
+                 "不做 B′、不挑子集重判；正式軌道 A 繼續累積。"},
         {"id": "撤單流", "line": "撤單流", "title": "方向性判決 FAIL",
          "verdict": "已陣亡", "tone": "dead",
          "text": "三個方向性檢定全滅，bar 級的方向領先主張到此為止。"

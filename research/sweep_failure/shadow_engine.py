@@ -840,11 +840,21 @@ def gate_stats(log: dict, cohort=None) -> dict:
         means.append(acc / cnt)
     means.sort()
     lo = means[50]
-    ok = n >= GATE_N and lo > 0
+    # Status is a classification of the frozen arithmetic above, nothing
+    # more.  Once the floor is reached the clock has run out: CI-low > 0 is
+    # PASS, otherwise FAIL (variant B: 2026-09-02, n=1428, CI-low -0.094,
+    # TODO §0.92).  Below the floor it is still accumulating — the verdict
+    # is only ever read at the floor, never "so far".
+    if n >= GATE_N and lo > 0:
+        status = "PASS"
+    elif n >= GATE_N:
+        status = "FAIL"
+    else:
+        status = "accumulating"
     return {"n_closed": n, "n_open": n_open, "floor": GATE_N,
             "mean_r": round(mean, 4), "ci_low": round(lo, 4),
             "wr_pct": round(100 * sum(1 for x in rs if x > 0) / n, 1),
-            "status": "PASS" if ok else "accumulating"}
+            "status": status}
 
 
 def gate_progress(log: dict) -> str:
@@ -853,14 +863,18 @@ def gate_progress(log: dict) -> str:
     if s["n_closed"] == 0:
         return "Variant B: 0/%d (no closed signals yet)" % GATE_N
     out = (f"Variant B: n={s['n_closed']}/{s['floor']} meanR={s['mean_r']:+.4f} "
-           f"clustered-CI-low={s['ci_low']:+.4f} -> "
-           f"{'PASS' if s['status'] == 'PASS' else 'accumulating'}")
+           f"clustered-CI-low={s['ci_low']:+.4f} -> {s['status']}")
     # C/D on their own clock and their own floor (TODO §0.44).  The pre-clock
     # rows are shown only as `base`, never mixed into the scored figure —
     # printing the pooled number made both look through the bar while their
     # true-forward CI was deeply negative.
+    # 連坐: A ⊃ B ⊃ C ⊃ D (TODO §0.43) — once B has failed at its floor the
+    # C/D clocks are void.  Their numbers keep printing so they stay
+    # auditable; only the label changes.
+    void = " [作廢·連坐 B FAIL 2026-09-02]" if s["status"] == "FAIL" else ""
     for label, pred in (("C(B∧收回)", is_variant_c),
                         ("D(C∧量能高)", is_variant_d)):
+        label += void
         st = gate_stats(log, _since_cd_clock(pred))
         base = gate_stats(log, pred)["n_closed"] - st["n_closed"]
         if st["n_closed"]:
