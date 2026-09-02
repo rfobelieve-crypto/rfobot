@@ -190,10 +190,68 @@ def build():
         except Exception:
             return 0
 
-    arb_min = _count_csv("minutes.csv.old") + _count_csv("minutes.csv")
-    _fam = {p: _count_csv(p, "minutes.csv")
-            for p in ("NBIS", "ANTH", "BTC", "ZEC", "NEAR")}
+    def _count_pair(*dirs) -> int:
+        """Live file + EVERY rotation.
+
+        2026-09-01 the recorder's rotation became TIMESTAMPED
+        (minutes.csv.<ts>.old) so a second schema change could not overwrite
+        the first one's data — and this counter, which only knew the literal
+        ".old" name, promptly dropped from ~6,000 to 914. That is
+        mistake.md 2026-08-29 verbatim (rotate a file, a downstream counter
+        silently restarts from a smaller number), committed in the same
+        session that fixed the rotation. Glob, never a literal name.
+        """
+        import glob as _g
+        base = ROOT.parent.joinpath("entropy-arb", "logs", *dirs, "minutes.csv")
+        n = _count_csv(*dirs, "minutes.csv")
+        for f in _g.glob(str(base) + "*.old"):
+            try:
+                with open(f, encoding="utf-8") as fh:
+                    n += max(0, sum(1 for _ in fh) - 1)
+            except Exception:
+                pass
+        return n
+
+    arb_min = _count_pair()
+    _fam = {p: _count_pair(p)
+            for p in ("NBIS", "ANTH", "BTC", "ZEC", "NEAR", "HYPE")}
     _fam_live = {k: v for k, v in _fam.items() if v > 0}
+    # §0.91 in-venue basis (registered 2026-09-02, product-side request).
+    # Counting FORWARD rows only: the 180-day backfill is prior context and
+    # must never move this number, or the clock would start life "full".
+    _basis_n = _basis_gate = 0
+    try:
+        from shared.db import get_db_conn as _gdb
+        _c = _gdb()
+        try:
+            with _c.cursor() as _cur:
+                _cur.execute("SELECT COUNT(*) n FROM basis_obs "
+                             "WHERE ts_received >= %s AND is_verdict=1",
+                             (int(datetime(2026, 9, 2,
+                                           tzinfo=timezone.utc).timestamp() * 1000),))
+                _basis_n = int((_cur.fetchone() or {}).get("n") or 0)
+        finally:
+            _c.close()
+        # 2 symbols x 6 per hour x 24 x 28 days
+        _basis_gate = 2 * 6 * 24 * 28
+    except Exception:
+        pass
+    if _basis_gate:
+        open_items.append({
+            "id": "0.91", "line": "套利（第四線）",
+            "title": "站內資金費收租分佈",
+            "hypothesis": "Bitget 現貨多＋永續空，BTC/ETH 結算資金費年化"
+                          "中位 ≥8% 且翻負時段 <25%",
+            "why": "永續與現貨是同一標的的兩個價，資金費就是那個價差的定價"
+                   "——不需要預測任何東西",
+            "registered": "2026-09-02", "source": "count",
+            "n": _basis_n, "gate_n": _basis_gate,
+            "days": round(_days_since(datetime(2026, 9, 2,
+                                               tzinfo=timezone.utc)), 1),
+            "gate_days": 28,
+            "note": "判準凍結後才拉 180 天回填：回填只作背景不判決（它的中位"
+                    "已低於門檻，但那不是這個窗口的答案）；只錄不交易",
+        })
     open_items.append({
         "id": "0.75", "line": "套利（第四線）", "title": "兩場館溢價錄製",
         "hypothesis": "SNDK 在 Entropy 與 Robinhood 鏈之間的溢價，扣費後有可交易的肉",

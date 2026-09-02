@@ -60,3 +60,8 @@ REM 2026-09-02: operations board -- every scheduled check and every
 REM revalidation verdict on one public surface (the schedule lived in
 REM four disconnected places until now).
 python research\ops_board_publish.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-09-02 (TODO 0.91): Bitget in-venue basis observation.
+REM Spot-long + perp-short funding carry; verdict 2026-09-30, the
+REM scorer refuses to judge before then.
+python research\arb\basis_recorder.py >> research\results\sweep_shadow_run.log 2>&1
+python research\arb\basis_verdict.py >> research\results\sweep_shadow_run.log 2>&1
