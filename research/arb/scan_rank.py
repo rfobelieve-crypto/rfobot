@@ -57,11 +57,26 @@ except Exception:
     pass
 
 
+# Every Bitget row recorded before this instant carries a depth that is wrong
+# by a factor of 1/sizeMultiplier (10,000x for BTC, 100x for XAUT): the scanner
+# treated Bitget's minimum size STEP as a contract value, though its book is
+# quoted in base coin. Dropping those rows is an INSTRUMENT correction, not a
+# criterion change — the metric below is byte-for-byte the one frozen on
+# 2026-08-30. Keeping them would blend two units into one median.
+BITGET_DEPTH_FIX_TS = 1788432000   # 2026-09-03 19:20 UTC, scanner restart
+
+
 def load() -> pd.DataFrame:
     files = sorted(glob.glob(str(SCAN / "scan_*.csv")))
     if not files:
         return pd.DataFrame()
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
+    bad = (((df.leg_a == "bitget") | (df.leg_b == "bitget"))
+           & (df.ts < BITGET_DEPTH_FIX_TS))
+    if bad.any():
+        print(f"  （丟棄 {int(bad.sum()):,} 筆修正前的 Bitget 列——深度單位錯 "
+              f"{'，'.join(sorted(df.loc[bad, 'pair'].unique()[:3]))} 等）")
+        df = df[~bad]
     return df.sort_values("ts").reset_index(drop=True)
 
 
