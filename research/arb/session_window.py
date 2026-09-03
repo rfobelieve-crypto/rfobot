@@ -205,6 +205,72 @@ def main() -> int:
     res["verdict"] = ("存活：登記變體 W，從今天起錄" if all(bars.values())
                       else "陣亡：時段條件化在這批資料上不成立，不開時鐘")
     print(f"  → {res['verdict']}")
+
+    # ── v2: two INSTRUMENT defects found after the v1 run (2026-09-04) ──
+    # Disclosed, not swapped in: the v1 bars above stay as registered and
+    # their verdict stands. This block exists because mistake.md 2026-08-02
+    # says a result that contradicts a plausible mechanism gets its
+    # instrument checked before it gets interpreted, and two defects were
+    # real:
+    #   (a) OPEN/OFF pooled Saturday and Sunday. The mechanism is a US cash
+    #       open; on weekends there is none, so weekend minutes inside the
+    #       13:30-15:30 slot are OFF-like by construction and dilute OPEN.
+    #       A window "by mechanism" should have excluded them. Instrument
+    #       error, not a finding.
+    #   (b) P3 sized the band on executable room (sell_max/buy_max p90 of the
+    #       window, 6-20 bps) but the frozen convergence() detects episodes
+    #       on premium_mean deviations from its midline -- a different scale.
+    #       The all-day verdict band (2-15 bps) yields hundreds of episodes;
+    #       the window band yielded 0-1, so P3 was UNINFORMATIVE, not failed.
+    #       The consistent test: take the verdict's OWN episodes (all-day
+    #       band, frozen scorer) and ask what share of those that START in
+    #       OPEN converge.
+    # Same selection data, so v2 can only decide whether a forward clock is
+    # worth opening -- exactly what v1 could decide, no more.
+    print("\nv2 儀器修正（探索；v1 判準與判決不動）：只算平日、P3 改用判決自己的偏離事件")
+    res["v2"] = {}
+    for pid, sub, a, b, note in PAIRS:
+        rows = PV.load(PV.LOGS / sub)
+        if not rows:
+            continue
+        wk = [r for r in rows if datetime.fromtimestamp(r["ts"], timezone.utc).weekday() < 5]
+        byw = defaultdict(list)
+        for r in wk:
+            byw[win_of(r["ts"])].append(r)
+        o, f = byw.get("OPEN", []), byw.get("OFF", [])
+        if not o or not f:
+            continue
+        ratio = max(p90([x["sell_max"] for x in o]), p90([x["buy_max"] for x in o])) / max(
+            p90([x["sell_max"] for x in f]), p90([x["buy_max"] for x in f]))
+        byday = defaultdict(lambda: {"OPEN": [], "OFF": []})
+        for r in wk:
+            w = win_of(r["ts"])
+            if w in ("OPEN", "OFF"):
+                byday[datetime.fromtimestamp(r["ts"], timezone.utc).date().isoformat()][w].append(
+                    max(r["sell_max"], r["buy_max"]))
+        days = [(d, p90(v["OPEN"]), p90(v["OFF"])) for d, v in sorted(byday.items())
+                if len(v["OPEN"]) >= 60 and len(v["OFF"]) >= 60]
+        wins = sum(1 for _, x, y in days if x > 2 * y)
+        conv = {}
+        for key, lab in (("sell_max", "sell"), ("buy_max", "buy")):
+            band = max(p90([x[key] for x in rows]), PV.NET_BPS_MIN)     # the verdict's band
+            c = PV.convergence(rows, band, with_starts=True)
+            eps = c.get("starts", [])
+            in_open = [(t, m) for t, m in eps if win_of(t) == "OPEN"
+                       and datetime.fromtimestamp(t, timezone.utc).weekday() < 5]
+            ok = sum(1 for _, m in in_open if m is not None and m <= PV.CONV_MAX_MIN)
+            conv[lab] = {"band": round(band, 2), "all_episodes": len(eps), "open_episodes": len(in_open),
+                         "open_converged": ok, "open_frac": round(ok / len(in_open), 2) if in_open else None,
+                         "open_share": round(len(in_open) / len(eps), 2) if eps else None}
+        res["v2"][pid] = {"open_off_ratio_weekday": round(ratio, 2), "days": days,
+                          "days_open_gt_2x_off": wins, "conv": conv}
+        print(f"  [{pid}] 平日 OPEN/OFF 帶寬比 {ratio:.2f}x｜逐日 "
+              + " ".join(f"{d[5:]} {x:.1f}/{y:.1f}" for d, x, y in days)
+              + f" → >2× 的天數 {wins}/{len(days)}")
+        for lab, c in conv.items():
+            print(f"        {lab}: 判決帶 {c['band']:.2f}，全部偏離 {c['all_episodes']} 次，其中平日 OPEN 起始 "
+                  f"{c['open_episodes']} 次（佔 {c['open_share']}），收斂 {c['open_converged']}"
+                  f"（{c['open_frac']}）")
     OUT.write_text(json.dumps(res, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
     print(f"\n  -> {OUT}")
     return 0
