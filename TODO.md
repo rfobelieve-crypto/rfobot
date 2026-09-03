@@ -860,9 +860,13 @@ EQUITY）。近 21 天 Binance 上了 **34 個**這類合約。所以 CoinGecko 
 Hyperliquid 三星 0.93%」的配對**可以重現**，而且 Binance 是本線缺的最大一個場館。
 教訓同 mistake.md 2026-09-03 Bitget 單位那條：**「查了沒有」的查詢要先問它看不看
 得到目標**——我用一個把它排除在外的篩子去找它。
-- [ ] Binance `TRADIFI_PERPETUAL` 接進掃描器（universe：`fapi/v1/exchangeInfo` 篩
-      `contractType` 含 PERPETUAL；簿口：`fapi/v1/depth`，量以幣計；費率：標準 5 bps
-      taker／2 bps maker，無返佣，先當未查證）
+- [x] **Binance 接進掃描器（2026-09-04，entropy-arb 本機倉）**：714 個市場，其中
+      **188 個 TradFi 永續**（AAPL/AMZN/ASML/ANTHROPIC/SAMSUNGEM/KODEX200/HK0625…）。
+      簿口單位以真實簿驗過：BTCUSDT 頂檔 **$1.02M**（最深的簿，合理）；新股票永續
+      很薄——GPRO $113、SAMSUNGEM $230、KODEX200 $11。踩到一個小坑：`depth` 的 limit
+      只收 {5,10,20,50,…}，我們的 25 會回錯誤 JSON、看起來像「沒簿」——修成取
+      ≥25 的最小合法值再截斷。掃描器已重啟；§1.03 的 BIG 分級加入 binance。
+      費率先用標準 5/2 bps、無返佣、標未查證。
 
 ### 1.03 套利·大所 vs 小所（2026-09-04 預註冊，使用者：「先做這個」）——外部報告的可檢驗版本
 

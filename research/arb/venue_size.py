@@ -66,7 +66,7 @@ except Exception:
     pass
 
 OUT = HERE.parents[1] / "research" / "results" / "arb_venue_size.json"
-BIG = {"okx", "bitget"}
+BIG = {"okx", "bitget", "binance"}   # binance added 2026-09-04 once its 188 TradFi perps were found
 LEVERAGED = re.compile(r"(CSOP|[0-9]+[LS]$|2L|3L|2S|3S)", re.I)
 MIN_ROWS = 200
 BAR_P1 = 3.0
