@@ -130,8 +130,12 @@ def _scan_block() -> dict | None:
     d = json.loads(SCAN.read_text(encoding="utf-8"))
     ctrl = d.get("control_band_bps")
     promote = set(d.get("promote") or [])
+    # `top` is the full ranking; only `eligible` passed the per-pair sample
+    # threshold. Without this a pair with 270 quotes read "掃描中" beside one
+    # with 2,700 — the same label for "in the running" and "not yet counted".
+    min_n = d.get("min_samples") or 0
     rows = []
-    for r in (d.get("top") or [])[:20]:
+    for r in (d.get("top_sampled") or d.get("top") or [])[:20]:
         band = r.get("band_bps")
         la, lb = _legs(r.get("pair") or "")
         need = round(FEES.required_band_bps(la, lb), 2)
@@ -154,7 +158,9 @@ def _scan_block() -> dict | None:
             "depth_tier": _depth_tier(r.get("depth_usd")),
             "samples": r.get("n"),
             "stage": ("升格候選" if r.get("pair") in promote else
-                      "掃描中" if d.get("gate_ok") else "資料未滿"),
+                      "資料未滿" if (not d.get("gate_ok")
+                                     or (r.get("n") or 0) < min_n) else
+                      "掃描中"),
         })
     return {
         "asof_utc": d.get("asof_utc"),
@@ -163,6 +169,7 @@ def _scan_block() -> dict | None:
         "pairs": d.get("pairs"),
         "gate_ok": d.get("gate_ok"),
         "control_band_bps": ctrl,
+        "pending_pairs": d.get("pending_pairs"),
         "rows": rows,
         "fees": FEES.table(),
         "fee_rule": "一筆抓半個帶，進出各跨兩腿 → 需要的帶 = 4 ×（兩腿費率）。"
@@ -184,7 +191,9 @@ def _scan_block() -> dict | None:
             {"step": "小額實盤", "state": "未做",
              "means": "回測與錄製都過了也只是紙上；斷腿與真實成交才算數"},
         ],
-        "caveat": "本板是「找戰場」，不是「已賺到」。帶寬與次數是掃描期的"
+        "caveat": "本板只列樣本數已達門檻的配對；剛加進來的場館要累積約 3 天"
+                  "才會出現（帶寬是分位數，十幾筆報價算出來的帶是雜訊）。"
+                  "本板是「找戰場」，不是「已賺到」。帶寬與次數是掃描期的"
                   "觀察，深度只給分級；排序用的可捕獲金額不出現在公開頁。"
                   "任何一列都還沒過收斂關、沒查費率、沒有實盤成交。",
     }

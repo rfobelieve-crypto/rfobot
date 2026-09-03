@@ -152,9 +152,25 @@ def main() -> int:
         print("  升格後從該配對自己的首列起算 7 天；掃描期資料不進判決。")
     out = {"asof_utc": now.strftime("%Y-%m-%d %H:%M"), "span_days": round(span, 2),
            "quotes": int(len(df)), "pairs": int(df.pair.nunique()),
+           # Published so the board can say "this row has not met the sample
+           # threshold" per pair. `top` is the whole ranking, unfiltered — the
+           # sample gate applies to `eligible`, and a reader looking at one row
+           # cannot tell the difference without this number.
+           "min_samples": MIN_SAMPLES,
            "gate_ok": gate_ok, "control_band_bps": ctrl_band,
            "promote": promote,
-           "top": tab.head(30).drop(columns=["sell", "buy"]).to_dict("records")}
+           # `top` = the ranking exactly as the frozen metric orders it, kept
+           # whole so the ordering stays auditable. `top_sampled` = the same
+           # ranking restricted to pairs that have met the sample threshold,
+           # which is what a board should show: after the CEX legs joined, a
+           # 14-quote pair with a deep book outranked 2,700-quote pairs and
+           # filled 19 of the 20 published rows with noise. Filtering the
+           # DISPLAY is not filtering the metric — promotion still reads
+           # `eligible`, and `pending_pairs` says how many are still counting.
+           "pending_pairs": int((tab.n < MIN_SAMPLES).sum()),
+           "top": tab.head(30).drop(columns=["sell", "buy"]).to_dict("records"),
+           "top_sampled": (tab[tab.n >= MIN_SAMPLES].head(30)
+                           .drop(columns=["sell", "buy"]).to_dict("records"))}
     OUT.write_text(json.dumps(out, indent=1, ensure_ascii=False, default=str),
                    encoding="utf-8")
     return 0
