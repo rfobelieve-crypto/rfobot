@@ -30,6 +30,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+from research.arb import fees as FEES  # noqa: E402  (single source of fee truth)
 SRC = ROOT / "research" / "results" / "arb_premium_verdict.json"
 SCAN = ROOT / "research" / "results" / "arb_scan_rank.json"
 
@@ -111,6 +112,18 @@ def _asset_class(pair: str) -> str:
     return "股票" if legs & STOCK_VENUES else "加密"
 
 
+def _legs(pair: str) -> tuple[str, str]:
+    """'GOLD@lighter-rh-bitget' -> ('lighter-rh', 'bitget'). Venue names may
+    themselves contain a hyphen, so match against the known table instead of
+    splitting blindly."""
+    _, _, tail = pair.partition("@")
+    for a_ in sorted(FEES.VENUES, key=len, reverse=True):
+        if tail.startswith(a_ + "-"):
+            return a_, tail[len(a_) + 1:]
+    a_, _, b_ = tail.partition("-")
+    return a_, b_
+
+
 def _scan_block() -> dict | None:
     if not SCAN.exists():
         return None
@@ -120,10 +133,19 @@ def _scan_block() -> dict | None:
     rows = []
     for r in (d.get("top") or [])[:20]:
         band = r.get("band_bps")
+        la, lb = _legs(r.get("pair") or "")
+        need = round(FEES.required_band_bps(la, lb), 2)
+        net = round(FEES.net_per_trade_bps(band, la, lb), 2) if band else None
         rows.append({
             "pair": r.get("pair"),
             "asset_class": _asset_class(r.get("pair") or ""),
             "band_bps": band,
+            # What the operator's own fee schedule does to this pair. A band
+            # is not an edge until it clears four crossings.
+            "required_band_bps": need,
+            "net_per_trade_bps": net,
+            "fee_ok": bool(net is not None and net > 0),
+            "fee_unverified": FEES.unverified(la, lb),
             # how far above the control pair's band — the instrument's own
             # noise floor. <=2x is "not distinguishable from spread".
             "band_vs_control": (round(band / ctrl, 2)
@@ -142,6 +164,10 @@ def _scan_block() -> dict | None:
         "gate_ok": d.get("gate_ok"),
         "control_band_bps": ctrl,
         "rows": rows,
+        "fees": FEES.table(),
+        "fee_rule": "一筆抓半個帶，進出各跨兩腿 → 需要的帶 = 4 ×（兩腿費率）。"
+                    "Lighter 兩條鏈是排程寫死的 0；Hyperliquid 系（含所有 "
+                    "builder dex）是 4.5 bps；CEX 扣掉返佣後 2.75–3.0 bps。",
         # The honest ladder. A row near the top of this board has passed
         # exactly ONE of these steps.
         "ladder": [
@@ -150,8 +176,11 @@ def _scan_block() -> dict | None:
              "means": "升格後從自己的第一分鐘起算，掃描期資料不進判決"},
             {"step": "收斂關", "state": "未做",
              "means": "偏離後要回得來；持續偏移看起來最肥卻永遠拿不到"},
-            {"step": "費率查證", "state": "未做",
-             "means": "零費率是獲客補貼，builder dex 不可假設也是 0"},
+            {"step": "費率查證", "state": "部分",
+             "means": "已查：Hyperliquid 系 4.5 bps（builder dex 不是零費）、"
+                      "Lighter 兩鏈排程 0、Bitget 6 bps。未確認：Entropy 的"
+                      "返佣是不是真的 100%、OKX 的標準費率——兩個都要靠一筆"
+                      "真實成交讀回執才算數"},
             {"step": "小額實盤", "state": "未做",
              "means": "回測與錄製都過了也只是紙上；斷腿與真實成交才算數"},
         ],
