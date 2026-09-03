@@ -745,7 +745,8 @@ def _raid_signals_payload() -> dict:
             cur.execute(
                 "SELECT symbol, side, level_kind, fill_ts, fill_utc,"
                 " entry_px, atr, stop_px, risk_frac, pierce_atr, universe,"
-                " variants, updated_at FROM raid_signals_live"
+                " variants, regime_cell, e_state, updated_at"
+                " FROM raid_signals_live"
                 " ORDER BY fill_ts DESC")
             rows = cur.fetchall()
     finally:
@@ -778,6 +779,13 @@ def _raid_signals_payload() -> dict:
             # at the FILL bar in the ledger instead (1-8h later, label can
             # move) — product validates the pipeline, ledger decides edge.
             "regime_cell": r.get("regime_cell") or "",
+            # Variant E membership (§0.474b), BTC-only. THREE states on
+            # purpose: "pending" means the derivative panels are not
+            # annotated yet (Coinglass lags ~6h against this feed's 8h
+            # window), and a consumer must not read that as "notE".
+            # E is under a frozen clock at 22/60 -- published so it CAN be
+            # selected, which is not the same as recommended.
+            "e_state": r.get("e_state") or "na",
             # Sizing inputs: followers must NOT hardcode the frozen
             # constants.  size_base = (equity x risk_pct) / |entry - stop|
             # keeps per-trade risk fixed, which is the unit the research

@@ -62,7 +62,15 @@ CREATE TABLE IF NOT EXISTS raid_signals_live (
   risk_frac   DECIMAL(12,8) NOT NULL,
   pierce_atr  DECIMAL(12,6) NOT NULL DEFAULT 0,
   universe    VARCHAR(16)   NOT NULL,
-  variants    VARCHAR(32)   NOT NULL,
+  variants    VARCHAR(40)   NOT NULL,
+  -- frozen ADX(14) 25/20 label at the FILL hour (§0.59). The route emitted
+  -- this field while the table did not have it, so every row carried "" and
+  -- any consumer filtering on it blocked everything (2026-09-03).
+  regime_cell VARCHAR(12)   NOT NULL DEFAULT '',
+  -- variant E membership, BTC-only (§0.474b). Three states, because
+  -- "absent" is ambiguous: E / notE / pending (derivative panels not yet
+  -- annotated -- Coinglass parquets lag ~6h) / na (not BTC).
+  e_state     VARCHAR(8)    NOT NULL DEFAULT 'na',
   updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY ux_sig (symbol, level_kind, fill_ts),
   KEY ix_fill (fill_ts)
@@ -70,10 +78,43 @@ CREATE TABLE IF NOT EXISTS raid_signals_live (
 """
 
 
+def _e_membership():
+    """(E predicate, ledger rows) from the owning engine, or (None, {}).
+
+    E's causal liq-burst median needs the whole log, so membership cannot be
+    decided from a single row -- shadow_engine owns it and this file only
+    labels. Failure leaves every row "pending", never a silent "notE".
+    """
+    try:
+        sys.path.insert(0, str(ROOT / "research" / "sweep_failure"))
+        import shadow_engine as SE
+        log = SE.read_log()
+        return SE.variant_e_pred(log), log
+    except Exception:
+        return None, {}
+
+
+def _e_state(r, pred, log) -> str:
+    if r.get("symbol") != "BTC":
+        return "na"
+    if pred is None:
+        return "pending"
+    key = (r["symbol"], r.get("level_kind", "swing"), int(r["fill_ts"]))
+    row = log.get(key, r)
+    # the derivative panels are annotated hourly but the Coinglass parquets
+    # lag ~6h, so a fresh raid is legitimately "not decided yet"
+    if row.get("drv_q") in (None, "") or row.get("drv_liqburst") in (None, ""):
+        return "pending"
+    if row.get("drv_q") == "na":
+        return "na"
+    return "E" if pred(row) else "notE"
+
+
 def collect() -> list[tuple]:
     if not LOG.exists():
         return []
     now = int(time.time())
+    e_pred, e_log = _e_membership()
     rows = []
     with LOG.open(newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
@@ -108,12 +149,15 @@ def collect() -> list[tuple]:
                 variants.append("R")
                 if is_v:
                     variants.append("RV")
+            est = _e_state(r, e_pred, e_log)
+            if est == "E":
+                variants.append("E")
             rows.append((
                 r["symbol"], r["side"], r.get("level_kind", "swing"),
                 fill_ts, r.get("fill_utc", ""), entry, atr,
                 entry - sgn * STOP_ATR * atr, STOP_ATR * atr / entry,
                 float(r.get("pierce_atr") or 0), r.get("universe", ""),
-                ",".join(variants)))
+                ",".join(variants), r.get("regime_cell", "") or "", est))
     return rows
 
 
@@ -124,6 +168,19 @@ def main() -> None:
     try:
         with conn.cursor() as cur:
             cur.execute(DDL)
+            # CREATE TABLE IF NOT EXISTS does not add columns to a table that
+            # already exists, so evolve explicitly. Idempotent.
+            cur.execute("SELECT COLUMN_NAME FROM information_schema.COLUMNS"
+                        " WHERE TABLE_SCHEMA=DATABASE()"
+                        " AND TABLE_NAME='raid_signals_live'")
+            have = {list(c.values())[0] for c in cur.fetchall()}
+            for col, ddl in (("regime_cell", "VARCHAR(12) NOT NULL DEFAULT ''"),
+                             ("e_state", "VARCHAR(8) NOT NULL DEFAULT 'na'")):
+                if col not in have:
+                    cur.execute(f"ALTER TABLE raid_signals_live ADD COLUMN {col} {ddl}")
+            if "variants" in have:
+                cur.execute("ALTER TABLE raid_signals_live"
+                            " MODIFY variants VARCHAR(40) NOT NULL")
             # Replace wholesale: closed/aged-out signals must vanish, and a
             # follower must never act on a row this run no longer vouches for.
             cur.execute("DELETE FROM raid_signals_live")
@@ -131,12 +188,14 @@ def main() -> None:
                 cur.executemany(
                     "INSERT INTO raid_signals_live (symbol, side, level_kind,"
                     " fill_ts, fill_utc, entry_px, atr, stop_px, risk_frac,"
-                    " pierce_atr, universe, variants)"
-                    " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", rows)
+                    " pierce_atr, universe, variants, regime_cell, e_state)"
+                    " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", rows)
         conn.commit()
         core = sum(1 for r in rows if r[10] == "core9")
+        nE = sum(1 for r in rows if r[13] == "E")
+        npend = sum(1 for r in rows if r[13] == "pending")
         print(f"raid_signals_live: published {len(rows)} signals "
-              f"({core} core9)")
+              f"({core} core9, E={nE}, E待定={npend})")
     finally:
         conn.close()
 
