@@ -31,6 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 SRC = ROOT / "research" / "results" / "arb_premium_verdict.json"
+SCAN = ROOT / "research" / "results" / "arb_scan_rank.json"
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -72,6 +73,94 @@ def _side(interim: dict, lab: str) -> dict | None:
     }
 
 
+# ── the battlefield scan (2026-09-03, TODO §1.00) ──────────────────────────
+# One weapon, many battlefields: the recording family is the weapon and it is
+# fixed; this block is the search for where to point it. It is a SEARCH board,
+# never a verdict board — `scan_rank.py` owns the promotion metric and
+# `premium_verdict.py` owns every verdict, exactly as before.
+#
+# Same money-stripping as the rest of this file: band in bps, fires/day,
+# depth as a TIER. `capturable_usd_per_day` (the ranking metric) never
+# reaches the payload — only the ORDER it produces does.
+CLASS_SETS = {
+    "商品": {"GOLD", "SILVER", "COPPER", "PLATINUM", "PALLADIUM", "NATGAS",
+             "CL", "BRENTOIL", "WTI", "OIL", "URANIUM", "ALUMINIUM", "URNM",
+             "WHEAT", "SOY"},
+    "指數": {"SP500", "XYZ100", "JP225", "KR200", "US500", "USA500", "USTECH",
+             "USA100", "SMALL2000", "MAGS", "SMH", "SOXL", "XBI", "XLE",
+             "TOTAL2", "OTHERS", "BTCD", "SEMI", "IGV"},
+    "外匯": {"EUR", "GBP", "JPY"},
+    "利率": {"2Y", "10Y", "30Y", "USBOND", "SGOV"},
+}
+# Venues that ONLY list non-crypto. Lighter's Robinhood chain is deliberately
+# NOT here: it carries stocks AND crypto (BTC, ZEC, HYPE), so its presence
+# says nothing about the asset (first version called ZEC a stock).
+STOCK_VENUES = {"xyz", "IO", "para", "mkts"}
+
+
+def _asset_class(pair: str) -> str:
+    """Display-only bucket. Ticker sets first, then venue: a pair that
+    touches a stock/commodity dex is not crypto even if we do not know
+    the ticker."""
+    head, _, venues = pair.partition("@")
+    for label, members in CLASS_SETS.items():
+        if head in members:
+            return label
+    legs = set(venues.split("-", 1)) if venues else set()
+    legs |= {v for v in STOCK_VENUES if v in venues}
+    return "股票" if legs & STOCK_VENUES else "加密"
+
+
+def _scan_block() -> dict | None:
+    if not SCAN.exists():
+        return None
+    d = json.loads(SCAN.read_text(encoding="utf-8"))
+    ctrl = d.get("control_band_bps")
+    promote = set(d.get("promote") or [])
+    rows = []
+    for r in (d.get("top") or [])[:20]:
+        band = r.get("band_bps")
+        rows.append({
+            "pair": r.get("pair"),
+            "asset_class": _asset_class(r.get("pair") or ""),
+            "band_bps": band,
+            # how far above the control pair's band — the instrument's own
+            # noise floor. <=2x is "not distinguishable from spread".
+            "band_vs_control": (round(band / ctrl, 2)
+                                if band and ctrl else None),
+            "fires_per_day": r.get("fires_per_day"),
+            "depth_tier": _depth_tier(r.get("depth_usd")),
+            "samples": r.get("n"),
+            "stage": ("升格候選" if r.get("pair") in promote else
+                      "掃描中" if d.get("gate_ok") else "資料未滿"),
+        })
+    return {
+        "asof_utc": d.get("asof_utc"),
+        "span_days": d.get("span_days"),
+        "quotes": d.get("quotes"),
+        "pairs": d.get("pairs"),
+        "gate_ok": d.get("gate_ok"),
+        "control_band_bps": ctrl,
+        "rows": rows,
+        # The honest ladder. A row near the top of this board has passed
+        # exactly ONE of these steps.
+        "ladder": [
+            {"step": "掃描", "state": "本板", "means": "兩個場館的報價差得夠開、夠常發生"},
+            {"step": "錄製 7 天", "state": "下一步",
+             "means": "升格後從自己的第一分鐘起算，掃描期資料不進判決"},
+            {"step": "收斂關", "state": "未做",
+             "means": "偏離後要回得來；持續偏移看起來最肥卻永遠拿不到"},
+            {"step": "費率查證", "state": "未做",
+             "means": "零費率是獲客補貼，builder dex 不可假設也是 0"},
+            {"step": "小額實盤", "state": "未做",
+             "means": "回測與錄製都過了也只是紙上；斷腿與真實成交才算數"},
+        ],
+        "caveat": "本板是「找戰場」，不是「已賺到」。帶寬與次數是掃描期的"
+                  "觀察，深度只給分級；排序用的可捕獲金額不出現在公開頁。"
+                  "任何一列都還沒過收斂關、沒查費率、沒有實盤成交。",
+    }
+
+
 def build() -> dict:
     raw = json.loads(SRC.read_text(encoding="utf-8"))
     pairs = []
@@ -103,6 +192,7 @@ def build() -> dict:
         "asof_utc": raw.get("asof_utc"),
         "gate_days": raw.get("gate_days"),
         "pairs": pairs,
+        "scan": _scan_block(),
         "principle": "判準 2026-08-28 凍結：扣費後 ≥1bps 的帶、日均 ≥10 次、"
                      "兩半皆成立、且偏離後要收斂。家族同判準、全部報告、"
                      "不挑好看的。BTC 是對照組——它若過閘代表儀器壞了。",
@@ -145,8 +235,12 @@ def main() -> int:
         conn.close()
     n = len(payload["pairs"])
     live = sum(1 for p in payload["pairs"] if (p.get("carry") or {}).get("n"))
+    sc = payload.get("scan") or {}
     print(f"arb_status published: {n} pairs, {live} with carry data, "
-          f"asof {payload['asof_utc']}")
+          f"asof {payload['asof_utc']}"
+          + (f" | scan {sc.get('pairs')} 配對 / {sc.get('span_days')}天 "
+             f"→ {len(sc.get('rows') or [])} 列上牆" if sc
+             else " | scan MISSING (先跑 arb/scan_rank.py)"))
     return 0
 
 
