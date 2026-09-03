@@ -67,8 +67,17 @@ def load(sym):
 
 
 def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
-             reanchor="none", reanchor_days=90, stop=None, stop_buf=0.03):
-    """One continuous run. Returns metrics + the hourly equity curve."""
+             reanchor="none", reanchor_days=90, stop=None, stop_buf=0.03,
+             gate=None, gate_scale=0.0):
+    """One continuous run. Returns metrics + the hourly equity curve.
+
+    gate: optional per-bar bool array. False = do not OPEN new rungs on that
+    bar (sells, stops and re-anchors are untouched -- a filter that also
+    blocked exits would be a different strategy, not a filter). gate_scale
+    lets a blocked bar still buy a fraction (0.0 = fully off, 0.5 = half
+    size). The caller is responsible for the array being causal; this
+    function does not shift it.
+    """
     m = 5 if N % 5 == 0 else 1
     alloc = (nested_alloc(1.0, r, m, N // m) if profile == "nested"
              else uniform_alloc(1.0, r, m, N // m))
@@ -80,7 +89,7 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
     width = float(hi_e[0] / lo_e[0] - 1)
     anchor_i = 0
     eq = np.empty(len(close))
-    n_anchor = n_stop = n_fill = 0
+    n_anchor = n_stop = n_fill = n_gated_off = 0
 
     def replace(px, i):
         nonlocal edges, lo_e, hi_e, anchor_i, n_anchor
@@ -100,13 +109,15 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
             cost[s] = 0.0
         # buys: a bar that reaches the low edge of an empty bin
         b = (qty <= 0) & (low[i] <= lo_e)
-        if b.any():
-            spend = alloc[b].sum()
+        scale = 1.0 if (gate is None or gate[i]) else gate_scale
+        if b.any() and scale > 0:
+            spend = alloc[b].sum() * scale
             if spend <= cash + 1e-12:
-                qty[b] = alloc[b] / lo_e[b] * (1 - MAKER)
-                cost[b] = alloc[b]
+                qty[b] = alloc[b] * scale / lo_e[b] * (1 - MAKER)
+                cost[b] = alloc[b] * scale
                 cash -= spend
                 n_fill += int(b.sum())
+                n_gated_off += 0
         px = close[i]
         eq[i] = cash + (qty * px).sum()
         # ── policies ────────────────────────────────────────────────
@@ -131,6 +142,7 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
               for j in range(0, len(eq) - 90 * 24, 24)) if len(eq) > 90 * 24 else 0.0
     return {"final": float(eq[-1]), "cagr": float(eq[-1] ** (1 / yrs) - 1),
             "mdd": float(dd.min()), "worst90d": float(w90),
+            "gated_frac": float(0.0 if gate is None else 1 - gate.mean()),
             "anchors": n_anchor, "stops": n_stop, "fills": n_fill,
             "end_deployed": float((qty * close[-1]).sum() / eq[-1]),
             "width_pct": width}, eq
