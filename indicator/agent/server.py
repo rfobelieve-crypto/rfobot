@@ -1068,7 +1068,12 @@ async def public_ops_board_route(request: Request) -> JSONResponse:
             data = {"error": f"ops board unavailable: {type(e).__name__}"}
         _ops_cache["data"] = data
         _ops_cache["ts"] = now
-    payload = _ops_cache["data"]
+    payload = dict(_ops_cache["data"])
+    # Signing is a per-process env fact, so it must NOT ride the 5-minute
+    # payload cache: a redeploy that fixes the key would keep reporting the
+    # old answer for another five minutes, which is exactly when someone is
+    # staring at it. Computed fresh on every request.
+    payload["signal_signing"] = security.signing_status()
     resp = JSONResponse(payload, status_code=503 if "error" in payload else 200)
     resp.headers["Cache-Control"] = "public, max-age=300"
     resp.headers["Access-Control-Allow-Origin"] = "*"

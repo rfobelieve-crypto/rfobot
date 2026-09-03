@@ -118,6 +118,23 @@ def _key() -> bytes | None:
     return k.encode("utf-8") if len(k) >= 16 else None
 
 
+def signing_status() -> dict:
+    """Is signing actually ON in this process, and if not, why not?
+
+    2026-09-03: `_key()` drops a key shorter than 16 chars and returns None
+    -- signing switches off with no error, no log line, and the response
+    simply has no header. From outside, "pasted into the wrong service",
+    "not redeployed yet" and "value got truncated on paste" all look
+    identical. This reports enough to tell them apart and nothing more:
+    the length is only revealed when it is too short to be a usable key.
+    """
+    raw = os.environ.get("SIGNAL_SIGNING_KEY", "").strip()
+    out = {"enabled": len(raw) >= 16, "key_present": bool(raw)}
+    if raw and len(raw) < 16:
+        out["key_len_too_short"] = len(raw)
+    return out
+
+
 def sign(payload) -> str | None:
     """HMAC-SHA256 over canonical JSON. None when no key is configured."""
     k = _key()
