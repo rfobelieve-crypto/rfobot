@@ -203,11 +203,12 @@ def _scan_block() -> dict | None:
              "means": "升格後從自己的第一分鐘起算，掃描期資料不進判決"},
             {"step": "收斂關", "state": "未做",
              "means": "偏離後要回得來；持續偏移看起來最肥卻永遠拿不到"},
-            {"step": "費率查證", "state": "部分",
-             "means": "已查：Hyperliquid 系 4.5 bps（builder dex 不是零費）、"
-                      "Lighter 兩鏈排程 0、Bitget 6 bps。未確認：Entropy 的"
-                      "返佣是不是真的 100%、OKX 的標準費率——兩個都要靠一筆"
-                      "真實成交讀回執才算數"},
+            {"step": "費率查證", "state": "已查",
+             "means": "Hyperliquid 系 4.5 bps（builder dex 不是零費）、Lighter "
+                      "兩鏈排程 0、Bitget 6 bps 返佣 50%、OKX 5 bps 返佣 45%（已確認）。"
+                      "Entropy 推薦頁 2026-09-04：自己交易的折扣是 25%，不是"
+                      "上游 README 寫的 100%——那是推薦人分成，不是折扣。"
+                      "剩一件：一筆真實成交讀回執，確認帳單上的數字"},
             {"step": "小額實盤", "state": "未做",
              "means": "回測與錄製都過了也只是紙上；斷腿與真實成交才算數"},
         ],
@@ -235,6 +236,10 @@ def build() -> dict:
             "gate_days": p.get("gate_days"),
             "start_utc": p.get("start_utc"),
             "is_control": pid == "BTC",
+            # both legs on a schedule that is 0/0 (TODO 1.02): the fee
+            # variable is literally zero, so the pair is a control for
+            # "is there anything left once fees are not the reason".
+            "zero_fee": all(v.startswith("lighter") for v in VENUE_KEYS.get(pid, ("x", "x"))),
             "sell": _side(interim, "sell", VENUE_KEYS.get(pid)),
             "buy": _side(interim, "buy", VENUE_KEYS.get(pid)),
             "carry": ({
@@ -257,6 +262,14 @@ def build() -> dict:
         "carry_note": "資金費率是第二條收益軸（持有就付，不需要收斂），"
                       "報告用、不進判準：凍結的四關是關於價差的，不因為"
                       "出現第二種收益就事後擴充。",
+        # 2026-09-03/04: the frozen gate's parenthetical "fees are 0+0" fell.
+        # The gate is not touched; the truth is shown beside it, per pair.
+        "fee_note": "「扣費後」欄：凍結判準當時把費用當成 0+0，2026-09-03 費率"
+                    "查證推翻了這個前提（Entropy 腿的零是推薦促銷，09-04 帳戶頁"
+                    "顯示折扣是 25%）。判準一字未動；每個配對旁邊直接算「以你"
+                    "的費率、四次吃單，每筆剩多少」。負數＝帶過了門檻但扣費後"
+                    "是負的，只剩掛單一條路。零費對照＝兩腿費率表都是 0 的配對，"
+                    "能殺它的只剩收斂與深度。",
         "disclaimer": "Research recording only — not a live strategy, "
                       "not financial advice.",
     }
