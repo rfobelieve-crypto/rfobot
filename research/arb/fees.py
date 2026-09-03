@@ -63,10 +63,10 @@ VENUES: dict[str, dict] = {
                 "Rebate 50% stated by the operator 2026-09-03.",
     },
     "okx": {
-        "taker_bps": 5.0, "maker_bps": 2.0, "rebate": 0.45, "verified": False,
-        "note": "ASSUMED 0.05% taker (standard tier); OKX does not publish it "
-                "on an unauthenticated endpoint. Rebate 45% stated by the "
-                "operator 2026-09-03. Confirm from the account's fee page.",
+        "taker_bps": 5.0, "maker_bps": 2.0, "rebate": 0.45, "verified": True,
+        "note": "0.05%/0.02% is OKX's published standard-tier perp schedule. "
+                "Rebate 45% CONFIRMED by the operator 2026-09-04 (account "
+                "terms, not a promotion).",
     },
 }
 
