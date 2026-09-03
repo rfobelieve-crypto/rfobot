@@ -153,6 +153,7 @@ exit` 的列是真前瞻，判 Gate 只能用前者」——**這條是錯的，
 | V7 本體架構細節（資料層→模型→推論） | `docs/系統架構說明書.md` |
 | 多策略組合風控設計 | `docs/PORTFOLIO_RISK_FRAMEWORK.md` |
 | 踩過的坑（**開工前必讀**） | `.claude/rules/mistake.md` |
+| 策略／因子研究的十道檢查（**開新研究線前必讀**） | `.claude/rules/factor-research.md` |
 | 當前任務、預註冊、凍結假設 | `TODO.md` |
 
 ---
