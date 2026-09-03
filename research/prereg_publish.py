@@ -67,6 +67,22 @@ def _shadow_rows():
         return []
 
 
+def _e_clock():
+    """Variant E progress — read from its OWNING scorer, never recounted here.
+
+    shadow_engine.e_clock() holds the four frozen conditions (§0.474b); this
+    board only displays what it returns. If the two ever disagree, this file
+    is wrong. Returns None when the engine cannot be imported so the board
+    degrades to "no row" instead of inventing one.
+    """
+    try:
+        sys.path.insert(0, str(ROOT / "research" / "sweep_failure"))
+        import shadow_engine as SE
+        return SE.e_clock(SE.read_log(), "E")
+    except Exception:
+        return None
+
+
 def _n_gate_f(rows):
     """Gate F progress — MUST reproduce shadow_engine's "B (pierce) closed=".
 
@@ -115,7 +131,8 @@ def build():
     rows = _shadow_rows()
     q2 = _json("v7_regime_q2_clock.json") or {}
     veto = _json("v7_veto_clock.json") or {}
-    gf = _json("sweep_forward_gate.json") or {}   # variant A, owned by sweep_forward.py
+    gf = _json("sweep_forward_gate.json") or {}
+    _ec = _e_clock()   # variant A, owned by sweep_forward.py
     open_items = [
         {
             "id": "0.59", "line": "流動性獵取", "title": "regime 進場濾網",
@@ -166,6 +183,22 @@ def build():
             "note": "數字由判決程式每月 5 號（或手動）計分時產出，不是每小時更新；"
                     "約 8 筆/天，1400 筆預計 2027-01 中到期",
         },
+        *([{
+            "id": "0.474b E", "line": "流動性獵取",
+            "title": "獵取當下的衍生品讀法（BTC）",
+            "hypothesis": "獵取當下 OI 下降＋清算爆量＝止損沖洗，反轉勝率高於一般獵取",
+            "why": "B 的濾網路線作廢後，這是唯一有機會在近期拿到判決的線；"
+                   "判準 2026-09-03 才凍結，在那之前它只有定義沒有門檻",
+            "registered": "2026-08-02", "source": "engine",
+            "n": _ec.get("n", 0), "gate_n": _ec.get("floor", 60),
+            "days": round(_days_since(datetime(2026, 8, 2, tzinfo=timezone.utc)), 1),
+            "gate_days": None,
+            "ci_low": _ec.get("ci_low"), "mean_r": _ec.get("mean_r"),
+            "pos": None, "pos_of": None,
+            "note": "四條全要：n≥60、日聚類 CI 下緣>0、均netR 高於同期非本組 BTC "
+                    f"獵取≥+0.08R（現差 {_ec.get('gap')}）、前後兩半皆正"
+                    f"（現 {_ec.get('halves')}）。約 0.8 筆/天",
+        }] if _ec else []),
         {
             "id": "0.52", "line": "縮帆（風控）", "title": "ADX 趨勢環境減碼",
             "hypothesis": "偵測到趨勢時把部位砍半，降低單邊行情的受傷幅度",
