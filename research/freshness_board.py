@@ -91,9 +91,13 @@ REGISTRY = [
     ("raid outcomes row", "db",
      "raid_outcomes:updated_at", 2.5,
      "skip-vs-taken scoring surface; silent staleness = consumer silently scores against stale outcomes"),
+    # Cadence corrected 2026-09-03: the recorder rides the HOURLY train
+    # (shadow_engine.bat), not a 10-min loop — with max 1.0h this row sat at
+    # exactly 1.0h before every train and would have flapped red each hour
+    # once the epoch bug above was fixed. Same limit as the other hourly rows.
     ("basis obs (§0.91)", "db",
-     "basis_obs:ts_received", 1.0,
-     "Bitget in-venue basis recorder (10-min cadence; 6 missed = dead)"),
+     "basis_obs:ts_received", 2.5,
+     "Bitget in-venue basis recorder (hourly, on shadow_engine.bat)"),
     # 2026-09-03: the V7 fill pipeline (TODO 0.81) sat broken for days
     # printing one skip line an hour -- MILL_EXPORT_UID was still the
     # account name after the product side went id-only. No artifact-age
