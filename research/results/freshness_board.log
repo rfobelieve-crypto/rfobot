@@ -1204,3 +1204,37 @@ portfolio clocks           75.8h  195.0h  ok
 tracked signals             2.3h  336.0h  ok
 
 1 red / 30 tracked: basis obs (§0.91)
+freshness board — 2026-09-03 11:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           0.2h    2.5h  ok
+basis obs (§0.91)         MISSING    1.0h  RED  <-- Bitget in-venue basis recorder (10-min cadence; 6 missed = d
+ops board row               0.2h    2.5h  ok
+arb status row              0.0h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.1h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.1h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     35.0h   48.0h  ok
+coinglass parquets         15.3h   48.0h  ok
+daily collect log          15.3h   30.0h  ok
+freshness board self        6.0h    7.0h  ok
+revalidation report       702.7h  840.0h  ok
+portfolio clocks           81.8h  195.0h  ok
+tracked signals             6.3h  336.0h  ok
+
+1 red / 30 tracked: basis obs (§0.91)

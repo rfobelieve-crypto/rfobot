@@ -1,5 +1,5 @@
 {
- "asof_utc": "2026-09-03 05:20",
+ "asof_utc": "2026-09-03 11:20",
  "rows": [
   {
    "name": "bat-train heartbeat",
@@ -51,7 +51,7 @@
   },
   {
    "name": "raid outcomes row",
-   "age_h": 1.2,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -75,7 +75,7 @@
   },
   {
    "name": "arb status row",
-   "age_h": 0.2,
+   "age_h": 0.0,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -91,7 +91,7 @@
   },
   {
    "name": "degradation guard",
-   "age_h": 0.3,
+   "age_h": 0.1,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -115,7 +115,7 @@
   },
   {
    "name": "cloud train parity",
-   "age_h": 0.2,
+   "age_h": 0.1,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -182,12 +182,12 @@
    "age_h": 0.0,
    "max_h": 0.5,
    "ok": true,
-   "detail": "scan_20260903.csv",
+   "detail": "scan_v5_20260903.csv",
    "note": "cross-venue REST scanner, ~2 min cycle over ~110 pairs"
   },
   {
    "name": "coinglass parquet CONTENT",
-   "age_h": 29.0,
+   "age_h": 35.0,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_fear_greed_daily.parquet",
@@ -195,7 +195,7 @@
   },
   {
    "name": "coinglass parquets",
-   "age_h": 9.3,
+   "age_h": 15.3,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_oi_1h.parquet",
@@ -203,7 +203,7 @@
   },
   {
    "name": "daily collect log",
-   "age_h": 9.3,
+   "age_h": 15.3,
    "max_h": 30.0,
    "ok": true,
    "detail": "",
@@ -219,7 +219,7 @@
   },
   {
    "name": "revalidation report",
-   "age_h": 696.7,
+   "age_h": 702.7,
    "max_h": 840.0,
    "ok": true,
    "detail": "quarterly_revalidation_20260805.md",
@@ -227,7 +227,7 @@
   },
   {
    "name": "portfolio clocks",
-   "age_h": 75.8,
+   "age_h": 81.8,
    "max_h": 195.0,
    "ok": true,
    "detail": "",
@@ -235,7 +235,7 @@
   },
   {
    "name": "tracked signals",
-   "age_h": 2.3,
+   "age_h": 6.3,
    "max_h": 336.0,
    "ok": true,
    "detail": "",
