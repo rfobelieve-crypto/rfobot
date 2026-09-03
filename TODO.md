@@ -852,9 +852,17 @@ Polymarket 掛單獎勵是「成本」那一軌的直接候選：它不是折扣
 - [ ] **掃描器的同場館配對**（§1.03 查到）：`GOLD@bitget-bitget` 這種兩腿在同
       一個場館的列不該存在，加一道 `leg_a != leg_b` 的守衛。
 
-**不做的（寫下來免得重想）**：加 Binance 當場館——它的 USDT 永續沒有真股票，
-`SPXUSDT`/`MUSDT` 是迷因幣、`XAUTUSDT` 是代幣化黃金（2026-09-04 查證）。
-外部報告的「Binance 股票永續」是另一個產品，不在這條線的射程內。
+**~~不做的~~ → 改列必做（2026-09-04 當天改正）**：我先前寫「Binance 的 USDT 永續沒有
+真股票」是**錯的**——我的篩選只認 `contractType == "PERPETUAL"`，而 Binance 的股票
+永續是 **`TRADIFI_PERPETUAL`**（`GPROUSDT`／`DDOGUSDT`／`IONQUSDT`／`SAMSUNGEMUSDT`／
+`KODEX200USDT`／`HK0625USDT`…，`underlyingType` 標 KR_EQUITY／HK_EQUITY／CN_EQUITY／
+EQUITY）。近 21 天 Binance 上了 **34 個**這類合約。所以 CoinGecko 那個「Binance vs
+Hyperliquid 三星 0.93%」的配對**可以重現**，而且 Binance 是本線缺的最大一個場館。
+教訓同 mistake.md 2026-09-03 Bitget 單位那條：**「查了沒有」的查詢要先問它看不看
+得到目標**——我用一個把它排除在外的篩子去找它。
+- [ ] Binance `TRADIFI_PERPETUAL` 接進掃描器（universe：`fapi/v1/exchangeInfo` 篩
+      `contractType` 含 PERPETUAL；簿口：`fapi/v1/depth`，量以幣計；費率：標準 5 bps
+      taker／2 bps maker，無返佣，先當未查證）
 
 ### 1.03 套利·大所 vs 小所（2026-09-04 預註冊，使用者：「先做這個」）——外部報告的可檢驗版本
 

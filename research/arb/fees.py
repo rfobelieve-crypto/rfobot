@@ -66,6 +66,12 @@ VENUES: dict[str, dict] = {
         "note": "Bitget publishes takerFeeRate per contract (0.0006 = 6 bps). "
                 "Rebate 50% stated by the operator 2026-09-03.",
     },
+    "binance": {
+        "taker_bps": 5.0, "maker_bps": 2.0, "rebate": 0.0, "verified": False,
+        "note": "Binance USDT-M standard tier 0.05%/0.02% (public schedule). "
+                "No rebate stated by the operator. Lists equity perps as "
+                "contractType TRADIFI_PERPETUAL (2026-09-04).",
+    },
     "okx": {
         "taker_bps": 5.0, "maker_bps": 2.0, "rebate": 0.45, "verified": True,
         "note": "0.05%/0.02% is OKX's published standard-tier perp schedule. "
