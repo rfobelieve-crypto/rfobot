@@ -235,6 +235,41 @@ def capturable_usd_per_day(side, ins, conv=None):
                  * ins["fat_median_notional_usd"], 2)
 
 
+def capturable_usd_per_day_tradeable(side, ins, conv, days):
+    """REPORT-ONLY, and the one to quote.  2026-09-03: the operator asked
+    where the ceiling number above comes from, and re-deriving it found it
+    overstates by one to two ORDERS OF MAGNITUDE.  Two independent errors,
+    both in the same direction:
+
+      1. `fires` counts MINUTES, not trades.  The band is the p90 of the
+         executable room, so by construction 10% of minutes fire — 144/day
+         out of 1440, for every pair, always.  But a deviation lasting an
+         hour is ONE trade with sixty fire-minutes, not sixty trades.  The
+         count of actual opportunities is the count of deviation EPISODES,
+         which the convergence check already computes: SNDK's buy side has
+         846 fire-minutes and **4 episodes**.
+      2. It pays the FULL band per trade.  "Converged" is defined as coming
+         back within HALF the band, so a trade entered at the band and
+         closed on that definition captures half of it, not all of it.
+
+    So: episodes/day x half the band x depth.  Still a ceiling (it assumes
+    every episode is caught, filled at top-of-book on both legs, at zero
+    fees), but a ceiling of the right order.  The old number is kept beside
+    it as `_ceiling` rather than deleted, because a number that was quoted
+    should stay auditable.
+
+    The GATE is untouched by this: it was always about band width, fire
+    frequency, both halves and convergence — never about this figure.
+    """
+    if conv is None or not conv.get("passed") or not days:
+        return 0.0
+    ep = conv.get("episodes") or 0
+    if not ep or not side or not ins or ins.get("fat_median_notional_usd") is None:
+        return 0.0
+    return round(ep / days * (side["band_bps"] / 2) / 1e4
+                 * ins["fat_median_notional_usd"], 2)
+
+
 def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
     CSV = LOGS / csv_sub
     res = {"pair": pid, "legs": f"{leg_a} vs {leg_b}", "note": note}
@@ -270,15 +305,20 @@ def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
                 ins = instrument_stats(rows, lab)
                 if ins:
                     res["interim"][f"depth_{lab}"] = ins
-                    cap = capturable_usd_per_day(
-                        st_, ins, res["interim"].get(f"conv_{lab}"))
+                    conv_ = res["interim"].get(f"conv_{lab}")
+                    ceil = capturable_usd_per_day(st_, ins, conv_)
+                    cap = capturable_usd_per_day_tradeable(st_, ins, conv_, days)
                     res["interim"][f"capturable_usd_per_day_{lab}"] = cap
-                    if cap == 0.0:
+                    res["interim"][f"capturable_usd_per_day_{lab}_ceiling"] = ceil
+                    if ceil == 0.0:
                         print(f"    {lab} 帶存在但**不收斂**（結構性偏移，"
                               f"不是會回來的價差）→ 可捕獲記 0")
+                    ep = (conv_ or {}).get("episodes") or 0
                     print(f"    {lab} 最肥時刻深度中位 ${ins['fat_median_notional_usd']:,.0f}"
                           f"｜卡價(>5s) {ins['fat_stale_gt5s']}/{ins['fat_prints']}"
-                          f"｜可捕獲 ≈ ${cap}/天（報告用，不進判準）")
+                          f"｜可捕獲 ≈ ${cap}/天"
+                          f"（{ep} 次偏離 × 半個帶；分鐘計數的上限是 ${ceil}"
+                          f"，兩個都是報告用不進判準）")
             f = funding_stats(rows)
             if f:
                 res["interim"]["funding"] = f
@@ -306,10 +346,12 @@ def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
                   and all(x["fires_per_day"] >= FIRES_PER_DAY_MIN
                           and x["band_bps"] >= NET_BPS_MIN for x in h)
                   and bool(conv.get("passed")))
-        cap = capturable_usd_per_day(full, ins, conv)
+        ceil = capturable_usd_per_day(full, ins, conv)
+        cap = capturable_usd_per_day_tradeable(full, ins, conv, days)
         verdict_sides[lab] = {"full": full, "halves": h,
                               "convergence": conv, "depth": ins,
                               "capturable_usd_per_day": cap,
+                              "capturable_usd_per_day_ceiling": ceil,
                               "passed": passed}
         ok_any = ok_any or passed
         cs = (f"收斂 {conv['frac']*100:.0f}%（門檻 {CONV_PASS_FRAC*100:.0f}%）"
@@ -320,7 +362,9 @@ def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
         if ins:
             print(f"        最肥時刻深度中位 ${ins['fat_median_notional_usd']:,.0f}"
                   f"｜卡價(>5s) {ins['fat_stale_gt5s']}/{ins['fat_prints']}"
-                  f"｜可捕獲 ≈ ${cap}/天（供工程閘門評估，不進本判準）")
+                  f"｜可捕獲 ≈ ${cap}/天"
+                  f"（{conv.get('episodes') or 0} 次偏離 × 半個帶；"
+                  f"分鐘計數的上限是 ${ceil}）——供工程閘門評估，不進本判準)")
     if pid == "BTC" and ok_any:
         v = "**對照組亮了** —— BTC 兩邊深簿零費率不該有帶；先查儀器，不是查市場。"
     elif ok_any:
