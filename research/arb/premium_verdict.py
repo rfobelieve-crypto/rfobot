@@ -140,9 +140,14 @@ CONV_MAX_MIN = 240
 CONV_PASS_FRAC = 0.70
 
 
-def convergence(rows, band_bps):
+def convergence(rows, band_bps, with_starts=False):
+    """with_starts=True additionally returns the start ts of every episode
+    (2026-09-04, session-window exploration). Default output is unchanged
+    -- the verdict path never passes it -- so the frozen scorer's numbers
+    cannot move; the flag only exposes what the loop already knew."""
     import statistics as st
     prems = [x["prem"] for x in rows]
+    starts = []
     episodes, i, n = [], MIDLINE_WIN, len(rows)
     while i < n:
         mid = st.median(prems[i - MIDLINE_WIN:i])
@@ -156,6 +161,7 @@ def convergence(rows, band_bps):
                 j += 1
             mins = (rows[j]["ts"] - rows[i]["ts"]) / 60 if j < n else None
             episodes.append(mins)
+            starts.append(rows[i]["ts"])
             i = j + 1
         else:
             i += 1
@@ -163,10 +169,13 @@ def convergence(rows, band_bps):
         return {"episodes": 0}
     ok = sum(1 for m in episodes if m is not None and m <= CONV_MAX_MIN)
     med = st.median([m for m in episodes if m is not None] or [float("inf")])
-    return {"episodes": len(episodes), "converged_4h": ok,
-            "frac": round(ok / len(episodes), 2),
-            "median_minutes": round(med, 1) if med != float("inf") else None,
-            "passed": ok / len(episodes) >= CONV_PASS_FRAC}
+    out = {"episodes": len(episodes), "converged_4h": ok,
+           "frac": round(ok / len(episodes), 2),
+           "median_minutes": round(med, 1) if med != float("inf") else None,
+           "passed": ok / len(episodes) >= CONV_PASS_FRAC}
+    if with_starts:
+        out["starts"] = list(zip(starts, episodes))
+    return out
 
 
 def instrument_stats(rows, side):
