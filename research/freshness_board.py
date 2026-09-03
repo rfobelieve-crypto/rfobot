@@ -159,6 +159,12 @@ REGISTRY = [
     # operator to ignore the channel (the exact failure this board exists
     # to prevent). "glob_newest" asks the real question: is the CURRENT
     # file being written?
+    ("arb recorder GOLD_LL (§1.02)", "file",
+     "../entropy-arb/logs/GOLD_LL/minutes.csv", 1.0,
+     "zero-fee control: lighter XAU vs lighter-rh XAU"),
+    ("arb recorder NVDA_LL (§1.02)", "file",
+     "../entropy-arb/logs/NVDA_LL/minutes.csv", 1.0,
+     "zero-fee control: lighter NVDA vs lighter-rh NVDA"),
     ("arb scanner (§0.75b)", "glob_newest",
      "../entropy-arb/logs/scan/scan_*.csv", 0.5,
      "cross-venue REST scanner, ~2 min cycle over ~110 pairs"),

@@ -61,6 +61,11 @@ PAIRS = [
     ("HYPE", "HYPE/minutes.csv", "HL HYPE",         "lighter-rh HYPE",      "thin crypto; largest funding gap on 09-01"),
     ("ZEC",  "ZEC/minutes.csv",  "HL ZEC",          "lighter-rh ZEC",       "thin crypto"),
     ("NEAR", "NEAR/minutes.csv", "HL NEAR",         "lighter-rh NEAR",      "thin crypto"),
+    # Zero-fee control pairs (2026-09-04, TODO 1.02): BOTH legs on a schedule
+    # that is 0 maker / 0 taker, so the only things that can kill them are
+    # convergence (USDC vs USDG basis dressed up as premium) and depth.
+    ("GOLD_LL", "GOLD_LL/minutes.csv", "lighter XAU",  "lighter-rh XAU",  "zero-fee both legs; gold index (not PAXG)"),
+    ("NVDA_LL", "NVDA_LL/minutes.csv", "lighter NVDA", "lighter-rh NVDA", "zero-fee both legs; stock perp"),
 ]
 # Venue keys for the fee table (2026-09-03). Written explicitly rather than
 # parsed out of the prose above: the leg descriptions are for humans, and a
@@ -70,6 +75,7 @@ VENUE_KEYS = {
     "ANTH": ("IO", "lighter-rh"), "BTC": ("HL", "lighter-rh"),
     "HYPE": ("HL", "lighter-rh"), "ZEC": ("HL", "lighter-rh"),
     "NEAR": ("HL", "lighter-rh"),
+    "GOLD_LL": ("lighter", "lighter-rh"), "NVDA_LL": ("lighter", "lighter-rh"),
 }
 
 FIXED_START = {"SNDK": datetime(2026, 8, 28, 10, 28, tzinfo=timezone.utc)}

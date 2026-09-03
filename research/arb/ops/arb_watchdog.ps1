@@ -33,6 +33,8 @@ $Members = [ordered]@{
   'ZEC'     = @('--symbol ZEC ',  'run_recorder_ZEC.bat')
   'NEAR'    = @('--symbol NEAR ', 'run_recorder_NEAR.bat')
   'HYPE'    = @('--symbol HYPE ', 'run_recorder_HYPE.bat')
+  'GOLD_LL' = @('--symbol XAU ',  'run_recorder_GOLD_LL.bat')
+  'NVDA_LL' = @('--symbol NVDA ', 'run_recorder_NVDA_LL.bat')
   'scanner' = @('tools\scanner.py', 'run_scanner.bat')
 }
 
@@ -49,7 +51,7 @@ foreach ($name in $Members.Keys) {
     Start-Process -FilePath (Join-Path $Root $bat) -WorkingDirectory $Root -WindowStyle Minimized
   }
 }
-$line = if ($dead.Count -eq 0) { "$stamp UTC  all 8 alive" }
+$line = if ($dead.Count -eq 0) { "$stamp UTC  all 10 alive" }
         elseif ($DryRun)      { "$stamp UTC  DRY-RUN would relaunch: $($dead -join ',')" }
         else                  { "$stamp UTC  RELAUNCHED: $($dead -join ',')" }
 Add-Content -Path $Log -Value $line -Encoding UTF8
