@@ -74,11 +74,18 @@ DEFAULT = {"taker_bps": 4.5, "maker_bps": 1.5, "rebate": 0.0, "verified": False,
            "note": "unknown venue - charged at the HL schedule to stay pessimistic"}
 
 
-def fee_bps(venue: str, maker: bool = False) -> float:
-    """Effective cost of ONE crossing on this venue, in bps."""
+def fee_bps(venue: str, maker: bool = False, rebate: bool = True) -> float:
+    """Effective cost of ONE crossing on this venue, in bps.
+
+    rebate=False prices the SCHEDULE only. Every rebate here is account
+    terms rather than a public fact (IO's 100% is explicitly UNCONFIRMED),
+    so any figure a verdict rests on has to be showable both ways —
+    otherwise a promotion that expires quietly takes the conclusion with
+    it (2026-09-03: the §0.75 family's "both legs 0 bps" was exactly this).
+    """
     v = VENUES.get(venue, DEFAULT)
     base = v["maker_bps"] if maker else v["taker_bps"]
-    return base * (1.0 - v["rebate"])
+    return base * (1.0 - (v["rebate"] if rebate else 0.0))
 
 
 # Execution mode. 2026-09-03: the author of the recorder we run published his
@@ -95,28 +102,31 @@ MODES = {
 }
 
 
-def round_trip_bps(leg_a: str, leg_b: str, mode: str = "taker_taker") -> float:
+def round_trip_bps(leg_a: str, leg_b: str, mode: str = "taker_taker",
+                   rebate: bool = True) -> float:
     """Both legs, in and out, under one execution mode."""
     if mode == "maker_maker":
-        per_leg = fee_bps(leg_a, True) + fee_bps(leg_b, True)
+        per_leg = (fee_bps(leg_a, True, rebate)
+                   + fee_bps(leg_b, True, rebate))
     elif mode == "maker_taker":
         # rest on the cheaper-to-rest venue, cross the other
-        per_leg = min(fee_bps(leg_a, True) + fee_bps(leg_b, False),
-                      fee_bps(leg_a, False) + fee_bps(leg_b, True))
+        per_leg = min(fee_bps(leg_a, True, rebate) + fee_bps(leg_b, False, rebate),
+                      fee_bps(leg_a, False, rebate) + fee_bps(leg_b, True, rebate))
     else:
-        per_leg = fee_bps(leg_a) + fee_bps(leg_b)
+        per_leg = fee_bps(leg_a, False, rebate) + fee_bps(leg_b, False, rebate)
     return 2.0 * per_leg
 
 
-def required_band_bps(leg_a: str, leg_b: str, mode: str = "taker_taker") -> float:
+def required_band_bps(leg_a: str, leg_b: str, mode: str = "taker_taker",
+                      rebate: bool = True) -> float:
     """The band this pair needs before a trade breaks even."""
-    return 2.0 * round_trip_bps(leg_a, leg_b, mode)
+    return 2.0 * round_trip_bps(leg_a, leg_b, mode, rebate)
 
 
 def net_per_trade_bps(band_bps: float, leg_a: str, leg_b: str,
-                      mode: str = "taker_taker") -> float:
+                      mode: str = "taker_taker", rebate: bool = True) -> float:
     """What one round trip keeps: half the band, minus four crossings."""
-    return band_bps / 2.0 - round_trip_bps(leg_a, leg_b, mode)
+    return band_bps / 2.0 - round_trip_bps(leg_a, leg_b, mode, rebate)
 
 
 def unverified(leg_a: str, leg_b: str) -> list[str]:

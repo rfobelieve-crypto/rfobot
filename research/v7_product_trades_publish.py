@@ -47,6 +47,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 OUT = ROOT / "research" / "results" / "v7_product_trades.jsonl"
+# Health of the PIPE, written every run (2026-09-03). The rows artifact
+# cannot report this: "no fills yet" (legitimate) and "misconfigured"
+# (a bug) both produce zero rows, which is exactly how this pipeline sat
+# broken for days printing one skip line an hour. freshness_board reads
+# the `ok` flag -- see mistake.md 2026-09-01 ("translate 'never started'
+# into 'some number is wrong'").
+STATUS = ROOT / "research" / "results" / "v7_product_trades_status.json"
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -96,6 +103,19 @@ def _check_uid(uid: str) -> bool:
     return ok
 
 
+def _status(ok: bool, reason: str) -> None:
+    """State the pipe's own health. Never raises: a broken monitor must not
+    break the hourly train, but it must not be silent either (the
+    2026-08-01 rule about non-silent except blocks)."""
+    try:
+        STATUS.write_text(json.dumps(
+            {"asof_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+             "ok": bool(ok), "reason": reason}, ensure_ascii=False, indent=1),
+            encoding="utf-8")
+    except Exception as exc:
+        print(f"[WARN] v7_product_trades status write failed: {exc}")
+
+
 def fetch_events() -> list:
     base = _env("MILL_EXPORT_URL")
     token = _env("MILL_EXPORT_TOKEN")
@@ -103,8 +123,10 @@ def fetch_events() -> list:
     if not (base and token and uid):
         print("v7_product_trades: MILL_EXPORT_* not set — skip (token 未設，"
               "同 §0.78 的那一步)")
+        _status(False, "MILL_EXPORT_* 未設")
         return []
     if not _check_uid(uid):
+        _status(False, f"MILL_EXPORT_UID='{uid}' 不是 16 hex id（產品端 V1.62.0 起只收 id）")
         return []
     url = (_export_url(base, "v7") + "?"
            + urllib.parse.urlencode({"uid": uid}))
@@ -118,8 +140,12 @@ def fetch_events() -> list:
         # errors likewise must not fail the hourly bat. One line, exit 0.
         print(f"v7_product_trades: fetch failed ({exc}) — skip "
               f"(product side /export/v7 pending, 規格請求 2026-08-31)")
+        _status(False, f"fetch failed: {exc}")
         return []
     rows = data.get("rows") or []
+    # 200 with zero rows is HEALTHY (the bot simply has not traded yet) --
+    # the flag is about reachability + configuration, never about volume.
+    _status(True, f"HTTP 200, {len(rows)} events for {data.get('user')}")
     print(f"v7_product_trades: fetched {len(rows)} events for {data.get('user')}")
     OUT.write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in rows)
                    + ("\n" if rows else ""), encoding="utf-8")

@@ -1,0 +1,14 @@
+shadow run 2026-09-03 13:40  new signals: 0  flow annotated: +0 (4039/4274 covered)  BTC survivors: +0
+  logged rows: 4274
+  ALL      n=4274  open= 80  closed=4194  meanR=-0.0210  WR=52%  t=-2.24
+  B (pierce) n=1527  open= 29  closed=1498  meanR=-0.0082  WR=56%  t=-0.54
+  C (B∧收回) n=1205  open= 28  closed=1177  meanR=+0.0243  WR=59%  t=+1.42
+  D (C∧量能高) n= 562  open= 13  closed= 549  meanR=+0.0172  WR=57%  t=+0.66
+  E (BTC·OI↓∧CVD順破∧清算高) n=  32  open=  1  closed=  31  meanR=+0.3636  WR=77%  t=+2.85
+  E' (BTC·OI↓∧清算高, 凍結 2026-09-03) n=  32  open=  1  closed=  31  meanR=+0.3636  WR=77%  t=+2.85
+  B:swing  n= 316  open=  3  closed= 313  meanR=-0.0205  WR=58%  t=-0.58
+  B:session n= 784  open= 21  closed= 763  meanR=+0.0070  WR=55%  t=+0.34
+  B:pdh_pdl n= 369  open=  4  closed= 365  meanR=+0.0045  WR=58%  t=+0.15
+  B:pwh_pwl n=  58  open=  1  closed=  57  meanR=-0.2268  WR=49%  t=-2.56
+  genuinely prospective (first_seen < exit): 3447
+  Variant B: n=1498/1400 meanR=-0.0082 clustered-CI-low=-0.0911 -> FAIL | C(B∧收回) [作廢·連坐 B FAIL 2026-09-02]: n=820/400 since 2026-08-09 meanR=-0.0200 CI-low=-0.1271 (base 357 excluded) | D(C∧量能高) [作廢·連坐 B FAIL 2026-09-02]: n=381/400 since 2026-08-09 meanR=-0.0334 CI-low=-0.1446 (base 168 excluded) | E(BTC·OI↓∧CVD順破∧清算高): n=22/60 since 2026-08-02 meanR=+0.1990 CI-low=-0.2029 vs非本組BTC +0.0120(差+0.1870) -> accumulating | E'(BTC·OI↓∧清算高): n=0/60 since 2026-09-03 meanR=— CI-low=— vs非本組BTC -0.1516(差—) -> accumulating | M(A∧後方磁鐵≤1.00ATR·core9): n=3/400 since 2026-09-03 meanR=+0.0309 CI-low=+0.0309 幣1/3正 -> accumulating

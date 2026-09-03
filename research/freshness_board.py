@@ -94,6 +94,14 @@ REGISTRY = [
     ("basis obs (§0.91)", "db",
      "basis_obs:ts_received", 1.0,
      "Bitget in-venue basis recorder (10-min cadence; 6 missed = dead)"),
+    # 2026-09-03: the V7 fill pipeline (TODO 0.81) sat broken for days
+    # printing one skip line an hour -- MILL_EXPORT_UID was still the
+    # account name after the product side went id-only. No artifact-age
+    # rule could see it: "no fills yet" and "misconfigured" both produce
+    # nothing. The producer now states its own health and this reads it.
+    ("v7 export pipe (§0.81)", "json_flag",
+     "research/results/v7_product_trades_status.json:ok", 2.5,
+     "product-side /export/v7 reachable AND configured (not: has rows)"),
     ("ops board row", "db",
      "ops_board:checked_at", 2.5,
      "operations surface (schedule + revalidation history) for the site"),
@@ -260,6 +268,30 @@ def age_glob(pattern: str) -> tuple[float | None, str]:
     return (time.time() - stalest.stat().st_mtime) / H, stalest.name
 
 
+def age_json_flag(spec: str):
+    """Age + a boolean health flag out of a small status artifact.
+
+    For pipelines whose failure mode is "it never produced anything at all"
+    (mistake.md 2026-09-01): an mtime rule cannot tell "no rows yet, which
+    is legitimate" from "misconfigured, which is a bug", because both leave
+    the same absence. So the producer writes {ok: bool, reason: str} every
+    run and this reads the flag. Missing file = RED (absence of evidence is
+    the failure mode here, per the module docstring).
+
+    spec: "<path relative to repo root>:<boolean key>"
+    """
+    rel, key = spec.rsplit(":", 1)
+    p = ROOT / rel
+    if not p.exists():
+        return None, "(no status file)", False
+    age = (time.time() - p.stat().st_mtime) / H
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return age, f"unreadable: {exc}"[:60], False
+    return age, str(d.get("reason") or "")[:60], bool(d.get(key))
+
+
 def age_db(spec: str, conn) -> float | None:
     table, col = spec.split(":")
     try:
@@ -269,7 +301,16 @@ def age_db(spec: str, conn) -> float | None:
         m = row and row.get("m")
         if m is None:
             return None
-        if not isinstance(m, datetime):
+        if isinstance(m, (int, float)) and not isinstance(m, bool):
+            # Epoch columns (basis_obs.ts_received is BIGINT). Before
+            # 2026-09-03 this fell into fromisoformat, threw, and the row
+            # was RED forever -- a guard that cannot go green cannot detect
+            # a real death either (the recorder was alive the whole time).
+            # Seconds vs milliseconds: anything past ~2001 in seconds is
+            # < 1e12; treat larger values as ms.
+            secs = float(m) / (1000.0 if float(m) > 1e12 else 1.0)
+            m = datetime.fromtimestamp(secs, tz=timezone.utc)
+        elif not isinstance(m, datetime):
             m = datetime.fromisoformat(str(m))
         return (datetime.now(timezone.utc)
                 - m.replace(tzinfo=timezone.utc)).total_seconds() / H
@@ -291,7 +332,7 @@ def main() -> int:
 
     rows, reds = [], []
     for name, kind, target, max_h, note in REGISTRY:
-        detail = ""
+        detail, flag = "", True
         if kind == "file":
             age = age_file(target)
         elif kind == "glob":
@@ -300,9 +341,11 @@ def main() -> int:
             age, detail = age_parquet_content(target)
         elif kind == "glob_newest":
             age, detail = age_glob_newest(target)
+        elif kind == "json_flag":
+            age, detail, flag = age_json_flag(target)
         else:
             age = age_db(target, conn) if conn else None
-        ok = age is not None and age <= max_h
+        ok = age is not None and age <= max_h and flag
         rows.append({"name": name, "age_h": None if age is None
                      else round(age, 1), "max_h": max_h, "ok": ok,
                      "detail": detail, "note": note})

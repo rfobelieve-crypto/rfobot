@@ -85,6 +85,23 @@ class TestTimestampAutoDetection:
 # API failure fallback
 # ---------------------------------------------------------------------------
 
+def _valid_kline_cache(n: int = 2) -> pd.DataFrame:
+    """A cached frame the CURRENT contract accepts.
+
+    2026-08-20 (data_fetcher.py:215) made a wrong-shaped cache fatal instead
+    of fail-open: handing a frame with only `close` downstream produced an
+    unreadable KeyError six steps later in feature_builder. These tests were
+    written against the old fail-open behaviour and passed a one-column
+    frame, so they had been red ever since — a red suite is how the next
+    real failure gets ignored. The intent (API dies -> cache is used) is
+    unchanged; only the fixture now satisfies KLINE_REQUIRED_COLS.
+    """
+    from indicator.data_fetcher import KLINE_REQUIRED_COLS
+    idx = pd.date_range("2026-08-01", periods=n, freq="1h", tz="UTC")
+    return pd.DataFrame({c: [67000.0 + i for i in range(n)]
+                         for c in KLINE_REQUIRED_COLS}, index=idx)
+
+
 class TestAPIFailureFallback:
     """Verify fallback to cached data when API calls fail."""
 
@@ -95,8 +112,7 @@ class TestAPIFailureFallback:
         from indicator.data_fetcher import fetch_binance_klines
 
         mock_request.side_effect = requests.RequestException("Connection refused")
-        cached_df = pd.DataFrame({"close": [67000, 67100]})
-        mock_cache.return_value = cached_df
+        mock_cache.return_value = _valid_kline_cache(2)
 
         result = fetch_binance_klines()
         mock_cache.assert_called_with("binance_klines")
@@ -112,11 +128,11 @@ class TestAPIFailureFallback:
         mock_resp.json.return_value = []
         mock_request.return_value = mock_resp
 
-        cached_df = pd.DataFrame({"close": [67000]})
-        mock_cache.return_value = cached_df
+        mock_cache.return_value = _valid_kline_cache(1)
 
         result = fetch_binance_klines()
         mock_cache.assert_called_with("binance_klines")
+        assert len(result) == 1
 
     @patch("indicator.data_fetcher._load_cache")
     @patch("indicator.data_fetcher._retry_request")
@@ -196,12 +212,30 @@ class TestResponseValidation:
         mock_resp.json.return_value = rows
         mock_request.return_value = mock_resp
 
-        cached = pd.DataFrame({"close": [67000.0]})
-        mock_cache.return_value = cached
+        mock_cache.return_value = _valid_kline_cache(1)
 
         result = fetch_binance_klines()
         # Should have fallen back to cache due to invalid prices
         mock_cache.assert_called()
+        assert len(result) == 1
+
+    @patch("indicator.data_fetcher._load_cache")
+    @patch("indicator.data_fetcher._retry_request")
+    def test_malformed_cache_raises_instead_of_returning_junk(
+            self, mock_request, mock_cache):
+        """The other half of the 2026-08-20 contract, pinned.
+
+        All sources down AND the cache is the wrong shape -> RuntimeError,
+        never a frame that explodes further downstream. Without this test the
+        fixture fix above would silently allow a regression back to fail-open.
+        """
+        from indicator.data_fetcher import fetch_binance_klines
+
+        mock_request.side_effect = requests.RequestException("Connection refused")
+        mock_cache.return_value = pd.DataFrame({"close": [67000.0]})
+
+        with pytest.raises(RuntimeError, match="kline"):
+            fetch_binance_klines()
 
 
 # ---------------------------------------------------------------------------

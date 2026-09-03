@@ -1,0 +1,5 @@
+{
+ "asof_utc": "2026-09-03 13:34",
+ "ok": false,
+ "reason": "MILL_EXPORT_UID='Rfo' 不是 16 hex id（產品端 V1.62.0 起只收 id）"
+}

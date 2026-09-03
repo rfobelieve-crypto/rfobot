@@ -53,6 +53,12 @@ sys.path.insert(0, str(HERE.parents[1]))
 os.environ["SLIP"] = "0"          # gross engine; bps costs applied here
 import sweep_core as SC            # noqa: E402
 import level_types as LT           # noqa: E402  (same trade fn = no drift)
+# §0.94 variant M: the pool-lifecycle and distance definitions live in
+# room_ahead and are imported, never re-implemented — a second copy of a
+# definition disagrees silently (mistake.md 2026-08-26). Import-safe: both
+# modules set SLIP=0 before importing sweep_core, and sweep_forward (pulled
+# in transitively) is constants + defs only.
+import room_ahead as RA            # noqa: E402
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -207,7 +213,18 @@ FIELDS = ["symbol", "universe", "level_kind", "first_seen_utc", "fill_ts",
           # three measurable families agreed in sign, so the verdict-day
           # question needs forward values — and forward values only exist
           # if they are recorded from today (the regime_cell rule).
-          "confluence_kinds"]
+          "confluence_kinds",
+          # §0.94 prospective column (2026-09-03). Variant M = A ∧ 後方磁鐵
+          # ≤ 1.00 ATR. The effect was found by EXPLORATION on backtest data
+          # (the two pre-registered predictions both failed; the surviving
+          # shape is the reverse of P2), so it may only be judged on rows
+          # that did not exist when it was found -- hence a column recorded
+          # from today rather than a retro-computed one, and hence NO
+          # backfill of older rows: re-cutting the existing forward sample
+          # is the C/D trap (§0.92 rule 3). Definition is imported from
+          # room_ahead (all_pools + distances) so there is exactly ONE
+          # implementation of it in the repo (mistake.md 2026-08-26).
+          "magnet_atr"]
 
 FLOW_BACKFILL_PER_RUN = 40      # cap 1m-kline fetch work per hourly run
 
@@ -957,6 +974,62 @@ def e_clock(log: dict, which: str = "E") -> dict:
             "status": ("PASS" if ok else "FAIL" if at_floor else "accumulating")}
 
 
+# ── Variant M, frozen 2026-09-03 (TODO §0.94) ────────────────────────
+# M = A ∧ back magnet <= 1.00 ATR. Floor 400 comes from the backtest cell's
+# own variance BEFORE any forward row existed (n=2338, meanR +0.1015,
+# sd 0.633, design effect 1.69 -> n≈253 clears zero at the observed mean;
+# 400 leaves margin). core9 only: the registered breadth bar is >=6/9 and
+# the backtest that produced the effect was core9.
+# 連坐: A ⊃ M — if A is judged NO-GO, M is void. That was decided at
+# registration, before any data, precisely so it cannot be revisited on
+# the day A fails.
+M_CLOCK, M_GATE_N = "2026-09-03", 400
+M_CLOCK_TS = int(datetime(2026, 9, 3, tzinfo=timezone.utc).timestamp())
+MAGNET_MAX_M = 1.00
+
+
+def variant_m_pred(r) -> bool:
+    v = r.get("magnet_atr")
+    if v in (None, "", "na") or r.get("universe") != "core9":
+        return False
+    try:
+        return float(v) <= MAGNET_MAX_M
+    except (TypeError, ValueError):
+        return False
+
+
+def m_clock(log: dict) -> dict:
+    """Frozen scorer for M. Owns these numbers; boards must read it.
+
+    Four conditions, ALL required, read once at the floor (§0.94):
+      1. n >= 400 closed rows with fill_ts on/after the freeze
+      2. day-clustered bootstrap CI95 low > 0
+      3. >= 6/9 core9 coins positive
+      4. both halves of the window positive
+    """
+    inside = _since(variant_m_pred, M_CLOCK)
+    st = gate_stats(log, inside)
+    rows = sorted((r for r in log.values()
+                   if r["status"] == "CLOSED" and r["net_r"] != "" and inside(r)),
+                  key=lambda r: int(r["exit_ts"]))
+    rs = [float(r["net_r"]) for r in rows]
+    h = len(rs) // 2
+    halves = ((sum(rs[:h]) / h, sum(rs[h:]) / (len(rs) - h))
+              if len(rs) >= 2 else (0.0, 0.0))
+    per: dict[str, list] = {}
+    for r in rows:
+        per.setdefault(r["symbol"], []).append(float(r["net_r"]))
+    pos = sum(1 for v in per.values() if sum(v) / len(v) > 0)
+    at_floor = st["n_closed"] >= M_GATE_N
+    ok = (at_floor and st["ci_low"] is not None and st["ci_low"] > 0
+          and pos >= 6 and min(halves) > 0)
+    return {"clock": M_CLOCK, "floor": M_GATE_N, "n": st["n_closed"],
+            "mean_r": st["mean_r"], "ci_low": st["ci_low"],
+            "wr_pct": st["wr_pct"], "coins_pos": pos, "coins": len(per),
+            "halves": [round(halves[0], 4), round(halves[1], 4)],
+            "status": ("PASS" if ok else "FAIL" if at_floor else "accumulating")}
+
+
 def gate_progress(log: dict) -> str:
     """Variant B gate line + the variant C observation line (same maths)."""
     s = gate_stats(log)
@@ -994,6 +1067,15 @@ def gate_progress(log: dict) -> str:
                 f"meanR={_n(c['mean_r'])} CI-low={_n(c['ci_low'])} "
                 f"vs非本組BTC {_n(c['control_mean'])}"
                 f"(差{_n(c['gap'])}) -> {c['status']}")
+    m = m_clock(log)
+
+    def _m(x):
+        return f"{x:+.4f}" if isinstance(x, (int, float)) else "—"
+
+    out += (f" | M(A∧後方磁鐵≤{MAGNET_MAX_M:.2f}ATR·core9): "
+            f"n={m['n']}/{m['floor']} since {m['clock']} "
+            f"meanR={_m(m['mean_r'])} CI-low={_m(m['ci_low'])} "
+            f"幣{m['coins_pos']}/{m['coins']}正 -> {m['status']}")
     return out
 
 
@@ -1044,6 +1126,7 @@ def main() -> int:
             cellmap = _regime_cells(bars)
             confcnt = _confluence_counter(bars)
             bar_idx = {b[0]: i for i, b in enumerate(bars)}
+            pools = None          # §0.94: built on first row that needs it
             # one source of truth per kind: the frozen engine for swing,
             # the shared level engine for the time-defined pools. Tuples carry
             # (kind, fill_ts, exit_ts, gross, net, pierce, lvl, atr, stopped);
@@ -1092,6 +1175,19 @@ def main() -> int:
                     if fi is not None:
                         row["confluence_kinds"] = confcnt(
                             kind, lvl, atr, fi, side == "LONG")
+                # §0.94 magnet: only rows from M's own freeze forward. Older
+                # rows are deliberately left blank — they are the data the
+                # effect was FOUND on, so labelling them would manufacture
+                # a "forward" sample out of the exploration set.
+                if (row.get("magnet_atr") in (None, "")
+                        and fill_ts >= M_CLOCK_TS):
+                    fi = bar_idx.get(fill_ts)
+                    if fi is not None:
+                        if pools is None:
+                            pools = RA.all_pools(bars)
+                        _room, _mag = RA.distances(
+                            pools, fi, lvl, 1 if side == "LONG" else -1, atr)
+                        row["magnet_atr"] = f"{_mag:.4f}"
                 row.update({
                     "status": "CLOSED" if done else "OPEN",
                     "exit_ts": exit_ts if done else "",

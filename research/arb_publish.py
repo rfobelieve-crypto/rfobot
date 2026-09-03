@@ -31,6 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from research.arb import fees as FEES  # noqa: E402  (single source of fee truth)
+from research.arb.premium_verdict import VENUE_KEYS  # noqa: E402  (one map)
 SRC = ROOT / "research" / "results" / "arb_premium_verdict.json"
 SCAN = ROOT / "research" / "results" / "arb_scan_rank.json"
 
@@ -56,13 +57,13 @@ def _depth_tier(usd) -> str | None:
     return "deep"
 
 
-def _side(interim: dict, lab: str) -> dict | None:
+def _side(interim: dict, lab: str, legs=None) -> dict | None:
     s = interim.get(lab)
     if not s:
         return None
     conv = interim.get(f"conv_{lab}") or {}
     depth = interim.get(f"depth_{lab}") or {}
-    return {
+    out = {
         "band_bps": s.get("band_bps"),
         "fires_per_day": s.get("fires_per_day"),
         "converges": bool(conv.get("passed")) if conv.get("episodes") else None,
@@ -72,6 +73,25 @@ def _side(interim: dict, lab: str) -> dict | None:
         "depth_tier": _depth_tier(depth.get("fat_median_notional_usd")),
         "stale_prints": depth.get("fat_stale_gt5s"),
     }
+    # 2026-09-03: the scan board already states what the operator's own fee
+    # schedule does to a pair; the RECORDING family showed only its band,
+    # which reads as "there is room" when the fee table may already have
+    # eaten it. Same numbers, same owner (fees.py), both boards.
+    if legs:
+        la, lb = legs
+        band = s.get("band_bps")
+        net = (FEES.net_per_trade_bps(band, la, lb)
+               if isinstance(band, (int, float)) else None)
+        out.update({
+            "fee_venues": [la, lb],
+            "required_band_bps": round(FEES.required_band_bps(la, lb), 2),
+            "required_band_bps_schedule": round(
+                FEES.required_band_bps(la, lb, rebate=False), 2),
+            "net_bps_per_trade": None if net is None else round(net, 2),
+            "fee_ok": bool(net is not None and net > 0),
+            "fee_unverified": FEES.unverified(la, lb),
+        })
+    return out
 
 
 # ── the battlefield scan (2026-09-03, TODO §1.00) ──────────────────────────
@@ -215,8 +235,8 @@ def build() -> dict:
             "gate_days": p.get("gate_days"),
             "start_utc": p.get("start_utc"),
             "is_control": pid == "BTC",
-            "sell": _side(interim, "sell"),
-            "buy": _side(interim, "buy"),
+            "sell": _side(interim, "sell", VENUE_KEYS.get(pid)),
+            "buy": _side(interim, "buy", VENUE_KEYS.get(pid)),
             "carry": ({
                 "median_bps_8h": f.get("median_bps_8h"),
                 "annualised_pct": f.get("annualised_pct_at_median"),

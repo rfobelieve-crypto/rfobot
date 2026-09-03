@@ -35,6 +35,9 @@ try:
 except Exception:
     pass
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import fees as FEES               # noqa: E402  single source of truth
+
 LOGS = ROOT.parent / "entropy-arb" / "logs"
 OUT = ROOT / "research" / "results" / "arb_premium_verdict.json"
 
@@ -59,6 +62,16 @@ PAIRS = [
     ("ZEC",  "ZEC/minutes.csv",  "HL ZEC",          "lighter-rh ZEC",       "thin crypto"),
     ("NEAR", "NEAR/minutes.csv", "HL NEAR",         "lighter-rh NEAR",      "thin crypto"),
 ]
+# Venue keys for the fee table (2026-09-03). Written explicitly rather than
+# parsed out of the prose above: the leg descriptions are for humans, and a
+# fee must never depend on string-matching a comment.
+VENUE_KEYS = {
+    "SNDK": ("IO", "lighter-rh"), "NBIS": ("IO", "lighter"),
+    "ANTH": ("IO", "lighter-rh"), "BTC": ("HL", "lighter-rh"),
+    "HYPE": ("HL", "lighter-rh"), "ZEC": ("HL", "lighter-rh"),
+    "NEAR": ("HL", "lighter-rh"),
+}
+
 FIXED_START = {"SNDK": datetime(2026, 8, 28, 10, 28, tzinfo=timezone.utc)}
 GATE_DAYS = 7
 NET_BPS_MIN = 1.0
@@ -336,6 +349,27 @@ def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
               [r for r in rows if r["ts"] >= mid])
     verdict_sides = {}
     ok_any = False
+    ok_any_at_fee = False
+    # THE FROZEN GATE'S OWN PARENTHETICAL IS NOW KNOWN TO BE CONDITIONAL.
+    # It reads "fees are 0+0 on this pair, so net == raw executable room",
+    # written 2026-08-28. On 2026-09-03 the fee check found that the zero on
+    # the Entropy/HL leg is Entropy's referral rebate (a promotion, and
+    # UNCONFIRMED on a real fill), not a schedule -- and for the HL-core
+    # pairs (BTC/HYPE/ZEC/NEAR) there is no rebate claimed at all, so their
+    # true requirement is 18 bps, not 1.
+    #
+    # The registered threshold is NOT touched: `passed` below is still the
+    # frozen criterion, because moving a bar the day before the verdict is
+    # the thing pre-registration exists to stop. What IS added is the fee
+    # truth beside it -- a second flag, named, so the verdict cannot be
+    # read without seeing which assumption it rests on.
+    va, vb = VENUE_KEYS.get(pid, ("HL", "lighter"))
+    req_rebate = FEES.required_band_bps(va, vb)
+    req_sched = FEES.required_band_bps(va, vb, rebate=False)
+    unver = FEES.unverified(va, vb)
+    print(f"  費率：{va}+{vb} → 需要帶 {req_rebate:.1f} bps（含返佣）／"
+          f"{req_sched:.1f} bps（只看費率表）"
+          + (f"｜未查證的腿：{','.join(unver)}" if unver else ""))
     for key, lab in (("sell_max", "sell"), ("buy_max", "buy")):
         full = side_stats(rows, key)
         h = [side_stats(hh, key) for hh in halves]
@@ -348,15 +382,29 @@ def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
                   and bool(conv.get("passed")))
         ceil = capturable_usd_per_day(full, ins, conv)
         cap = capturable_usd_per_day_tradeable(full, ins, conv, days)
+        net_rebate = FEES.net_per_trade_bps(full["band_bps"], va, vb)
+        net_sched = FEES.net_per_trade_bps(full["band_bps"], va, vb,
+                                           rebate=False)
+        passed_at_fee = passed and net_rebate > 0
         verdict_sides[lab] = {"full": full, "halves": h,
                               "convergence": conv, "depth": ins,
                               "capturable_usd_per_day": cap,
                               "capturable_usd_per_day_ceiling": ceil,
-                              "passed": passed}
+                              "passed": passed,
+                              "fee_venues": [va, vb],
+                              "required_band_bps_with_rebate": round(req_rebate, 2),
+                              "required_band_bps_schedule": round(req_sched, 2),
+                              "net_bps_per_trade_with_rebate": round(net_rebate, 2),
+                              "net_bps_per_trade_schedule": round(net_sched, 2),
+                              "fee_unverified_legs": unver,
+                              "passed_at_fee": passed_at_fee}
         ok_any = ok_any or passed
+        ok_any_at_fee = ok_any_at_fee or passed_at_fee
         cs = (f"收斂 {conv['frac']*100:.0f}%（門檻 {CONV_PASS_FRAC*100:.0f}%）"
               if conv.get("episodes") else "收斂事件 0（不可判）")
         mark = "✓" if passed else "✗"
+        mark += (" 扣費後仍正" if passed_at_fee
+                 else (" 扣費後轉負" if passed else ""))
         print(f"  {lab}: 帶 {full['band_bps']:.2f} bps、{full['fires_per_day']:.1f} 次/天、"
               f"兩半 {h[0]['fires_per_day']:.1f}/{h[1]['fires_per_day']:.1f}、{cs} → {mark}")
         if ins:
@@ -366,14 +414,31 @@ def score_pair(pid, csv_sub, leg_a, leg_b, note, now):
                   f"（{conv.get('episodes') or 0} 次偏離 × 半個帶；"
                   f"分鐘計數的上限是 ${ceil}）——供工程閘門評估，不進本判準)")
     if pid == "BTC" and ok_any:
-        v = "**對照組亮了** —— BTC 兩邊深簿零費率不該有帶；先查儀器，不是查市場。"
-    elif ok_any:
+        v = ("**對照組亮了** —— BTC 兩個深簿之間不該有帶；先查儀器，不是查市場。"
+             f"（本句原文寫「兩邊零費率」，2026-09-03 費率查證後改正："
+             f"Lighter 是 0，HL 不是，這個配對需要帶 {req_rebate:.1f} bps。）")
+    elif ok_any and ok_any_at_fee:
         v = ("**過閘** —— 進工程閘門討論（審計下單路徑、統一風控、資金拆分）。"
-             "注意這只證明溢價存在，不證明抓得到它；看可捕獲美元再決定值不值得。")
+             "注意這只證明溢價存在，不證明抓得到它；看可捕獲美元再決定值不值得。"
+             f"帶也撐得過實際費率（需要 {req_rebate:.1f} bps）"
+             + (f"，但 {','.join(unver)} 的費率／返佣尚未在真實成交上查證——"
+                "這一條沒查證前不得動錢。" if unver else "。"))
+    elif ok_any:
+        v = ("**過閘（僅在零費率假設下）** —— 帶過了 2026-08-28 凍結的 "
+             f"{NET_BPS_MIN:.1f} bps 門檻，但按費率表這個配對需要 "
+             f"{req_rebate:.1f} bps（只看費率表 {req_sched:.1f} bps），"
+             "所以扣掉實際費率之後每筆是負的。凍結門檻寫的是「扣費後」，"
+             "而它當時把費用當成 0+0——**判準沒被改，是它的前提被推翻了**。"
+             "要救這條線只有兩條路：查證返佣，或改掛單執行。")
     else:
         v = "**關線** —— 扣費後的可成交空間撐不起門檻；一週結案，成本≈零。"
     print(f"  判決：{v}")
-    res.update({"status": "verdict", "sides": verdict_sides, "verdict": v})
+    res.update({"status": "verdict", "sides": verdict_sides, "verdict": v,
+                "fee": {"venues": [va, vb],
+                        "required_band_bps_with_rebate": round(req_rebate, 2),
+                        "required_band_bps_schedule": round(req_sched, 2),
+                        "unverified_legs": unver},
+                "passed_at_fee": ok_any_at_fee})
     return res
 
 

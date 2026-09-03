@@ -68,8 +68,14 @@ def load(sym):
 
 def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
              reanchor="none", reanchor_days=90, stop=None, stop_buf=0.03,
-             gate=None, gate_scale=0.0):
+             stop_delay_h=0, gate=None, gate_scale=0.0):
     """One continuous run. Returns metrics + the hourly equity curve.
+
+    stop_delay_h: after a hard stop, stay FLAT (no ladder at all) for this
+    many hours before re-anchoring at the then-current price. 0 = the
+    2026-09-03 七/八 behaviour (stop then immediately stand back in), which
+    TODO 0.93 flagged as an open question. Time re-anchoring is suspended
+    while the pause runs -- the pause is the re-entry rule, not a second one.
 
     gate: optional per-bar bool array. False = do not OPEN new rungs on that
     bar (sells, stops and re-anchors are untouched -- a filter that also
@@ -88,6 +94,7 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
     lo_e, hi_e = edges[1:], edges[:-1]
     width = float(hi_e[0] / lo_e[0] - 1)
     anchor_i = 0
+    paused_until = -1               # bar index at which a post-stop pause ends
     eq = np.empty(len(close))
     n_anchor = n_stop = n_fill = n_gated_off = 0
 
@@ -99,6 +106,13 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
         n_anchor += 1
 
     for i in range(len(close)):
+        if i < paused_until:
+            # flat by construction (the stop emptied every bin); no ladder
+            eq[i] = cash
+            continue
+        if paused_until >= 0 and i == paused_until:
+            replace(close[i], i)
+            paused_until = -1
         held = qty > 0
         # sells first: a bar that reaches the top edge of a held bin
         s = held & (high[i] >= hi_e)
@@ -126,7 +140,10 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
             qty[:] = 0.0
             cost[:] = 0.0
             n_stop += 1
-            replace(px, i)
+            if stop_delay_h > 0:
+                paused_until = i + int(stop_delay_h)
+            else:
+                replace(px, i)
             eq[i] = cash
             continue
         flat = not (qty > 0).any()
