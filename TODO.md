@@ -811,7 +811,15 @@ Polymarket 掛單獎勵是「成本」那一軌的直接候選：它不是折扣
 - [ ] **前瞻時鐘**：從 2026-09-04 起每一筆真上市自動進本節四關；≥20 個事件各自
       有 >72h 追蹤時第一次讀（約 09-18）
 - [ ] 公告監看：三家公告端點每 5 分鐘輪詢，公告→市場出現的領先時間逐筆記錄
-- [ ] Polymarket 永續接進掃描器（前提：API 從本機連得到，見下）
+- [ ] Polymarket 永續接進掃描器——**本機連不到**（2026-09-04 查證）：`polymarket.com`、
+      `docs.polymarket.com`、`api.perpetuals.polymarket.com` 三個主機全部解析到同一個
+      IP `182.173.0.181`，連線逾時——這是 **ISP 層的 DNS 黑洞**（台灣把它當博弈站擋），
+      不是 Polymarket 自己的地區限制（那個只擋美國下單）。後果：(a) 掃描它需要一台
+      在台灣以外的機器——**這是東京那台機器第一個具體的、非延遲的理由**；(b) 就算
+      掃到了，下單前要先確認帳戶地區可下單。API 形狀（公開文件）：
+      `https://api.perpetuals.polymarket.com/v1/`，instruments／ticker（index_price、
+      mark_price、funding_rate、next_funding）／book（bids/asks、sequence），有 SDK
+      `fetch_perps_book(instrument_id, depth)`。
 
 ### 1.04 套利·待辦清單（2026-09-04 使用者：「其他的列入待辦事項」）
 
