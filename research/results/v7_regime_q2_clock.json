@@ -3,7 +3,7 @@
  "cell": "TREND_UPxUP",
  "n": 0,
  "gate_n": 60,
- "days": 0.4,
+ "days": 4.7,
  "gate_days": 30,
  "gate_met": false,
  "limits": [

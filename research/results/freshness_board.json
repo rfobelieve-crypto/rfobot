@@ -1,5 +1,5 @@
 {
- "asof_utc": "2026-08-28 23:20",
+ "asof_utc": "2026-09-03 05:20",
  "rows": [
   {
    "name": "bat-train heartbeat",
@@ -19,7 +19,7 @@
   },
   {
    "name": "kline caches",
-   "age_h": 0.3,
+   "age_h": 0.2,
    "max_h": 3.5,
    "ok": true,
    "detail": "BTCUSDT_1h.csv",
@@ -58,12 +58,44 @@
    "note": "skip-vs-taken scoring surface; silent staleness = consumer silently scores against stale outcomes"
   },
   {
+   "name": "basis obs (§0.91)",
+   "age_h": null,
+   "max_h": 1.0,
+   "ok": false,
+   "detail": "",
+   "note": "Bitget in-venue basis recorder (10-min cadence; 6 missed = dead)"
+  },
+  {
+   "name": "ops board row",
+   "age_h": 0.2,
+   "max_h": 2.5,
+   "ok": true,
+   "detail": "",
+   "note": "operations surface (schedule + revalidation history) for the site"
+  },
+  {
+   "name": "arb status row",
+   "age_h": 0.2,
+   "max_h": 2.5,
+   "ok": true,
+   "detail": "",
+   "note": "§0.75 family surface for the site (off-cloud recorder -> DB -> agent)"
+  },
+  {
    "name": "prereg board row",
    "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
    "note": "site research-progress board; a frozen board reads as 'no progress'"
+  },
+  {
+   "name": "degradation guard",
+   "age_h": 0.3,
+   "max_h": 2.5,
+   "ok": true,
+   "detail": "",
+   "note": "§0.85 guard ran this cycle (not just: state last changed)"
   },
   {
    "name": "indicator bars",
@@ -98,8 +130,72 @@
    "note": "two-venue premium recording; silence = the week of data quietly stops"
   },
   {
+   "name": "arb recorder NBIS (§0.75)",
+   "age_h": 0.0,
+   "max_h": 1.0,
+   "ok": true,
+   "detail": "",
+   "note": "§0.75 family 2026-08-30: io:NBIS vs lighter"
+  },
+  {
+   "name": "arb recorder ANTH (§0.75)",
+   "age_h": 0.0,
+   "max_h": 1.0,
+   "ok": true,
+   "detail": "",
+   "note": "§0.75 family 2026-08-30: io:ANTH vs lighter-rh ANTHROPIC"
+  },
+  {
+   "name": "arb recorder BTC (§0.75)",
+   "age_h": 0.0,
+   "max_h": 1.0,
+   "ok": true,
+   "detail": "",
+   "note": "§0.75 family 2026-08-30: CONTROL pair — band must stay ~0"
+  },
+  {
+   "name": "arb recorder ZEC (§0.75)",
+   "age_h": 0.0,
+   "max_h": 1.0,
+   "ok": true,
+   "detail": "",
+   "note": "§0.75 family 2026-08-30: HL vs lighter-rh, thin"
+  },
+  {
+   "name": "arb recorder NEAR (§0.75)",
+   "age_h": 0.0,
+   "max_h": 1.0,
+   "ok": true,
+   "detail": "",
+   "note": "§0.75 family 2026-08-30: HL vs lighter-rh, thin"
+  },
+  {
+   "name": "arb recorder HYPE (§0.75)",
+   "age_h": 0.0,
+   "max_h": 1.0,
+   "ok": true,
+   "detail": "",
+   "note": "§0.75 family 2026-09-01: largest funding gap in the snapshot"
+  },
+  {
+   "name": "arb scanner (§0.75b)",
+   "age_h": 0.0,
+   "max_h": 0.5,
+   "ok": true,
+   "detail": "scan_20260903.csv",
+   "note": "cross-venue REST scanner, ~2 min cycle over ~110 pairs"
+  },
+  {
+   "name": "coinglass parquet CONTENT",
+   "age_h": 29.0,
+   "max_h": 48.0,
+   "ok": true,
+   "detail": "cg_fear_greed_daily.parquet",
+   "note": "last DATA row age of the stalest CG parquet — mtime lies in an outage"
+  },
+  {
    "name": "coinglass parquets",
-   "age_h": 3.3,
+   "age_h": 9.3,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_oi_1h.parquet",
@@ -107,15 +203,31 @@
   },
   {
    "name": "daily collect log",
-   "age_h": 3.3,
+   "age_h": 9.3,
    "max_h": 30.0,
    "ok": true,
    "detail": "",
    "note": "04:00 daily task heartbeat"
   },
   {
+   "name": "freshness board self",
+   "age_h": 6.0,
+   "max_h": 7.0,
+   "ok": true,
+   "detail": "",
+   "note": "the board's own 6-hourly run — nothing else watches the watchman"
+  },
+  {
+   "name": "revalidation report",
+   "age_h": 696.7,
+   "max_h": 840.0,
+   "ok": true,
+   "detail": "quarterly_revalidation_20260805.md",
+   "note": "monthly model revalidation actually produced a report"
+  },
+  {
    "name": "portfolio clocks",
-   "age_h": 62.7,
+   "age_h": 75.8,
    "max_h": 195.0,
    "ok": true,
    "detail": "",
@@ -123,12 +235,14 @@
   },
   {
    "name": "tracked signals",
-   "age_h": 6.3,
+   "age_h": 2.3,
    "max_h": 336.0,
    "ok": true,
    "detail": "",
    "note": ">=14d without ANY signal = decode locked again (TODO rule 7)"
   }
  ],
- "reds": []
+ "reds": [
+  "basis obs (§0.91)"
+ ]
 }

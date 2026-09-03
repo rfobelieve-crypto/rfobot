@@ -11,31 +11,31 @@
  "by_tier": [
   {
    "tier": "Moderate",
-   "n": 1418,
-   "mkt_bps": -8.12,
-   "grid_bps": -6.79,
-   "diff_bps": 1.32,
+   "n": 1425,
+   "mkt_bps": -8.16,
+   "grid_bps": -6.84,
+   "diff_bps": 1.33,
    "entry_imp_bps": -0.41,
    "fill_rate": 0.578,
-   "h1_diff_bps": 2.52,
-   "h2_diff_bps": 0.12,
+   "h1_diff_bps": 2.63,
+   "h2_diff_bps": 0.03,
    "halves_agree": true,
-   "n_forward": 59,
-   "forward_diff_bps": -2.71
+   "n_forward": 66,
+   "forward_diff_bps": -2.22
   },
   {
    "tier": "Strong",
-   "n": 815,
-   "mkt_bps": 3.77,
-   "grid_bps": 4.03,
-   "diff_bps": 0.25,
-   "entry_imp_bps": -1.54,
-   "fill_rate": 0.596,
-   "h1_diff_bps": 3.07,
-   "h2_diff_bps": -2.55,
+   "n": 819,
+   "mkt_bps": 3.68,
+   "grid_bps": 4.02,
+   "diff_bps": 0.34,
+   "entry_imp_bps": -1.46,
+   "fill_rate": 0.597,
+   "h1_diff_bps": 3.19,
+   "h2_diff_bps": -2.5,
    "halves_agree": false,
-   "n_forward": 49,
-   "forward_diff_bps": 0.41
+   "n_forward": 53,
+   "forward_diff_bps": 1.74
   }
  ]
 }

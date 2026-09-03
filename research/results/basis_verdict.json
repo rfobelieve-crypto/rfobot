@@ -1,0 +1,36 @@
+{
+ "registered": "2026-09-02",
+ "deadline": "2026-09-30",
+ "days": 1.3,
+ "gate_days": 28.0,
+ "gate_met": false,
+ "criteria": {
+  "median_ann_pct_min": 8.0,
+  "neg_frac_max": 0.25,
+  "both_halves": true,
+  "symbols_each": [
+   "BTCUSDT",
+   "ETHUSDT"
+  ]
+ },
+ "prior": {
+  "BTCUSDT": {
+   "n": 270,
+   "median_ann_pct": 4.05,
+   "p10": -3.94,
+   "p90": 10.95,
+   "neg_frac": 0.215
+  },
+  "ETHUSDT": {
+   "n": 270,
+   "median_ann_pct": 3.67,
+   "p10": -2.41,
+   "p90": 10.95,
+   "neg_frac": 0.215
+  }
+ },
+ "forward": {
+  "BTCUSDT": null,
+  "ETHUSDT": null
+ }
+}
