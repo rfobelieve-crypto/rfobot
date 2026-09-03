@@ -180,6 +180,84 @@ def main() -> int:
                       if all(bars.values()) else
                       "沒有支持「寬一個數量級」——不因為這份外部報告改變配對選擇")
     print(f"  → {res['verdict']}")
+
+    # ── v2: two instrument defects, disclosed not swapped in (2026-09-04) ──
+    # v1's bars and verdict stand as registered. These two are real and were
+    # found by reading the per-pair listing, per mistake.md 2026-08-02
+    # (check the instrument before interpreting a number):
+    #   (a) GOLD pairs mix PAXG / XAUT / XAU -- three different tokenized
+    #       gold products plus a gold index. PAXG vs XAUT is an ISSUER
+    #       basis, not a venue price gap; the recorder's own author warned
+    #       "底层资产必须完全一致" and TODO 1.00 logged it. Every GOLD band
+    #       in the 27-33 bps range is partly that.
+    #   (b) GOLD@bitget-bitget and GOLD@lighter-lighter have the SAME venue
+    #       on both legs -- not cross-venue arbitrage at all, and they sit
+    #       in the BIG-BIG control cell that P2 depends on.
+    # Symbol strings differ by naming convention everywhere (0G vs 0GUSDT vs
+    # 0G-USDT-SWAP), so the filter normalises the ticker instead of
+    # comparing raw strings.
+    print("\nv2 儀器修正（探索；v1 判準與判決不動）：剔除同場館配對與跨代號配對")
+
+    def norm(sym: str) -> str:
+        t = str(sym).upper().split(":")[-1]
+        t = t.replace("-USDT-SWAP", "").replace("USDT", "")
+        return t or str(sym).upper()
+
+    keep = []
+    for pair, g in df.groupby("pair"):
+        if len(g) < MIN_ROWS:
+            continue
+        gg = g[(g.leg_a != g.leg_b)
+               & (g.sym_a.map(norm) == g.sym_b.map(norm))]
+        if len(gg) < MIN_ROWS:
+            continue
+        la, lb = gg.leg_a.iloc[0], gg.leg_b.iloc[0]
+        asset = pair.split("@")[0].upper()
+        best = None
+        for col, dep in (("sell_edge_bps", ("a_bid_usd", "b_ask_usd")),
+                         ("buy_edge_bps", ("b_bid_usd", "a_ask_usd"))):
+            if col not in gg.columns:
+                continue
+            m = SR.side_metric(gg, col, dep)
+            if m["band_bps"] is not None and (best is None
+                                              or m["band_bps"] > best["band_bps"]):
+                best = m
+        if not best:
+            continue
+        keep.append({"pair": pair, "asset": asset, "klass": klass(la, lb),
+                     "kind": "equity" if asset in EQUITY else "crypto",
+                     "band_bps": best["band_bps"], "depth_usd": best["depth_usd"],
+                     "n": len(gg)})
+    k = pd.DataFrame(keep)
+    res["v2"] = {"pairs": len(k), "cells": {}}
+    print(f"  剩 {len(k)} 個配對（v1 是 {len(r)}）")
+    for kind in ("equity", "crypto"):
+        sub = k[k.kind == kind] if not k.empty else k
+        if sub.empty:
+            continue
+        cell = {}
+        print(f"  [{kind}]  {'類別':<12}{'n配對':>6}{'帶中位':>9}{'帶p75':>9}{'深度中位$':>12}")
+        for kk in ("BIG-BIG", "BIG-SMALL", "SMALL-SMALL"):
+            ss = sub[sub.klass == kk]
+            if ss.empty:
+                continue
+            cell[kk] = {"pairs": len(ss),
+                        "band_med": round(float(ss.band_bps.median()), 2),
+                        "band_p75": round(float(ss.band_bps.quantile(0.75)), 2),
+                        "depth_med": round(float(ss.depth_usd.median()), 0)}
+            print(f"           {kk:<12}{len(ss):>6}{cell[kk]['band_med']:>9.2f}"
+                  f"{cell[kk]['band_p75']:>9.2f}{cell[kk]['depth_med']:>12,.0f}")
+        res["v2"]["cells"][kind] = cell
+    r2_eq, r2_cr = ratio(res["v2"]["cells"].get("equity", {})), ratio(res["v2"]["cells"].get("crypto", {}))
+    res["v2"].update({"ratio_equity": r2_eq, "ratio_crypto": r2_cr})
+    print(f"  v2 比值：股票/商品 {r2_eq}×｜加密 {r2_cr}×"
+          f"  → P1 門檻 {BAR_P1}× {'仍不過' if (r2_eq or 0) < BAR_P1 else '會過（但 v1 已定案）'}")
+    if not k.empty:
+        eqk = k[k.kind == "equity"]
+        print("\nv2 股票/商品逐配對（帶寬前 15）：")
+        for _, x in eqk.sort_values("band_bps", ascending=False).head(15).iterrows():
+            print(f"    {x.pair:<30}{x.klass:<12}{x.band_bps:>8.2f} bps"
+                  f"  深度 ${x.depth_usd:>10,.0f}  n={x.n}")
     OUT.write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"\n  -> {OUT}")
     return 0
