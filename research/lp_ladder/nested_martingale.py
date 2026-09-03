@@ -170,13 +170,25 @@ def load_btc():
     return (np.array(ts), np.array(o), np.array(h), np.array(l), np.array(cl))
 
 
-def replay_one(low, high, close, edges, alloc, fee_bps):
-    """One ladder over one window. Returns (fee_yield, inventory_pnl, deployed).
+def replay_one(low, high, close, edges, alloc, fee_bps, maker_bps=2.0):
+    """One ladder over one window.
 
     bin i owns [edges[i+1], edges[i]]; it is BUY-filled the first time the bar
     low pierces edges[i+1] and unwound when a later bar high regains edges[i].
-    Every completed down-up traversal turns the bin's capital over once, which
-    is the notional the fee is charged on.
+
+    Two venues price that same event differently, which is the whole question:
+
+      AMM LP (v3-style)   a traversal down-and-back returns the position to
+                          quote at ~the same average price: round trip PnL ~ 0
+                          ex-fees. Revenue is the pool's fee tier on the volume
+                          that crossed you. Entry is the range average (~ the
+                          geometric mid).
+      CEX grid            limit buy at the bin's LOW edge, limit sell at its
+                          HIGH edge: every traversal realises the full bin
+                          width minus two maker fees, and unsold inventory is
+                          carried at the low edge, not the mid.
+
+    Returns (amm_fee, amm_inv, grid_realised, grid_inv, touched, turnover).
     """
     N = len(alloc)
     lo_edge, hi_edge = edges[1:], edges[:-1]
@@ -193,11 +205,15 @@ def replay_one(low, high, close, edges, alloc, fee_bps):
         if back.any():
             traversals[back] += 1
             filled[back] = False
-    fee = (alloc * traversals).sum() * fee_bps / 1e4
+    turn = float((alloc * traversals).sum())
     px = close[-1]
-    inv = (alloc[filled] * (px / entry[filled] - 1)).sum() if filled.any() else 0.0
+    amm_fee = turn * fee_bps / 1e4
+    amm_inv = (alloc[filled] * (px / entry[filled] - 1)).sum() if filled.any() else 0.0
+    width = float(hi_edge[0] / lo_edge[0] - 1)          # same for every bin (log grid)
+    grid_realised = turn * (width - 2 * maker_bps / 1e4)
+    grid_inv = (alloc[filled] * (px / lo_edge[filled] - 1)).sum() if filled.any() else 0.0
     touched = filled | (traversals > 0)
-    return fee, inv, alloc[touched].sum(), (alloc * traversals).sum()
+    return amm_fee, amm_inv, grid_realised, grid_inv, alloc[touched].sum(), turn
 
 
 def replay(T, r, m, n, drop, window_days, step_days, fee_bps):
@@ -206,20 +222,25 @@ def replay(T, r, m, n, drop, window_days, step_days, fee_bps):
     bars = window_days * 24
     step = step_days * 24
     starts = range(0, len(c) - bars, step)
-    out = {k: {"fee": [], "inv": [], "dep": [], "turn": []} for k in PROFILES}
+    out = {k: {"fee": [], "inv": [], "dep": [], "turn": [], "grealised": [],
+               "ginv": [], "oor": []} for k in PROFILES}
     maxdrop = []
     for s in starts:
         p0 = c[s]
         edges = grid(p0, p0 * (1 - drop), N)
         w = slice(s + 1, s + 1 + bars)
         maxdrop.append(1 - l[w].min() / p0)
+        oor = 1.0 if l[w].min() < edges[-1] else 0.0
         for name, fn in PROFILES.items():
-            fee, inv, dep, turn = replay_one(l[w], h[w], c[w], edges,
-                                             fn(T, r, m, n), fee_bps)
+            fee, inv, gre, ginv, dep, turn = replay_one(
+                l[w], h[w], c[w], edges, fn(T, r, m, n), fee_bps)
             out[name]["fee"].append(fee / T)
             out[name]["inv"].append(inv / T)
             out[name]["dep"].append(dep / T)
             out[name]["turn"].append(turn / T)
+            out[name]["grealised"].append(gre / T)
+            out[name]["ginv"].append(ginv / T)
+            out[name]["oor"].append(oor)
     print(f"\n=== path replay: BTC 1h, {len(list(starts))} rolling starts "
           f"(every {step_days}d), {window_days}d windows, "
           f"range = spot -> spot-{drop:.0%}, fee {fee_bps}bps/traversal ===")
@@ -260,6 +281,26 @@ def replay(T, r, m, n, drop, window_days, step_days, fee_bps):
           "inventory loss. beFee_bps = fee that would have to be charged on "
           "EVERY bin traversal to break even -- compare with the venue's actual "
           "tier (5 / 30 / 100 bps). That comparison is the whole decision.")
+
+    width = (1 - drop) ** (-1 / (m * n)) - 1
+    print(f"\n=== same ladder, two venues (bin width {width:.3%}, "
+          f"AMM tier {fee_bps:.0f}bps, grid maker 2bps/side) ===")
+    print(f"{'profile':10s} {'AMMnet/yr':>10s} {'GRIDnet/yr':>11s} "
+          f"{'grid p5':>9s} {'gridWorst':>10s}")
+    yr2 = 365 / window_days
+    for name in PROFILES:
+        d = out[name]
+        amm = (np.array(d["fee"]) + np.array(d["inv"])) * yr2
+        gnet = (np.array(d["grealised"]) + np.array(d["ginv"])) * yr2
+        print(f"{name:10s} {amm.mean():10.2%} {gnet.mean():11.2%} "
+              f"{np.percentile(gnet, 5):9.2%} {gnet.min():10.2%}")
+    print(f"out-of-range (price left the bottom of the ladder) in "
+          f"{np.mean(out['nested']['oor']):.1%} of windows -- that is where "
+          f"both venues stop earning and only the inventory tail is left.")
+    print("net/yr = window result scaled to a year, on TOTAL capital. The AMM "
+          "column is a LOWER bound: it only counts full bin traversals, while a "
+          "real pool also earns on churn inside a bin -- but it never earns the "
+          "bin width itself, which is exactly what the grid column collects.")
 
 
 def main():
