@@ -433,7 +433,7 @@ R 收回＝刺穿價位後一小時內縮回內側（拿完止損就回來）　
 R∧V 放量刺縮回(+0.165/n390)　R∧Q 縮回＋確認掃止損(+0.199/n202)　R∧V∧Q 三重確認·最肥(+0.267/WR70%/n112)　R∧快 五分鐘搶完就跑(+0.115/n531)　R∧快∧Q 快閃＋止損確認(+0.202)　R 有縮回就算(+0.085/n926)　PA V7也站這邊(+0.104)　V∧LIQ 放量＋清算噴(+0.168)<br>
 <b>數字怎麼讀：</b>n=歷史出現次數　netR=每筆平均賺幾成停損距離(已扣費, +0.165=16.5%)　t=多不像運氣(2有料/5很硬)　WR=勝率<br>
 <b>共同核心：</b>八個提名六個含 R——「刺出去、拿完止損、又縮回來」就是獵殺完成的簽名，其他條件都是加分。<br>
-<b>上線判準：</b>歷史成績只是入場券；shadow 每小時記 forward 成績單，樣本夠＋CI低緣>0＋十月預註冊蓋章才談上線。
+<b>上線判準：</b>歷史成績只是入場券；shadow 每小時記 forward 成績單，樣本夠＋CI低緣>0＋預註冊蓋章才談上線。<b>2026-09-02 判決</b>：變體B 走到 1400 筆門檻，日聚類 CI 下緣 −0.094 → <b>未通過</b>；C、D 建在 B 之上一併作廢。仍在累積的只有正式軌道 A（波段池·9 幣）。
 </details>
 <details><summary>圖例與定義</summary>
 線起點=造出該價位的針尖K棒 · 變體B=掃單穿越≤0.25 ATR（已註冊濾網） · 形成中=樞紐未滿10根確認／當日當週極值未收盤<br>
@@ -563,6 +563,10 @@ def main() -> int:
     bsub = [t for t in fwd if t["b"]]
     bclosed = [t for t in closed if t["b"]]
 
+    # 2026-09-02: gate_stats gained FAIL. Mapping it to "累積中" would keep a
+    # settled verdict printing as if the clock were still running.
+    _ZH_STATUS = {"PASS": "PASS", "FAIL": "未通過（2026-09-02 判決）"}
+
     def _wr(ts):
         return (100 * sum(1 for t in ts if t["net"] > 0) / len(ts)) if ts else None
 
@@ -595,10 +599,10 @@ def main() -> int:
                 f"<td class='{cls}'>{s_:+.2f}</td></tr>")
 
     perf_rows = "".join([
-        prow("本幣全部 (A)", fwd, closed),
-        prow("變體B 淺穿越", bsub, bclosed),
-        prow("變體C ＋收回", call_a, cclosed),
-        prow("變體D ＋量能", dall, dclosed),
+        prow("本幣全部（四種池·無濾網）", fwd, closed),
+        prow("變體B 淺穿越〔FAIL 09-02〕", bsub, bclosed),
+        prow("變體C ＋收回〔作廢·連坐〕", call_a, cclosed),
+        prow("變體D ＋量能〔作廢·連坐〕", dall, dclosed),
         prow("變體E 三面板", eall, eclosed),
     ])
     gate_line = "全籃進度: 見每週一 09:30 PortfolioClocks 報告"
@@ -613,7 +617,7 @@ def main() -> int:
             gsub = (f"全籃29幣：B 進度 {gs['n_closed']}/{gs['floor']}"
                     f" · 均netR {gs['mean_r']:+.3f}"
                     f" · CI低緣·日聚類 {gs['ci_low']:+.3f}"
-                    f" · {'PASS' if gs['status'] == 'PASS' else '累積中'}")
+                    f" · {_ZH_STATUS.get(gs['status'], '累積中')}")
         gate_line = ("全籃(29幣) " + SE.gate_progress(slog)
                      + (f" · log截至 {asof} UTC" if asof else ""))
     except Exception:
@@ -628,8 +632,13 @@ def main() -> int:
             "<th>ΣnetR</th></tr></thead>"
             f"<tbody>{perf_rows}</tbody></table></div>"
             + (f"<div class='sub'>{gsub}</div>" if gsub else "")
+            + "<div class='sub'><b>注意</b>：上表第一列是這個幣<b>全部四種池</b>的"
+            + "無濾網成績，<b>不是</b> Gate F 的變體A——A 只算<b>波段池</b>，"
+            + "本幣的 A 就是下面「凍結後 forward」那行的<b>波段</b>那一格。"
+            + "全籃29幣同定義（四池·無濾網）的均netR 是<b>負的</b>（−0.032，"
+            + "CI低緣 −0.138）——單幣好看不代表規則好。</div>"
             + "<div class='sub'><b>變體A</b>=原始版·波段池·無濾網（Gate F 正式軌道）"
-            + "　<b>變體B</b>=四種池＋淺穿越≤0.25ATR（預註冊 forward 中，表格 B 欄）"
+            + "　<b>變體B</b>=四種池＋淺穿越≤0.25ATR（2026-09-02 判決未通過，表格 B 欄）"
             + "　<b>變體C</b>=B∧收回內側✓（1m 價格收回確認，表格 C 欄）"
             + "　<b>變體D</b>=C∧量能高（訂單流組合配方，量能高=高於該幣自身歷史中位，表格 D 欄）"
             + "　<b>變體E</b>=BTC·OI↓∧CVD順破∧清算爆量高＝操作者三面板「當下」讀法</div>"
