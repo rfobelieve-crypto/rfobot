@@ -3601,7 +3601,13 @@ E ⊂ E′，兩者在 live 幾乎**同一批訊號**，所以 E′ 的時鐘**�
 regime，看起來像濾網正常。這是 mistake.md 2026-08-26 的鏡像（那次 SELECT 了
 沒 emit，這次 emit 了沒 SELECT）。已修並在線上驗證：15/15 有真值。
 
-- [ ] 三張 CG parquet（oi/liq/futures_cvd）改每小時刷新，讓 E 變成即時標籤
+- [x] 三張 CG parquet（oi/liq/futures_cvd）改每小時刷新（2026-09-03 完成）：
+      `research/refresh_cg_hourly.py`，掛在 `shadow_engine.bat` 的 **最前面**
+      （必須在引擎標註之前跑，同一輪才看得到新的一小時）。只刷這三個端點，
+      不是全部 14 個——每小時跑，其餘的沒有小時級消費者。實測：三張的落後
+      從 **~6 小時降到 0.6 小時**，整支 bat 跑過一次、log 尾巴確認新步驟
+      有輸出（判準是產物不是退出碼）。後果：BTC 獵取的 E 狀態在 1~2 小時內
+      就決定得了，遠早於 feed 的 8 小時窗口，`e_state` 不再多數是 pending。
 
 **新增記錄欄位**：`drv_oi_dn` / `drv_cvd_with`——`drv_q` 是兩個盤的 AND，
 以前無法分開計分。新欄位、同一份不可變來源，不是改寫舊欄位；134 列 BTC
