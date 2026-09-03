@@ -38,10 +38,14 @@ VENUES: dict[str, dict] = {
     # promotion, not a schedule — and it is the one number a small live fill
     # still has to confirm.
     "IO": {
-        "taker_bps": 4.5, "maker_bps": 1.5, "rebate": 1.0, "verified": False,
-        "note": "Entropy Tier-4 referral claims 100% rebate. UNCONFIRMED on a "
-                "real fill; HL docs also say deployers keep at most 50% of "
-                "fees, which would cap the rebate at ~2.25 bps.",
+        "taker_bps": 4.5, "maker_bps": 1.5, "rebate": 0.25, "verified": True,
+        "note": "Operator's own Entropy referral page 2026-09-04 (referred by "
+                "yourquantguy, TIER 1): Benefit 25% = the fee discount on "
+                "one's OWN trades. The '100%' quoted from the upstream README "
+                "was the REFERRER's share of referees' fees (income), never a "
+                "trading discount -- two different numbers with one name. "
+                "Rebate 60% on that page is what the operator would earn from "
+                "people he refers; it does not touch his own cost.",
     },
     "xyz": {"taker_bps": 4.5, "maker_bps": 1.5, "rebate": 0.0, "verified": True,
             "note": "deployerFeeScale 1.0 + growth mode -> HL schedule."},
