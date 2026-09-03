@@ -20,16 +20,29 @@ n≈7,000**。**兩者不能混**。所以本輪唯一算得上訂單流的是**
 前瞻註冊——bar 級的方向性主張已經 FAIL（CLAUDE.md §撤單流），沒有
 被否證過的只剩「掃單事件當下的撤單行為」，那要另外寫。
 
+**2026-09-03 修正（第一版跑完後撤回 I1/I4 的定義，結果作廢）**
+第一版把 I1 定義成「**成交 bar 的收盤** 相對被掃價位」、I4 定義成
+「**成交 bar 的總量**」，並宣稱兩者無前視。**那是錯的**：`sweep_core`
+的成交發生在該 bar 的**盤中觸價**（`backtest_symbol` 在 j+1..j+W 找第一根
+碰到 lvl 的 bar），所以那根 bar 的收盤與總量在成交當下都還不知道。第一版
+的 I1 因此跑出 +0.52R 的分格差距（是既有任何維度的四倍）——那是「這筆
+已經賺了」在冒充預測力。凍結引擎自己的註解早就寫過這條線
+（pierce 特地取**掃單 bar j**，「Known at the sweep bar, i.e. strictly
+before the fill」），是我沒照著做。**第一版的 I1 存活與 I4 陣亡一律作廢**，
+改成下面兩個可執行的定義重跑。I2/I3 不受影響（它們本來就是延後進場，
+用的是已經收完的 bar）。
+
 四個檢定（凍結，各自帶方向預測，寫在跑之前）
 --------------------------------------------
-無前視的條件化維度（只用成交 bar 及之前的資訊，三等分格）：
-
-  I1 收復強度 reclaim = d × (成交 bar 收盤 − 被掃價位) / ATR
-     ICT：掃了流動性又收回區間內＝被拒絕。**預測 netR 隨它上升。**
-     （與既有的 pierce 不同：pierce 是穿多深，這個是收多回來。）
-  I4 量能衝擊 vshock = 成交 bar 量 / 前 20 根均量
+  I1 收復進場（改為替代進場規則，不再是條件化）：成交 bar **收盤**若
+     收回被掃價位的正確一側，就在**那根收盤**進場；沒收回就不做這筆。
+     ICT：掃了流動性又收回區間內＝被拒絕。收盤價在收盤當下是知道的，
+     所以這是可執行的；代價是讓掉成交那根剩下的行情。
+     **預測：成對 dR > 0。**
+  I4 量能衝擊（改用**掃單 bar j** 的量，與 pierce 同一個時點，
+     嚴格早於成交）vshock = v[j] / 前 20 根均量。
      ICT/訂單流：掃單要有人真的成交，沒有量的假突破是雜訊。
-     **預測 netR 隨它上升。**
+     **預測 netR 隨它上升**（三等分格）。
 
 替代進場規則（會延後進場，所以整筆重算，與凍結規則成對比較）：
 
@@ -56,9 +69,9 @@ n≈7,000**。**兩者不能混**。所以本輪唯一算得上訂單流的是**
 
 判準（沿用 §0.94 / 出場輪的四關與三關，不放寬）
 ------------------------------------------------
-  I1/I4（分格）：方向如宣稱 ∧ 兩半同號 ∧ ≥6/9 幣同號 ∧ 日聚類 CI 離零
-  I2/I3（成對）：dR>0 ∧ 兩半同號 ∧ ≥6/9 幣為正 ∧ 日聚類 CI 下緣>0
-                 ∧ 成對置換 p<0.05
+  I4（分格）：方向如宣稱 ∧ 兩半同號 ∧ ≥6/9 幣同號 ∧ 日聚類 CI 離零
+  I1/I2/I3（成對）：dR>0 ∧ 兩半同號 ∧ ≥6/9 幣為正 ∧ 日聚類 CI 下緣>0
+                    ∧ 成對置換 p<0.05
 
 本輪檢定數 = 4。這條線（出場／地形／進場族）累計 17 次，判準一律維持
 單次 5%，**不事後放寬**；通過的仍需自己的前瞻註冊才可能動凍結規則。
@@ -112,6 +125,24 @@ def short_pivots(bars):
     return out
 
 
+def sweep_bar_map(bars):
+    """fill_bar_index -> sweep_bar_index j, replaying backtest_symbol's own
+    fill search. Needed because the frozen trade tuple carries pierce (taken
+    at j) but not j itself, and I4 must live at j to stay ahead of the fill.
+    """
+    n = len(bars)
+    h = [b[SC.H] for b in bars]
+    l = [b[SC.L] for b in bars]
+    out = {}
+    for e in SC.detect_sweeps(bars):
+        j, lvl, kd = e["j"], e["level"], (1 if e["kind"] == "buy" else -1)
+        for f in range(j + 1, min(j + 1 + SC.W, n)):
+            if (kd == 1 and l[f] <= lvl) or (kd == -1 and h[f] >= lvl):
+                out.setdefault(f, j)
+                break
+    return out
+
+
 def run(bars, sym):
     n = len(bars)
     o = [b[SC.O] for b in bars]
@@ -121,7 +152,9 @@ def run(bars, sym):
     v = [b[SC.V] for b in bars]
     idx = {b[0]: i for i, b in enumerate(bars)}
     piv = short_pivots(bars)
+    jmap = sweep_bar_map(bars)
     s = SCEN["A"]
+    missing = 0
     ecost = s["entry"] / 1e4
     rows = []
     for fill_ts, _e, _r, lvl, atr, _st, pierce, side in SC.backtest_symbol(bars):
@@ -150,10 +183,22 @@ def run(bars, sym):
         if base is None:
             continue
 
-        # ---- I1 / I4: no look-ahead, computed on the fill bar
-        reclaim = d * (c[f] - lvl) / atr
-        vbase = sum(v[f - VOL_LB:f]) / VOL_LB
-        vshock = v[f] / vbase if vbase > 0 else 0.0
+        # ---- I4: volume shock AT THE SWEEP BAR (strictly before the fill,
+        #      same timing rule the frozen engine uses for `pierce`).
+        j = jmap.get(f)
+        if j is None or j < VOL_LB:
+            missing += 1
+            continue
+        vbase = sum(v[j - VOL_LB:j]) / VOL_LB
+        vshock = v[j] / vbase if vbase > 0 else 0.0
+
+        # ---- I1 close-back entry: act at the fill bar's CLOSE (known then),
+        #      only if it closed back on the correct side of the swept level.
+        r1, hit1 = 0.0, False
+        if d * (c[f] - lvl) > 0 and d * (c[f] - stop) > 0 and f < last:
+            got = close_out(f + 1, c[f])
+            if got is not None:
+                r1, hit1 = got, True
 
         # ---- I2 MSS entry
         opp = [p for p in piv if p[0] <= f and p[2] == d]
@@ -190,9 +235,11 @@ def run(bars, sym):
                         break
                 break
 
-        rows.append(dict(sym=sym, ts=fill_ts, base=base, reclaim=reclaim,
+        rows.append(dict(sym=sym, ts=fill_ts, base=base, reclaim=r1,
                          vshock=vshock, pierce=pierce, mss=r2, fvg=r3,
-                         hit_mss=hit2, hit_fvg=hit3))
+                         hit_reclaim=hit1, hit_mss=hit2, hit_fvg=hit3))
+    if missing:
+        print(f"  [WARN] {sym}: {missing} 筆對不到掃單 bar，已剔除")
     return rows
 
 
@@ -301,10 +348,10 @@ def main() -> int:
     print(f"\n  n={n}   凍結進場 meanR {sum(r['base'] for r in rows)/n:+.4f}\n")
     res = {"n": n, "base_mean": sum(r["base"] for r in rows) / n,
            "pivot_s": PIVOT_S, "conf_w": CONF_W}
-    print("  A 無前視條件化（三等分格，預測：高格 > 低格）")
-    res["reclaim"] = cell_gate(rows, "reclaim", "I1 收復強度")
+    print("  A 無前視條件化（掃單 bar 的量，三等分格，預測：高格 > 低格）")
     res["vshock"] = cell_gate(rows, "vshock", "I4 量能衝擊")
     print("\n  B 替代進場規則（成對，未觸發記 0）")
+    res["reclaim"] = pair_gate(rows, "reclaim", "hit_reclaim", "I1 收復進場")
     res["mss"] = pair_gate(rows, "mss", "hit_mss", "I2 MSS 進場")
     res["fvg"] = pair_gate(rows, "fvg", "hit_fvg", "I3 FVG 進場")
     OUT.write_text(json.dumps(res, ensure_ascii=False, indent=2),
