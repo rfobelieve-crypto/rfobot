@@ -67,6 +67,35 @@ def _env(name: str) -> str:
     return ""
 
 
+def _export_url(base: str, leaf: str) -> str:
+    """Normalise the export URL to the V1.62.0 location.
+
+    2026-09-02 handover (產品端請求_研究端匯出搬家): the endpoint moved from
+    /api/u/export/* to /api/research/export/*, the token is header-only
+    (a token in the query string now returns 400 — it leaks into access logs
+    and referers), and uid must be the 16-hex id, not the account name.
+    Old URLs still in .env are rewritten here so the migration is one edit,
+    not a scavenger hunt across machines.
+    """
+    base = base.replace("/api/u/export/", "/api/research/export/")
+    if base.rstrip("/").endswith("/export"):
+        base = base.rstrip("/") + "/" + leaf
+    for other in ("fills", "v7"):
+        if base.endswith("/export/" + other) and other != leaf:
+            base = base[: -len(other)] + leaf
+    return base
+
+
+def _check_uid(uid: str) -> bool:
+    """The product side stopped accepting account names (they are guessable)."""
+    ok = len(uid) == 16 and all(c in "0123456789abcdefABCDEF" for c in uid)
+    if not ok:
+        print(f"MILL_EXPORT_UID='{uid}' 不是 16 位 hex 的使用者 id。"
+              "產品端 V1.62.0 起只收 id（名字回 404）——請把 .env 裡的名字"
+              "換成 id 後重跑。")
+    return ok
+
+
 def fetch_events() -> list:
     base = _env("MILL_EXPORT_URL")
     token = _env("MILL_EXPORT_TOKEN")
@@ -75,9 +104,10 @@ def fetch_events() -> list:
         print("v7_product_trades: MILL_EXPORT_* not set — skip (token 未設，"
               "同 §0.78 的那一步)")
         return []
-    url = (base.replace("/export/fills", "/export/v7")
-           + ("&" if "?" in base else "?")
-           + f"uid={urllib.parse.quote(uid)}&token={urllib.parse.quote(token)}")
+    if not _check_uid(uid):
+        return []
+    url = (_export_url(base, "v7") + "?"
+           + urllib.parse.urlencode({"uid": uid}))
     req = urllib.request.Request(url, headers={"x-export-token": token})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:

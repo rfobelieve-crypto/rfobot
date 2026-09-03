@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 """磨坊逐筆資料攝取＋首輪體檢（研究端裁示_磨坊regime提案 §三 的研究端半邊）。
 
-產品端 V1.51.4 開了 /api/u/export/fills（token 保護）。這支：
+產品端 V1.51.4 開了匯出端點（token 保護），V1.62.0 搬到
+/api/research/export/fills（header-only token、只收 id）。這支：
   1. 拉逐筆成交 → research/results/mill_fills.jsonl（本地留檔，可重跑）
   2. FIFO 配對成回合（同幣：買開→賣平），算每回合淨損益（含手續費）
   3. 印首輪體檢：回合數、每回合淨益、勝率、費用佔比 —— 這是「磨坊
      賺的是本事還是行情」判決的原料，不是判決本身
 
 連線設定放環境變數（.env，不進 git）：
-  MILL_EXPORT_URL   例 https://<jarvis-railway>/api/u/export/fills
-  MILL_EXPORT_TOKEN 與 Railway 上 RESEARCH_EXPORT_TOKEN 同值
-  MILL_EXPORT_UID   帳戶名（例 Rfo）
+  MILL_EXPORT_URL   例 https://<jarvis-railway>/api/research/export/fills
+                    （舊的 /api/u/export/... 會被本檔自動改寫，不必手動改）
+  MILL_EXPORT_TOKEN 與 Railway 上 RESEARCH_EXPORT_TOKEN 同值（只走 header）
+  MILL_EXPORT_UID   使用者 **id**（16 位 hex）——V1.62.0 起不收帳戶名
 
 誠實註記：
   - src 歸屬 2026-08-24 前不可靠（cid_known=false），統計只用可靠列，
@@ -49,14 +51,45 @@ def _env(name):
     return v
 
 
+def _export_url(base: str, leaf: str) -> str:
+    """Normalise the export URL to the V1.62.0 location.
+
+    2026-09-02 handover (產品端請求_研究端匯出搬家): the endpoint moved from
+    /api/u/export/* to /api/research/export/*, the token is header-only
+    (a token in the query string now returns 400 — it leaks into access logs
+    and referers), and uid must be the 16-hex id, not the account name.
+    Old URLs still in .env are rewritten here so the migration is one edit,
+    not a scavenger hunt across machines.
+    """
+    base = base.replace("/api/u/export/", "/api/research/export/")
+    if base.rstrip("/").endswith("/export"):
+        base = base.rstrip("/") + "/" + leaf
+    for other in ("fills", "v7"):
+        if base.endswith("/export/" + other) and other != leaf:
+            base = base[: -len(other)] + leaf
+    return base
+
+
+def _check_uid(uid: str) -> bool:
+    """The product side stopped accepting account names (they are guessable)."""
+    ok = len(uid) == 16 and all(c in "0123456789abcdefABCDEF" for c in uid)
+    if not ok:
+        print(f"MILL_EXPORT_UID='{uid}' 不是 16 位 hex 的使用者 id。"
+              "產品端 V1.62.0 起只收 id（名字回 404）——請把 .env 裡的名字"
+              "換成 id 後重跑。")
+    return ok
+
+
 def fetch():
     base, tok, uid = _env("MILL_EXPORT_URL"), _env("MILL_EXPORT_TOKEN"), _env("MILL_EXPORT_UID")
     if not (base and tok and uid):
         print("尚未設定 MILL_EXPORT_URL / MILL_EXPORT_TOKEN / MILL_EXPORT_UID（.env）")
         print("Railway 那端也要設同值的 RESEARCH_EXPORT_TOKEN。設好後重跑本腳本。")
         return None
-    q = urllib.parse.urlencode({"uid": uid, "token": tok})
-    req = urllib.request.Request(f"{base}?{q}")
+    if not _check_uid(uid):
+        return None
+    url = _export_url(base, "fills") + "?" + urllib.parse.urlencode({"uid": uid})
+    req = urllib.request.Request(url, headers={"x-export-token": tok})
     with urllib.request.urlopen(req, timeout=30) as r:
         d = json.load(r)
     rows = d.get("rows", [])
