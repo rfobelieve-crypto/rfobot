@@ -28,7 +28,7 @@ from __future__ import annotations
 # venue key -> (taker bps, rebate fraction, verified?, note)
 VENUES: dict[str, dict] = {
     "HL": {
-        "taker_bps": 4.5, "rebate": 0.0, "verified": True,
+        "taker_bps": 4.5, "maker_bps": 1.5, "rebate": 0.0, "verified": True,
         "note": "Hyperliquid docs, base tier 0.045%. Volume tiers need $5M+/14d; "
                 "HYPE staking discounts reach 40% only at 500,000 HYPE.",
     },
@@ -38,61 +38,85 @@ VENUES: dict[str, dict] = {
     # promotion, not a schedule — and it is the one number a small live fill
     # still has to confirm.
     "IO": {
-        "taker_bps": 4.5, "rebate": 1.0, "verified": False,
+        "taker_bps": 4.5, "maker_bps": 1.5, "rebate": 1.0, "verified": False,
         "note": "Entropy Tier-4 referral claims 100% rebate. UNCONFIRMED on a "
                 "real fill; HL docs also say deployers keep at most 50% of "
                 "fees, which would cap the rebate at ~2.25 bps.",
     },
-    "xyz": {"taker_bps": 4.5, "rebate": 0.0, "verified": True,
+    "xyz": {"taker_bps": 4.5, "maker_bps": 1.5, "rebate": 0.0, "verified": True,
             "note": "deployerFeeScale 1.0 + growth mode -> HL schedule."},
-    "para": {"taker_bps": 4.5, "rebate": 0.0, "verified": True,
+    "para": {"taker_bps": 4.5, "maker_bps": 1.5, "rebate": 0.0, "verified": True,
              "note": "deployerFeeScale 1.0 + growth mode -> HL schedule."},
-    "mkts": {"taker_bps": 4.5, "rebate": 0.0, "verified": True,
+    "mkts": {"taker_bps": 4.5, "maker_bps": 1.5, "rebate": 0.0, "verified": True,
              "note": "deployerFeeScale 1.0 + growth mode -> HL schedule."},
-    "hyna": {"taker_bps": 4.5, "rebate": 0.0, "verified": True,
+    "hyna": {"taker_bps": 4.5, "maker_bps": 1.5, "rebate": 0.0, "verified": True,
              "note": "deployerFeeScale 1.0 + growth mode -> HL schedule."},
-    "lighter": {"taker_bps": 0.0, "rebate": 0.0, "verified": True,
+    "lighter": {"taker_bps": 0.0, "maker_bps": 0.0, "rebate": 0.0, "verified": True,
                 "note": "Lighter docs: standard account 0 maker / 0 taker. "
                         "Structural, not a promotion."},
-    "lighter-rh": {"taker_bps": 0.0, "rebate": 0.0, "verified": True,
+    "lighter-rh": {"taker_bps": 0.0, "maker_bps": 0.0, "rebate": 0.0, "verified": True,
                    "note": "Same schedule; quotes in USDG, so part of any "
                            "premium is the stablecoin basis."},
     "bitget": {
-        "taker_bps": 6.0, "rebate": 0.50, "verified": True,
+        "taker_bps": 6.0, "maker_bps": 2.0, "rebate": 0.50, "verified": True,
         "note": "Bitget publishes takerFeeRate per contract (0.0006 = 6 bps). "
                 "Rebate 50% stated by the operator 2026-09-03.",
     },
     "okx": {
-        "taker_bps": 5.0, "rebate": 0.45, "verified": False,
+        "taker_bps": 5.0, "maker_bps": 2.0, "rebate": 0.45, "verified": False,
         "note": "ASSUMED 0.05% taker (standard tier); OKX does not publish it "
                 "on an unauthenticated endpoint. Rebate 45% stated by the "
                 "operator 2026-09-03. Confirm from the account's fee page.",
     },
 }
 
-DEFAULT = {"taker_bps": 4.5, "rebate": 0.0, "verified": False,
+DEFAULT = {"taker_bps": 4.5, "maker_bps": 1.5, "rebate": 0.0, "verified": False,
            "note": "unknown venue - charged at the HL schedule to stay pessimistic"}
 
 
-def fee_bps(venue: str) -> float:
-    """Effective taker cost of one crossing on this venue, in bps."""
+def fee_bps(venue: str, maker: bool = False) -> float:
+    """Effective cost of ONE crossing on this venue, in bps."""
     v = VENUES.get(venue, DEFAULT)
-    return v["taker_bps"] * (1.0 - v["rebate"])
+    base = v["maker_bps"] if maker else v["taker_bps"]
+    return base * (1.0 - v["rebate"])
 
 
-def round_trip_bps(leg_a: str, leg_b: str) -> float:
-    """Both legs, in and out."""
-    return 2.0 * (fee_bps(leg_a) + fee_bps(leg_b))
+# Execution mode. 2026-09-03: the author of the recorder we run published his
+# own account of this trade (edgeX, 60 days) and the single biggest difference
+# from our model is that he rests orders instead of crossing -- "挂单便宜但不保证
+# 成交，吃单一定成交但会滑点", with three documented patterns (rest A then cross
+# B; rest A then try to rest B; rest both and cross whichever side is left).
+# Crossing four times is the PESSIMISTIC bound, not the only way to trade, and
+# on Bitget it is the difference between 6 bps and 2 bps per crossing.
+MODES = {
+    "taker_taker": "四次吃單（最保守；我們原本的假設）",
+    "maker_taker": "一腿掛單、一腿吃單（作者的方式 A）",
+    "maker_maker": "兩腿都掛單（作者的方式 C；不保證成交，未成交就切吃單）",
+}
 
 
-def required_band_bps(leg_a: str, leg_b: str) -> float:
+def round_trip_bps(leg_a: str, leg_b: str, mode: str = "taker_taker") -> float:
+    """Both legs, in and out, under one execution mode."""
+    if mode == "maker_maker":
+        per_leg = fee_bps(leg_a, True) + fee_bps(leg_b, True)
+    elif mode == "maker_taker":
+        # rest on the cheaper-to-rest venue, cross the other
+        per_leg = min(fee_bps(leg_a, True) + fee_bps(leg_b, False),
+                      fee_bps(leg_a, False) + fee_bps(leg_b, True))
+    else:
+        per_leg = fee_bps(leg_a) + fee_bps(leg_b)
+    return 2.0 * per_leg
+
+
+def required_band_bps(leg_a: str, leg_b: str, mode: str = "taker_taker") -> float:
     """The band this pair needs before a trade breaks even."""
-    return 2.0 * round_trip_bps(leg_a, leg_b)
+    return 2.0 * round_trip_bps(leg_a, leg_b, mode)
 
 
-def net_per_trade_bps(band_bps: float, leg_a: str, leg_b: str) -> float:
-    """What one round trip actually keeps: half the band, minus four crossings."""
-    return band_bps / 2.0 - round_trip_bps(leg_a, leg_b)
+def net_per_trade_bps(band_bps: float, leg_a: str, leg_b: str,
+                      mode: str = "taker_taker") -> float:
+    """What one round trip keeps: half the band, minus four crossings."""
+    return band_bps / 2.0 - round_trip_bps(leg_a, leg_b, mode)
 
 
 def unverified(leg_a: str, leg_b: str) -> list[str]:
@@ -106,6 +130,8 @@ def table() -> list[dict]:
     return [{"venue": k, "taker_bps": v["taker_bps"],
              "rebate_pct": round(v["rebate"] * 100),
              "effective_bps": round(fee_bps(k), 2),
+             "maker_bps": v["maker_bps"],
+             "effective_maker_bps": round(fee_bps(k, True), 2),
              "verified": v["verified"], "note": v["note"]}
             for k, v in VENUES.items()]
 
