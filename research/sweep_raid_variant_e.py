@@ -244,6 +244,49 @@ def main() -> int:
         res["confounds"][label] = [round(ve, 4), round(vo, 4)]
         print(f"  {label:<26} E {ve:>9.4f}   非E {vo:>9.4f}")
 
+    # ── Q5: is it just a side bet? ───────────────────────────────────
+    # E fires 85% on low sweeps (the fade is LONG) versus 40% at base --
+    # mechanically, because long liquidations are what makes a burst. So the
+    # only honest test is WITHIN each side: if E beats base on both sides,
+    # the panels are doing something; if only on one, E is a direction bet
+    # wearing a signal's clothes.
+    print("\n  [Q5] 分邊看（E 有 85% 落在掃低點那一側）")
+    print(f"  {'側':<16}{'定義':<22}{'n':>6}{'netR':>10}{'WR%':>7}"
+          f"   {'vs 同側基準 CI':>22}")
+    res["by_side"] = {}
+    for sd, zh in ((-1, "掃低點→做多"), (1, "掃高點→做空")):
+        side_rows = [r for r in rows if r["side"] == sd]
+        base_ns = nets(side_rows)
+        for name, pred in (("基準（全部）", lambda r: True),
+                           ("E（三盤）", lambda r: r["E"]),
+                           ("E′（OI↓∧爆量）", lambda r: r["oi_dn"] and r["liq_high"]),
+                           ("只有 OI↓", lambda r: r["oi_dn"]),
+                           ("只有爆量", lambda r: r["liq_high"])):
+            sub = [r for r in side_rows if pred(r)]
+            c = cell(sub)
+            if not c or c["n"] < 20:
+                continue
+            ns = nets(sub)
+            dlo, dhi = boot_diff(ns, base_ns)
+            res["by_side"][f"{zh}/{name}"] = dict(c, vs_side_base_ci=[dlo, dhi])
+            tail = f"   [{dlo:+.4f},{dhi:+.4f}]" if dlo is not None else ""
+            print(f"  {zh:<16}{name:<22}{c['n']:>6}{c.get('netR', 0):>+10.4f}"
+                  f"{c.get('wr_pct', 0):>7.1f}{tail}")
+
+    # ── Q6: what the CVD panel actually costs ────────────────────────
+    # E' minus E is exactly the "OI down AND burst BUT taker against the
+    # break" pocket. Small by construction; reported so the CVD panel's
+    # marginal value is a number, not an impression.
+    pocket = [r for r in rows if r["oi_dn"] and r["liq_high"] and not r["with_break"]]
+    c = cell(pocket)
+    if c:
+        lo, hi = boot_ci(nets(pocket))
+        res["cvd_pocket"] = dict(c, ci=[lo, hi])
+        print(f"\n  [Q6] E′ 比 E 多出來的那一格（OI↓∧爆量∧**逆**破）："
+              f"n={c['n']} netR{c.get('netR', 0):+.4f} "
+              f"WR{c.get('wr_pct', 0):.0f}% CI[{lo:+.4f},{hi:+.4f}]")
+        print("       CVD 那一盤擋掉的就是這一格——擋得對不對，看它是不是比 E 差。")
+
     OUT.write_text(json.dumps(res, ensure_ascii=False, indent=2),
                    encoding="utf-8")
     print(f"\n  -> {OUT}")

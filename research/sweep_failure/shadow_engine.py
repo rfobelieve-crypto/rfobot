@@ -166,6 +166,10 @@ FIELDS = ["symbol", "universe", "level_kind", "first_seen_utc", "fill_ts",
           #                added 2026-08-02 when the operator caught the
           #                recording gap
           "drv_q", "drv_liqburst", "drv_gap_oi", "v7_align", "drv_gap_cvd",
+          # 2026-09-03: drv_q is the AND of two panels, so neither could be
+          # scored on its own -- and the historical decomposition says the
+          # CVD half is the weak one. Recorded separately from here on.
+          "drv_oi_dn", "drv_cvd_with",
           # M2 additive (2026-08-18, TODO §0.5): trade side from the
           # frozen detection (swept high -> SHORT, swept low -> LONG).
           # Old rows carry "" and are deterministically backfilled on
@@ -540,7 +544,8 @@ def summary(log: dict) -> None:
         return str(r.get("variant_b", "")) == "1"
     groups = [("ALL", lambda r: True), ("B (pierce)", _isb),
               ("C (B∧收回)", is_variant_c), ("D (C∧量能高)", is_variant_d),
-              ("E (BTC·OI↓∧CVD順破∧清算高)", variant_e_pred(log))]
+              ("E (BTC·OI↓∧CVD順破∧清算高)", variant_e_pred(log)),
+              ("E' (BTC·OI↓∧清算高, 凍結 2026-09-03)", variant_e2_pred(log))]
     groups += [(f"B:{k}", (lambda k_: lambda r: _isb(r)
                            and r.get("level_kind") == k_)(k))
                for k in LEVEL_KINDS]
@@ -620,9 +625,13 @@ def is_variant_d(row: dict) -> bool:
 # BTC-only (Coinglass scope). Observation cohort, same rules as C/D.
 
 
-def variant_e_pred(log: dict):
-    """Build the E-membership test (causal liq-burst median needs the
-    whole log, so this returns a closure for gate_stats)."""
+def _liq_high_keys(log: dict) -> set:
+    """BTC raids whose liq burst >= the causal median of EARLIER BTC raids.
+
+    Causal by construction: the bar at each raid is what BTC's own past
+    raids looked like up to that moment, never a global median. Shared by
+    E and E' so the two cohorts cannot drift apart on this half.
+    """
     from statistics import median
     rows = [(int(r["fill_ts"]), float(r["drv_liqburst"]),
              (r["symbol"], r.get("level_kind", "swing"), int(r["fill_ts"])))
@@ -635,7 +644,32 @@ def variant_e_pred(log: dict):
         prior = [v for (ft2, v, _k) in rows[:i] if ft2 < fts]
         if len(prior) >= 5 and lb >= median(prior):
             eligible.add(key)
+    return eligible
+
+
+def variant_e_pred(log: dict):
+    """Build the E-membership test (causal liq-burst median needs the
+    whole log, so this returns a closure for gate_stats)."""
+    eligible = _liq_high_keys(log)
     return lambda r: (str(r.get("drv_q", "")) == "1"
+                      and (r["symbol"], r.get("level_kind", "swing"),
+                           int(r["fill_ts"])) in eligible)
+
+
+# ── VARIANT E' (registered 2026-09-03): E without the CVD panel.
+# E = OI down AND taker-with-break AND liq burst; E' drops the middle one:
+#   E' = BTC raid ∧ OI down at the raid hour ∧ liq burst >= causal median
+# Why it exists: the historical decomposition (research/sweep_raid_variant_e.py,
+# 3,068 BTC raids) says the CVD panel is the weak half -- dropping it scores
+# HIGHER (+0.1723 vs +0.1616), and the pocket it excludes (OI down + burst but
+# taker AGAINST the break) is the best cell in the table (n=37, +0.4382).
+# That is a DISCOVERY-SAMPLE observation and cannot promote itself, so E'
+# starts a clock of its own from zero today. E ⊂ E'; a failure of E' does NOT
+# void E (E carries an extra condition), which is the opposite direction from
+# the A⊃B⊃C⊃D chain and is deliberate.
+def variant_e2_pred(log: dict):
+    eligible = _liq_high_keys(log)
+    return lambda r: (str(r.get("drv_oi_dn", "")) == "1"
                       and (r["symbol"], r.get("level_kind", "swing"),
                            int(r["fill_ts"])) in eligible)
 
@@ -650,6 +684,7 @@ def annotate_btc_survivors(log: dict, bars) -> int:
     for up to a day (retried automatically)."""
     todo = [k for k, r in log.items()
             if k[0] == "BTC" and (r.get("drv_q") in (None, "")
+                                  or r.get("drv_oi_dn") in (None, "")
                                   or r.get("v7_align") in (None, "")
                                   or r.get("drv_gap_cvd") in (None, ""))]
     if not todo:
@@ -709,6 +744,16 @@ def annotate_btc_survivors(log: dict, bars) -> int:
                 continue
             sweep_ts, side = sw
             hh = sweep_ts // 3600
+            if r.get("drv_oi_dn") in (None, ""):
+                # the two halves of drv_q, recorded separately (2026-09-03).
+                # Same source, same hour, same sign convention -- this is a
+                # NEW column from immutable data, not a rewrite of an old one.
+                if all(x is not None for x in
+                       (oi.get(hh), oi.get(hh - 1), fb.get(hh), fs.get(hh))):
+                    r["drv_oi_dn"] = int(oi[hh] < oi[hh - 1])
+                    r["drv_cvd_with"] = int(side * (fb[hh] - fs[hh]) > 0)
+                else:
+                    r["drv_oi_dn"] = r["drv_cvd_with"] = "na"
             if r.get("drv_q") in (None, ""):
                 if all(x is not None for x in
                        (oi.get(hh), oi.get(hh - 1), fb.get(hh), fs.get(hh))):
@@ -857,6 +902,61 @@ def gate_stats(log: dict, cohort=None) -> dict:
             "status": status}
 
 
+# ── E / E' decision rules, frozen 2026-09-03 (TODO §0.474b) ───────────
+# E was registered 2026-08-02 with a definition and NO criteria ("純記錄").
+# That is the shape that lets a good-looking number promote itself, so the
+# bar is written down here, in code, where it gets evaluated -- and the
+# numbers were derived BEFORE looking at anything but E's own variance
+# (sd 0.65 on 22 post-registration rows -> n=41 for a CI that clears zero at
+# the observed mean; 60 leaves margin for a weaker true mean).
+#
+# Four conditions, ALL required, read once at the floor:
+#   1. n >= 60 closed rows dated on/after the cohort's own freeze
+#   2. day-clustered bootstrap CI95 low > 0
+#   3. meanR at least +0.08R above BTC raids OUTSIDE the cohort over the
+#      same window -- without this, "BTC raids are good lately" passes as
+#      "the three panels work"
+#   4. both halves of the window positive (no single event carrying it)
+E_CLOCK, E_GATE_N = "2026-08-02", 60
+E2_CLOCK, E2_GATE_N = "2026-09-03", 60
+E_CONTROL_EDGE = 0.08
+
+
+def _since(pred, clock: str):
+    ts0 = int(datetime.strptime(clock, "%Y-%m-%d")
+              .replace(tzinfo=timezone.utc).timestamp())
+    return lambda r: pred(r) and int(r["fill_ts"]) >= ts0
+
+
+def e_clock(log: dict, which: str = "E") -> dict:
+    """Frozen scorer for E / E'. Owns these numbers; boards must read it."""
+    pred = variant_e_pred(log) if which == "E" else variant_e2_pred(log)
+    clock, floor = ((E_CLOCK, E_GATE_N) if which == "E"
+                    else (E2_CLOCK, E2_GATE_N))
+    inside = _since(pred, clock)
+    st = gate_stats(log, inside)
+    btc_out = gate_stats(log, _since(
+        lambda r: r["symbol"] == "BTC" and not pred(r), clock))
+    rows = sorted((r for r in log.values()
+                   if r["status"] == "CLOSED" and r["net_r"] != "" and inside(r)),
+                  key=lambda r: int(r["exit_ts"]))
+    rs = [float(r["net_r"]) for r in rows]
+    h = len(rs) // 2
+    halves = ((sum(rs[:h]) / h, sum(rs[h:]) / (len(rs) - h))
+              if len(rs) >= 2 else (0.0, 0.0))
+    gap = (st["mean_r"] - btc_out["mean_r"]) if st["n_closed"] and btc_out["n_closed"] else None
+    at_floor = st["n_closed"] >= floor
+    ok = (at_floor and st["ci_low"] > 0 and gap is not None
+          and gap >= E_CONTROL_EDGE and min(halves) > 0)
+    return {"which": which, "clock": clock, "floor": floor,
+            "n": st["n_closed"], "mean_r": st["mean_r"], "ci_low": st["ci_low"],
+            "wr_pct": st["wr_pct"], "control_mean": btc_out["mean_r"],
+            "control_n": btc_out["n_closed"],
+            "gap": round(gap, 4) if gap is not None else None,
+            "halves": [round(halves[0], 4), round(halves[1], 4)],
+            "status": ("PASS" if ok else "FAIL" if at_floor else "accumulating")}
+
+
 def gate_progress(log: dict) -> str:
     """Variant B gate line + the variant C observation line (same maths)."""
     s = gate_stats(log)
@@ -883,10 +983,17 @@ def gate_progress(log: dict) -> str:
                     f" (base {base} excluded)")
         else:
             out += f" | {label}: 0/{CD_GATE_N} since {CD_CLOCK} (base {base} excluded)"
-    e = gate_stats(log, variant_e_pred(log))
-    if e["n_closed"]:
-        out += (f" | E(BTC·OI↓∧CVD順破∧清算高): n={e['n_closed']} "
-                f"meanR={e['mean_r']:+.4f}")
+    for which, zh in (("E", "E(BTC·OI↓∧CVD順破∧清算高)"),
+                      ("E'", "E'(BTC·OI↓∧清算高)")):
+        c = e_clock(log, which)
+
+        def _n(x):
+            return f"{x:+.4f}" if isinstance(x, (int, float)) else "—"
+
+        out += (f" | {zh}: n={c['n']}/{c['floor']} since {c['clock']} "
+                f"meanR={_n(c['mean_r'])} CI-low={_n(c['ci_low'])} "
+                f"vs非本組BTC {_n(c['control_mean'])}"
+                f"(差{_n(c['gap'])}) -> {c['status']}")
     return out
 
 
