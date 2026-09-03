@@ -1262,13 +1262,39 @@ def raid_cohorts_feed():
         # 規則註冊日：C/D/E 是在看過部分資料之後才定義的觀察組，
         # 「資料前瞻」(first_seen < exit) 不等於「規則前瞻」。把日期一併給
         # 消費端，讓 UI 有辦法講清楚這條規則是什麼時候凍結的。
+        # 2026-09-02 判決（§0.92）。這個選單本來只出數字不出判決，於是一個
+        # 已經在自己的預註冊門檻上 FAIL 的變體，看起來仍像個可選項——而 C/D
+        # 的統計量甚至比 B 好看（那正是連坐規則要擋的事後挑選）。判決跟數字
+        # 必須同框，否則消費端無從分辨「還沒判」與「判過沒過」。
+        verdict = {
+            "A": {"state": "accumulating",
+                  "note": "Gate F 正式軌道（core9·無濾網），292/1400，"
+                          "約 2027-01 中到期；未判＝未通過"},
+            "B": {"state": "FAIL", "date": "2026-09-02",
+                  "note": "n=1428/1400、日聚類 CI 下緣 −0.094 → 未通過。"
+                          "不放寬門檻、不挑子集重判"},
+            "C": {"state": "VOID", "date": "2026-09-02",
+                  "note": "建立在 B 之上，連坐作廢（C ⊂ B）；統計量比 B 好看"
+                          "不構成復活理由"},
+            "D": {"state": "VOID", "date": "2026-09-02",
+                  "note": "建立在 C 之上，連坐作廢（D ⊂ C）"},
+            "E": {"state": "accumulating",
+                  "note": "BTC-only 盤感線，22/60（§0.474b 已凍結判準）；"
+                          "live 樣本裡 CVD 那一條從未生效，實際等於 OI↓∧爆量"},
+        }
+        for k, v in out.items():
+            v["verdict"] = verdict.get(k, {"state": "unregistered"})
         return jsonify({"basis": "prospective", "universe": want_u,
                         "nRows": len(pro), "cohorts": out,
+                        "verdict_asof": "2026-09-03",
                         "registered": {"A": "log-start", "B": "log-start",
                                        "C": "2026-07-31", "D": "2026-08-01",
                                        "E": "2026-08-02"},
                         "note": "統計為資料前瞻（記錄時結果未知）；C/D/E 的規則"
-                                "本身註冊於上列日期，之前的樣本對該規則屬於樣本內。"})
+                                "本身註冊於上列日期，之前的樣本對該規則屬於樣本內。"
+                                "cohorts[x].verdict 是該變體的預註冊判決狀態——"
+                                "數字好看不等於通過，FAIL/VOID 的變體不應作為"
+                                "預設可選項。"})
     except Exception as e:  # noqa: BLE001
         return jsonify({"error": str(e)}), 500
 
