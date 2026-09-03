@@ -76,3 +76,6 @@ research/results/portfolio_clocks_state.json
 research/results/portfolio_clocks.log
 research/sweep_failure/.cache/
 research/results/sweep_shadow_run.log
+
+# 看門狗每 5 分鐘一行，不進 git（2026-09-03）
+research/results/arb_watchdog.log

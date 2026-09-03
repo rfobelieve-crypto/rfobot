@@ -1,33 +1,33 @@
 {
- "asof_utc": "2026-09-03 13:44",
+ "asof_utc": "2026-09-03 15:06",
  "gate_days": 7,
  "pairs": {
   "SNDK": {
    "pair": "SNDK",
    "legs": "Entropy io:SNDK vs lighter-rh SNDK",
    "note": "stock perp (original)",
-   "minutes": 8792,
+   "minutes": 8864,
    "start_utc": "2026-08-28 10:28",
-   "days": 6.14,
+   "days": 6.19,
    "gate_days": 7,
    "gate_met": false,
    "interim": {
     "sell": {
-     "p90_bps": 2.011,
-     "band_bps": 2.011,
-     "fires": 880,
-     "fires_per_day": 144.0
+     "p90_bps": 2.012,
+     "band_bps": 2.012,
+     "fires": 887,
+     "fires_per_day": 143.2
     },
     "buy": {
-     "p90_bps": 7.848,
-     "band_bps": 7.848,
-     "fires": 880,
-     "fires_per_day": 144.0
+     "p90_bps": 7.966,
+     "band_bps": 7.966,
+     "fires": 887,
+     "fires_per_day": 143.2
     },
     "conv_sell": {
-     "episodes": 186,
-     "converged_4h": 183,
-     "frac": 0.98,
+     "episodes": 190,
+     "converged_4h": 188,
+     "frac": 0.99,
      "median_minutes": 5.0,
      "passed": true
     },
@@ -39,27 +39,27 @@
      "passed": true
     },
     "depth_sell": {
-     "instrumented_min": 8535,
-     "fat_prints": 853,
-     "fat_median_notional_usd": 283.0,
+     "instrumented_min": 8607,
+     "fat_prints": 860,
+     "fat_median_notional_usd": 282.0,
      "fat_stale_gt5s": 2
     },
-    "capturable_usd_per_day_sell": 0.86,
-    "capturable_usd_per_day_sell_ceiling": 8.2,
+    "capturable_usd_per_day_sell": 0.87,
+    "capturable_usd_per_day_sell_ceiling": 8.12,
     "depth_buy": {
-     "instrumented_min": 8535,
-     "fat_prints": 853,
-     "fat_median_notional_usd": 269.0,
+     "instrumented_min": 8607,
+     "fat_prints": 860,
+     "fat_median_notional_usd": 250.0,
      "fat_stale_gt5s": 0
     },
-    "capturable_usd_per_day_buy": 0.07,
-    "capturable_usd_per_day_buy_ceiling": 30.4,
+    "capturable_usd_per_day_buy": 0.06,
+    "capturable_usd_per_day_buy_ceiling": 28.52,
     "funding": {
-     "n": 2762,
+     "n": 2834,
      "median_bps_8h": -0.18,
      "p10_bps_8h": -0.18,
-     "p90_bps_8h": 0.6917,
-     "frac_positive": 0.172,
+     "p90_bps_8h": 0.67,
+     "frac_positive": 0.171,
      "annualised_pct_at_median": -1.97
     }
    },
@@ -69,29 +69,29 @@
    "pair": "NBIS",
    "legs": "Entropy io:NBIS vs lighter NBIS",
    "note": "stock perp",
-   "minutes": 5670,
+   "minutes": 5742,
    "start_utc": "2026-08-30 14:36",
-   "days": 3.96,
+   "days": 4.02,
    "gate_days": 7,
    "gate_met": false,
    "interim": {
     "sell": {
-     "p90_bps": 3.478,
-     "band_bps": 3.478,
-     "fires": 567,
-     "fires_per_day": 143.9
+     "p90_bps": 3.903,
+     "band_bps": 3.903,
+     "fires": 575,
+     "fires_per_day": 143.0
     },
     "buy": {
-     "p90_bps": 14.503,
-     "band_bps": 14.503,
-     "fires": 567,
-     "fires_per_day": 143.9
+     "p90_bps": 14.451,
+     "band_bps": 14.451,
+     "fires": 575,
+     "fires_per_day": 143.0
     },
     "conv_sell": {
-     "episodes": 141,
-     "converged_4h": 138,
-     "frac": 0.98,
-     "median_minutes": 5.0,
+     "episodes": 119,
+     "converged_4h": 115,
+     "frac": 0.97,
+     "median_minutes": 4.5,
      "passed": true
     },
     "conv_buy": {
@@ -102,28 +102,28 @@
      "passed": true
     },
     "depth_sell": {
-     "instrumented_min": 5670,
-     "fat_prints": 567,
-     "fat_median_notional_usd": 419.0,
+     "instrumented_min": 5742,
+     "fat_prints": 574,
+     "fat_median_notional_usd": 429.0,
      "fat_stale_gt5s": 0
     },
-    "capturable_usd_per_day_sell": 2.59,
-    "capturable_usd_per_day_sell_ceiling": 20.97,
+    "capturable_usd_per_day_sell": 2.48,
+    "capturable_usd_per_day_sell_ceiling": 23.94,
     "depth_buy": {
-     "instrumented_min": 5670,
-     "fat_prints": 567,
+     "instrumented_min": 5742,
+     "fat_prints": 574,
      "fat_median_notional_usd": 315.0,
      "fat_stale_gt5s": 0
     },
     "capturable_usd_per_day_buy": 0.06,
-    "capturable_usd_per_day_buy_ceiling": 65.74,
+    "capturable_usd_per_day_buy_ceiling": 65.09,
     "funding": {
-     "n": 2762,
-     "median_bps_8h": -0.5273,
-     "p10_bps_8h": -2.8482,
+     "n": 2834,
+     "median_bps_8h": -0.5605,
+     "p10_bps_8h": -4.1877,
      "p90_bps_8h": -0.18,
-     "frac_positive": 0.06,
-     "annualised_pct_at_median": -5.77
+     "frac_positive": 0.058,
+     "annualised_pct_at_median": -6.14
     }
    },
    "status": "accumulating"
@@ -132,23 +132,23 @@
    "pair": "ANTH",
    "legs": "Entropy io:ANTH vs lighter-rh ANTHROPIC",
    "note": "private-co perp, no spot anchor",
-   "minutes": 5670,
+   "minutes": 5742,
    "start_utc": "2026-08-30 14:36",
-   "days": 3.96,
+   "days": 4.02,
    "gate_days": 7,
    "gate_met": false,
    "interim": {
     "sell": {
-     "p90_bps": 14.865,
-     "band_bps": 14.865,
-     "fires": 567,
-     "fires_per_day": 143.9
+     "p90_bps": 14.896,
+     "band_bps": 14.896,
+     "fires": 575,
+     "fires_per_day": 143.0
     },
     "buy": {
-     "p90_bps": 12.151,
-     "band_bps": 12.151,
-     "fires": 570,
-     "fires_per_day": 144.7
+     "p90_bps": 12.128,
+     "band_bps": 12.128,
+     "fires": 575,
+     "fires_per_day": 143.0
     },
     "conv_sell": {
      "episodes": 4,
@@ -165,25 +165,25 @@
      "passed": true
     },
     "depth_sell": {
-     "instrumented_min": 5670,
-     "fat_prints": 567,
+     "instrumented_min": 5742,
+     "fat_prints": 574,
      "fat_median_notional_usd": 67.0,
      "fat_stale_gt5s": 0
     },
     "capturable_usd_per_day_sell": 0.05,
-    "capturable_usd_per_day_sell_ceiling": 14.33,
+    "capturable_usd_per_day_sell_ceiling": 14.27,
     "depth_buy": {
-     "instrumented_min": 5670,
-     "fat_prints": 567,
-     "fat_median_notional_usd": 142.0,
+     "instrumented_min": 5742,
+     "fat_prints": 574,
+     "fat_median_notional_usd": 144.0,
      "fat_stale_gt5s": 0
     },
     "capturable_usd_per_day_buy": 0.13,
     "capturable_usd_per_day_buy_ceiling": 24.97,
     "funding": {
-     "n": 2762,
+     "n": 2834,
      "median_bps_8h": 0.3075,
-     "p10_bps_8h": 0.2817,
+     "p10_bps_8h": 0.2818,
      "p90_bps_8h": 0.3275,
      "frac_positive": 1.0,
      "annualised_pct_at_median": 3.37
@@ -195,56 +195,56 @@
    "pair": "BTC",
    "legs": "HL BTC vs lighter-rh BTC",
    "note": "CONTROL - band expected ~0",
-   "minutes": 5670,
+   "minutes": 5742,
    "start_utc": "2026-08-30 14:36",
-   "days": 3.96,
+   "days": 4.02,
    "gate_days": 7,
    "gate_met": false,
    "interim": {
     "sell": {
-     "p90_bps": 6.651,
-     "band_bps": 6.651,
-     "fires": 567,
-     "fires_per_day": 143.9
+     "p90_bps": 6.647,
+     "band_bps": 6.647,
+     "fires": 575,
+     "fires_per_day": 143.0
     },
     "buy": {
-     "p90_bps": 0.216,
+     "p90_bps": 0.337,
      "band_bps": 1.0,
-     "fires": 252,
-     "fires_per_day": 64.0
+     "fires": 303,
+     "fires_per_day": 75.4
     },
     "conv_sell": {
      "episodes": 0
     },
     "conv_buy": {
-     "episodes": 250,
-     "converged_4h": 248,
-     "frac": 0.99,
+     "episodes": 253,
+     "converged_4h": 252,
+     "frac": 1.0,
      "median_minutes": 3.0,
      "passed": true
     },
     "depth_sell": {
-     "instrumented_min": 5670,
-     "fat_prints": 567,
+     "instrumented_min": 5742,
+     "fat_prints": 574,
      "fat_median_notional_usd": 1000.0,
      "fat_stale_gt5s": 0
     },
     "capturable_usd_per_day_sell": 0.0,
     "capturable_usd_per_day_sell_ceiling": 0.0,
     "depth_buy": {
-     "instrumented_min": 5670,
-     "fat_prints": 567,
-     "fat_median_notional_usd": 347.0,
+     "instrumented_min": 5742,
+     "fat_prints": 574,
+     "fat_median_notional_usd": 774.0,
      "fat_stale_gt5s": 0
     },
-    "capturable_usd_per_day_buy": 1.09,
-    "capturable_usd_per_day_buy_ceiling": 2.22,
+    "capturable_usd_per_day_buy": 2.43,
+    "capturable_usd_per_day_buy_ceiling": 5.84,
     "funding": {
-     "n": 2762,
+     "n": 2834,
      "median_bps_8h": -0.12,
      "p10_bps_8h": -0.68,
      "p90_bps_8h": -0.04,
-     "frac_positive": 0.0,
+     "frac_positive": 0.005,
      "annualised_pct_at_median": -1.31
     }
    },
@@ -254,23 +254,23 @@
    "pair": "HYPE",
    "legs": "HL HYPE vs lighter-rh HYPE",
    "note": "thin crypto; largest funding gap on 09-01",
-   "minutes": 2764,
+   "minutes": 2836,
    "start_utc": "2026-09-01 15:04",
-   "days": 1.94,
+   "days": 2.0,
    "gate_days": 7,
    "gate_met": false,
    "interim": {
     "sell": {
-     "p90_bps": 5.717,
-     "band_bps": 5.717,
-     "fires": 277,
-     "fires_per_day": 144.3
+     "p90_bps": 5.752,
+     "band_bps": 5.752,
+     "fires": 285,
+     "fires_per_day": 142.5
     },
     "buy": {
-     "p90_bps": 3.959,
-     "band_bps": 3.959,
-     "fires": 277,
-     "fires_per_day": 144.3
+     "p90_bps": 4.018,
+     "band_bps": 4.018,
+     "fires": 284,
+     "fires_per_day": 142.0
     },
     "conv_sell": {
      "episodes": 2,
@@ -280,34 +280,34 @@
      "passed": true
     },
     "conv_buy": {
-     "episodes": 14,
-     "converged_4h": 13,
+     "episodes": 15,
+     "converged_4h": 14,
      "frac": 0.93,
-     "median_minutes": 9.0,
+     "median_minutes": 8.0,
      "passed": true
     },
     "depth_sell": {
-     "instrumented_min": 2764,
-     "fat_prints": 276,
-     "fat_median_notional_usd": 177.0,
+     "instrumented_min": 2836,
+     "fat_prints": 283,
+     "fat_median_notional_usd": 171.0,
      "fat_stale_gt5s": 0
     },
     "capturable_usd_per_day_sell": 0.05,
-    "capturable_usd_per_day_sell_ceiling": 14.6,
+    "capturable_usd_per_day_sell_ceiling": 14.02,
     "depth_buy": {
-     "instrumented_min": 2764,
-     "fat_prints": 276,
+     "instrumented_min": 2836,
+     "fat_prints": 283,
      "fat_median_notional_usd": 100.0,
      "fat_stale_gt5s": 0
     },
-    "capturable_usd_per_day_buy": 0.14,
+    "capturable_usd_per_day_buy": 0.15,
     "capturable_usd_per_day_buy_ceiling": 5.71,
     "funding": {
-     "n": 2764,
+     "n": 2836,
      "median_bps_8h": -0.04,
      "p10_bps_8h": -1.16,
-     "p90_bps_8h": 0.7752,
-     "frac_positive": 0.261,
+     "p90_bps_8h": 0.7657,
+     "frac_positive": 0.255,
      "annualised_pct_at_median": -0.44
     }
    },
@@ -317,27 +317,27 @@
    "pair": "ZEC",
    "legs": "HL ZEC vs lighter-rh ZEC",
    "note": "thin crypto",
-   "minutes": 5670,
+   "minutes": 5742,
    "start_utc": "2026-08-30 14:36",
-   "days": 3.96,
+   "days": 4.02,
    "gate_days": 7,
    "gate_met": false,
    "interim": {
     "sell": {
-     "p90_bps": 2.723,
-     "band_bps": 2.723,
-     "fires": 567,
-     "fires_per_day": 143.9
+     "p90_bps": 2.884,
+     "band_bps": 2.884,
+     "fires": 575,
+     "fires_per_day": 143.0
     },
     "buy": {
-     "p90_bps": 11.437,
-     "band_bps": 11.437,
-     "fires": 567,
-     "fires_per_day": 143.9
+     "p90_bps": 11.421,
+     "band_bps": 11.421,
+     "fires": 575,
+     "fires_per_day": 143.0
     },
     "conv_sell": {
-     "episodes": 88,
-     "converged_4h": 85,
+     "episodes": 86,
+     "converged_4h": 83,
      "frac": 0.97,
      "median_minutes": 9.0,
      "passed": true
@@ -350,27 +350,27 @@
      "passed": true
     },
     "depth_sell": {
-     "instrumented_min": 5670,
-     "fat_prints": 567,
-     "fat_median_notional_usd": 297.0,
+     "instrumented_min": 5742,
+     "fat_prints": 574,
+     "fat_median_notional_usd": 372.0,
      "fat_stale_gt5s": 0
     },
-    "capturable_usd_per_day_sell": 0.9,
-    "capturable_usd_per_day_sell_ceiling": 11.64,
+    "capturable_usd_per_day_sell": 1.15,
+    "capturable_usd_per_day_sell_ceiling": 15.34,
     "depth_buy": {
-     "instrumented_min": 5670,
-     "fat_prints": 567,
+     "instrumented_min": 5742,
+     "fat_prints": 574,
      "fat_median_notional_usd": 500.0,
      "fat_stale_gt5s": 0
     },
     "capturable_usd_per_day_buy": 0.07,
-    "capturable_usd_per_day_buy_ceiling": 82.29,
+    "capturable_usd_per_day_buy_ceiling": 81.66,
     "funding": {
-     "n": 2762,
+     "n": 2834,
      "median_bps_8h": -0.04,
      "p10_bps_8h": -0.04,
-     "p90_bps_8h": 0.3417,
-     "frac_positive": 0.114,
+     "p90_bps_8h": 0.3299,
+     "frac_positive": 0.112,
      "annualised_pct_at_median": -0.44
     }
    },
@@ -380,23 +380,23 @@
    "pair": "NEAR",
    "legs": "HL NEAR vs lighter-rh NEAR",
    "note": "thin crypto",
-   "minutes": 5670,
+   "minutes": 5742,
    "start_utc": "2026-08-30 14:36",
-   "days": 3.96,
+   "days": 4.02,
    "gate_days": 7,
    "gate_met": false,
    "interim": {
     "sell": {
-     "p90_bps": 11.652,
-     "band_bps": 11.652,
-     "fires": 567,
-     "fires_per_day": 143.9
+     "p90_bps": 11.647,
+     "band_bps": 11.647,
+     "fires": 575,
+     "fires_per_day": 143.0
     },
     "buy": {
-     "p90_bps": -2.09,
+     "p90_bps": -2.1,
      "band_bps": 1.0,
-     "fires": 142,
-     "fires_per_day": 36.1
+     "fires": 143,
+     "fires_per_day": 35.6
     },
     "conv_sell": {
      "episodes": 0
@@ -409,53 +409,53 @@
      "passed": true
     },
     "depth_sell": {
-     "instrumented_min": 5670,
-     "fat_prints": 567,
+     "instrumented_min": 5742,
+     "fat_prints": 574,
      "fat_median_notional_usd": 302.0,
      "fat_stale_gt5s": 0
     },
     "capturable_usd_per_day_sell": 0.0,
     "capturable_usd_per_day_sell_ceiling": 0.0,
     "depth_buy": {
-     "instrumented_min": 5670,
-     "fat_prints": 567,
-     "fat_median_notional_usd": 168.0,
+     "instrumented_min": 5742,
+     "fat_prints": 574,
+     "fat_median_notional_usd": 189.0,
      "fat_stale_gt5s": 0
     },
-    "capturable_usd_per_day_buy": 0.37,
-    "capturable_usd_per_day_buy_ceiling": 0.61,
+    "capturable_usd_per_day_buy": 0.41,
+    "capturable_usd_per_day_buy_ceiling": 0.67,
     "funding": {
-     "n": 2762,
+     "n": 2834,
      "median_bps_8h": -0.04,
      "p10_bps_8h": -0.04,
      "p90_bps_8h": -0.04,
-     "frac_positive": 0.089,
+     "frac_positive": 0.086,
      "annualised_pct_at_median": -0.44
     }
    },
    "status": "accumulating"
   }
  },
- "minutes": 8792,
- "days": 6.14,
+ "minutes": 8864,
+ "days": 6.19,
  "gate_met": false,
  "interim": {
   "sell": {
-   "p90_bps": 2.011,
-   "band_bps": 2.011,
-   "fires": 880,
-   "fires_per_day": 144.0
+   "p90_bps": 2.012,
+   "band_bps": 2.012,
+   "fires": 887,
+   "fires_per_day": 143.2
   },
   "buy": {
-   "p90_bps": 7.848,
-   "band_bps": 7.848,
-   "fires": 880,
-   "fires_per_day": 144.0
+   "p90_bps": 7.966,
+   "band_bps": 7.966,
+   "fires": 887,
+   "fires_per_day": 143.2
   },
   "conv_sell": {
-   "episodes": 186,
-   "converged_4h": 183,
-   "frac": 0.98,
+   "episodes": 190,
+   "converged_4h": 188,
+   "frac": 0.99,
    "median_minutes": 5.0,
    "passed": true
   },
@@ -467,27 +467,27 @@
    "passed": true
   },
   "depth_sell": {
-   "instrumented_min": 8535,
-   "fat_prints": 853,
-   "fat_median_notional_usd": 283.0,
+   "instrumented_min": 8607,
+   "fat_prints": 860,
+   "fat_median_notional_usd": 282.0,
    "fat_stale_gt5s": 2
   },
-  "capturable_usd_per_day_sell": 0.86,
-  "capturable_usd_per_day_sell_ceiling": 8.2,
+  "capturable_usd_per_day_sell": 0.87,
+  "capturable_usd_per_day_sell_ceiling": 8.12,
   "depth_buy": {
-   "instrumented_min": 8535,
-   "fat_prints": 853,
-   "fat_median_notional_usd": 269.0,
+   "instrumented_min": 8607,
+   "fat_prints": 860,
+   "fat_median_notional_usd": 250.0,
    "fat_stale_gt5s": 0
   },
-  "capturable_usd_per_day_buy": 0.07,
-  "capturable_usd_per_day_buy_ceiling": 30.4,
+  "capturable_usd_per_day_buy": 0.06,
+  "capturable_usd_per_day_buy_ceiling": 28.52,
   "funding": {
-   "n": 2762,
+   "n": 2834,
    "median_bps_8h": -0.18,
    "p10_bps_8h": -0.18,
-   "p90_bps_8h": 0.6917,
-   "frac_positive": 0.172,
+   "p90_bps_8h": 0.67,
+   "frac_positive": 0.171,
    "annualised_pct_at_median": -1.97
   }
  }
