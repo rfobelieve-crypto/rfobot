@@ -3587,6 +3587,22 @@ E ⊂ E′，兩者在 live 幾乎**同一批訊號**，所以 E′ 的時鐘**�
 檢定，只是把「將來要不要放寬」這個選擇留下可稽核的紀錄。E′ FAIL 不連坐 E
 （E 多帶一個條件），方向與 A⊃B⊃C⊃D 相反，這是刻意的。
 
+**已發布到用戶端（2026-09-03，使用者要求）**：E 之前只在帳本裡計分、
+`variants` 只有 A/B/C/D/R/RV，產品端拿不到。現在 `variants` 在 E 成立時多一個
+`E`，並新增 `e_state` 四態：`E` / `notE` / **`pending`** / `na`（非 BTC）。
+`pending` 是刻意的——三個面板來自 Coinglass 小時資料，parquet 落後約 6 小時，
+而 feed 的窗口是 8 小時，**新鮮的 BTC 訊號多半還沒判定就已經在 feed 裡**。
+所以 **E 目前不是即時可跟的標籤**；要即時得把那三張 parquet 改成每小時刷新
+（未做）。交接：`../jarvis/研究端通知_變體E上線與regime_cell修復_20260903.md`。
+
+**順手抓到的真 bug**：`/public/raid-signals` 的 payload 一直有 `regime_cell`，
+但 `raid_signals_live` **沒有這個欄位**、SELECT 也沒撈——每一列都送 `""`。
+產品端若照 §0.59 用 `regime_cell === "RANGING"` 過濾就是**全擋**，skip 還記成
+regime，看起來像濾網正常。這是 mistake.md 2026-08-26 的鏡像（那次 SELECT 了
+沒 emit，這次 emit 了沒 SELECT）。已修並在線上驗證：15/15 有真值。
+
+- [ ] 三張 CG parquet（oi/liq/futures_cvd）改每小時刷新，讓 E 變成即時標籤
+
 **新增記錄欄位**：`drv_oi_dn` / `drv_cvd_with`——`drv_q` 是兩個盤的 AND，
 以前無法分開計分。新欄位、同一份不可變來源，不是改寫舊欄位；134 列 BTC
 已回填。
