@@ -1,0 +1,13 @@
+{
+ "events": 17,
+ "pairs_matched": 20,
+ "measured": 0,
+ "control_median_ratio": 0.55,
+ "control_n": 108,
+ "bars": {
+  "P1 新配對 <24h 帶 ≥ 2.0× >72h": false,
+  "P2 對照組無同樣衰減（< 1.3×）": true,
+  "P3 ≥60% 的事件同向": false
+ },
+ "verdict": "未通過——不開時鐘（多半是樣本不足，見上）"
+}
