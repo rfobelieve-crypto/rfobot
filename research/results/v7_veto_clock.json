@@ -30,8 +30,8 @@
    "since_trigger": 78,
    "trigger_target": 60,
    "gap_threshold_pp": 8.0,
-   "since_trigger_fired": 78
+   "since_trigger_fired": 79
   }
  },
- "asof_utc": "2026-09-04 01:06"
+ "asof_utc": "2026-09-04 02:06"
 }
