@@ -1,619 +1,619 @@
 {
- "asof_utc": "2026-09-04 04:06",
- "span_days": 4.56,
- "quotes": 951791,
+ "asof_utc": "2026-09-04 05:06",
+ "span_days": 4.6,
+ "quotes": 1011379,
  "pairs": 3043,
  "min_samples": 500,
  "gate_ok": true,
- "control_band_bps": 7.956,
+ "control_band_bps": 7.949,
  "promote": [
   "GOLD@bitget-binance",
-  "GOLD@bitget-bitget",
-  "GOLD@okx-bitget"
+  "GOLD@okx-bitget",
+  "GOLD@bitget-bitget"
  ],
- "pending_pairs": 2919,
+ "pending_pairs": 2918,
  "top": [
   {
    "pair": "GOLD@bitget-binance",
-   "n": 747,
+   "n": 927,
    "leg_b": "binance",
-   "listed_h": 12617.606975122748,
-   "capturable_usd_per_day": 5881.2,
-   "band_bps": 29.748,
-   "depth_usd": 8442.0,
-   "fires_per_day": 234.2
-  },
-  {
-   "pair": "ETH@HL-okx",
-   "n": 381,
-   "leg_b": "okx",
-   "listed_h": NaN,
-   "capturable_usd_per_day": 4421.15,
-   "band_bps": 6.548,
-   "depth_usd": 161700.0,
-   "fires_per_day": 41.8
+   "listed_h": 3879.1081664674884,
+   "capturable_usd_per_day": 7520.39,
+   "band_bps": 30.23,
+   "depth_usd": 10572.0,
+   "fires_per_day": 235.3
   },
   {
    "pair": "GOLD@binance-binance",
-   "n": 249,
+   "n": 309,
    "leg_b": "binance",
-   "listed_h": 3878.1069751227483,
-   "capturable_usd_per_day": 4139.17,
-   "band_bps": 31.858,
-   "depth_usd": 13054.0,
-   "fires_per_day": 99.5
+   "listed_h": 3879.1081664674884,
+   "capturable_usd_per_day": 3976.87,
+   "band_bps": 32.203,
+   "depth_usd": 12495.0,
+   "fires_per_day": 98.8
   },
   {
-   "pair": "QNT@xyz-binance",
-   "n": 83,
-   "leg_b": "binance",
-   "listed_h": 34005.10697512275,
-   "capturable_usd_per_day": 3201.56,
-   "band_bps": 3353.507,
-   "depth_usd": 181.0,
-   "fires_per_day": 52.7
-  },
-  {
-   "pair": "GOLD@bitget-bitget",
-   "n": 1005,
-   "leg_b": "bitget",
-   "listed_h": NaN,
-   "capturable_usd_per_day": 2606.41,
-   "band_bps": 31.658,
-   "depth_usd": 8901.0,
-   "fires_per_day": 92.5
-  },
-  {
-   "pair": "BTC@HL-okx",
-   "n": 381,
+   "pair": "ETH@HL-okx",
+   "n": 401,
    "leg_b": "okx",
    "listed_h": NaN,
-   "capturable_usd_per_day": 2163.31,
-   "band_bps": 3.901,
-   "depth_usd": 215052.0,
-   "fires_per_day": 25.8
-  },
-  {
-   "pair": "GOLD@okx-bitget",
-   "n": 1002,
-   "leg_b": "bitget",
-   "listed_h": NaN,
-   "capturable_usd_per_day": 2116.62,
-   "band_bps": 30.852,
-   "depth_usd": 6626.0,
-   "fires_per_day": 103.5
-  },
-  {
-   "pair": "BTC@HL-binance",
-   "n": 83,
-   "leg_b": "binance",
-   "listed_h": 61258.19030845608,
-   "capturable_usd_per_day": 2055.55,
-   "band_bps": 2.88,
-   "depth_usd": 243834.0,
-   "fires_per_day": 29.3
-  },
-  {
-   "pair": "BTC@HL-bitget",
-   "n": 335,
-   "leg_b": "bitget",
-   "listed_h": NaN,
-   "capturable_usd_per_day": 1906.63,
-   "band_bps": 4.043,
-   "depth_usd": 179784.0,
-   "fires_per_day": 26.2
+   "capturable_usd_per_day": 3533.7,
+   "band_bps": 6.528,
+   "depth_usd": 128697.0,
+   "fires_per_day": 42.1
   },
   {
    "pair": "GOLD@okx-binance",
-   "n": 249,
+   "n": 309,
    "leg_b": "binance",
-   "listed_h": 3878.1069751227483,
-   "capturable_usd_per_day": 1814.48,
-   "band_bps": 30.977,
-   "depth_usd": 5885.0,
-   "fires_per_day": 99.5
+   "listed_h": 3879.1081664674884,
+   "capturable_usd_per_day": 3284.8,
+   "band_bps": 31.256,
+   "depth_usd": 10150.0,
+   "fires_per_day": 103.5
+  },
+  {
+   "pair": "GOLD@okx-bitget",
+   "n": 1062,
+   "leg_b": "bitget",
+   "listed_h": NaN,
+   "capturable_usd_per_day": 3015.66,
+   "band_bps": 30.878,
+   "depth_usd": 9351.0,
+   "fires_per_day": 104.4
+  },
+  {
+   "pair": "GOLD@bitget-bitget",
+   "n": 1065,
+   "leg_b": "bitget",
+   "listed_h": NaN,
+   "capturable_usd_per_day": 2816.29,
+   "band_bps": 31.768,
+   "depth_usd": 9564.0,
+   "fires_per_day": 92.7
+  },
+  {
+   "pair": "QNT@xyz-binance",
+   "n": 103,
+   "leg_b": "binance",
+   "listed_h": 34006.108166467486,
+   "capturable_usd_per_day": 2765.87,
+   "band_bps": 3346.848,
+   "depth_usd": 160.0,
+   "fires_per_day": 51.8
+  },
+  {
+   "pair": "BTC@HL-bitget",
+   "n": 355,
+   "leg_b": "bitget",
+   "listed_h": NaN,
+   "capturable_usd_per_day": 1983.68,
+   "band_bps": 3.887,
+   "depth_usd": 195481.0,
+   "fires_per_day": 26.1
+  },
+  {
+   "pair": "BTC@HL-okx",
+   "n": 401,
+   "leg_b": "okx",
+   "listed_h": NaN,
+   "capturable_usd_per_day": 1807.4,
+   "band_bps": 3.674,
+   "depth_usd": 191420.0,
+   "fires_per_day": 25.7
+  },
+  {
+   "pair": "BTC@HL-binance",
+   "n": 103,
+   "leg_b": "binance",
+   "listed_h": 61259.19149980082,
+   "capturable_usd_per_day": 1627.5,
+   "band_bps": 2.836,
+   "depth_usd": 243834.0,
+   "fires_per_day": 23.5
   },
   {
    "pair": "ETH@HL-bitget",
-   "n": 335,
+   "n": 355,
    "leg_b": "bitget",
    "listed_h": NaN,
-   "capturable_usd_per_day": 1616.96,
-   "band_bps": 6.938,
-   "depth_usd": 54456.0,
-   "fires_per_day": 42.8
-  },
-  {
-   "pair": "GOLD@xyz-binance",
-   "n": 249,
-   "leg_b": "binance",
-   "listed_h": 3878.1069751227483,
-   "capturable_usd_per_day": 1430.72,
-   "band_bps": 11.117,
-   "depth_usd": 19984.0,
-   "fires_per_day": 64.4
-  },
-  {
-   "pair": "QNT@okx-binance",
-   "n": 83,
-   "leg_b": "binance",
-   "listed_h": 34005.10697512275,
-   "capturable_usd_per_day": 1378.05,
-   "band_bps": 3338.508,
-   "depth_usd": 78.0,
-   "fires_per_day": 52.7
+   "capturable_usd_per_day": 1574.46,
+   "band_bps": 6.976,
+   "depth_usd": 52389.0,
+   "fires_per_day": 43.1
   },
   {
    "pair": "ETH@HL-binance",
-   "n": 83,
+   "n": 103,
    "leg_b": "binance",
-   "listed_h": 59348.35697512275,
-   "capturable_usd_per_day": 1241.67,
-   "band_bps": 4.97,
-   "depth_usd": 53337.0,
-   "fires_per_day": 46.8
+   "listed_h": 59349.358166467486,
+   "capturable_usd_per_day": 1360.25,
+   "band_bps": 5.15,
+   "depth_usd": 56120.0,
+   "fires_per_day": 47.1
+  },
+  {
+   "pair": "QNT@okx-binance",
+   "n": 103,
+   "leg_b": "binance",
+   "listed_h": 34006.108166467486,
+   "capturable_usd_per_day": 1353.11,
+   "band_bps": 3336.329,
+   "depth_usd": 78.0,
+   "fires_per_day": 51.8
+  },
+  {
+   "pair": "GOLD@xyz-binance",
+   "n": 309,
+   "leg_b": "binance",
+   "listed_h": 3879.1081664674884,
+   "capturable_usd_per_day": 1267.85,
+   "band_bps": 11.081,
+   "depth_usd": 18701.0,
+   "fires_per_day": 61.2
   },
   {
    "pair": "GOLD@xyz-okx",
-   "n": 379,
+   "n": 399,
    "leg_b": "okx",
    "listed_h": NaN,
-   "capturable_usd_per_day": 908.55,
-   "band_bps": 10.276,
-   "depth_usd": 18460.0,
-   "fires_per_day": 47.9
+   "capturable_usd_per_day": 891.7,
+   "band_bps": 10.269,
+   "depth_usd": 18581.0,
+   "fires_per_day": 46.7
   },
   {
    "pair": "QNT@xyz-bitget",
-   "n": 335,
+   "n": 355,
    "leg_b": "bitget",
    "listed_h": NaN,
-   "capturable_usd_per_day": 772.97,
-   "band_bps": 3489.62,
+   "capturable_usd_per_day": 774.26,
+   "band_bps": 3487.83,
    "depth_usd": 47.0,
-   "fires_per_day": 46.9
+   "fires_per_day": 47.0
   },
   {
    "pair": "GOLD@lighter-rh-binance",
-   "n": 249,
+   "n": 309,
    "leg_b": "binance",
-   "listed_h": 3878.1069751227483,
-   "capturable_usd_per_day": 693.85,
-   "band_bps": 28.981,
-   "depth_usd": 2406.0,
-   "fires_per_day": 99.5
+   "listed_h": 3879.1081664674884,
+   "capturable_usd_per_day": 708.53,
+   "band_bps": 29.075,
+   "depth_usd": 2466.0,
+   "fires_per_day": 98.8
   },
   {
    "pair": "GOLD@xyz-bitget",
-   "n": 1005,
+   "n": 1065,
    "leg_b": "bitget",
    "listed_h": NaN,
-   "capturable_usd_per_day": 682.36,
-   "band_bps": 23.904,
-   "depth_usd": 4495.0,
-   "fires_per_day": 63.5
+   "capturable_usd_per_day": 684.8,
+   "band_bps": 23.865,
+   "depth_usd": 4486.0,
+   "fires_per_day": 64.0
   },
   {
    "pair": "SOL@HL-okx",
-   "n": 381,
+   "n": 401,
    "leg_b": "okx",
    "listed_h": NaN,
-   "capturable_usd_per_day": 633.31,
+   "capturable_usd_per_day": 648.84,
    "band_bps": 5.79,
    "depth_usd": 34257.0,
-   "fires_per_day": 31.9
-  },
-  {
-   "pair": "CL@xyz-binance",
-   "n": 83,
-   "leg_b": "binance",
-   "listed_h": 3739.1069751227483,
-   "capturable_usd_per_day": 608.57,
-   "band_bps": 9.156,
-   "depth_usd": 12615.0,
-   "fires_per_day": 52.7
-  },
-  {
-   "pair": "ETH@lighter-rh-binance",
-   "n": 83,
-   "leg_b": "binance",
-   "listed_h": 59348.35697512275,
-   "capturable_usd_per_day": 602.03,
-   "band_bps": 7.784,
-   "depth_usd": 33028.0,
-   "fires_per_day": 23.4
-  },
-  {
-   "pair": "SPCX@xyz-binance",
-   "n": 83,
-   "leg_b": "binance",
-   "listed_h": 2543.3569751227483,
-   "capturable_usd_per_day": 592.3,
-   "band_bps": 7.324,
-   "depth_usd": 17266.0,
-   "fires_per_day": 46.8
-  },
-  {
-   "pair": "GOLD@lighter-rh-bitget",
-   "n": 1005,
-   "leg_b": "bitget",
-   "listed_h": NaN,
-   "capturable_usd_per_day": 561.25,
-   "band_bps": 29.492,
-   "depth_usd": 2188.0,
-   "fires_per_day": 87.0
-  },
-  {
-   "pair": "BNB@okx-binance",
-   "n": 83,
-   "leg_b": "binance",
-   "listed_h": 57548.10697512275,
-   "capturable_usd_per_day": 490.33,
-   "band_bps": 9.558,
-   "depth_usd": 9736.0,
-   "fires_per_day": 52.7
-  },
-  {
-   "pair": "OAI@IO-bitget",
-   "n": 335,
-   "leg_b": "bitget",
-   "listed_h": NaN,
-   "capturable_usd_per_day": 477.89,
-   "band_bps": 670.969,
-   "depth_usd": 152.0,
-   "fires_per_day": 46.9
-  },
-  {
-   "pair": "BTC@okx-binance",
-   "n": 83,
-   "leg_b": "binance",
-   "listed_h": 61258.19030845608,
-   "capturable_usd_per_day": 468.07,
-   "band_bps": 1.049,
-   "depth_usd": 152461.0,
-   "fires_per_day": 29.3
+   "fires_per_day": 32.7
   },
   {
    "pair": "ETH@bitget-binance",
-   "n": 83,
+   "n": 103,
    "leg_b": "binance",
-   "listed_h": 59348.35697512275,
-   "capturable_usd_per_day": 457.55,
-   "band_bps": 1.69,
-   "depth_usd": 92478.0,
-   "fires_per_day": 29.3
+   "listed_h": 59349.358166467486,
+   "capturable_usd_per_day": 645.83,
+   "band_bps": 1.892,
+   "depth_usd": 103612.0,
+   "fires_per_day": 32.9
+  },
+  {
+   "pair": "XRP@HL-binance",
+   "n": 103,
+   "leg_b": "binance",
+   "listed_h": 58388.77483313416,
+   "capturable_usd_per_day": 637.57,
+   "band_bps": 6.91,
+   "depth_usd": 19605.0,
+   "fires_per_day": 47.1
+  },
+  {
+   "pair": "GOLD@lighter-rh-bitget",
+   "n": 1065,
+   "leg_b": "bitget",
+   "listed_h": NaN,
+   "capturable_usd_per_day": 564.42,
+   "band_bps": 29.492,
+   "depth_usd": 2188.0,
+   "fires_per_day": 87.5
+  },
+  {
+   "pair": "BTC@okx-binance",
+   "n": 103,
+   "leg_b": "binance",
+   "listed_h": 61259.19149980082,
+   "capturable_usd_per_day": 544.32,
+   "band_bps": 1.084,
+   "depth_usd": 152461.0,
+   "fires_per_day": 32.9
   },
   {
    "pair": "BTC@bitget-binance",
-   "n": 83,
+   "n": 103,
    "leg_b": "binance",
-   "listed_h": 61258.19030845608,
-   "capturable_usd_per_day": 412.51,
-   "band_bps": 1.077,
-   "depth_usd": 108997.0,
-   "fires_per_day": 35.1
+   "listed_h": 61259.19149980082,
+   "capturable_usd_per_day": 530.89,
+   "band_bps": 1.097,
+   "depth_usd": 128534.0,
+   "fires_per_day": 37.7
   },
   {
-   "pair": "CL@okx-binance",
-   "n": 83,
+   "pair": "OAI@IO-bitget",
+   "n": 355,
+   "leg_b": "bitget",
+   "listed_h": NaN,
+   "capturable_usd_per_day": 475.76,
+   "band_bps": 667.157,
+   "depth_usd": 152.0,
+   "fires_per_day": 47.0
+  },
+  {
+   "pair": "SPCX@xyz-binance",
+   "n": 103,
    "leg_b": "binance",
-   "listed_h": 3739.1069751227483,
-   "capturable_usd_per_day": 380.28,
-   "band_bps": 3.278,
-   "depth_usd": 28310.0,
-   "fires_per_day": 41.0
+   "listed_h": 2544.3581664674884,
+   "capturable_usd_per_day": 462.24,
+   "band_bps": 6.857,
+   "depth_usd": 14323.0,
+   "fires_per_day": 47.1
+  },
+  {
+   "pair": "BNB@okx-binance",
+   "n": 103,
+   "leg_b": "binance",
+   "listed_h": 57549.108166467486,
+   "capturable_usd_per_day": 443.44,
+   "band_bps": 9.558,
+   "depth_usd": 8962.0,
+   "fires_per_day": 51.8
+  },
+  {
+   "pair": "CL@xyz-binance",
+   "n": 103,
+   "leg_b": "binance",
+   "listed_h": 3740.1081664674884,
+   "capturable_usd_per_day": 428.57,
+   "band_bps": 9.153,
+   "depth_usd": 9949.0,
+   "fires_per_day": 47.1
+  },
+  {
+   "pair": "ETH@okx-binance",
+   "n": 103,
+   "leg_b": "binance",
+   "listed_h": 59349.358166467486,
+   "capturable_usd_per_day": 425.1,
+   "band_bps": 1.474,
+   "depth_usd": 122572.0,
+   "fires_per_day": 23.5
   },
   {
    "pair": "GOLD@lighter-binance",
-   "n": 498,
+   "n": 618,
    "leg_b": "binance",
-   "listed_h": 3878.1069751227483,
-   "capturable_usd_per_day": 377.72,
-   "band_bps": 33.076,
+   "listed_h": 3879.1081664674884,
+   "capturable_usd_per_day": 381.67,
+   "band_bps": 33.089,
    "depth_usd": 500.0,
-   "fires_per_day": 228.3
+   "fires_per_day": 230.6
   }
  ],
  "top_sampled": [
   {
    "pair": "GOLD@bitget-binance",
-   "n": 747,
+   "n": 927,
    "leg_b": "binance",
-   "listed_h": 12617.606975122748,
-   "capturable_usd_per_day": 5881.2,
-   "band_bps": 29.748,
-   "depth_usd": 8442.0,
-   "fires_per_day": 234.2
-  },
-  {
-   "pair": "GOLD@bitget-bitget",
-   "n": 1005,
-   "leg_b": "bitget",
-   "listed_h": NaN,
-   "capturable_usd_per_day": 2606.41,
-   "band_bps": 31.658,
-   "depth_usd": 8901.0,
-   "fires_per_day": 92.5
+   "listed_h": 3879.1081664674884,
+   "capturable_usd_per_day": 7520.39,
+   "band_bps": 30.23,
+   "depth_usd": 10572.0,
+   "fires_per_day": 235.3
   },
   {
    "pair": "GOLD@okx-bitget",
-   "n": 1002,
+   "n": 1062,
    "leg_b": "bitget",
    "listed_h": NaN,
-   "capturable_usd_per_day": 2116.62,
-   "band_bps": 30.852,
-   "depth_usd": 6626.0,
-   "fires_per_day": 103.5
+   "capturable_usd_per_day": 3015.66,
+   "band_bps": 30.878,
+   "depth_usd": 9351.0,
+   "fires_per_day": 104.4
+  },
+  {
+   "pair": "GOLD@bitget-bitget",
+   "n": 1065,
+   "leg_b": "bitget",
+   "listed_h": NaN,
+   "capturable_usd_per_day": 2816.29,
+   "band_bps": 31.768,
+   "depth_usd": 9564.0,
+   "fires_per_day": 92.7
   },
   {
    "pair": "GOLD@xyz-bitget",
-   "n": 1005,
+   "n": 1065,
    "leg_b": "bitget",
    "listed_h": NaN,
-   "capturable_usd_per_day": 682.36,
-   "band_bps": 23.904,
-   "depth_usd": 4495.0,
-   "fires_per_day": 63.5
+   "capturable_usd_per_day": 684.8,
+   "band_bps": 23.865,
+   "depth_usd": 4486.0,
+   "fires_per_day": 64.0
   },
   {
    "pair": "GOLD@lighter-rh-bitget",
-   "n": 1005,
+   "n": 1065,
    "leg_b": "bitget",
    "listed_h": NaN,
-   "capturable_usd_per_day": 561.25,
+   "capturable_usd_per_day": 564.42,
    "band_bps": 29.492,
    "depth_usd": 2188.0,
-   "fires_per_day": 87.0
+   "fires_per_day": 87.5
+  },
+  {
+   "pair": "GOLD@lighter-binance",
+   "n": 618,
+   "leg_b": "binance",
+   "listed_h": 3879.1081664674884,
+   "capturable_usd_per_day": 381.67,
+   "band_bps": 33.089,
+   "depth_usd": 500.0,
+   "fires_per_day": 230.6
   },
   {
    "pair": "GOLD@lighter-bitget",
-   "n": 1998,
+   "n": 2118,
    "leg_b": "bitget",
    "listed_h": NaN,
-   "capturable_usd_per_day": 306.95,
-   "band_bps": 32.928,
+   "capturable_usd_per_day": 311.68,
+   "band_bps": 32.918,
    "depth_usd": 500.0,
-   "fires_per_day": 186.4
+   "fires_per_day": 189.3
   },
   {
    "pair": "OAI@IO-lighter-rh",
-   "n": 932,
+   "n": 952,
    "leg_b": "lighter-rh",
-   "listed_h": 204.20521567830403,
-   "capturable_usd_per_day": 294.63,
-   "band_bps": 549.36,
+   "listed_h": 205.20640702304416,
+   "capturable_usd_per_day": 293.47,
+   "band_bps": 549.035,
    "depth_usd": 97.0,
-   "fires_per_day": 55.1
+   "fires_per_day": 55.0
   },
   {
    "pair": "OAI@IO-lighter",
-   "n": 625,
+   "n": 628,
    "leg_b": "lighter",
-   "listed_h": 2177.6320601227485,
-   "capturable_usd_per_day": 91.36,
-   "band_bps": 461.624,
+   "listed_h": 2178.6332514674887,
+   "capturable_usd_per_day": 89.1,
+   "band_bps": 461.551,
    "depth_usd": 54.0,
-   "fires_per_day": 36.4
+   "fires_per_day": 35.5
   },
   {
    "pair": "GOLD@lighter-okx",
-   "n": 734,
+   "n": 774,
    "leg_b": "okx",
    "listed_h": NaN,
-   "capturable_usd_per_day": 88.35,
-   "band_bps": 8.651,
-   "depth_usd": 1890.0,
-   "fires_per_day": 54.0
+   "capturable_usd_per_day": 86.66,
+   "band_bps": 8.527,
+   "depth_usd": 1891.0,
+   "fires_per_day": 53.7
   },
   {
    "pair": "GOLD@HL-bitget",
-   "n": 1005,
+   "n": 1065,
    "leg_b": "bitget",
    "listed_h": NaN,
-   "capturable_usd_per_day": 81.8,
-   "band_bps": 27.391,
+   "capturable_usd_per_day": 80.47,
+   "band_bps": 27.229,
    "depth_usd": 503.0,
-   "fires_per_day": 59.4
+   "fires_per_day": 58.7
   },
   {
    "pair": "ETH@HL-lighter",
-   "n": 3065,
+   "n": 3085,
    "leg_b": "lighter",
-   "listed_h": 14276.756669567192,
-   "capturable_usd_per_day": 80.01,
-   "band_bps": 7.327,
+   "listed_h": 14277.757860911934,
+   "capturable_usd_per_day": 79.85,
+   "band_bps": 7.328,
    "depth_usd": 1722.0,
-   "fires_per_day": 63.4
+   "fires_per_day": 63.3
   },
   {
    "pair": "GOLD@HL-lighter",
-   "n": 734,
+   "n": 774,
    "leg_b": "lighter",
-   "listed_h": 7645.680152622748,
-   "capturable_usd_per_day": 50.57,
-   "band_bps": 15.255,
+   "listed_h": 9661.411256467489,
+   "capturable_usd_per_day": 52.05,
+   "band_bps": 15.369,
    "depth_usd": 500.0,
-   "fires_per_day": 66.3
+   "fires_per_day": 67.8
   },
   {
    "pair": "SOL@HL-lighter",
-   "n": 3066,
+   "n": 3086,
    "leg_b": "lighter",
-   "listed_h": 14276.756662067193,
-   "capturable_usd_per_day": 45.61,
-   "band_bps": 6.001,
-   "depth_usd": 1724.0,
-   "fires_per_day": 44.1
+   "listed_h": 14277.757853411933,
+   "capturable_usd_per_day": 46.77,
+   "band_bps": 6.051,
+   "depth_usd": 1760.0,
+   "fires_per_day": 43.9
   },
   {
    "pair": "GOLD@xyz-lighter",
-   "n": 770,
+   "n": 810,
    "leg_b": "lighter",
-   "listed_h": 7645.680152622748,
-   "capturable_usd_per_day": 44.86,
-   "band_bps": 12.894,
+   "listed_h": 9661.411256467489,
+   "capturable_usd_per_day": 44.89,
+   "band_bps": 12.883,
    "depth_usd": 500.0,
-   "fires_per_day": 69.6
+   "fires_per_day": 69.7
   },
   {
    "pair": "HYPE@HL-lighter",
-   "n": 3065,
+   "n": 3085,
    "leg_b": "lighter",
-   "listed_h": 13351.970686789415,
-   "capturable_usd_per_day": 40.56,
-   "band_bps": 8.363,
-   "depth_usd": 1332.0,
-   "fires_per_day": 36.4
+   "listed_h": 13352.971878134154,
+   "capturable_usd_per_day": 41.13,
+   "band_bps": 8.536,
+   "depth_usd": 1319.0,
+   "fires_per_day": 36.5
   },
   {
    "pair": "HBAR@HL-lighter",
-   "n": 3063,
+   "n": 3083,
    "leg_b": "lighter",
-   "listed_h": 9396.861269289415,
-   "capturable_usd_per_day": 34.37,
-   "band_bps": 12.971,
+   "listed_h": 9397.862460634155,
+   "capturable_usd_per_day": 34.31,
+   "band_bps": 12.981,
    "depth_usd": 400.0,
-   "fires_per_day": 66.2
-  },
-  {
-   "pair": "ZEC@HL-lighter-rh",
-   "n": 3078,
-   "leg_b": "lighter-rh",
-   "listed_h": 1665.3817087338596,
-   "capturable_usd_per_day": 33.02,
-   "band_bps": 10.85,
-   "depth_usd": 758.0,
-   "fires_per_day": 40.1
-  },
-  {
-   "pair": "TRX@HL-lighter",
-   "n": 3065,
-   "leg_b": "lighter",
-   "listed_h": 10307.934977900526,
-   "capturable_usd_per_day": 32.78,
-   "band_bps": 5.859,
-   "depth_usd": 1747.0,
-   "fires_per_day": 32.0
-  },
-  {
-   "pair": "CASHCAT@HL-lighter-rh",
-   "n": 3079,
-   "leg_b": "lighter-rh",
-   "listed_h": 1381.793117067193,
-   "capturable_usd_per_day": 31.91,
-   "band_bps": 54.032,
-   "depth_usd": 144.0,
-   "fires_per_day": 41.0
+   "fires_per_day": 66.1
   },
   {
    "pair": "ICP@HL-lighter",
-   "n": 3063,
+   "n": 3083,
    "leg_b": "lighter",
-   "listed_h": 7185.48635873386,
-   "capturable_usd_per_day": 31.43,
-   "band_bps": 11.709,
-   "depth_usd": 506.0,
-   "fires_per_day": 53.1
+   "listed_h": 7186.487550078599,
+   "capturable_usd_per_day": 33.32,
+   "band_bps": 11.779,
+   "depth_usd": 535.0,
+   "fires_per_day": 52.8
+  },
+  {
+   "pair": "ZEC@HL-lighter-rh",
+   "n": 3098,
+   "leg_b": "lighter-rh",
+   "listed_h": 1666.3829000785997,
+   "capturable_usd_per_day": 32.87,
+   "band_bps": 10.831,
+   "depth_usd": 759.0,
+   "fires_per_day": 40.0
+  },
+  {
+   "pair": "TRX@HL-lighter",
+   "n": 3085,
+   "leg_b": "lighter",
+   "listed_h": 10308.936169245266,
+   "capturable_usd_per_day": 32.48,
+   "band_bps": 5.859,
+   "depth_usd": 1747.0,
+   "fires_per_day": 31.7
+  },
+  {
+   "pair": "CASHCAT@HL-lighter-rh",
+   "n": 3099,
+   "leg_b": "lighter-rh",
+   "listed_h": 1382.7943084119331,
+   "capturable_usd_per_day": 31.8,
+   "band_bps": 54.017,
+   "depth_usd": 144.0,
+   "fires_per_day": 40.9
   },
   {
    "pair": "NBIS@IO-lighter",
-   "n": 2903,
+   "n": 2907,
    "leg_b": "lighter",
-   "listed_h": 2195.762564567193,
-   "capturable_usd_per_day": 28.88,
+   "listed_h": 2196.763755911933,
+   "capturable_usd_per_day": 28.7,
    "band_bps": 11.358,
    "depth_usd": 539.0,
-   "fires_per_day": 47.2
+   "fires_per_day": 46.9
   },
   {
    "pair": "SUI@HL-lighter-rh",
-   "n": 3078,
+   "n": 3098,
    "leg_b": "lighter-rh",
-   "listed_h": 1665.3816854005263,
-   "capturable_usd_per_day": 22.47,
-   "band_bps": 12.054,
-   "depth_usd": 486.0,
-   "fires_per_day": 38.4
+   "listed_h": 1666.3828767452665,
+   "capturable_usd_per_day": 22.46,
+   "band_bps": 12.042,
+   "depth_usd": 485.0,
+   "fires_per_day": 38.5
   },
   {
    "pair": "STBL@HL-lighter",
-   "n": 3063,
+   "n": 3083,
    "leg_b": "lighter",
-   "listed_h": 8268.983779011638,
-   "capturable_usd_per_day": 22.35,
-   "band_bps": 15.348,
+   "listed_h": 8269.984970356378,
+   "capturable_usd_per_day": 22.21,
+   "band_bps": 15.326,
    "depth_usd": 275.0,
-   "fires_per_day": 52.9
+   "fires_per_day": 52.6
   },
   {
    "pair": "HYPE@HL-lighter-rh",
-   "n": 3078,
+   "n": 3098,
    "leg_b": "lighter-rh",
-   "listed_h": 1665.381718456082,
-   "capturable_usd_per_day": 21.89,
-   "band_bps": 10.616,
+   "listed_h": 1666.3829098008218,
+   "capturable_usd_per_day": 21.98,
+   "band_bps": 10.645,
    "depth_usd": 500.0,
-   "fires_per_day": 41.2
+   "fires_per_day": 41.3
   },
   {
    "pair": "SNDK@IO-lighter",
-   "n": 3063,
+   "n": 3083,
    "leg_b": "lighter",
-   "listed_h": 4951.464710122748,
-   "capturable_usd_per_day": 20.84,
-   "band_bps": 9.674,
-   "depth_usd": 341.0,
-   "fires_per_day": 63.2
+   "listed_h": 4952.465901467489,
+   "capturable_usd_per_day": 21.09,
+   "band_bps": 9.718,
+   "depth_usd": 344.0,
+   "fires_per_day": 63.0
   },
   {
    "pair": "GOLD@lighter-lighter-rh",
-   "n": 770,
+   "n": 810,
    "leg_b": "lighter-rh",
-   "listed_h": 250.29680456719294,
-   "capturable_usd_per_day": 20.5,
-   "band_bps": 6.097,
+   "listed_h": 251.29799591193304,
+   "capturable_usd_per_day": 20.73,
+   "band_bps": 6.045,
    "depth_usd": 1000.0,
-   "fires_per_day": 33.6
+   "fires_per_day": 34.3
   },
   {
-   "pair": "XRP@HL-lighter-rh",
-   "n": 3079,
-   "leg_b": "lighter-rh",
-   "listed_h": 1665.3816987338596,
-   "capturable_usd_per_day": 20.07,
-   "band_bps": 10.998,
-   "depth_usd": 445.0,
-   "fires_per_day": 41.0
+   "pair": "PONS@HL-lighter",
+   "n": 833,
+   "leg_b": "lighter",
+   "listed_h": 35.67001257859972,
+   "capturable_usd_per_day": 19.53,
+   "band_bps": 69.046,
+   "depth_usd": 83.0,
+   "fires_per_day": 33.9
   },
   {
    "pair": "LIT@HL-lighter-rh",
-   "n": 3078,
+   "n": 3098,
    "leg_b": "lighter-rh",
-   "listed_h": 1665.3817034560818,
-   "capturable_usd_per_day": 19.33,
-   "band_bps": 18.549,
+   "listed_h": 1666.382894800822,
+   "capturable_usd_per_day": 19.42,
+   "band_bps": 18.708,
    "depth_usd": 250.0,
-   "fires_per_day": 41.7
+   "fires_per_day": 41.5
   },
   {
-   "pair": "NEAR@HL-lighter-rh",
-   "n": 3078,
+   "pair": "XRP@HL-lighter-rh",
+   "n": 3099,
    "leg_b": "lighter-rh",
-   "listed_h": 1665.3816948449708,
-   "capturable_usd_per_day": 18.52,
-   "band_bps": 15.01,
-   "depth_usd": 294.0,
-   "fires_per_day": 41.9
-  },
-  {
-   "pair": "PENGU@HL-lighter",
-   "n": 3063,
-   "leg_b": "lighter",
-   "listed_h": 9785.594021511637,
-   "capturable_usd_per_day": 18.01,
-   "band_bps": 8.378,
-   "depth_usd": 400.0,
-   "fires_per_day": 53.7
+   "listed_h": 1666.3828900785998,
+   "capturable_usd_per_day": 19.04,
+   "band_bps": 11.001,
+   "depth_usd": 421.0,
+   "fires_per_day": 41.1
   }
  ]
 }
