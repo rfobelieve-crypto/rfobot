@@ -306,6 +306,73 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         errors.append(f"floor_headroom: {e}")
 
+    # 2e-c ── level BIAS vs the market (2026-09-04) ─────────────────
+    # 2e-b above watches the LEVEL, which is the right input for "will the
+    # floor choke a tail".  But the level rises both when the market is
+    # genuinely up (correct) and when the model's zero point walks (the
+    # 2026-08-08 disease), and 2e-b cannot separate those.  This line can:
+    # it compares the prediction against the realised 4h TWAP return.
+    #
+    # Measured on the production stream 2026-09-04 (frozen-model output; a
+    # walk-forward rerun self-centres each fold and is blind to this):
+    #   old model, full run  n=2382  +0.000702  [+0.000293, +0.001370]
+    #   old model, last 60d  n=1438  +0.000756  [+0.000359, +0.001243]
+    #   new model, 27 days   n= 644  -0.000675  [-0.003123, +0.000640]
+    # Power, from 200 random contiguous windows of the old (biased) run:
+    #   27d 60% | 45d 92% | 60d 100% | 90d 100%
+    # So a clean reading before ~45 days means almost nothing, and no
+    # reading can ever justify extending the 60-day retrain cap -- the test
+    # only becomes reliable at the moment the cap already fires.
+    try:
+        import numpy as _np
+        import pandas as _pd
+        import shared.db as _sdb
+        _conn = _sdb.get_db_conn()
+        try:
+            with _conn.cursor() as _cur:
+                _cur.execute(
+                    "SELECT dt, close, pred_return_4h p FROM indicator_history "
+                    "WHERE pred_return_4h IS NOT NULL AND model_version = ("
+                    "  SELECT model_version FROM indicator_history "
+                    "  WHERE pred_return_4h IS NOT NULL "
+                    "  ORDER BY dt DESC LIMIT 1) ORDER BY dt")
+                _b = _pd.DataFrame(_cur.fetchall())
+        finally:
+            _conn.close()
+        if len(_b) >= 200:
+            _b["p"] = _b["p"].astype(float)
+            _b["close"] = _b["close"].astype(float)
+            # y = mean(close[t+1..t+4]) / close[t] - 1, the training target
+            _y = (_b["close"].shift(-1).rolling(4).mean().shift(-3)
+                  / _b["close"] - 1.0)
+            _bi = (_b["p"] - _y).dropna().values
+            _days = len(_bi) / 24.0
+            _rng = _np.random.default_rng(20260904)   # fixed: reproducible
+            _blk = 168                                # one week, kills the AR
+            _k = max(1, len(_bi) // _blk)
+            _draw = _np.empty(2000)
+            for _i in range(2000):
+                _st = _rng.integers(0, max(1, len(_bi) - _blk), _k)
+                _draw[_i] = _np.concatenate(
+                    [_bi[_j:_j + _blk] for _j in _st]).mean()
+            _lo, _hi = _np.percentile(_draw, [2.5, 97.5])
+            _pw = ("60%" if _days < 36 else "92%" if _days < 53
+                   else "100%")
+            _ln = (f"level bias (2e-c): {_bi.mean():+.6f} "
+                   f"[{_lo:+.6f}, {_hi:+.6f}] over {_days:.0f}d "
+                   f"(power ~{_pw} for a 2026-05 sized drift)")
+            if _lo > 0:
+                _ln += "  << BIASED BULLISH - the 2026-08-08 shape, retrain"
+            elif _hi < 0:
+                _ln += "  << BIASED BEARISH - retrain"
+            elif _days < 36:
+                _ln += "  -- too short to clear the model, cap still rules"
+            lines.append(_ln)
+        else:
+            lines.append(f"level bias (2e-c): n={len(_b)} bars (need 200)")
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"level_bias: {e}")
+
     # 2e-d ── Strong fire-rate vs design (2026-08-18) ───────────────────
     # The 08-13→08-17 DOWN avalanche fired Strong on 21% of bars against a
     # ~5% two-tailed design: a rank-vs-self decode under a fast output-level
