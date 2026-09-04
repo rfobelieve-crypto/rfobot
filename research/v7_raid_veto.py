@@ -171,14 +171,37 @@ def main() -> int:
             blocks["moderate"] = clock_block(mrows, "Moderate")
         except Exception as e:  # noqa: BLE001
             print(f"  [WARN] moderate clock failed: {e}")
+        # CLOSED 2026-09-04 (TODO 0.86). Was "trigger N/60"; the review
+        # found the threshold (8pp) smaller than the gap's standard error
+        # (11.6pp at n=59/27), so the design could never decide. Printed
+        # rather than deleted: a clock that vanishes reads as "someone
+        # adopted it", and this one adopted nothing.
+        TRIGGER_STATUS = ("trigger CLOSED 2026-09-04 — inconclusive by "
+                          "design (SE 11.6pp > 8pp threshold; a decidable "
+                          "version needs ~474/217 ≈ 24mo). Terrain stays "
+                          "display-only.")
+
         for tag, b in blocks.items():
             if b["kept_wr"] is None or b["veto_wr"] is None:
                 print(f"V7 raid-veto [{tag}]: thin")
                 continue
+            # The gap's own standard error, printed beside it. Registering
+            # a POINT-ESTIMATE threshold (>=8pp) against a quantity whose SE
+            # is 11.6pp is what made this clock undecidable; showing the SE
+            # every week is how the next one avoids that (TODO 0.86).
+            _se = None
+            try:
+                _pk, _pv = b["kept_wr"] / 100.0, b["veto_wr"] / 100.0
+                _se = 100.0 * (
+                    _pk * (1 - _pk) / max(b["n_kept"], 1)
+                    + _pv * (1 - _pv) / max(b["n_veto"], 1)) ** 0.5
+            except Exception:  # noqa: BLE001
+                pass
             print(f"V7 raid-veto [{tag}] (90d): kept {b['kept_wr']:.0f}% "
                   f"(n={b['n_kept']}) vs vetoed {b['veto_wr']:.0f}% "
-                  f"(n={b['n_veto']}) — gap {b['gap_pp']:+.1f}pp | "
-                  f"trigger {b['since_trigger']}/{b['trigger_target']}")
+                  f"(n={b['n_veto']}) — gap {b['gap_pp']:+.1f}pp"
+                  + (f" ±{_se:.1f}SE" if _se else "")
+                  + f" | {TRIGGER_STATUS}")
         k = blocks["strong"]["kept_wr"]
         v = blocks["strong"]["veto_wr"]
         # adoption-trigger progress (TODO 0.483): +60 Strong fired since
