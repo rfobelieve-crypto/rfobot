@@ -921,6 +921,16 @@ Binance 65、HL 80、Bitget 88、OKX 95。三個結論：(a) 機會壽命是**�
       `LIGHTER_*`），而 mainnet 與 RH 是不同鏈不同帳號——`NVDA_LL` 兩腿都是 Lighter，
       **上線前必修**，錄價階段看不出來因為它不簽單；(c) OKX／Bitget／Binance 的下單
       認證**尚未實作**（現在只有公開簿口讀取）
+- [x] **B1 逐行審下單路徑完成（2026-09-04）**：`research/arb/B1_ENGINE_AUDIT.md`。
+      **核心設計是對的**——未決不假設沒成交、對帳只採信鏈上真相**不下修正單**、
+      對沖前檢查簿口新鮮度、`reduce_only` 寫死、連續錯誤 HALT、`RECONCILE_GRACE_SEC=5`
+      防「剛成交就對帳」的幻影震盪（作者註解直接寫了 Lighter REST 落後 ws）。
+      **沒有找到「以為沒成交就重送」的邏輯**——那正是兄弟 $1.1M 的病灶。
+      四個缺口：**G1 沒有累積差額硬上限**（兄弟參數裡的 `maxDelta: 800` 沒有對應物，
+      現有的 cap_usd／reduce_only／consec_errors 都是間接防護，**這是五個 kill switch
+      裡最該先加的**）、**G2** `settle_timeout` 逾時回 `filled_base=0` 是猜測，而
+      `_execute` 先用了它才檢查 `unresolved`（對帳會修回來，但那之前本地部位是錯的，
+      而 `_scan` 可能下新單）、**G3** 沒有 maker 路徑、**G4** 兩條 Lighter 鏈共用憑證。
 - [ ] **引擎缺的那一半：maker 路徑**（2026-09-04 查證）——錄價程式的
       `venue_hl.send_taker` / `venue_lighter.send_taker` 是完整的（IOC、reduce_only、
       成交輪詢、簽章），但**只有吃單**。而成本分析的結論是掛單才活得下來，所以引擎
