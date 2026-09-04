@@ -27,8 +27,8 @@ convergence on the perp leg while the spot gain sits in a different
 margin pool (the 2026-08-31 uniMMR case the operator forwarded — spot and
 perp are not one account unless the venue says so).
 
-Run: python research/arb/basis_recorder.py            # one cycle
-     python research/arb/basis_recorder.py --backfill # 180d prior, once
+Run: python research/basis_recorder.py            # one cycle
+     python research/basis_recorder.py --backfill # 180d prior, once
 """
 from __future__ import annotations
 

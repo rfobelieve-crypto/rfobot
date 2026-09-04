@@ -215,7 +215,11 @@ def main() -> int:
         conn.close()
     nb = sum(1 for r in rows if "B" in r[10].split(","))
     now = int(time.time())
-    soon = sum(1 for r in rows if r[11] > now)
+    # expires_ts is r[12]: regime_cell was inserted at r[11] on 2026-08-26
+    # and this summary line kept the old index -- 306 tracebacks in the
+    # hourly log AFTER the commit, so the feed was fine but the log was
+    # crying wolf every hour a level was armed.
+    soon = sum(1 for r in rows if r[12] > now)
     print(f"raid_pending_levels: published {len(rows)} armed "
           f"({nb} variant-B, {soon} not yet expired)")
     return 0
