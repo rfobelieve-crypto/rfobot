@@ -2,7 +2,7 @@
 """Publish the §0.75 arbitrage family to MySQL for the public site.
 
 Why a publisher and not a cloud route (2026-09-01): the verdict lives in a
-local JSON produced by `research/arb/premium_verdict.py`, which reads CSVs
+local JSON produced by the arb repo's `arblib/premium_verdict.py`, which reads CSVs
 written by a recorder running OFF-CLOUD on the operator's machine. A cloud
 endpoint cannot see any of it — the fourth instance of the same fix family
 as raid_signals / v7_veto / prereg_clocks (a route that cannot compute a
@@ -30,10 +30,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from research.arb import fees as FEES  # noqa: E402  (single source of fee truth)
-from research.arb.premium_verdict import VENUE_KEYS  # noqa: E402  (one map)
-SRC = ROOT / "research" / "results" / "arb_premium_verdict.json"
-SCAN = ROOT / "research" / "results" / "arb_scan_rank.json"
+from research import arb_home  # noqa: E402  (one place knows where arb is)
+
+arb_home.add_to_path()
+from arblib import fees as FEES  # noqa: E402  (single source of fee truth)
+from arblib.premium_verdict import VENUE_KEYS  # noqa: E402  (one map)
+SRC = arb_home.RESULTS / "arb_premium_verdict.json"
+SCAN = arb_home.RESULTS / "arb_scan_rank.json"
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")

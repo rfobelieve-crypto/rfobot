@@ -220,7 +220,7 @@ def build():
             "note": "成交在時間上高度集中，短窗等於一個行情段落不是一批樣本",
         },
     ]
-    # §0.75 arb clock: minutes recorded, from the third-party clone's CSV.
+    # §0.75 arb clock: minutes recorded, from the arb repo's engine CSV.
     # Count BOTH files for the primary pair: the 2026-08-28 instrument
     # upgrade rotated the first 257 minutes to minutes.csv.old — same
     # window, same clock.
@@ -232,7 +232,7 @@ def build():
     # line — same shape as §0.86: work that exists but never surfaces.
     def _count_csv(*parts) -> int:
         try:
-            with open(ROOT.parent.joinpath("entropy-arb", "logs", *parts),
+            with open(ROOT.parent.joinpath("arb", "engine", "logs", *parts),
                       encoding="utf-8") as fh:
                 return max(0, sum(1 for _ in fh) - 1)
         except Exception:
@@ -250,7 +250,7 @@ def build():
         session that fixed the rotation. Glob, never a literal name.
         """
         import glob as _g
-        base = ROOT.parent.joinpath("entropy-arb", "logs", *dirs, "minutes.csv")
+        base = ROOT.parent.joinpath("arb", "engine", "logs", *dirs, "minutes.csv")
         n = _count_csv(*dirs, "minutes.csv")
         for f in _g.glob(str(base) + "*.old"):
             try:

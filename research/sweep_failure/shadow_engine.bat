@@ -56,10 +56,10 @@ REM 2026-09-01: refresh the arb verdict file (TODO 0.75). It had NO
 REM schedule at all — the JSON that will碰 the 09-04 verdict was 2 days
 REM stale, and nothing said so (same shape as 0.86: exists locally,
 REM never reaches the surface). Refuses to judge before the gate.
-python research\arb\premium_verdict.py >> research\results\sweep_shadow_run.log 2>&1
+python ..\arb\arblib\premium_verdict.py >> research\results\sweep_shadow_run.log 2>&1
 REM 2026-09-03 (TODO 1.00): rank the cross-venue scan BEFORE publishing,
 REM so the site's battlefield board is never older than the arb board.
-python research\arb\scan_rank.py >> research\results\sweep_shadow_run.log 2>&1
+python ..\arb\arblib\scan_rank.py >> research\results\sweep_shadow_run.log 2>&1
 REM 2026-09-01: publish the arb family to MySQL for the site (0.75).
 REM The recorder runs off-cloud, so a cloud route cannot compute this
 REM -- 4th instance of that fix family. Money figures stripped by the
@@ -72,5 +72,5 @@ python research\ops_board_publish.py >> research\results\sweep_shadow_run.log 2>
 REM 2026-09-02 (TODO 0.91): Bitget in-venue basis observation.
 REM Spot-long + perp-short funding carry; verdict 2026-09-30, the
 REM scorer refuses to judge before then.
-python research\arb\basis_recorder.py >> research\results\sweep_shadow_run.log 2>&1
-python research\arb\basis_verdict.py >> research\results\sweep_shadow_run.log 2>&1
+python research\basis_recorder.py >> research\results\sweep_shadow_run.log 2>&1
+python research\basis_verdict.py >> research\results\sweep_shadow_run.log 2>&1

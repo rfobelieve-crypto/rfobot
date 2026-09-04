@@ -636,11 +636,26 @@ Step 2 研究基礎建設（backfill 歷史、建特徵表、跑乾淨 WF），�
 track——不得進 executor、不得用來加碼、不得互相背書（「機制可複製」不等於
 「機制有 edge」）。
 
-**第 4 線的隔離（2026-08-28 使用者要求，家在 `research/arb/`）**：套利
-不預測市場，跟前三條本質不同——永不 import 交易路徑、資金完全獨立
+**第 4 線的隔離（2026-08-28 使用者要求；2026-09-04 整條線搬出本 repo）**：
+套利不預測市場，跟前三條本質不同——永不 import 交易路徑、資金完全獨立
 （未來就算接錢包也不進 OKX/Bitget 帳戶體系）、只共用進度看板與新鮮度
-檢查兩個唯讀顯示層。錄價程式在 repo 外（`../entropy-arb`），這個 repo
-只放判斷。定位是戰役型（一個戰場吃幾週到幾個月就換），不是常駐線。第二條策略要上線必須先有統一風控框架（兩層 kill /
+檢查兩個唯讀顯示層。定位是戰役型（一個戰場吃幾週到幾個月就換），不是常駐線。
+
+**現在它有自己的 repo**：`../arb`（GitHub `rfobelieve-crypto/flowbot-arb`，
+私有）。`engine/` 是錄價與執行引擎、`arblib/` 是判斷層、`docs/`、`ops/`、
+`results/`。分離不是整理是風控——這條線將來要碰**自己的帳戶與憑證**，
+而這個 repo 的帳戶已經被手動單爆過兩次。
+
+**本 repo 只剩兩座橋，方向都是單向（讀它，不被它讀）**：
+`research/arb_publish.py`（讀 `results/*.json` ＋ `import arblib` 的成本
+模型 → 寫 MySQL 給網站）、`research/freshness_board.py` 與
+`prereg_publish.py`（讀 `engine/logs/*/minutes.csv` 的 mtime 與行數）。
+**只有一個檔案知道它在哪：`research/arb_home.py`**（`ARB_HOME` 可覆寫，
+引擎搬去 VPS 時改那一行）。arb repo **完全不碰本 repo 的 MySQL**。
+
+`basis_recorder.py` / `basis_verdict.py`（§0.91 站內資金費）**留在本 repo**
+——它們零依賴 `arblib`、純寫 MySQL，而且那是產品端的站內請求，不是 §0.75
+跨場館家族。第二條策略要上線必須先有統一風控框架（兩層 kill /
 風險預算 / 中央曝險帳本 / 相關性預算），不是各跑各的。
 
 ### 地形層（V7 × 流動性位置，2026-08-02 戰役收官）
