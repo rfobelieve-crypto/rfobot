@@ -1,40 +1,40 @@
 {
- "asof_utc": "2026-08-31 01:30",
- "n_total": 1325,
+ "asof_utc": "2026-09-04 11:55",
+ "n_total": 1540,
  "states": {
   "TREND_UP": {
-   "n": 352,
-   "share": 0.2657,
-   "base_share": 0.2189,
-   "meanR": -0.1696,
-   "sumR": -59.704,
-   "mdd": -80.853
+   "n": 407,
+   "share": 0.2643,
+   "base_share": 0.218,
+   "meanR": -0.1301,
+   "sumR": -52.946,
+   "mdd": -81.235
   },
   "TREND_DOWN": {
-   "n": 226,
-   "share": 0.1706,
-   "base_share": 0.2527,
-   "meanR": 0.1103,
-   "sumR": 24.939,
-   "mdd": -5.532
+   "n": 263,
+   "share": 0.1708,
+   "base_share": 0.253,
+   "meanR": 0.0865,
+   "sumR": 22.754,
+   "mdd": -7.554
   },
   "NEUTRAL": {
-   "n": 241,
-   "share": 0.1819,
-   "base_share": 0.2011,
-   "meanR": 0.0297,
-   "sumR": 7.157,
+   "n": 284,
+   "share": 0.1844,
+   "base_share": 0.2013,
+   "meanR": 0.0179,
+   "sumR": 5.072,
    "mdd": -9.817
   },
   "RANGING": {
-   "n": 506,
-   "share": 0.3819,
-   "base_share": 0.3273,
-   "meanR": 0.0347,
-   "sumR": 17.57,
+   "n": 586,
+   "share": 0.3805,
+   "base_share": 0.3277,
+   "meanR": 0.018,
+   "sumR": 10.575,
    "mdd": -26.702
   }
  },
- "reading": "insufficient for a reading (span 34d < 60d or RANGING CI spans zero) -- pattern so far: RANGING +0.0347 / TREND_UP -0.1696, consistent with B-P9 -- reading deferred to verdict day",
+ "reading": "insufficient for a reading (span 38d < 60d or RANGING CI spans zero) -- pattern so far: RANGING +0.0180 / TREND_UP -0.1301, consistent with B-P9 -- reading deferred to verdict day",
  "role": "Gate F attachment -- explanatory only, never a criterion"
 }
