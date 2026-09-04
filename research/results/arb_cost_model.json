@@ -1,5 +1,5 @@
 {
- "size_usd": 50.0,
+ "size_usd": 300.0,
  "mode": "maker_taker",
  "rebate": false,
  "assumptions": {
@@ -49,9 +49,13 @@
     "ASSUMED 10x"
    ]
   },
-  "idle_buffer_frac": [
+  "idle_buffer_frac_big": [
    1.0,
-   "ASSUMED: each venue holds 1x the working notional idle so either leg can fill without a transfer"
+   "DECIDED: big venue (okx/bitget/binance) 1x notional idle"
+  ],
+  "idle_buffer_usd_small": [
+   300.0,
+   "DECIDED 2026-09-04: small venue holds $300 idle"
   ],
   "transfer_fee_bps": [
    2.0,
@@ -111,26 +115,26 @@
    "spec": {
     "leg_a": "IO",
     "leg_b": "lighter-rh",
-    "band_bps": 7.997,
-    "size_usd": 50.0,
-    "depth_top": 250.0,
-    "depth_1bps": 1125.0,
-    "depth_3bps": 1125.0,
+    "band_bps": 7.988,
+    "size_usd": 300.0,
+    "depth_top": 252.0,
+    "depth_1bps": 1134.0,
+    "depth_3bps": 1134.0,
     "hold_minutes": 7.0,
     "fund_diff_bps_8h": -0.18,
-    "trades_per_year": 223.58346094946398,
+    "trades_per_year": 222.2222222222222,
     "mode": "maker_taker",
     "rebate": false,
     "pid": "SNDK"
    },
    "buckets_bps": {
     "1_fees": 3.0,
-    "2_slippage": 0.0,
+    "2_slippage": 0.16,
     "3_capital": 0.015,
     "4_carry": 0.003,
     "5_transfer": 1.951,
     "6_ops": 0.586,
-    "7_tail": 3.909
+    "7_tail": 3.933
    },
    "tail_excluded": false,
    "tags": {
@@ -140,26 +144,26 @@
     "4_carry": "MEASURED (recorder fund_diff); sign per pair",
     "5_transfer": "ASSUMED (all inputs)",
     "6_ops": "leg_fail MEASURED (scanner); loss ASSUMED",
-    "7_tail": "ASSUMED probabilities; 874 bps/yr of capital spread over 224 trades/yr"
+    "7_tail": "ASSUMED probabilities; 874 bps/yr of capital spread over 222 trades/yr"
    },
-   "gross_bps": 3.998,
-   "total_cost_bps": 9.463,
-   "net_bps": -5.465,
-   "fees_only_net_bps": 0.998,
+   "gross_bps": 3.994,
+   "total_cost_bps": 9.647,
+   "net_bps": -5.653,
+   "fees_only_net_bps": 0.994,
    "measured_share": 0.43
   },
   "NBIS": {
    "spec": {
     "leg_a": "IO",
     "leg_b": "lighter",
-    "band_bps": 14.192,
-    "size_usd": 50.0,
-    "depth_top": 352.0,
-    "depth_1bps": 1584.0,
-    "depth_3bps": 1584.0,
+    "band_bps": 14.18,
+    "size_usd": 300.0,
+    "depth_top": 355.0,
+    "depth_1bps": 1597.5,
+    "depth_3bps": 1597.5,
     "hold_minutes": 43.0,
-    "fund_diff_bps_8h": -0.8872,
-    "trades_per_year": 251.14678899082568,
+    "fund_diff_bps_8h": -0.9131,
+    "trades_per_year": 248.86363636363635,
     "mode": "maker_taker",
     "rebate": false,
     "pid": "NBIS"
@@ -168,10 +172,10 @@
     "1_fees": 3.0,
     "2_slippage": 0.0,
     "3_capital": 0.094,
-    "4_carry": 0.079,
+    "4_carry": 0.082,
     "5_transfer": 1.951,
     "6_ops": 0.605,
-    "7_tail": 3.48
+    "7_tail": 3.512
    },
    "tail_excluded": false,
    "tags": {
@@ -181,38 +185,38 @@
     "4_carry": "MEASURED (recorder fund_diff); sign per pair",
     "5_transfer": "ASSUMED (all inputs)",
     "6_ops": "leg_fail MEASURED (scanner); loss ASSUMED",
-    "7_tail": "ASSUMED probabilities; 874 bps/yr of capital spread over 251 trades/yr"
+    "7_tail": "ASSUMED probabilities; 874 bps/yr of capital spread over 249 trades/yr"
    },
-   "gross_bps": 7.096,
-   "total_cost_bps": 9.209,
-   "net_bps": -2.113,
-   "fees_only_net_bps": 4.096,
+   "gross_bps": 7.09,
+   "total_cost_bps": 9.243,
+   "net_bps": -2.153,
+   "fees_only_net_bps": 4.09,
    "measured_share": 0.43
   },
   "ANTH": {
    "spec": {
     "leg_a": "IO",
     "leg_b": "lighter-rh",
-    "band_bps": 15.652,
-    "size_usd": 50.0,
-    "depth_top": 95.0,
-    "depth_1bps": 427.5,
-    "depth_3bps": 427.5,
+    "band_bps": 15.479,
+    "size_usd": 300.0,
+    "depth_top": 97.0,
+    "depth_1bps": 436.5,
+    "depth_3bps": 436.5,
     "hold_minutes": 13.0,
     "fund_diff_bps_8h": 0.3075,
-    "trades_per_year": 334.8623853211009,
+    "trades_per_year": 331.8181818181818,
     "mode": "maker_taker",
     "rebate": false,
     "pid": "ANTH"
    },
    "buckets_bps": {
     "1_fees": 3.0,
-    "2_slippage": 0.0,
+    "2_slippage": 0.677,
     "3_capital": 0.028,
     "4_carry": -0.008,
     "5_transfer": 1.951,
     "6_ops": 0.589,
-    "7_tail": 2.61
+    "7_tail": 2.634
    },
    "tail_excluded": false,
    "tags": {
@@ -222,20 +226,20 @@
     "4_carry": "MEASURED (recorder fund_diff); sign per pair",
     "5_transfer": "ASSUMED (all inputs)",
     "6_ops": "leg_fail MEASURED (scanner); loss ASSUMED",
-    "7_tail": "ASSUMED probabilities; 874 bps/yr of capital spread over 335 trades/yr"
+    "7_tail": "ASSUMED probabilities; 874 bps/yr of capital spread over 332 trades/yr"
    },
-   "gross_bps": 7.826,
-   "total_cost_bps": 8.17,
-   "net_bps": -0.344,
-   "fees_only_net_bps": 4.826,
+   "gross_bps": 7.739,
+   "total_cost_bps": 8.87,
+   "net_bps": -1.131,
+   "fees_only_net_bps": 4.739,
    "measured_share": 0.43
   },
   "BTC": {
    "spec": {
     "leg_a": "HL",
     "leg_b": "lighter-rh",
-    "band_bps": 6.578,
-    "size_usd": 50.0,
+    "band_bps": 6.574,
+    "size_usd": 300.0,
     "depth_top": 1000.0,
     "depth_1bps": 4500.0,
     "depth_3bps": 4500.0,
@@ -265,24 +269,24 @@
     "6_ops": "leg_fail MEASURED (scanner); loss ASSUMED",
     "7_tail": "n/a per trade (0.0 trades/yr); 836 bps/yr of capital, ASSUMED"
    },
-   "gross_bps": 3.289,
+   "gross_bps": 3.287,
    "total_cost_bps": 5.705,
-   "net_bps": -2.416,
-   "fees_only_net_bps": 0.289,
+   "net_bps": -2.418,
+   "fees_only_net_bps": 0.287,
    "measured_share": 0.43
   },
   "HYPE": {
    "spec": {
     "leg_a": "HL",
     "leg_b": "lighter-rh",
-    "band_bps": 6.574,
-    "size_usd": 50.0,
+    "band_bps": 6.892,
+    "size_usd": 300.0,
     "depth_top": 400.0,
     "depth_1bps": 1800.0,
     "depth_3bps": 1800.0,
-    "hold_minutes": 23.5,
+    "hold_minutes": 16.0,
     "fund_diff_bps_8h": -0.04,
-    "trades_per_year": 623.931623931624,
+    "trades_per_year": 920.1680672268907,
     "mode": "maker_taker",
     "rebate": false,
     "pid": "HYPE"
@@ -290,11 +294,11 @@
    "buckets_bps": {
     "1_fees": 3.0,
     "2_slippage": 0.0,
-    "3_capital": 0.049,
-    "4_carry": 0.002,
+    "3_capital": 0.033,
+    "4_carry": 0.001,
     "5_transfer": 1.951,
-    "6_ops": 0.595,
-    "7_tail": 1.34
+    "6_ops": 0.591,
+    "7_tail": 0.909
    },
    "tail_excluded": false,
    "tags": {
@@ -304,26 +308,26 @@
     "4_carry": "MEASURED (recorder fund_diff); sign per pair",
     "5_transfer": "ASSUMED (all inputs)",
     "6_ops": "leg_fail MEASURED (scanner); loss ASSUMED",
-    "7_tail": "ASSUMED probabilities; 836 bps/yr of capital spread over 624 trades/yr"
+    "7_tail": "ASSUMED probabilities; 836 bps/yr of capital spread over 920 trades/yr"
    },
-   "gross_bps": 3.287,
-   "total_cost_bps": 6.936,
-   "net_bps": -3.649,
-   "fees_only_net_bps": 0.287,
+   "gross_bps": 3.446,
+   "total_cost_bps": 6.484,
+   "net_bps": -3.038,
+   "fees_only_net_bps": 0.446,
    "measured_share": 0.43
   },
   "ZEC": {
    "spec": {
     "leg_a": "HL",
     "leg_b": "lighter-rh",
-    "band_bps": 11.307,
-    "size_usd": 50.0,
+    "band_bps": 11.282,
+    "size_usd": 300.0,
     "depth_top": 500.0,
     "depth_1bps": 2250.0,
     "depth_3bps": 2250.0,
     "hold_minutes": 16.0,
     "fund_diff_bps_8h": -0.04,
-    "trades_per_year": 83.71559633027522,
+    "trades_per_year": 82.95454545454545,
     "mode": "maker_taker",
     "rebate": false,
     "pid": "ZEC"
@@ -335,7 +339,7 @@
     "4_carry": 0.001,
     "5_transfer": 1.951,
     "6_ops": 0.591,
-    "7_tail": 9.986
+    "7_tail": 10.078
    },
    "tail_excluded": false,
    "tags": {
@@ -345,20 +349,20 @@
     "4_carry": "MEASURED (recorder fund_diff); sign per pair",
     "5_transfer": "ASSUMED (all inputs)",
     "6_ops": "leg_fail MEASURED (scanner); loss ASSUMED",
-    "7_tail": "ASSUMED probabilities; 836 bps/yr of capital spread over 84 trades/yr"
+    "7_tail": "ASSUMED probabilities; 836 bps/yr of capital spread over 83 trades/yr"
    },
-   "gross_bps": 5.654,
-   "total_cost_bps": 15.562,
-   "net_bps": -9.909,
-   "fees_only_net_bps": 2.654,
+   "gross_bps": 5.641,
+   "total_cost_bps": 15.654,
+   "net_bps": -10.013,
+   "fees_only_net_bps": 2.641,
    "measured_share": 0.43
   },
   "NEAR": {
    "spec": {
     "leg_a": "HL",
     "leg_b": "lighter-rh",
-    "band_bps": 11.401,
-    "size_usd": 50.0,
+    "band_bps": 11.388,
+    "size_usd": 300.0,
     "depth_top": 302.0,
     "depth_1bps": 1359.0,
     "depth_3bps": 1359.0,
@@ -388,21 +392,21 @@
     "6_ops": "leg_fail MEASURED (scanner); loss ASSUMED",
     "7_tail": "n/a per trade (0.0 trades/yr); 836 bps/yr of capital, ASSUMED"
    },
-   "gross_bps": 5.7,
+   "gross_bps": 5.694,
    "total_cost_bps": 5.695,
-   "net_bps": 0.005,
-   "fees_only_net_bps": 2.7,
+   "net_bps": -0.001,
+   "fees_only_net_bps": 2.694,
    "measured_share": 0.43
   },
   "GOLD_LL": {
    "spec": {
     "leg_a": "lighter",
     "leg_b": "lighter-rh",
-    "band_bps": 5.294,
-    "size_usd": 50.0,
-    "depth_top": 1013.0,
-    "depth_1bps": 4558.5,
-    "depth_3bps": 4558.5,
+    "band_bps": 5.405,
+    "size_usd": 300.0,
+    "depth_top": 1000.0,
+    "depth_1bps": 4500.0,
+    "depth_3bps": 4500.0,
     "hold_minutes": 60.0,
     "fund_diff_bps_8h": 0.0,
     "trades_per_year": 0.0,
@@ -429,23 +433,23 @@
     "6_ops": "leg_fail MEASURED (scanner); loss ASSUMED",
     "7_tail": "n/a per trade (0.0 trades/yr); 836 bps/yr of capital, ASSUMED"
    },
-   "gross_bps": 2.647,
+   "gross_bps": 2.703,
    "total_cost_bps": 2.69,
-   "net_bps": -0.043,
-   "fees_only_net_bps": 2.647,
+   "net_bps": 0.012,
+   "fees_only_net_bps": 2.703,
    "measured_share": 0.43
   },
   "NVDA_LL": {
    "spec": {
     "leg_a": "lighter",
     "leg_b": "lighter-rh",
-    "band_bps": 6.729,
-    "size_usd": 50.0,
+    "band_bps": 6.635,
+    "size_usd": 300.0,
     "depth_top": 250.0,
     "depth_1bps": 1125.0,
     "depth_3bps": 1125.0,
     "hold_minutes": 60.0,
-    "fund_diff_bps_8h": 0.24,
+    "fund_diff_bps_8h": 0.32,
     "trades_per_year": 0.0,
     "mode": "maker_taker",
     "rebate": false,
@@ -453,9 +457,9 @@
    },
    "buckets_bps": {
     "1_fees": 0.0,
-    "2_slippage": 0.0,
+    "2_slippage": 0.167,
     "3_capital": 0.126,
-    "4_carry": -0.03,
+    "4_carry": -0.04,
     "5_transfer": 1.951,
     "6_ops": 0.614,
     "7_tail": null
@@ -470,10 +474,10 @@
     "6_ops": "leg_fail MEASURED (scanner); loss ASSUMED",
     "7_tail": "n/a per trade (0.0 trades/yr); 836 bps/yr of capital, ASSUMED"
    },
-   "gross_bps": 3.365,
-   "total_cost_bps": 2.66,
-   "net_bps": 0.704,
-   "fees_only_net_bps": 3.365,
+   "gross_bps": 3.317,
+   "total_cost_bps": 2.817,
+   "net_bps": 0.501,
+   "fees_only_net_bps": 3.317,
    "measured_share": 0.43
   }
  }

@@ -91,6 +91,9 @@ def episodes_with_paths(rows, band):
     return eps
 
 
+NO_CARRY = "--no-carry" in sys.argv     # ablation: same exit rule, carry income zeroed
+
+
 def main() -> int:
     print("=" * 96)
     print("  §1.07 持有收租 vs 回半帶就平（預註冊，探索；判準見檔頭）")
@@ -134,7 +137,7 @@ def main() -> int:
                     if rk <= 0:                       # carry flipped -> exit
                         exit_k = k
                         break
-                    carry += rk * dt_h / 8.0
+                    carry += 0.0 if NO_CARRY else rk * dt_h / 8.0
                     if sign * (rows[k]["prem"] - mid) <= 0:     # crossed midline
                         exit_k = k
                         break
@@ -188,6 +191,10 @@ def main() -> int:
                 "bars": bars, "median_hold_h": round(med_hold, 2) if extra_hold else None,
                 "verdict": "存活：開前瞻時鐘" if all(bars.values()) else "未通過——留作筆記，不開時鐘"})
     print(f"  → {res['verdict']}")
+    if NO_CARRY:
+        print("  (ablation: carry income zeroed -- if the gains match the full run, "
+              "the driver is the exit target, not carry)")
+        return 0
     OUT.write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"\n  -> {OUT}")
     return 0
