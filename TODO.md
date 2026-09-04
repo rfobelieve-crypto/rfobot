@@ -780,7 +780,18 @@ Binance 65、HL 80、Bitget 88、OKX 95。三個結論：(a) 機會壽命是**�
 公開面規則照舊：只出百分比、方向、時間。
 
 - [ ] 東京 VPS 開機（X1，$8–20/月）——執行引擎與 Polymarket 掃描都卡在這
-- [ ] M1 先做：三所各一筆最小單讀回執（不需要 VPS，本機就能做）
+- [x] **M1 的讀取端已就緒**（`research/arb/fee_receipts.py`，2026-09-04）：讀四個場館
+      過去 N 小時的成交回執，算**帳單上實際付的 bps**（分 maker/taker），與 `fees.py`
+      並列，差 >0.5 bps 就標「以回執為準改 fees.py」。**這支只讀，沒有任何下單或
+      簽單程式碼**——下單是操作者的動作。`HL_ACCOUNT_ADDRESS` 一設就能讀（HL 的
+      `userFills` 是公開的，不需要金鑰）；CEX 要唯讀 API key。
+- [ ] M1 執行：每所手動下一筆最小單（OKX $1.9–7.7／Bitget $5／Binance $5／HL $10），
+      再跑 `fee_receipts.py`。總成本 <$15，換掉整個 F 桶的假設
+- [ ] **引擎缺的那一半：maker 路徑**（2026-09-04 查證）——錄價程式的
+      `venue_hl.send_taker` / `venue_lighter.send_taker` 是完整的（IOC、reduce_only、
+      成交輪詢、簽章），但**只有吃單**。而成本分析的結論是掛單才活得下來，所以引擎
+      要補 post-only 下單＋撤單＋5 秒逾時。這是新的、碰錢的程式碼 → 上線前逐行審
+      （CLAUDE.md「下單程式碼要逐行審」）
 - [ ] `arb_live_*` 表與 `/public/arb-live` 端點（引擎有資料之後才做，避免空殼）
 - [ ] 儀表板頁（jarvis）——端點有資料之後；**唯讀、一顆按鈕都沒有**
 - [ ] 控制通道：TG 四個動詞 `pause`／`resume`／`flat`／`size`，冪等、不經儀表板、

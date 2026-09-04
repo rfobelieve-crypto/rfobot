@@ -1,0 +1,22 @@
+{
+ "asof_utc": "2026-09-04 01:37",
+ "window_hours": 72.0,
+ "venues": {
+  "HL": {
+   "n": 0,
+   "reason": "未設憑證"
+  },
+  "okx": {
+   "n": 0,
+   "reason": "沒有成交"
+  },
+  "bitget": {
+   "n": 0,
+   "reason": "沒有成交"
+  },
+  "binance": {
+   "n": 0,
+   "reason": "沒有成交"
+  }
+ }
+}
