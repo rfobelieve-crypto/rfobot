@@ -70,6 +70,27 @@ def variants_catalog() -> dict[str, ExitPolicy]:
         "trail_4x":      ExitPolicy(name="trail_4x",       trail_mult=4.0),
         "no_opp":        ExitPolicy(name="no_opp",         opp_enabled=False),
         "be_after_1atr": ExitPolicy(name="be_after_1atr",  breakeven_after_atr_mult=1.0),
+        # ── 2026-09-04 新增：在模型自己的預測視野結束時出場 ──────────
+        # 觸發：18 筆 live 的中位持倉是 11.3h，而 direction model 預測的是
+        # y_path_ret_4h = mean(close[t+1..t+4])/close[t]-1 —— **4 小時**。
+        # 超出的那 7 小時模型沒有意見，倉位由移動停損自己在跑。
+        # 現行 time_cap 是 72h，是預測視野的 18 倍，而那個數字從沒被問過。
+        #
+        # 這跟 2026-07-06「11 個出場變體全敗給 3xATR」不同族：那些是
+        # **價格觸發**的收緊（把 winner 提早掃掉），這是**時間觸發**，
+        # 而且時間點不是調出來的，是模型自己的 horizon。
+        #
+        # 預註冊判準（在跑之前寫死，2026-09-04）：
+        #   要部署必須三條同時成立——
+        #   (1) 配對每筆淨報酬差 ≥ **+22 bps**（不是 +10：research/
+        #       prereg_power.py 用 live 實測配對 sd 101bps、n=169 算出
+        #       MDE=21.8bps，+10 只有 1.29×SE ＝ 沒有功效的門檻）
+        #   (2) bootstrap 95% CI 不含零
+        #   (3) 前後兩半同號
+        #   任一不過就是 NO-GO，**不得事後調門檻或改看別的變體**。
+        "cap_4h":        ExitPolicy(name="cap_4h",  time_cap_hours=4),
+        "cap_8h":        ExitPolicy(name="cap_8h",  time_cap_hours=8),
+        "cap_12h":       ExitPolicy(name="cap_12h", time_cap_hours=12),
     }
 
 
