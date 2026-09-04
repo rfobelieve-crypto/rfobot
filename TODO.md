@@ -902,7 +902,8 @@ Binance 65、HL 80、Bitget 88、OKX 95。三個結論：(a) 機會壽命是**�
       簽單程式碼**——下單是操作者的動作。`HL_ACCOUNT_ADDRESS` 一設就能讀（HL 的
       `userFills` 是公開的，不需要金鑰）；CEX 要唯讀 API key。
 - [ ] **M1 執行（2026-09-04 使用者：「今晚我來搞全部交易所註冊帳號」）**：
-      清單 `research/arb/M1_CHECKLIST.md`——註冊要點（子帳戶、只勾交易不勾提幣、
+      清單 `research/arb/M1_CHECKLIST.md`；**交易所端開通步驟 `research/arb/ONBOARDING.md`**
+      （每家要錢包還是 API key、批 A 唯讀先做／批 B 下單再開、Lighter 兩鏈要兩個帳號）——註冊要點（子帳戶、只勾交易不勾提幣、
       HL 用獨立錢包、**Lighter 兩條鏈各一組**）、四筆最小單（OKX $2.3／Bitget $5／
       Binance $5／HL $10）、要貼給我的唯讀憑證，以及**同一晚可以順便做完的四項查證**
       （M7 劃轉成本、第 3 桶保證金率、A7 保證金是否分帳戶、rToken 抵押率）。
