@@ -1,9 +1,9 @@
 {
- "asof_utc": "2026-09-04 01:54",
+ "asof_utc": "2026-09-04 03:24",
  "rows": [
   {
    "name": "bat-train heartbeat",
-   "age_h": 0.8,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -11,7 +11,7 @@
   },
   {
    "name": "sweep shadow log",
-   "age_h": 0.8,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -19,7 +19,7 @@
   },
   {
    "name": "kline caches",
-   "age_h": 0.8,
+   "age_h": 0.3,
    "max_h": 3.5,
    "ok": true,
    "detail": "BTCUSDT_1h.csv",
@@ -27,7 +27,7 @@
   },
   {
    "name": "weather station row",
-   "age_h": 0.7,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -35,7 +35,7 @@
   },
   {
    "name": "raid signals row",
-   "age_h": 0.7,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -43,7 +43,7 @@
   },
   {
    "name": "v7 veto clock row",
-   "age_h": 0.8,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -51,7 +51,7 @@
   },
   {
    "name": "raid outcomes row",
-   "age_h": 0.8,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -59,7 +59,7 @@
   },
   {
    "name": "basis obs (§0.91)",
-   "age_h": 0.8,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -67,7 +67,7 @@
   },
   {
    "name": "v7 export pipe (§0.81)",
-   "age_h": 0.8,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "HTTP 200, 0 events for Rfo",
@@ -75,7 +75,7 @@
   },
   {
    "name": "ops board row",
-   "age_h": 0.8,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -83,7 +83,7 @@
   },
   {
    "name": "arb status row",
-   "age_h": 0.8,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -91,7 +91,7 @@
   },
   {
    "name": "prereg board row",
-   "age_h": 0.8,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -99,7 +99,7 @@
   },
   {
    "name": "degradation guard",
-   "age_h": 0.2,
+   "age_h": 0.4,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -107,7 +107,7 @@
   },
   {
    "name": "indicator bars",
-   "age_h": 1.9,
+   "age_h": 1.4,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -123,7 +123,7 @@
   },
   {
    "name": "cloud train parity",
-   "age_h": 0.2,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -211,7 +211,7 @@
   },
   {
    "name": "coinglass parquet CONTENT",
-   "age_h": 25.6,
+   "age_h": 27.1,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_fear_greed_daily.parquet",
@@ -219,7 +219,7 @@
   },
   {
    "name": "coinglass parquets",
-   "age_h": 5.9,
+   "age_h": 7.4,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_oi_1h.parquet",
@@ -227,7 +227,7 @@
   },
   {
    "name": "daily collect log",
-   "age_h": 5.9,
+   "age_h": 7.4,
    "max_h": 30.0,
    "ok": true,
    "detail": "",
@@ -235,7 +235,7 @@
   },
   {
    "name": "freshness board self",
-   "age_h": 2.6,
+   "age_h": 1.5,
    "max_h": 7.0,
    "ok": true,
    "detail": "",
@@ -243,7 +243,7 @@
   },
   {
    "name": "revalidation report",
-   "age_h": 717.3,
+   "age_h": 718.8,
    "max_h": 840.0,
    "ok": true,
    "detail": "quarterly_revalidation_20260805.md",
@@ -251,7 +251,7 @@
   },
   {
    "name": "portfolio clocks",
-   "age_h": 96.4,
+   "age_h": 97.9,
    "max_h": 195.0,
    "ok": true,
    "detail": "",
@@ -259,7 +259,7 @@
   },
   {
    "name": "tracked signals",
-   "age_h": 20.9,
+   "age_h": 1.4,
    "max_h": 336.0,
    "ok": true,
    "detail": "",
