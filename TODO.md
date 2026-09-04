@@ -938,6 +938,16 @@ Binance 65、HL 80、Bitget 88、OKX 95。三個結論：(a) 機會壽命是**�
       裡最該先加的**）、**G2** `settle_timeout` 逾時回 `filled_base=0` 是猜測，而
       `_execute` 先用了它才檢查 `unresolved`（對帳會修回來，但那之前本地部位是錯的，
       而 `_scan` 可能下新單）、**G3** 沒有 maker 路徑、**G4** 兩條 Lighter 鏈共用憑證。
+- [x] **B4 第一個 kill switch 完成（2026-09-04）：`max_net_base`**（entropy-arb 本機倉
+      `5ba9347`）。B1 的 G1——`_hedge` 只縮當下的差額，**沒有任何地方限制差額能長到
+      多大**。修法：`risk.max_net_base`（預設 3×`net_tolerance_base`），在
+      `_maybe_hedge` **開頭**檢查（因為失效形狀是「對沖一直失敗而差額一直長大」，
+      這種必須自己停，不能等人發現），超過即 `halted=True` + critical log，
+      **不下任何單、不碰既有部位**；HALT 單向，重啟時 `strict=True` 會重讀真實部位。
+      順帶修 **G2**：`unresolved` 時 `filled_base` 是猜測（逾時回 0.0），加 warning
+      說明本地部位在對帳前可能是舊的。
+      **五種情境已知答案測試全過**：超限 HALT 且零下單／上限內照常對沖（無誤觸）／
+      `cap=0` 停用時行為與改動前相同／容差內不動作／預設值＝3×tol。
 - [ ] **引擎缺的那一半：maker 路徑**（2026-09-04 查證）——錄價程式的
       `venue_hl.send_taker` / `venue_lighter.send_taker` 是完整的（IOC、reduce_only、
       成交輪詢、簽章），但**只有吃單**。而成本分析的結論是掛單才活得下來，所以引擎
