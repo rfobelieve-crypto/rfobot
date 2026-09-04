@@ -1,0 +1,60 @@
+================================================================================================
+  網格 × 流動性波動閘門：shock 對未來 4h 波動的 conditional IC（對照 trailing vol）
+  判準（凍結）：日區塊 bootstrap CI 離零 ∧ |cond IC| ≥ 0.02 ∧ 兩半同號
+================================================================================================
+BTC-USD   binance_perp  n= 71546 (52d)
+   主標籤 fut_vol : raw IC +0.0556 [+0.042,+0.073]  | cond IC +0.1141 [+0.0989,+0.1287]  halves +0.100/+0.119  → PASS
+                    SE 0.0079 vs floor 0.02: floor < 2.8 SE — underpowered
+                    分層 IC(依 trail_vol 五分位): Q1:+0.047 Q2:+0.106 Q3:+0.111 Q4:+0.168 Q5:+0.118
+   副標籤 exit2x  : raw IC +0.0478 | cond IC -0.0109 [-0.0227,+0.0038] halves -0.039/+0.009 → FAIL
+ETH-USD   binance_perp  n= 60060 (44d)
+   主標籤 fut_vol : raw IC +0.0509 [+0.034,+0.072]  | cond IC +0.1205 [+0.1037,+0.1337]  halves +0.112/+0.120  → PASS
+                    SE 0.0082 vs floor 0.02: floor < 2.8 SE — underpowered
+                    分層 IC(依 trail_vol 五分位): Q1:+0.058 Q2:+0.117 Q3:+0.137 Q4:+0.129 Q5:+0.126
+   副標籤 exit2x  : raw IC +0.0546 | cond IC -0.0065 [-0.0257,+0.0095] halves -0.026/+0.007 → FAIL
+BNB-USD   binance_perp  n= 53177 (39d)
+   主標籤 fut_vol : raw IC +0.0500 [+0.038,+0.065]  | cond IC +0.1131 [+0.1022,+0.1266]  halves +0.102/+0.121  → PASS
+                    SE 0.0066 vs floor 0.02: floor is >2.8 SE (decidable)
+                    分層 IC(依 trail_vol 五分位): Q1:+0.067 Q2:+0.120 Q3:+0.093 Q4:+0.154 Q5:+0.139
+   副標籤 exit2x  : raw IC +0.0343 | cond IC -0.0145 [-0.0329,-0.0013] halves -0.027/-0.021 → FAIL
+XRP-USD   binance_perp  n= 53152 (39d)
+   主標籤 fut_vol : raw IC +0.0308 [+0.020,+0.045]  | cond IC +0.1144 [+0.0937,+0.1341]  halves +0.096/+0.120  → PASS
+                    SE 0.0103 vs floor 0.02: floor < 2.8 SE — underpowered
+                    分層 IC(依 trail_vol 五分位): Q1:+0.087 Q2:+0.105 Q3:+0.104 Q4:+0.127 Q5:+0.088
+   副標籤 exit2x  : raw IC +0.0247 | cond IC -0.0179 [-0.0288,-0.0062] halves -0.037/-0.032 → FAIL
+ADA-USD   binance_perp  n= 53163 (39d)
+   主標籤 fut_vol : raw IC +0.0171 [+0.005,+0.032]  | cond IC +0.0899 [+0.0737,+0.1032]  halves +0.071/+0.107  → PASS
+                    SE 0.0079 vs floor 0.02: floor < 2.8 SE — underpowered
+                    分層 IC(依 trail_vol 五分位): Q1:+0.053 Q2:+0.084 Q3:+0.069 Q4:+0.119 Q5:+0.115
+   副標籤 exit2x  : raw IC +0.0266 | cond IC -0.0352 [-0.0484,-0.0220] halves -0.034/-0.040 → PASS
+DOGE-USD  binance_perp  n= 53172 (39d)
+   主標籤 fut_vol : raw IC +0.0363 [+0.025,+0.052]  | cond IC +0.0958 [+0.0801,+0.1094]  halves +0.087/+0.091  → PASS
+                    SE 0.0080 vs floor 0.02: floor < 2.8 SE — underpowered
+                    分層 IC(依 trail_vol 五分位): Q1:+0.063 Q2:+0.108 Q3:+0.113 Q4:+0.110 Q5:+0.067
+   副標籤 exit2x  : raw IC +0.0379 | cond IC +0.0024 [-0.0106,+0.0481] halves -0.013/-0.018 → FAIL
+LINK-USD  binance_perp  n= 53180 (39d)
+   主標籤 fut_vol : raw IC +0.0623 [+0.051,+0.076]  | cond IC +0.1176 [+0.1047,+0.1300]  halves +0.106/+0.115  → PASS
+                    SE 0.0070 vs floor 0.02: floor is >2.8 SE (decidable)
+                    分層 IC(依 trail_vol 五分位): Q1:+0.075 Q2:+0.121 Q3:+0.112 Q4:+0.162 Q5:+0.113
+   副標籤 exit2x  : raw IC +0.0297 | cond IC -0.0115 [-0.0269,+0.0018] halves -0.014/-0.030 → FAIL
+SUI-USD   binance_perp  n= 53183 (39d)
+   主標籤 fut_vol : raw IC +0.0222 [+0.013,+0.037]  | cond IC +0.1019 [+0.0865,+0.1163]  halves +0.088/+0.100  → PASS
+                    SE 0.0077 vs floor 0.02: floor < 2.8 SE — underpowered
+                    分層 IC(依 trail_vol 五分位): Q1:+0.064 Q2:+0.092 Q3:+0.109 Q4:+0.123 Q5:+0.103
+   副標籤 exit2x  : raw IC +0.0330 | cond IC -0.0245 [-0.0377,-0.0117] halves -0.039/-0.032 → PASS
+UNI-USD   binance_perp  n= 53194 (39d)
+   主標籤 fut_vol : raw IC +0.0410 [+0.029,+0.055]  | cond IC +0.1046 [+0.0858,+0.1165]  halves +0.092/+0.115  → PASS
+                    SE 0.0078 vs floor 0.02: floor < 2.8 SE — underpowered
+                    分層 IC(依 trail_vol 五分位): Q1:+0.052 Q2:+0.119 Q3:+0.102 Q4:+0.123 Q5:+0.094
+   副標籤 exit2x  : raw IC +0.0303 | cond IC -0.0146 [-0.0277,-0.0017] halves -0.012/-0.027 → FAIL
+AAVE-USD  binance_perp  n= 53202 (39d)
+   主標籤 fut_vol : raw IC +0.0314 [+0.019,+0.046]  | cond IC +0.0861 [+0.0708,+0.0986]  halves +0.072/+0.101  → PASS
+                    SE 0.0076 vs floor 0.02: floor < 2.8 SE — underpowered
+                    分層 IC(依 trail_vol 五分位): Q1:+0.058 Q2:+0.068 Q3:+0.105 Q4:+0.126 Q5:+0.053
+   副標籤 exit2x  : raw IC +0.0296 | cond IC -0.0091 [-0.0222,+0.0079] halves +0.001/-0.018 → FAIL
+
+  fut_vol: cond IC 正號 10/10，過判準 10/10
+
+  exit2x: cond IC 正號 1/10，過判準 2/10
+
+  wrote C:\Users\rfo\Desktop\flowbot\flow_system\research\results\flow_grid_gate.json
