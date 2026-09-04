@@ -69,8 +69,12 @@ ASSUMED = {
         "okx": (0.10, "ASSUMED 10x"), "bitget": (0.10, "ASSUMED 10x"),
         "binance": (0.10, "ASSUMED 10x"),
     },
-    "idle_buffer_frac": (1.0, "ASSUMED: each venue holds 1x the working notional idle so "
-                              "either leg can fill without a transfer"),
+    # Operator decision 2026-09-04 (COST_INVENTORY #3): buffers are
+    # ASYMMETRIC -- the big venue holds 1x working notional idle, the small
+    # venue holds a flat $300 and is topped up just-in-time. This is the
+    # R1-vs-C3 trade the operator chose; the number is his, not a guess.
+    "idle_buffer_frac_big": (1.0, "DECIDED: big venue (okx/bitget/binance) 1x notional idle"),
+    "idle_buffer_usd_small": (300.0, "DECIDED 2026-09-04: small venue holds $300 idle"),
     # 5 transfer
     "transfer_fee_bps": (2.0, "ASSUMED: bridge/withdrawal ~$1-2 per $1k moved, amortised"),
     "transfer_delay_min": (20.0, "ASSUMED: 20 min single-leg exposure per rebalance"),
@@ -147,7 +151,12 @@ def cost_breakdown(t: TradeSpec) -> dict:
     # 3 capital: margin on both legs + idle buffer on both venues, x hurdle x hold
     mf_a = ASSUMED["margin_frac"].get(a, (0.2, "ASSUMED"))[0]
     mf_b = ASSUMED["margin_frac"].get(b, (0.2, "ASSUMED"))[0]
-    locked = (mf_a + mf_b + 2 * ASSUMED["idle_buffer_frac"][0])   # x notional
+    big = {"okx", "bitget", "binance"}
+    buf = 0.0
+    for v in (a, b):
+        buf += (ASSUMED["idle_buffer_frac_big"][0] if v in big
+                else ASSUMED["idle_buffer_usd_small"][0] / max(t.size_usd, 1.0))
+    locked = (mf_a + mf_b + buf)                                   # x notional
     out["3_capital"] = locked * ASSUMED["hurdle_rate_pa"][0] * hold_yr * 1e4
     tags["3_capital"] = "ASSUMED (hurdle, margin, idle buffer); hold MEASURED"
 
