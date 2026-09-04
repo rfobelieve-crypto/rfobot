@@ -103,6 +103,16 @@ REGISTRY = [
     # account name after the product side went id-only. No artifact-age
     # rule could see it: "no fills yet" and "misconfigured" both produce
     # nothing. The producer now states its own health and this reads it.
+    # 2026-09-05 (TODO 0.88d): GEX recorder. Two rows on purpose -- the DB
+    # row says "a snapshot landed", the flag says "the recorder itself is ok"
+    # (a failed Deribit call writes ok=false with the reason; the DB row alone
+    # would just go stale, which is the shape that hid the §0.81 breakage).
+    ("gex snapshots (§0.88d)", "db",
+     "gex_snapshots:created_at", 2.5,
+     "Deribit option OI+IV -> dealer gamma, hourly on shadow_engine.bat"),
+    ("gex recorder flag (§0.88d)", "json_flag",
+     "research/results/gex_last.json:ok", 2.5,
+     "recorder self-report {ok, reason}; red = Deribit call or DB write failed"),
     ("v7 export pipe (§0.81)", "json_flag",
      "research/results/v7_product_trades_status.json:ok", 2.5,
      "product-side /export/v7 reachable AND configured (not: has rows)"),
