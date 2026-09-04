@@ -787,6 +787,12 @@ Binance 65、HL 80、Bitget 88、OKX 95。三個結論：(a) 機會壽命是**�
       `userFills` 是公開的，不需要金鑰）；CEX 要唯讀 API key。
 - [ ] M1 執行：每所手動下一筆最小單（OKX $1.9–7.7／Bitget $5／Binance $5／HL $10），
       再跑 `fee_receipts.py`。總成本 <$15，換掉整個 F 桶的假設
+- [ ] **憑證缺口（2026-09-04 查證，規格 §7）**：(a) HL 要用 **API wallet**——能下單撤單
+      但**永遠不能提幣**，把 DEX 腿的金鑰風險拉到跟 CEX 一樣（官方文件明載）；
+      (b) **兩條 Lighter 鏈現在共用同一組憑證**（`config.py` 兩處都讀同樣的
+      `LIGHTER_*`），而 mainnet 與 RH 是不同鏈不同帳號——`NVDA_LL` 兩腿都是 Lighter，
+      **上線前必修**，錄價階段看不出來因為它不簽單；(c) OKX／Bitget／Binance 的下單
+      認證**尚未實作**（現在只有公開簿口讀取）
 - [ ] **引擎缺的那一半：maker 路徑**（2026-09-04 查證）——錄價程式的
       `venue_hl.send_taker` / `venue_lighter.send_taker` 是完整的（IOC、reduce_only、
       成交輪詢、簽章），但**只有吃單**。而成本分析的結論是掛單才活得下來，所以引擎
