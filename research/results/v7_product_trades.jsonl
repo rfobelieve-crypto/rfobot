@@ -1,2 +1,3 @@
 {"mode": "paper", "t": 1788527024508, "marketId": "BTCUSDT", "event": "entry", "side": "buy", "entry": 79507.7, "sizeBase": 0.05031, "signalPx": 79423.8, "stopDist": 1669.5010483912965, "isFlip": false}
 {"mode": "paper", "t": 1788545071487, "marketId": "BTCUSDT", "event": "exit", "side": "buy", "reason": "opp", "entry": 79507.7, "exit": 79532, "sizeBase": 0.05031, "pnl": 1.2225, "r": 0.015, "signalPx": 79423.8, "stopPx": 78148.498952, "heldMs": 18046980}
+{"mode": "paper", "t": 1788595426332, "marketId": "BTCUSDT", "event": "entry", "side": "sell", "entry": 79638.7, "sizeBase": 0.050227, "signalPx": 79673, "stopDist": 750.1707751845515, "isFlip": false}
