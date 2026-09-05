@@ -25,6 +25,13 @@ from pathlib import Path
 
 import requests
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):
+        return True
+
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PNG = PROJECT_ROOT / "research" / "results" / "cancel_flow_monitor.png"
 
@@ -57,6 +64,8 @@ def _load_env_val(*keys: str) -> str:
 
 
 def main() -> int:
+    if _tg_guard("push_cancel_flow"):
+        return
     ap = argparse.ArgumentParser()
     ap.add_argument("--hours", type=int, default=0)  # 0 = plot script default (24h)
     args = ap.parse_args()

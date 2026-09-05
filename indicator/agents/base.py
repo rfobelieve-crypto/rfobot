@@ -31,6 +31,12 @@ from typing import Any, Callable, Optional
 
 import anthropic
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):
+        return True
+
 logger = logging.getLogger(__name__)
 
 TZ_TPE = timezone(timedelta(hours=8))
@@ -128,6 +134,8 @@ class BaseAgent(ABC):
     # ── Telegram ────────────────────────────────────────────────────────
 
     def send_alert(self, message: str):
+        if _tg_guard("agents.base"):
+            return
         bot_token = AGENT_BOT_TOKEN or os.environ.get("INDICATOR_BOT_TOKEN", "")
         chat_id = AGENT_CHAT_ID or os.environ.get("INDICATOR_CHAT_ID", "")
         if not bot_token or not chat_id:

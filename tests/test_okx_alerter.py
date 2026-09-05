@@ -18,9 +18,31 @@ from indicator.okx.alerter import (
 # ── send_critical ────────────────────────────────────────────────────
 
 
+# 2026-09-05 Telegram 斷流閘門：送出預設封鎖。測送出邏輯的案例必須明確
+# 開啟通關語，而「預設是封鎖的」本身用下面那條測試釘住（反向證明）。
+_REENABLE = "I_ROTATED_ALL_TOKENS"
+
+
+class TestTelegramCutover:
+    def test_blocked_by_default(self):
+        env = {k: v for k, v in os.environ.items() if k != "TELEGRAM_REENABLE"}
+        env["TELEGRAM_BOT_TOKEN"] = "tok"
+        with patch.dict(os.environ, env, clear=True):
+            with patch("indicator.okx.alerter.requests.post") as m:
+                assert send_critical("123", "msg") is False
+                m.assert_not_called()          # 一個字都不准送出去
+
+    def test_wrong_phrase_still_blocked(self):
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok",
+                                     "TELEGRAM_REENABLE": "1"}):
+            with patch("indicator.okx.alerter.requests.post") as m:
+                assert send_critical("123", "msg") is False
+                m.assert_not_called()
+
+
 class TestSendCritical:
     def test_empty_chat_id_returns_false(self):
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok"}):
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok", "TELEGRAM_REENABLE": _REENABLE}):
             assert send_critical("", "msg") is False
 
     def test_missing_token_returns_false(self):
@@ -29,7 +51,7 @@ class TestSendCritical:
             assert send_critical("chat", "msg") is False
 
     def test_200_response_returns_true(self):
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok"}):
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok", "TELEGRAM_REENABLE": _REENABLE}):
             with patch("indicator.okx.alerter.requests.post") as post:
                 post.return_value = MagicMock(status_code=200, text="")
                 assert send_critical("chat", "msg") is True
@@ -40,14 +62,14 @@ class TestSendCritical:
         assert call_kwargs["json"]["parse_mode"] == "Markdown"
 
     def test_non_200_response_returns_false(self):
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok"}):
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok", "TELEGRAM_REENABLE": _REENABLE}):
             with patch("indicator.okx.alerter.requests.post") as post:
                 post.return_value = MagicMock(status_code=429,
                                               text="rate limit")
                 assert send_critical("chat", "msg") is False
 
     def test_exception_swallowed_returns_false(self):
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok"}):
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok", "TELEGRAM_REENABLE": _REENABLE}):
             with patch("indicator.okx.alerter.requests.post",
                        side_effect=RuntimeError("network")):
                 # Must not raise
@@ -58,7 +80,7 @@ class TestSendCritical:
         # '_' that makes Telegram reject the Markdown message (400), silently
         # dropping EVERY exit notification.  send_critical must retry once as
         # plain text so the alert still gets through.
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok"}):
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok", "TELEGRAM_REENABLE": _REENABLE}):
             with patch("indicator.okx.alerter.requests.post") as post:
                 post.side_effect = [
                     MagicMock(status_code=400, text="can't parse entities"),
@@ -74,7 +96,7 @@ class TestSendCritical:
     def test_429_does_not_double_send(self):
         # Only a 400 (parse error) is retryable as plain text; rate-limit /
         # server errors aren't fixed by dropping parse_mode.
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok"}):
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "tok", "TELEGRAM_REENABLE": _REENABLE}):
             with patch("indicator.okx.alerter.requests.post") as post:
                 post.return_value = MagicMock(status_code=429, text="rate")
                 assert send_critical("chat", "msg") is False

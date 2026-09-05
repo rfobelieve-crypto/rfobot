@@ -30,6 +30,13 @@ import requests as _requests
 
 from shared.db import get_db_conn
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):
+        return True
+
+
 logger = logging.getLogger(__name__)
 
 # Stage-3 hard ceilings — per-account caps may be tighter, never looser.
@@ -229,6 +236,8 @@ def _tg_token() -> str:
 
 
 def _tg_send(chat_id: str, text: str) -> None:
+    if _tg_guard("accounts"):
+        return
     token = _tg_token()
     if not token:
         return
@@ -244,6 +253,8 @@ def _tg_send(chat_id: str, text: str) -> None:
 
 def _tg_delete(chat_id: str, message_id) -> None:
     """Best-effort delete of the message that carried raw credentials."""
+    if _tg_guard("accounts"):
+        return
     token = _tg_token()
     if not token or not message_id:
         return

@@ -22,6 +22,12 @@ from market_data.storage.db import run_migration
 from market_data.features.snapshot_repository import get_pending_snapshots, save_snapshot
 from market_data.features.snapshot_builder import build_snapshot
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):
+        return True
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
@@ -36,6 +42,8 @@ LOOP_INTERVAL = 60  # 1 minute
 
 
 def _notify_telegram(features: dict):
+    if _tg_guard("snapshot_runner"):
+        return
     """Send snapshot result to Telegram (best-effort, never raises)."""
     if not _TG_TOKEN or not _TG_CHAT_ID:
         return

@@ -26,6 +26,13 @@ import pandas as pd
 from flask import Flask, Response, jsonify, request
 from dotenv import load_dotenv
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):  # 匯入失敗一律當成封鎖——止血優先於功能
+        return True
+
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 logging.basicConfig(
@@ -62,6 +69,7 @@ DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 def _make_reply_markup():
     """Inline keyboard with quick action buttons."""
     import json
+
     # /dashboard is admin-guarded; embed the token so the button keeps working
     # (the Telegram chat is operator-only, so the URL stays private).
     _base = "https://enchanting-emotion-production-4b4d.up.railway.app"
@@ -97,6 +105,8 @@ def _send_telegram_photo(png: bytes, caption: str) -> str:
     if not png or len(png) < 100:
         logger.error("Chart PNG is empty or too small (%d bytes)", len(png) if png else 0)
         return f"skipped: png_empty ({len(png) if png else 0} bytes)"
+    if _tg_guard("indicator.app.send_photo"):
+        return "skipped: telegram cutover"
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
     try:
         resp = requests.post(url, data={
@@ -121,6 +131,8 @@ def _send_telegram_text(message: str, chat_id: str = ""):
     """Send HTML text alert to Telegram."""
     cid = chat_id or CHAT_ID
     if not BOT_TOKEN or not cid:
+        return
+    if _tg_guard("indicator.app.send_message"):
         return
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:

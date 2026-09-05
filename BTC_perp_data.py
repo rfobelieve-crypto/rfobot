@@ -90,6 +90,12 @@ TV_WEBHOOK_SECRET = os.getenv("TV_WEBHOOK_SECRET", "")
 # MySQL: use shared DB helper (supports env / .env / config.json)
 from shared.db import get_db_conn as _shared_get_db_conn, get_db_info as _shared_get_db_info
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):  # 匯入失敗一律當成封鎖——止血優先於功能
+        return True
+
 MYSQL_HOST = os.getenv("MYSQL_HOST", "")
 MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
 MYSQL_USER = os.getenv("MYSQL_USER", "")
@@ -229,6 +235,8 @@ def format_duration_minutes(seconds: int) -> str:
 
 
 def send_photo(chat_id: str, image_bytes: bytes, caption: str = "") -> None:
+    if _tg_guard("BTC_perp_data.send_photo"):
+        return
     if not chat_id:
         return
     try:
@@ -245,6 +253,8 @@ def send_photo(chat_id: str, image_bytes: bytes, caption: str = "") -> None:
 
 
 def send_message(chat_id: str, text: str) -> None:
+    if _tg_guard("BTC_perp_data.send_message"):
+        return
     if not chat_id:
         logger.warning("send_message skipped: chat_id is empty")
         return
@@ -2087,6 +2097,8 @@ if CANCEL_TG_TOKEN:
             [{"text": "📋 五步摘要 90m", "callback_data": "cf_analyze"}],
         ]}
         try:
+            if _tg_guard("BTC_perp_data.cancel_bot"):
+                return
             requests.post(f"{_CANCEL_API}/sendMessage", data={
                 "chat_id": chat_id, "parse_mode": "HTML",
                 "text": ("<b>撤單流研究 bot</b>（研究·非信號）\n\n"
@@ -2104,6 +2116,8 @@ if CANCEL_TG_TOKEN:
     @app.route(f"/cancelbot/{CANCEL_TG_TOKEN}", methods=["POST"])
     def cancel_bot_webhook():
         """撤單流 bot：指令/選單 + ceb| 判讀 callback，回覆全走 _CANCEL_API。"""
+        if _tg_guard("cancelbot.inbound"):
+            return ("telegram cutover", 403)
         try:
             data = request.get_json(silent=True) or {}
             cb = data.get("callback_query")
@@ -2388,6 +2402,11 @@ def _handle_okx_approval_response(chat_id: str, raw_cmd: str) -> None:
 
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
+    # 2026-09-05：帳號遭盜用。webhook 路徑就是 token 本身，知道 token 的人
+    # 可以直接對這裡 POST 偽造的 update，chat_id 白名單擋不住（它可以自己填）。
+    # 在四支 token 全部輪替、且改用 secret_token 之前，這條路一律 403。
+    if _tg_guard("webhook.inbound"):
+        return ("telegram cutover", 403)
     try:
         data = request.get_json(silent=True)
         if not data:

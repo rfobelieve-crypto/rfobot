@@ -16,6 +16,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):
+        return True
+
+
 logger = logging.getLogger(__name__)
 
 ALERT_LOG = Path("research/monitor_alerts.csv")
@@ -273,6 +280,8 @@ def record_alert(alert_type: str):
 
 
 def send_telegram_alert(message: str):
+    if _tg_guard("monitor_icir"):
+        return
     if not BOT_TOKEN or not CHAT_ID:
         logger.warning("Telegram not configured, alert logged only: %s",
                         message.replace("<b>", "").replace("</b>", "")[:100])

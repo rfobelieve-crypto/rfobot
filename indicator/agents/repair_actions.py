@@ -20,6 +20,13 @@ import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):
+        return True
+
+
 logger = logging.getLogger(__name__)
 TZ_TPE = timezone(timedelta(hours=8))
 
@@ -45,6 +52,8 @@ def _audit_log(agent: str, action: str, detail: str, result: str):
 
 def _send_tg(message: str):
     """Send Telegram notification."""
+    if _tg_guard("agents.repair"):
+        return
     import requests
     bot_token = os.environ.get("AGENT_BOT_TOKEN") or os.environ.get("INDICATOR_BOT_TOKEN", "")
     chat_id = os.environ.get("AGENT_CHAT_ID") or os.environ.get("INDICATOR_CHAT_ID", "")

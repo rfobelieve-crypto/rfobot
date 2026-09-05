@@ -12,6 +12,12 @@ from typing import Optional
 
 import requests
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):
+        return True
+
 logger = logging.getLogger(__name__)
 
 TELEGRAM_API_BASE = "https://api.telegram.org"
@@ -25,6 +31,8 @@ def send_critical(chat_id: str, message: str, *,
     Reads TELEGRAM_BOT_TOKEN from env at call time so unit tests can
     patch it.
     """
+    if _tg_guard("okx.send_critical"):
+        return False
     if not chat_id:
         logger.warning("telegram_critical_skipped no_chat_id")
         return False

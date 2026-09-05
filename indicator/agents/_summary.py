@@ -9,6 +9,13 @@ import logging
 import os
 from datetime import datetime, timezone, timedelta
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):
+        return True
+
+
 logger = logging.getLogger(__name__)
 
 TZ_TPE = timezone(timedelta(hours=8))
@@ -158,6 +165,8 @@ def _send_report(text: str):
 
 
 def _tg_send(bot_token: str, chat_id: str, text: str):
+    if _tg_guard("agents.summary"):
+        return
     import requests
     try:
         requests.post(

@@ -53,6 +53,13 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.db import get_db_conn
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):
+        return True
+
+
 logger = logging.getLogger(__name__)
 
 DEF_VERSION = "v1-2026-07-16"
@@ -677,6 +684,8 @@ def alert_events(fresh: list[dict]) -> None:
                  + pd.Timedelta(hours=8)).strftime("%m-%d %H:%M")
             px = f"{e['px']:,.0f}" if e["px"] else "?"
             def fmt(v, p="+.2f"):
+                if _tg_guard("cancel_playbook_watcher"):
+                    return
                 return format(v, p) if v is not None else "?"
             # 2026-07-29: the forward-direction claim was falsified (hit_60m
             # 41-48% on all four playbooks, n=206; path/MFE-MAE agreed) — the
@@ -876,6 +885,8 @@ def reply_outcomes() -> None:
 
     只處理有推播過的事件（tg_message_id 非空）。送達或 4xx（卡片被刪等
     永久失敗）都標 outcome_replied，網路錯誤留給下一輪重試。"""
+    if _tg_guard("cancel_playbook_watcher"):
+        return
     token, chat = _tg_creds()
     if not token or not chat:
         return

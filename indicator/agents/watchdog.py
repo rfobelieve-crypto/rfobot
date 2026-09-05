@@ -24,6 +24,13 @@ import os
 import time
 from datetime import datetime, timezone, timedelta
 
+try:  # Telegram 斷流閘門（2026-09-05 帳號遭盜用），fail-closed
+    from shared.tg_kill import guard as _tg_guard
+except Exception:  # noqa: BLE001
+    def _tg_guard(_where):
+        return True
+
+
 logger = logging.getLogger(__name__)
 TZ_TPE = timezone(timedelta(hours=8))
 
@@ -487,6 +494,8 @@ def run_on_demand() -> dict:
 
 def _send_alarm_summary(gate: dict, agent_results: dict):
     """Send summary to Telegram."""
+    if _tg_guard("agents.watchdog"):
+        return
     import requests
 
     bot_token = os.environ.get("AGENT_BOT_TOKEN") or os.environ.get("INDICATOR_BOT_TOKEN", "")
