@@ -70,7 +70,7 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
              reanchor="none", reanchor_days=90, stop=None, stop_buf=0.03,
              stop_delay_h=0, gate=None, gate_scale=0.0,
              maker=None, stop_cost=None, fill_pen=0.0, fund_hourly=0.0,
-             n_series=None, size_series=None):
+             n_series=None, size_series=None, inv_skew=0.0):
     """One continuous run. Returns metrics + the hourly equity curve.
 
     stop_delay_h: after a hard stop, stay FLAT (no ladder at all) for this
@@ -108,6 +108,12 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
 
     alloc = _alloc_for(N)
     size_mult = 1.0
+    # ── 反應式層三（2026-09-05）：庫存就是路徑形態的實現 ──────────────
+    # 事前分不出震盪或單向（§1.18f），但**單向行情的定義就是庫存單邊累積**，
+    # 那個不用預測、會直接觀測到。A-S 的偏移項 r = S − qγσ²(T−t) 在網格上的
+    # 對應動作是：庫存往一側堆積時，接貨速度按 q 遞減。
+    # 代價是必然落後——你一定先吃到一段虧損才觸發——但它不需要一個不存在的
+    # 預測能力。inv_skew = γ，0 = 關閉（預設，回歸行為不變）。
     cash = 1.0                      # everything in units of starting capital
     qty = np.zeros(N)               # base units held per bin
     cost = np.zeros(N)              # quote spent per bin (for MTM)
@@ -154,6 +160,10 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
         # buys: a bar that reaches the low edge of an empty bin
         b = (qty <= 0) & (low[i] <= lo_e * (1 - fill_pen))
         scale = 1.0 if (gate is None or gate[i]) else gate_scale
+        if inv_skew > 0.0:
+            eq_now = cash + (qty * close[i]).sum()
+            q_frac = (qty * close[i]).sum() / eq_now if eq_now > 0 else 0.0
+            scale *= max(0.0, 1.0 - inv_skew * q_frac)
         if b.any() and scale > 0:
             spend = alloc[b].sum() * scale * size_mult
             if spend <= cash + 1e-12:

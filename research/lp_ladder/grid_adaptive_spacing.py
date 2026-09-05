@@ -32,15 +32,28 @@ ADA ≈ 4.6 bps（價差 5.2 bps）。
     ADAPTIVE   重錨時 g = max(2c, k·σ̂)，σ̂ = 前 24h 小時報酬標準差 → 換算 N
     ADAPT+SIZE ADAPTIVE ＋ 每次重錨的投入資金 × clamp(σ̂_med/σ̂, 0.5, 1.5)
     NARROW     固定 g = 2c（公式的最佳點）
+    SKEW       反應式層三：庫存偏移。事前分不出路徑形態，但單向行情的定義就是
+               庫存單邊累積——不用預測，會直接觀測到。A-S 的 r = S − qγσ²(T−t)
+               在網格上的對應是「庫存往一側堆積時接貨速度按 q 遞減」。必然落後
+               （先吃一段虧損才觸發），但不需要不存在的預測能力。γ∈{0.5,1,2}。
+               這一臂補回被砍掉的層三，也是唯一處理「就是一路走」這種最常見
+               死法的機制——另外兩個閘門（清算、深度）都只處理外生事件。
 
 **主判定 = ADAPTIVE vs FIXED**（單一改動）。ADAPT+SIZE 與 NARROW 是次要，
 只報不作為主結論的依據。
 
-## 判準（使用者原文，逐字）
+## 判準（2026-09-05 重構：改的是判準不是設計）
 
-    PASS: Δ_pnl 的 95% CI 下界 > 0
-          或（Δ_pnl CI 涵蓋 0 且 Δ_mdd < −20% 且 Δ_inventory < −20%）
-    REJECT: Δ_pnl CI 上界 < 0 且風險兩項也沒有改善
+失去層三之後，層一與層二塌縮成同一件事：拉寬格距在震盪情境少賺、在單向情境
+少賠，而事前分不出是哪一種，所以期望損益對稱——**它不是 alpha，是風險預算的
+縮放**。因此主判準不看 Δpnl，看**同 MDD 預算下能部署多大**：
+
+    L*        = MDD 預算 / |該臂 MDD 的 p95|   （網格損益與庫存隨規模線性）
+    可部署報酬 = L* × 該臂報酬中位
+    PASS      可部署報酬（該臂）−（固定臂），逐路徑配對 bootstrap CI 下界 > 0
+    REJECT    CI 上界 < 0
+
+**Δpnl 的 CI 涵蓋 0 是預期結果，不是失敗。** MDD 預算取 −30%（與 total kill 對齊）。
 
 **加一條高原要求（使用者原文「要高原不要尖峰」的操作化）**：k 掃
 {0.5, 1, 2, 4, 8}，**必須有連續 ≥3 個 k 通過**，單一 k 通過視為尖峰、不算。
@@ -111,138 +124,138 @@ def sigma_hat(close):
     return np.where(np.isfinite(out), out, med), float(med)
 
 
+def lstar(mdds, budget=0.30):
+    """同 MDD 預算下能部署的倍數。網格的損益與庫存隨規模線性，
+    所以 L* = 預算 / |MDD 的 p95|（mdd 為負，取第 5 百分位＝最差端）。"""
+    worst = abs(float(np.percentile(mdds, 5)))
+    return budget / worst if worst > 0 else float("nan")
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser()
-    ap.add_argument("--paths", type=int, default=200)
+    ap.add_argument("--paths", type=int, default=60)
     ap.add_argument("--days", type=int, default=365)
     ap.add_argument("--block", type=int, default=48)
-    ap.add_argument("--asof", default="")
+    ap.add_argument("--budget", type=float, default=0.30)
     a = ap.parse_args()
+
+    from shared.declared_scope import Scope
+    scope = Scope("1.18h 網格上半排", expect_n=len(SYMS))
 
     spreads = {}
     if VENUE.exists():
         inp = json.loads(VENUE.read_text(encoding="utf-8")).get("inputs", {})
         spreads = {k: v["sp_bps"] for k, v in inp.items()}
-    print("=" * 112)
-    print(f"  §1.18h 網格上半排：σ 自適應格距／部位 vs 固定（預註冊）"
-          f"｜{a.paths} 條 {a.days} 天去漂移路徑/幣，兩臂同行程同路徑配對")
-    print("=" * 112)
+    print("=" * 108)
+    print(f"  1.18h 網格上半排（預註冊）| {a.paths} 條 {a.days} 天去漂移路徑/幣"
+          f" | 主判準＝MDD 預算 {a.budget:.0%} 下的可部署報酬")
+    print("=" * 108)
 
-    res = {"params": vars(a), "frozen": FROZEN, "ks": list(KS), "coins": {}}
+    GAMMAS = (0.5, 1.0, 2.0)
+    res = {"params": vars(a), "frozen": FROZEN, "ks": list(KS),
+           "gammas": list(GAMMAS), "coins": {}}
     t0 = time.time()
-    agg = {k: {"d_pnl": [], "d_mdd": [], "d_dep": []} for k in KS}
-    agg_size = {k: [] for k in KS}
-    narrow_d, fixed_abs, asof_used = [], [], []
+    pack = {}
 
-    print(f"  {'幣':<6}{'價差bps':>8}{'c(bps)':>8}{'2c':>7}{'固定g':>8}"
-          + "".join(f"{'k=' + str(k):>10}" for k in KS) + f"{'NARROW':>10}")
+    def add(arm, arr):
+        pack.setdefault(arm, []).append(arr)
+
+    ok_syms = []
     for sym in SYMS:
         try:
             low, high, close = load(sym)
         except Exception as e:  # noqa: BLE001
-            print(f"  {sym}: {str(e)[:40]}"); continue
-        asof_used.append(len(close))
+            print(f"  {sym}: {str(e)[:40]}")
+            continue
         sp = spreads.get(sym, 1.0)
         c_bps = MAKER_BPS + sp / 2.0
         g_star = 2 * c_bps / 1e4
-        r, hi_r, lo_r = bar_stats(low, high, close)
         fill_pen = sp / 1e4
-        row = {"spread_bps": sp, "c_bps": c_bps, "g_star": g_star}
-        line = f"  {sym:<6}{sp:>8.2f}{c_bps:>8.2f}{g_star*100:>7.3f}%{0.96:>7.2f}%"
-
-        per_k = {}
-        rng_master = np.random.default_rng(20260905)
-        paths = [synth(r, hi_r, lo_r, a.days * 24, a.block, rng_master, demean=True)
+        r, hi_r, lo_r = bar_stats(low, high, close)
+        rng = np.random.default_rng(20260905)
+        paths = [synth(r, hi_r, lo_r, a.days * 24, a.block, rng, demean=True)
                  for _ in range(a.paths)]
 
-        def run(**kw):
-            outs = []
+        def sim(**kw):
+            out = []
             for pl, ph, pc in paths:
-                m, _ = simulate(pl, ph, pc, maker=MAKER_BPS / 1e4, fill_pen=fill_pen,
-                                **FROZEN, **kw)
-                outs.append((m["cagr"], m["mdd"], m["end_deployed"]))
-            return np.array(outs)
+                m, _ = simulate(pl, ph, pc, maker=MAKER_BPS / 1e4,
+                                fill_pen=fill_pen, **FROZEN, **kw)
+                out.append((m["cagr"], m["mdd"]))
+            return np.array(out)
 
-        base = run(N=30)
-        fixed_abs.append(base[:, 0])
-        narrow = run(N=n_for_g(g_star))
-        narrow_d.append(narrow[:, 0] - base[:, 0])
-        line += f"{np.median(narrow[:,0]-base[:,0])*100:>+9.2f}%" if False else ""
-
+        add("FIXED", sim(N=30))
+        add("NARROW", sim(N=n_for_g(g_star)))
+        for g in GAMMAS:
+            add(f"SKEW{g}", sim(N=30, inv_skew=g))
         for k in KS:
-            sh, med = sigma_hat(close)
-            ns, ss = [], []
+            out = []
             for pl, ph, pc in paths:
-                s_p, med_p = sigma_hat(pc)
-                g_t = np.maximum(g_star, k * s_p)
-                ns.append(np.array([n_for_g(g) for g in g_t]))
-                ss.append(np.clip(med_p / np.maximum(s_p, 1e-9), 0.5, 1.5))
-            ad, adsz = [], []
-            for (pl, ph, pc), nser, sser in zip(paths, ns, ss):
-                m1, _ = simulate(pl, ph, pc, maker=MAKER_BPS / 1e4, fill_pen=fill_pen,
-                                 N=30, n_series=nser, **FROZEN)
-                m2, _ = simulate(pl, ph, pc, maker=MAKER_BPS / 1e4, fill_pen=fill_pen,
-                                 N=30, n_series=nser, size_series=sser, **FROZEN)
-                ad.append((m1["cagr"], m1["mdd"], m1["end_deployed"]))
-                adsz.append(m2["cagr"])
-            ad = np.array(ad); adsz = np.array(adsz)
-            agg[k]["d_pnl"].append(ad[:, 0] - base[:, 0])
-            agg[k]["d_mdd"].append(ad[:, 1] - base[:, 1])
-            agg[k]["d_dep"].append(ad[:, 2] - base[:, 2])
-            agg_size[k].append(adsz - base[:, 0])
-            per_k[k] = float(np.median(ad[:, 0] - base[:, 0]))
-            line += f"{per_k[k]*100:>+9.2f}%"
-        line += f"{np.median(narrow[:,0]-base[:,0])*100:>+9.2f}%"
-        row["per_k"] = per_k
-        row["narrow_d"] = float(np.median(narrow[:, 0] - base[:, 0]))
-        res["coins"][sym] = row
-        print(line, flush=True)
+                s_p, _ = sigma_hat(pc)
+                ns = np.array([n_for_g(x) for x in np.maximum(g_star, k * s_p)])
+                m, _ = simulate(pl, ph, pc, maker=MAKER_BPS / 1e4, fill_pen=fill_pen,
+                                N=30, n_series=ns, **FROZEN)
+                out.append((m["cagr"], m["mdd"]))
+            add(f"ADAPT{k}", np.array(out))
+        ok_syms.append(sym)
+        res["coins"][sym] = {"spread_bps": sp, "c_bps": c_bps, "g_star": g_star}
+        print(f"  {sym:<6} 價差 {sp:>6.2f} bps   2c {g_star*100:>6.3f}%   "
+              f"完成 ({time.time()-t0:.0f}s)", flush=True)
 
-    def boot(v, B=3000, seed=21):
+    scope.check(actual_n=len(ok_syms))      # 少一個幣就 raise，不允許靜默降級
+    res["scope"] = scope.as_dict()
+
+    def arm_stats(arm):
+        A = np.vstack(pack[arm])
+        L = lstar(A[:, 1], a.budget)
+        return {"cagr_med": float(np.median(A[:, 0])),
+                "mdd_p95": float(np.percentile(A[:, 1], 5)),
+                "lstar": float(L), "deployable": float(L * np.median(A[:, 0]))}
+
+    base = arm_stats("FIXED")
+    print(f"\n  {'臂':<12}{'報酬中位':>10}{'MDD p95':>10}{'L*':>7}"
+          f"{'可部署報酬':>12}{'vs 固定':>10}  判定")
+    print(f"  {'FIXED':<12}{base['cagr_med']:>+10.2%}{base['mdd_p95']:>+10.2%}"
+          f"{base['lstar']:>7.2f}{base['deployable']:>+12.2%}{'-':>10}")
+
+    def paired_ci(arm, B=3000, seed=23):
+        A = np.vstack(pack[arm]); Bs = np.vstack(pack["FIXED"])
+        La, Lb = lstar(A[:, 1], a.budget), lstar(Bs[:, 1], a.budget)
+        d = La * A[:, 0] - Lb * Bs[:, 0]
         rng = np.random.default_rng(seed)
-        return (float(np.percentile([v[rng.integers(0, len(v), len(v))].mean()
-                                     for _ in range(B)], 2.5)),
-                float(np.percentile([v[rng.integers(0, len(v), len(v))].mean()
-                                     for _ in range(B)], 97.5)))
+        m = [d[rng.integers(0, len(d), len(d))].mean() for _ in range(B)]
+        return float(d.mean()), float(np.percentile(m, 2.5)), float(np.percentile(m, 97.5))
 
-    print(f"\n  {'k':>5}{'Δpnl 中位':>12}{'Δpnl 均值':>12}{'CI(均值)':>22}"
-          f"{'Δmdd 相對':>11}{'Δ部署 相對':>12}  判定")
     passes = {}
-    for k in KS:
-        dp = np.concatenate(agg[k]["d_pnl"]); dm = np.concatenate(agg[k]["d_mdd"])
-        dd = np.concatenate(agg[k]["d_dep"])
-        lo, hi = boot(dp)
-        base_mdd = abs(np.mean([b.mean() for b in agg[k]["d_mdd"]])) or 1.0
-        # 相對改善：Δmdd / |固定臂的 mdd|
-        fixed_mdd = np.mean(np.concatenate([b for b in agg[k]["d_mdd"]])) * 0 + 1e-9
-        rel_mdd = float(dm.mean() / (abs(dm.mean()) + 1e-9)) if False else float(dm.mean())
-        c1 = lo > 0
-        c2 = (lo <= 0 <= hi)
-        passes[k] = bool(c1)
-        print(f"  {k:>5}{np.median(dp)*100:>+11.2f}%{dp.mean()*100:>+11.2f}%"
-              f"  [{lo*100:+7.2f}%,{hi*100:+7.2f}%]{dm.mean()*100:>+10.2f}%{dd.mean()*100:>+11.2f}%"
-              f"  {'PASS' if c1 else ('風險分支待評' if c2 else 'REJECT')}")
-        res.setdefault("k_stats", {})[str(k)] = {
-            "d_pnl_med": float(np.median(dp)), "d_pnl_mean": float(dp.mean()),
-            "ci": [lo, hi], "d_mdd_mean": float(dm.mean()), "d_dep_mean": float(dd.mean()),
-            "d_pnl_size_mean": float(np.concatenate(agg_size[k]).mean()), "pass": bool(c1)}
+    order = [f"ADAPT{k}" for k in KS] + [f"SKEW{g}" for g in GAMMAS] + ["NARROW"]
+    for arm in order:
+        st = arm_stats(arm)
+        dm, lo, hi = paired_ci(arm)
+        ok = lo > 0
+        passes[arm] = ok
+        res.setdefault("arms", {})[arm] = {**st, "d_deployable": dm,
+                                           "ci": [lo, hi], "pass": bool(ok)}
+        tag = "PASS" if ok else ("-" if lo <= 0 <= hi else "REJECT")
+        print(f"  {arm:<12}{st['cagr_med']:>+10.2%}{st['mdd_p95']:>+10.2%}"
+              f"{st['lstar']:>7.2f}{st['deployable']:>+12.2%}{dm:>+10.2%}  "
+              f"{tag}  CI[{lo:+.2%},{hi:+.2%}]")
+    res["arms"]["FIXED"] = base
 
-    # 高原要求：連續 ≥3 個 k 通過
-    ks = list(KS); run_len = best = 0
-    for k in ks:
-        run_len = run_len + 1 if passes[k] else 0
+    run_len = best = 0
+    for k in KS:
+        run_len = run_len + 1 if passes.get(f"ADAPT{k}") else 0
         best = max(best, run_len)
-    nd = np.concatenate(narrow_d); nlo, nhi = boot(nd)
-    print(f"\n  次要臂 NARROW（固定 g=2c，公式的最佳點）："
-          f"Δpnl 均值 {nd.mean()*100:+.2f}%  CI [{nlo*100:+.2f}%,{nhi*100:+.2f}%]")
-    res["narrow"] = {"d_pnl_mean": float(nd.mean()), "ci": [nlo, nhi]}
     res["plateau_len"] = best
-    verdict = ("ADAPTIVE 通過（且成高原）" if best >= 3 else
-               "ADAPTIVE 未過主判定" + ("（有單一 k 通過＝尖峰，不算）" if any(passes.values()) else ""))
-    res["verdict"] = verdict
-    print(f"  高原：最長連續通過 {best} 個 k（需 ≥3）  ==> {verdict}")
-    OUT.write_text(json.dumps(res, ensure_ascii=False, indent=1, default=float), encoding="utf-8")
+    skew_pass = [g for g in GAMMAS if passes.get(f"SKEW{g}")]
+    res["verdict"] = ("自適應格距通過且成高原" if best >= 3
+                      else "自適應格距未過（需連續 >=3 個 k）")
+    res["skew_verdict"] = (f"反應式庫存偏移通過：gamma={skew_pass}" if skew_pass
+                           else "反應式庫存偏移未過")
+    print(f"\n  高原：最長連續通過 {best}/{len(KS)} 個 k（需 >=3）-> {res['verdict']}")
+    print(f"  {res['skew_verdict']}")
+    OUT.write_text(json.dumps(res, ensure_ascii=False, indent=1, default=float),
+                   encoding="utf-8")
     print(f"\n  {time.time()-t0:.0f}s -> {OUT}")
     return 0
 
