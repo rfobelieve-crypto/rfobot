@@ -79,3 +79,8 @@ research/results/sweep_shadow_run.log
 
 # 看門狗每 5 分鐘一行，不進 git（2026-09-03）
 research/results/arb_watchdog.log
+
+# 原始 API 快取（2026-09-05）：只是為了避免重跑時重打 API，不是研究結果。
+# perpdex_cache 一度到 55MB 被推上 GitHub，之後不再追蹤。
+research/results/*_cache.json
+research/results/funding_raw_cache.json
