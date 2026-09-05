@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -43,10 +44,11 @@ try:
 except Exception:  # noqa: BLE001
     pass
 
-OUT = ROOT / "research" / "results" / "daoge_sandbox_test.json"
+OUT = ROOT / "research" / "results" / ("daoge_sandbox_test.json" if float(os.environ.get("DAOGE_THR","1.0"))==1.0 else "daoge_sandbox_test_thr05.json")
 ZWIN, ZMIN = 24, 4          # frozen with feature_builder_live._zscore
 ZWIN_FLOW = 168
-THR = 1.0
+import os
+THR = float(os.environ.get("DAOGE_THR", "1.0"))   # 1.0 = 09-05 第一次；0.5 = 道哥自己的口訣門檻（第二次，宣告後只跑一次）
 
 
 def zscore(s, win=ZWIN, mn=ZMIN):
