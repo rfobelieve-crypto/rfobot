@@ -1386,3 +1386,122 @@ portfolio clocks          105.8h  195.0h  ok
 tracked signals             9.3h  336.0h  ok
 
 0 red / 33 tracked
+freshness board — 2026-09-04 17:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           4.2h    2.5h  RED  <-- skip-vs-taken scoring surface; silent staleness = consumer s
+basis obs (§0.91)           0.2h    2.5h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.1h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.0h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     41.0h   48.0h  ok
+coinglass parquets         21.3h   48.0h  ok
+daily collect log          21.3h   30.0h  ok
+freshness board self        5.1h    7.0h  ok
+revalidation report       732.7h  840.0h  ok
+portfolio clocks            3.9h  195.0h  ok
+tracked signals             5.3h  336.0h  ok
+
+1 red / 33 tracked: raid outcomes row
+alert DELIVERED: Freshness board transition:
+  RED: raid outcomes row (age 4.2h, limit 2h) — skip-vs-taken scoring surface; silent staleness = consumer silently scores against stale outcomes
+freshness board — 2026-09-04 23:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           1.2h    2.5h  ok
+basis obs (§0.91)           0.2h    2.5h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     23.0h   48.0h  ok
+coinglass parquets          3.3h   48.0h  ok
+daily collect log           3.3h   30.0h  ok
+freshness board self        6.0h    7.0h  ok
+revalidation report       738.7h  840.0h  ok
+portfolio clocks            9.9h  195.0h  ok
+tracked signals             4.3h  336.0h  ok
+
+0 red / 33 tracked
+alert DELIVERED: Freshness board transition:
+  recovered: raid outcomes row
+freshness board — 2026-09-05 05:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           1.2h    2.5h  ok
+basis obs (§0.91)           0.2h    2.5h  ok
+gex snapshots (§0.88d)      0.3h    2.5h  ok
+gex recorder flag (§0.88d)      0.2h    2.5h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       0.0h    1.5h  ok
+cloud train parity          0.2h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     29.0h   48.0h  ok
+coinglass parquets          9.3h   48.0h  ok
+daily collect log           3.7h   30.0h  ok
+freshness board self        3.7h    7.0h  ok
+revalidation report         4.3h  840.0h  ok
+portfolio clocks           15.9h  195.0h  ok
+tracked signals             1.3h  336.0h  ok
+
+0 red / 35 tracked
+alert DELIVERED: Freshness board transition:
+  recovered: gex recorder flag (§0.88d)

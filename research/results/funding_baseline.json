@@ -1,0 +1,52 @@
+{
+ "days": 365,
+ "pairs": {
+  "binance-bitget": {
+   "coins": 19,
+   "buckets": 5111,
+   "per_coin_buckets": {
+    "BTC": 269,
+    "ETH": 269,
+    "SOL": 269,
+    "XRP": 269,
+    "DOGE": 269,
+    "BNB": 269,
+    "ADA": 269,
+    "LINK": 269,
+    "AVAX": 269,
+    "SUI": 269,
+    "LTC": 269,
+    "TRX": 269,
+    "DOT": 269,
+    "NEAR": 269,
+    "APT": 269,
+    "UNI": 269,
+    "AAVE": 269,
+    "ARB": 269,
+    "OP": 269
+   },
+   "maker": {
+    "ann": -0.061179745967622434,
+    "mdd": -0.3170731858927685,
+    "sharpe": -2.699136360995992
+   },
+   "taker": {
+    "ann": -0.39625703025641124,
+    "mdd": -1.8545778274561253,
+    "sharpe": -13.550208228981019
+   },
+   "zero": {
+    "ann": 0.106358896176772,
+    "mdd": -0.013515445776937529,
+    "sharpe": 4.920651173431496
+   },
+   "fund_ann": 0.058205077431031114,
+   "basis_ann": 0.0481538187457409,
+   "diff_med": 0.3777,
+   "flips_yr": 418.84660536098613
+  }
+ },
+ "best_pair": "binance-bitget",
+ "gate_step1_maker_ann_ge_5pct": false,
+ "verdict": "Step 1 未過（maker 層年化 < 5%）——依 PREREG B.9 整條線停止"
+}

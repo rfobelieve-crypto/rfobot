@@ -127,6 +127,40 @@ def _n_059(rows):
     return n
 
 
+SEP_EXIT = datetime(2026, 9, 5, tzinfo=timezone.utc)
+
+
+def _n_liq_events() -> int:
+    """路徑 C 的進度＝已錄到的強平筆數。權威值就是這張表，沒有第二份實作。"""
+    from shared.db import get_db_conn as _gdb          # 本檔慣例：區域 import
+    try:
+        conn = _gdb()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) n FROM liq_events")
+                return int((cur.fetchone() or {}).get("n", 0))
+        finally:
+            conn.close()
+    except Exception as e:  # noqa: BLE001
+        print(f"[WARN] _n_liq_events: {e}", flush=True)   # 不靜默：0 和壞掉要分得出來
+        return 0
+
+
+def _n_lighter() -> int:
+    """路徑 A 的進度＝已錄的 250ms 取樣列數 / 240（換算成分鐘）。"""
+    d = ROOT / "research" / "exit_paths" / "logs" / "lighter"
+    if not d.exists():
+        return 0
+    n = 0
+    for f in d.glob("*.csv"):
+        try:
+            with open(f, "rb") as fh:
+                n += max(sum(1 for _ in fh) - 1, 0)
+        except Exception:  # noqa: BLE001
+            pass
+    return n // 240
+
+
 def build():
     rows = _shadow_rows()
     q2 = _json("v7_regime_q2_clock.json") or {}
@@ -134,6 +168,26 @@ def build():
     gf = _json("sweep_forward_gate.json") or {}
     _ec = _e_clock()   # variant A, owned by sweep_forward.py
     open_items = [
+        {
+            # 2026-09-05 出路研究線。時鐘的數字都從 DB / 檔案現算，判決由各自
+            # 的 PREREG 擁有（research/exit_paths/PREREG_*.md），這裡只出進度。
+            "id": "路徑A", "line": "訂單流", "title": "Lighter 零費率影子執行",
+            "hypothesis": "分鐘級系統在零費率場館的真實來回成本 < 6 bps",
+            "why": "該系統毛捕捉 +6.2 bps，只差在成本；Lighter 自報 maker/taker 皆 0",
+            "registered": "2026-09-05", "source": "count",
+            "n": _n_lighter(), "gate_n": 60,
+            "days": round(_days_since(SEP_EXIT), 1), "gate_days": 28,
+            "note": "n 是已錄的訊號分鐘（|ret_60| top 5%）；先看基差 σ ≤ 6 bps 的轉移關",
+        },
+        {
+            "id": "路徑C", "line": "訂單流", "title": "清算級聯後反轉",
+            "hypothesis": "清算驅動的急漲，比同幅度的一般急漲回落得更多",
+            "why": "V7 空側 +115 bps 的經濟解釋就是被迫買入；把隱含條件變顯性觸發",
+            "registered": "2026-09-05", "source": "count",
+            "n": _n_liq_events(), "gate_n": 300,
+            "days": round(_days_since(SEP_EXIT), 1), "gate_days": None,
+            "note": "300 筆是代理校準關（C1）；主假設的樣本閘門另外要 80 個級聯事件",
+        },
         {
             "id": "0.59", "line": "流動性獵取", "title": "regime 進場濾網",
             "hypothesis": "只在主場（震盪 ∪ 空頭趨勢）開火，其餘一律不進場",

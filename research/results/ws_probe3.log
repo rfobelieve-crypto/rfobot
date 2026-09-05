@@ -1,0 +1,4 @@
+binance SPOT aggTrade        frames=34    {"e":"aggTrade","E":1788584390013,"s":"BTCUSDT","a":4055672882,"p":"79500.01000000","q":"0
+bybit liquidation            frames=1     {"success":true,"ret_msg":"","conn_id":"da7tobg3r8h86vr8apsg-2r8rg","req_id":"","op":"subs
+bybit trade (control)        frames=3     {"success":true,"ret_msg":"","conn_id":"da7tou5kndmdrtnsr6cg-2rt8i","req_id":"","op":"subs
+okx liquidation              frames=1     {"event":"subscribe","arg":{"channel":"liquidation-orders","instType":"SWAP"},"connId":"00

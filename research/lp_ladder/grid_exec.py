@@ -68,7 +68,8 @@ def load(sym):
 
 def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
              reanchor="none", reanchor_days=90, stop=None, stop_buf=0.03,
-             stop_delay_h=0, gate=None, gate_scale=0.0):
+             stop_delay_h=0, gate=None, gate_scale=0.0,
+             maker=None, stop_cost=None, fill_pen=0.0, fund_hourly=0.0):
     """One continuous run. Returns metrics + the hourly equity curve.
 
     stop_delay_h: after a hard stop, stay FLAT (no ladder at all) for this
@@ -84,6 +85,14 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
     size). The caller is responsible for the array being causal; this
     function does not shift it.
     """
+    # ── venue realism (2026-09-05, §0.93 十二) — all default to the frozen constants
+    #    maker       fee per grid fill (spot ~10 bps, perp ~2 bps)
+    #    stop_cost   taker + fast-tape slippage + half-spread + depth impact
+    #    fill_pen    a resting order fills only when the bar trades THROUGH the
+    #                level by this fraction (≈ one spread) — queue-position proxy
+    #    fund_hourly funding charged per hour on held inventory value (perp only)
+    maker = MAKER if maker is None else maker
+    stop_cost = STOP_COST if stop_cost is None else stop_cost
     m = 5 if N % 5 == 0 else 1
     alloc = (nested_alloc(1.0, r, m, N // m) if profile == "nested"
              else uniform_alloc(1.0, r, m, N // m))
@@ -115,28 +124,30 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
             paused_until = -1
         held = qty > 0
         # sells first: a bar that reaches the top edge of a held bin
-        s = held & (high[i] >= hi_e)
+        s = held & (high[i] >= hi_e * (1 + fill_pen))
         if s.any():
             proceeds = (qty[s] * hi_e[s]).sum()
-            cash += proceeds * (1 - MAKER)
+            cash += proceeds * (1 - maker)
             qty[s] = 0.0
             cost[s] = 0.0
         # buys: a bar that reaches the low edge of an empty bin
-        b = (qty <= 0) & (low[i] <= lo_e)
+        b = (qty <= 0) & (low[i] <= lo_e * (1 - fill_pen))
         scale = 1.0 if (gate is None or gate[i]) else gate_scale
         if b.any() and scale > 0:
             spend = alloc[b].sum() * scale
             if spend <= cash + 1e-12:
-                qty[b] = alloc[b] * scale / lo_e[b] * (1 - MAKER)
+                qty[b] = alloc[b] * scale / lo_e[b] * (1 - maker)
                 cost[b] = alloc[b] * scale
                 cash -= spend
                 n_fill += int(b.sum())
                 n_gated_off += 0
         px = close[i]
+        if fund_hourly and (qty > 0).any():
+            cash -= (qty * px).sum() * fund_hourly
         eq[i] = cash + (qty * px).sum()
         # ── policies ────────────────────────────────────────────────
         if stop == "hard" and (qty > 0).any() and px < lo_e[-1] * (1 - stop_buf):
-            cash += (qty * px).sum() * (1 - STOP_COST)
+            cash += (qty * px).sum() * (1 - stop_cost)
             qty[:] = 0.0
             cost[:] = 0.0
             n_stop += 1

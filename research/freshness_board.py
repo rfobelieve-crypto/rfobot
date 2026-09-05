@@ -113,6 +113,15 @@ REGISTRY = [
     ("gex recorder flag (§0.88d)", "json_flag",
      "research/results/gex_last.json:ok", 2.5,
      "recorder self-report {ok, reason}; red = Deribit call or DB write failed"),
+    # 2026-09-05 (出路研究線 A/C): 兩個 24/7 錄製器。judged by their own
+    # self-report, not by artifact age -- a quiet market and a dead websocket
+    # leave the same blank (mistake.md 2026-09-03).
+    ("liq recorder flag (路徑C)", "json_flag",
+     "research/results/liq_last.json:ok", 1.0,
+     "OKX+Bybit 強平推送錄製器自報；紅 = WS 斷或 DB 寫入失敗"),
+    ("lighter recorder flag (路徑A)", "json_flag",
+     "research/results/lighter_last.json:ok", 1.0,
+     "Lighter L2 × Binance 現貨 250ms 取樣；紅 = 任一側無幀"),
     ("v7 export pipe (§0.81)", "json_flag",
      "research/results/v7_product_trades_status.json:ok", 2.5,
      "product-side /export/v7 reachable AND configured (not: has rows)"),

@@ -110,7 +110,12 @@ def f_bitget(sym, start, end):
     return [(t, r) for t, r in out if t >= start]
 
 
-# ── 8 小時收盤（算 basis） ──────────────────────────────────────────────
+# ── 桶末收盤（算 basis） ────────────────────────────────────────────────
+# **三個所都沒有 8H 這個粒度**（Bitget 回 400171、OKX 只到 6H/12H、Bybit 合法值
+# 沒有 480），只有 Binance 有。所以除 Binance 外一律用 4H，一個 8 小時桶裝兩根，
+# 桶內取最後一根 —— 其收盤時刻就是桶的右端點，與 8H 棒的慣例一致。
+# 這個錯的第一版讓 5/6 的場館對算不出任何東西，而輸出只是「少了幾列」，
+# 不會報錯（2026-09-05，查儀器才發現）。
 def k_binance(sym, start):
     out, t = [], start
     while True:
@@ -129,8 +134,8 @@ def k_bybit(sym, start):
     out, e = [], int(time.time() * 1000)
     while e > start:
         d = get("https://api.bybit.com/v5/market/kline",
-                params={"category": "linear", "symbol": f"{sym}USDT", "interval": "480",
-                        "end": e, "limit": 1000})
+                params={"category": "linear", "symbol": f"{sym}USDT", "interval": "240",
+                        "end": e, "limit": 1000})   # Bybit 合法值沒有 480
         lst = ((d.get("result") or {}).get("list")) or []
         if not lst:
             break
@@ -145,7 +150,7 @@ def k_okx(sym, start):
     out, e = [], int(time.time() * 1000)
     while e > start:
         d = get("https://www.okx.com/api/v5/market/history-candles",
-                params={"instId": f"{sym}-USDT-SWAP", "bar": "8H", "after": e, "limit": 100})
+                params={"instId": f"{sym}-USDT-SWAP", "bar": "4H", "after": e, "limit": 100})   # OKX 沒有 8H
         lst = d.get("data") or []
         if not lst:
             break
@@ -157,10 +162,13 @@ def k_okx(sym, start):
 
 
 def k_bitget(sym, start):
+    """Bitget 沒有 8H 這個粒度（實測只有 1H/4H/1D，8H 回 400171）。用 4H：
+    一個 8 小時桶裝兩根 4H 棒，桶內取最後一根，其收盤時刻恰好是桶的右端點，
+    與其他所用 8H 棒取桶內最後一根的慣例完全一致。"""
     out, e = [], int(time.time() * 1000)
     while e > start:
         d = get("https://api.bitget.com/api/v2/mix/market/history-candles",
-                params={"symbol": f"{sym}USDT", "productType": "USDT-FUTURES", "granularity": "8H",
+                params={"symbol": f"{sym}USDT", "productType": "usdt-futures", "granularity": "4H",
                         "endTime": e, "limit": 200})
         lst = d.get("data") or []
         if not lst:
@@ -247,12 +255,13 @@ def main() -> int:
             arr = np.array(rows, float)
             per_coin[s] = arr
             allpnl.append(arr)
+        n_coins = len(per_coin)
         if not allpnl:
             continue
         A_ = np.vstack(allpnl)
         y, bas, flips = A_[:, 0], A_[:, 1], A_[:, 2]
-        n_coins, n_b = len(per_coin), len(A_) // max(n_coins, 1)
-        out = {"coins": n_coins, "buckets": int(len(A_))}
+        out = {"coins": n_coins, "buckets": int(len(A_)),
+               "per_coin_buckets": {k: int(len(v)) for k, v in per_coin.items()}}
         for lbl, c in COSTS.items():
             pnl = (y + bas - flips * c) / 1e4
             eq = np.cumsum(pnl)
