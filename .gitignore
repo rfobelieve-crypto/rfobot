@@ -84,3 +84,4 @@ research/results/arb_watchdog.log
 # perpdex_cache 一度到 55MB 被推上 GitHub，之後不再追蹤。
 research/results/*_cache.json
 research/results/funding_raw_cache.json
+research/exit_paths/logs/
