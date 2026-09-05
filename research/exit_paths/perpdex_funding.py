@@ -96,6 +96,40 @@ def hl_candles(coin, start_ms, end_ms):
     return out
 
 
+def binance_symbols():
+    d = get("https://fapi.binance.com/fapi/v1/exchangeInfo")
+    return {x["baseAsset"] for x in (d.get("symbols") or [])
+            if x.get("quoteAsset") == "USDT" and x.get("status") == "TRADING"}
+
+
+def binance_funding(sym, start_ms, end_ms):
+    out, t = [], start_ms
+    while t < end_ms:
+        d = get("https://fapi.binance.com/fapi/v1/fundingRate",
+                params={"symbol": f"{sym}USDT", "startTime": t, "limit": 1000})
+        if not isinstance(d, list) or not d:
+            break
+        out += [(int(x["fundingTime"]), float(x["fundingRate"])) for x in d]
+        t = int(d[-1]["fundingTime"]) + 1
+        if len(d) < 1000:
+            break
+    return out
+
+
+def binance_candles(sym, start_ms):
+    out, t = [], start_ms
+    while True:
+        d = get("https://fapi.binance.com/fapi/v1/klines",
+                params={"symbol": f"{sym}USDT", "interval": "4h", "startTime": t, "limit": 1000})
+        if not isinstance(d, list) or not d:
+            break
+        out += [(int(x[0]), float(x[4])) for x in d]
+        t = int(d[-1][0]) + 1
+        if len(d) < 1000:
+            break
+    return out
+
+
 def bitget_symbols():
     d = get("https://api.bitget.com/api/v2/mix/market/tickers",
             params={"productType": "usdt-futures"})
@@ -207,17 +241,23 @@ def dblock(v, B=2000, seed=5, block=21):
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(); ap.add_argument("--days", type=int, default=365)
-    ap.add_argument("--max-tail", type=int, default=40)
+    ap.add_argument("--max-tail", type=int, default=0)   # 0 = 全取（預註冊）
+    # 主判定用哪個 CEX 腿：**在看到任何結果之前宣告**用 binance，理由與結果無關
+    # ——它有 365 天 funding 歷史，Bitget 只有 90 天，而 90 天的窗口撐不起年化的
+    # 主張。Bitget 作為敏感度另跑一次。
+    ap.add_argument("--cex", default="binance", choices=["binance", "bitget"])
     a = ap.parse_args()
     end = int(time.time() * 1000); start = end - a.days * 86400 * 1000
 
     meta = hl_post({"type": "meta"}) or {}
     hl_uni = [x["name"] for x in meta.get("universe", [])]
-    bg = bitget_symbols()
+    bg = binance_symbols() if a.cex == "binance" else bitget_symbols()
+    F_FUND = binance_funding if a.cex == "binance" else (lambda sm, st, en: bitget_funding(sm, st))
+    F_CAND = binance_candles if a.cex == "binance" else bitget_candles
     print("=" * 104)
-    print(f"  路徑 B2：Hyperliquid × Bitget funding carry 被動基準（預註冊）｜{a.days} 天")
+    print(f"  路徑 B2：Hyperliquid × {a.cex} funding carry 被動基準（預註冊）｜{a.days} 天")
     print("=" * 104)
-    print(f"  HL universe {len(hl_uni)}｜Bitget USDT 永續 {len(bg)}")
+    print(f"  HL universe {len(hl_uni)}｜{a.cex} USDT 永續 {len(bg)}｜CEX 腿 = {a.cex}（主判定，事前宣告）")
 
     def norm(c):
         for p in ("kk", "k"):
@@ -226,20 +266,25 @@ def main() -> int:
         return c
 
     majors = [c for c in MAJORS if c in hl_uni and c in bg]
+    # **全取不篩選**（PREREG）。第一版用 universe 順序截斷到 25 個，那是未註冊的
+    # 篩選，而且剛好排除了 HYPE / XPL 這些上市較晚的標的——也就是主張所在的那些。
     tail = [c for c in hl_uni if c not in MAJORS and (c in bg or norm(c) in bg)]
-    tail = tail[:a.max_tail]
+    if a.max_tail and a.max_tail < len(tail):
+        print(f"  [WARN] 長尾組被 --max-tail 截斷成 {a.max_tail}/{len(tail)}"
+              f" —— 這不是預註冊的一部分，只該用於冒煙測試")
+        tail = tail[:a.max_tail]
     print(f"  主流組 {len(majors)}：{majors}")
-    print(f"  長尾組 {len(tail)}（HL ∩ Bitget，全取不篩選，本輪上限 {a.max_tail}）")
+    print(f"  長尾組 {len(tail)}（HL ∩ {a.cex}，全取不篩選，本輪上限 {a.max_tail}）")
 
     cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
 
     def fetch(coin):
-        k = f"{coin}:{a.days}"
+        k = f"{coin}:{a.days}:{a.cex}"
         if k in cache:
             return cache[k]
         bsym = coin if coin in bg else norm(coin)
         v = {"fh": hl_funding(coin, start, end), "ph": hl_candles(coin, start, end),
-             "fc": bitget_funding(bsym, start), "pc": bitget_candles(bsym, start)}
+             "fc": F_FUND(bsym, start, end), "pc": F_CAND(bsym, start)}
         cache[k] = v
         return v
 
@@ -260,11 +305,22 @@ def main() -> int:
             rt_m = 2 * (FEE["maker"]["hl"] + FEE["maker"]["cex"])
             pa = run_a(rows, rt_m)
             pb, holds = run_b(rows, rt_m)
+            # 容量＝10 bps 內的累積名目（雙側取小），不是最佳價位單一檔——
+            # 單一檔在薄簿上會給出 $0/$3 這種物理上說不通的數字（2026-09-05 抓到）
             book = hl_post({"type": "l2Book", "coin": c}) or {}
             lv = (book.get("levels") or [[], []])
             top = 0.0
             try:
-                top = float(lv[0][0]["px"]) * float(lv[0][0]["sz"])
+                sides = []
+                for si, sgn in ((0, +1), (1, -1)):
+                    lvls = [(float(x["px"]), float(x["sz"])) for x in lv[si]]
+                    if not lvls:
+                        sides.append(0.0); continue
+                    best = lvls[0][0]
+                    lim = best * (1 - sgn * 10 / 1e4)
+                    sides.append(sum(px * sz for px, sz in lvls
+                                     if (sgn > 0 and px >= lim) or (sgn < 0 and px <= lim)))
+                top = min(sides)
             except Exception:  # noqa: BLE001
                 pass
             per[c] = {"buckets": len(rows), "diff_med": float(np.median([abs(r[1]) for r in rows])),
