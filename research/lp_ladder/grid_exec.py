@@ -69,7 +69,8 @@ def load(sym):
 def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
              reanchor="none", reanchor_days=90, stop=None, stop_buf=0.03,
              stop_delay_h=0, gate=None, gate_scale=0.0,
-             maker=None, stop_cost=None, fill_pen=0.0, fund_hourly=0.0):
+             maker=None, stop_cost=None, fill_pen=0.0, fund_hourly=0.0,
+             n_series=None, size_series=None):
     """One continuous run. Returns metrics + the hourly equity curve.
 
     stop_delay_h: after a hard stop, stay FLAT (no ladder at all) for this
@@ -94,8 +95,19 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
     maker = MAKER if maker is None else maker
     stop_cost = STOP_COST if stop_cost is None else stop_cost
     m = 5 if N % 5 == 0 else 1
-    alloc = (nested_alloc(1.0, r, m, N // m) if profile == "nested"
-             else uniform_alloc(1.0, r, m, N // m))
+    # ── 自適應格距（2026-09-05，§1.18h）────────────────────────────────
+    # n_series[i] = 在 bar i 重錨時要用幾格（格數多 = 格距窄）。None = 沿用
+    # 固定 N，行為與先前完全相同（回歸測試釘住）。size_series[i] 同理縮放
+    # 每次重錨後投入的資金比例（庫存上限與 σ̂ 成反比的實作）。
+    # **兩者只在重錨時生效**——格距不能在持倉中間改，那等於把既有掛單全撤
+    # 重掛，成本模型接不住那個動作。
+    def _alloc_for(n_):
+        mm = 5 if n_ % 5 == 0 else 1
+        return (nested_alloc(1.0, r, mm, n_ // mm) if profile == "nested"
+                else uniform_alloc(1.0, r, mm, n_ // mm))
+
+    alloc = _alloc_for(N)
+    size_mult = 1.0
     cash = 1.0                      # everything in units of starting capital
     qty = np.zeros(N)               # base units held per bin
     cost = np.zeros(N)              # quote spent per bin (for MTM)
@@ -108,7 +120,16 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
     n_anchor = n_stop = n_fill = n_gated_off = 0
 
     def replace(px, i):
-        nonlocal edges, lo_e, hi_e, anchor_i, n_anchor
+        nonlocal edges, lo_e, hi_e, anchor_i, n_anchor, N, alloc, qty, cost, size_mult
+        if n_series is not None:
+            n_new = int(n_series[min(i, len(n_series) - 1)])
+            if n_new != N:
+                N = n_new
+                alloc = _alloc_for(N)
+                qty = np.zeros(N)      # 重錨時本來就是空手（呼叫端保證），格數改變安全
+                cost = np.zeros(N)
+        if size_series is not None:
+            size_mult = float(size_series[min(i, len(size_series) - 1)])
         edges = grid(px, px * (1 - drop), N)
         lo_e, hi_e = edges[1:], edges[:-1]
         anchor_i = i
@@ -134,10 +155,10 @@ def simulate(low, high, close, *, drop=0.25, N=30, profile="nested", r=1.5,
         b = (qty <= 0) & (low[i] <= lo_e * (1 - fill_pen))
         scale = 1.0 if (gate is None or gate[i]) else gate_scale
         if b.any() and scale > 0:
-            spend = alloc[b].sum() * scale
+            spend = alloc[b].sum() * scale * size_mult
             if spend <= cash + 1e-12:
-                qty[b] = alloc[b] * scale / lo_e[b] * (1 - maker)
-                cost[b] = alloc[b] * scale
+                qty[b] = alloc[b] * scale * size_mult / lo_e[b] * (1 - maker)
+                cost[b] = alloc[b] * scale * size_mult
                 cash -= spend
                 n_fill += int(b.sum())
                 n_gated_off += 0
