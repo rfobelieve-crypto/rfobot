@@ -165,7 +165,7 @@ def main() -> int:
                 "ic_ci": [ic_lo, ic_hi], "tercile_pct": [float(np.mean(terc[b]) * 100) for b in (0, 1, 2)],
                 "random_pct": pct, "verdict": verdict,
                 "mde_ann_pct": float(2.802 * se * 52 * 100),
-                "bars": {"C1": c1, "C2": c2, "C3": c3, "C5": c5, "C6": c6}})
+                "bars": {k: bool(v) for k, v in (("C1", c1), ("C2", c2), ("C3", c3), ("C5", c5), ("C6", c6))}})
     OUT.write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"  wrote {OUT}")
     return 0

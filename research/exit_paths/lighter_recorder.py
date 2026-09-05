@@ -40,18 +40,23 @@ OUTDIR = ROOT / "research" / "exit_paths" / "logs" / "lighter"
 FLAG = ROOT / "research" / "results" / "lighter_last.json"
 L_URL = "wss://mainnet.zklighter.elliot.ai/stream"
 B_URL = "wss://stream.binance.com:9443/ws/btcusdt@bookTicker"
+# 2026-09-05：加 Bitget 永續。A0 的判準是「訊號能不能轉移到 Lighter」，
+# 對照場館要兩個：**Binance 現貨**（§1.15 訊號的原生資料）與 **Bitget 永續**
+# （產品端真正下單的地方）。兩個基差都算，PREREG 的 6 bps 門檻對兩者分別判。
+G_URL = "wss://ws.bitget.com/v2/ws/public"
 MARKET_ID = 1                      # Lighter BTC 永續
 SAMPLE_MS = 250
 BPS = (1, 5, 10)                   # 累積名目的深度帶
 
 COLS = (["ts_ms", "l_upd_us", "l_bid", "l_ask", "l_bid_sz", "l_ask_sz"]
         + [f"l_cum_bid_{b}bps" for b in BPS] + [f"l_cum_ask_{b}bps" for b in BPS]
-        + ["b_bid", "b_ask", "b_bid_sz", "b_ask_sz"])
+        + ["b_bid", "b_ask", "b_bid_sz", "b_ask_sz", "g_bid", "g_ask", "g_bid_sz", "g_ask_sz"])
 
 book = {"bids": {}, "asks": {}, "upd_us": 0, "ready": False}
 binance = {"bid": None, "ask": None, "bid_sz": None, "ask_sz": None, "ts": 0.0}
+bitget = {"bid": None, "ask": None, "bid_sz": None, "ask_sz": None, "ts": 0.0}
 lock = threading.Lock()
-stat = {"rows": 0, "l_msgs": 0, "b_msgs": 0, "day": None, "writer": None, "fh": None}
+stat = {"rows": 0, "l_msgs": 0, "b_msgs": 0, "g_msgs": 0, "day": None, "writer": None, "fh": None}
 
 
 def flag(ok: bool, reason: str):
@@ -59,6 +64,7 @@ def flag(ok: bool, reason: str):
         "ok": bool(ok), "reason": reason,
         "asof": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "rows_today": stat["rows"], "l_msgs": stat["l_msgs"], "b_msgs": stat["b_msgs"],
+        "g_msgs": stat["g_msgs"],
     }, ensure_ascii=False), encoding="utf-8")
 
 
@@ -96,6 +102,20 @@ def on_binance(ws, raw):
         stat["b_msgs"] += 1
     except Exception as e:  # noqa: BLE001
         print("[WARN] binance parse:", str(e)[:120], flush=True)
+
+
+def on_bitget(ws, raw):
+    try:
+        m = json.loads(raw)
+        for d in (m.get("data") or []):
+            b, a = (d.get("bids") or [None])[0], (d.get("asks") or [None])[0]
+            if not b or not a:
+                continue
+            bitget.update(bid=float(b[0]), ask=float(a[0]),
+                          bid_sz=float(b[1]), ask_sz=float(a[1]), ts=time.time())
+            stat["g_msgs"] += 1
+    except Exception as e:  # noqa: BLE001
+        print("[WARN] bitget parse:", str(e)[:120], flush=True)
 
 
 def run_ws(name, url, sub, handler):
@@ -141,6 +161,23 @@ def writer_loop():
                 stat["fh"].close()
             OUTDIR.mkdir(parents=True, exist_ok=True)
             p = OUTDIR / f"{day}.csv"
+            # 表頭守衛：欄位變過就把舊檔輪替走，不要把新格式的列append 進舊表頭
+            # （2026-08-29 的同族——那次是輪替之後下游計數器從零重數，這次是
+            #  不輪替導致兩種格式混在同一個檔案，兩個都不會報錯）。
+            if p.exists():
+                try:
+                    with open(p, encoding="utf-8") as fh0:
+                        hdr = (fh0.readline() or "").strip().split(",")
+                except Exception:  # noqa: BLE001
+                    hdr = []
+                if hdr != COLS:
+                    alt = p.with_name(f"{day}_schema{len(hdr)}.csv")
+                    i = 1
+                    while alt.exists():
+                        alt = p.with_name(f"{day}_schema{len(hdr)}_{i}.csv"); i += 1
+                    p.rename(alt)
+                    print(f"[INFO] schema changed ({len(hdr)} -> {len(COLS)} cols); rotated to {alt.name}",
+                          flush=True)
             new = not p.exists()
             stat["fh"] = open(p, "a", newline="", encoding="utf-8")
             stat["writer"] = csv.writer(stat["fh"])
@@ -148,7 +185,7 @@ def writer_loop():
                 stat["writer"].writerow(COLS)
             stat["day"], stat["rows"] = day, 0
         with lock:
-            if not book["ready"] or binance["bid"] is None:
+            if not book["ready"] or binance["bid"] is None or bitget["bid"] is None:
                 continue
             bids, asks = dict(book["bids"]), dict(book["asks"])
             upd = book["upd_us"]
@@ -157,12 +194,14 @@ def writer_loop():
             continue
         row = ([int(time.time() * 1000), upd, lb, la, bids[lb], asks[la]]
                + cum(bids, lb, +1) + cum(asks, la, -1)
-               + [binance["bid"], binance["ask"], binance["bid_sz"], binance["ask_sz"]])
+               + [binance["bid"], binance["ask"], binance["bid_sz"], binance["ask_sz"]]
+               + [bitget["bid"], bitget["ask"], bitget["bid_sz"], bitget["ask_sz"]])
         stat["writer"].writerow(row); stat["rows"] += 1
         if stat["rows"] % 240 == 0:           # 每分鐘落盤 + 更新旗標
             stat["fh"].flush()
-            stale_b = time.time() - binance["ts"]
-            flag(stale_b < 60, f"rows_today={stat['rows']} binance_stale={stale_b:.0f}s")
+            sb = time.time() - binance["ts"]; sg = time.time() - bitget["ts"]
+            flag(sb < 60 and sg < 60,
+                 f"rows_today={stat['rows']} binance_stale={sb:.0f}s bitget_stale={sg:.0f}s")
 
 
 def main():
@@ -172,11 +211,14 @@ def main():
     threading.Thread(target=run_ws, args=("lighter", L_URL,
         {"type": "subscribe", "channel": f"order_book/{MARKET_ID}"}, on_lighter), daemon=True).start()
     threading.Thread(target=run_ws, args=("binance", B_URL, None, on_binance), daemon=True).start()
+    threading.Thread(target=run_ws, args=("bitget", G_URL,
+        {"op": "subscribe", "args": [{"instType": "USDT-FUTURES", "channel": "books1",
+                                      "instId": "BTCUSDT"}]}, on_bitget), daemon=True).start()
     threading.Thread(target=writer_loop, daemon=True).start()
     while True:
         time.sleep(60)
-        if stat["l_msgs"] == 0 or stat["b_msgs"] == 0:
-            flag(False, f"no frames: lighter={stat['l_msgs']} binance={stat['b_msgs']}")
+        if stat["l_msgs"] == 0 or stat["b_msgs"] == 0 or stat["g_msgs"] == 0:
+            flag(False, f"no frames: lighter={stat['l_msgs']} binance={stat['b_msgs']} bitget={stat['g_msgs']}")
 
 
 if __name__ == "__main__":

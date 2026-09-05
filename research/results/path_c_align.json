@@ -1,0 +1,23 @@
+{
+ "hours": 6.0,
+ "groups": 358,
+ "cells": 341,
+ "dominant_cells": 310,
+ "buy": {
+  "n": 222,
+  "mean_bps": 32.15858147810272,
+  "median_bps": 16.840455872277893,
+  "se_bps": 4.91953699917576,
+  "sign_match": 0.7702702702702703
+ },
+ "sell": {
+  "n": 88,
+  "mean_bps": -41.924753439197644,
+  "median_bps": -18.001128850185232,
+  "se_bps": 9.815598635659816,
+  "sign_match": 0.8181818181818182
+ },
+ "convention_ok": true,
+ "cross_venue_cells": 15,
+ "symbols_with_klines": 71
+}
