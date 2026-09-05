@@ -1,1 +1,1 @@
-{"ok": true, "reason": "rows_today=31680 binance_stale=0s bitget_stale=0s", "asof": "2026-09-05T08:49:08+00:00", "rows_today": 31680, "l_msgs": 106887, "b_msgs": 318553, "g_msgs": 60626}
+{"ok": true, "reason": "rows_today=6240 binance_stale=0s bitget_stale=1s", "asof": "2026-09-05T15:15:07+00:00", "rows_today": 6240, "l_msgs": 24996, "b_msgs": 45796, "g_msgs": 11736}

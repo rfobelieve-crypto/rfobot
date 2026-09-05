@@ -1505,3 +1505,47 @@ tracked signals             1.3h  336.0h  ok
 0 red / 35 tracked
 alert DELIVERED: Freshness board transition:
   recovered: gex recorder flag (§0.88d)
+freshness board — 2026-09-05 11:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           0.2h    2.5h  ok
+basis obs (§0.91)           0.2h    2.5h  ok
+gex snapshots (§0.88d)      0.3h    2.5h  ok
+gex recorder flag (§0.88d)      0.2h    2.5h  ok
+liq recorder flag (路徑C)      0.0h    1.0h  ok
+lighter recorder flag (路徑A)      0.0h    1.0h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       2.8h    1.5h  RED  <-- executor WS alive — the aliveness signal per mistake 2026-07
+cloud train parity          0.2h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     35.0h   48.0h  ok
+coinglass parquets         15.3h   48.0h  ok
+daily collect log           9.7h   30.0h  ok
+freshness board self        5.9h    7.0h  ok
+revalidation report        10.3h  840.0h  ok
+portfolio clocks           21.9h  195.0h  ok
+tracked signals             1.3h  336.0h  ok
+
+1 red / 37 tracked: okx balance snapshots
+[TG-CUTOVER] blocked outbound telegram from okx.send_critical (帳號遭盜用 2026-09-05；設 TELEGRAM_REENABLE=I_ROTATED_ALL_TOKENS 才恢復)
+[WARN] freshness alert NOT delivered: Freshness board transition:
+  RED: okx balance snapshots (age 2.8h, limit 2h) — executor WS alive — the aliveness signal per mistake 2026-07-28

@@ -223,9 +223,12 @@ def main() -> int:
         A = np.vstack(pack[arm]); Bs = np.vstack(pack["FIXED"])
         La, Lb = lstar(A[:, 1], a.budget), lstar(Bs[:, 1], a.budget)
         d = La * A[:, 0] - Lb * Bs[:, 0]
+        # 統計量必須與表格一致：預註冊寫的是「L* x 報酬中位」，所以配對差也取
+        # 中位。第一版這裡用 mean、表格用 median，兩者在偏態分布上會給不同答案
+        # ——而唯一那個 PASS 剛好落在這個縫上（2026-09-05 抓到並修）。
         rng = np.random.default_rng(seed)
-        m = [d[rng.integers(0, len(d), len(d))].mean() for _ in range(B)]
-        return float(d.mean()), float(np.percentile(m, 2.5)), float(np.percentile(m, 97.5))
+        m = [np.median(d[rng.integers(0, len(d), len(d))]) for _ in range(B)]
+        return float(np.median(d)), float(np.percentile(m, 2.5)), float(np.percentile(m, 97.5))
 
     passes = {}
     order = [f"ADAPT{k}" for k in KS] + [f"SKEW{g}" for g in GAMMAS] + ["NARROW"]
