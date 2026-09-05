@@ -1884,7 +1884,9 @@ def _handle_cancel_flow(chat_id: str, hours: int = 48, api: str = None):
     url = f"{INDICATOR_SERVICE_URL}/research/cancel-flow-i?hours={hours}"
     tok = os.getenv("ADMIN_HEAL_TOKEN", "")
     if tok:
-        url += f"&token={tok}"
+        from shared.signed_link import make_query as _sq
+        _q = _sq("/research/cancel-flow-i")     # 簽章綁定路徑，不可用變數帶入
+        url += f"&{_q}" if _q else ""
     window = "全 depth 時代" if hours == 0 else f"最近 {hours}h"
     _say_via(api, chat_id,
         f"<b>撤單流覆盤（互動圖·研究非信號）</b>\n\n"

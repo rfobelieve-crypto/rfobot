@@ -74,12 +74,15 @@ def _make_reply_markup():
     # (the Telegram chat is operator-only, so the URL stays private).
     _base = "https://enchanting-emotion-production-4b4d.up.railway.app"
     _tok = os.environ.get("ADMIN_HEAL_TOKEN", "")
-    dash_url = f"{_base}/dashboard" + (f"?token={_tok}" if _tok else "")
+    from shared.signed_link import make_query as _sq
+    _q = _sq("/dashboard")
+    dash_url = f"{_base}/dashboard" + (f"?{_q}" if _q else "")
     # Shadow 覆盤 (strategy #3 recorder): URL button like Dashboard — opens
     # the on-demand review chart in a real browser, regenerated per query.
     # Other symbols by editing the symbol= param.
+    _q2 = _sq("/research/shadow-review")
     shadow_url = (f"{_base}/research/shadow-review?symbol=BTC"
-                  + (f"&token={_tok}" if _tok else ""))
+                  + (f"&{_q2}" if _q2 else ""))
     # Consolidated 2026-07-31 (user: "不用那麼多功能主要的幾個就好").
     # Removed from DISPLAY only — perf/db/flow_all/ichart/decay handlers
     # all stay in the webhook, so old messages' buttons and typed
@@ -1024,6 +1027,15 @@ def _admin_guard():
     if not expected:
         return jsonify({"error": "admin routes locked: ADMIN_HEAL_TOKEN "
                                  "not configured on this service"}), 503
+    # 2026-09-05：接受短效簽章連結（?exp=&sig=）。長期 token 仍可用於服務之間
+    # 的呼叫與 CLI，但**送給人點的連結一律用簽章**——網址會留在瀏覽器歷史、
+    # referrer、代理 log 與聊天記錄裡，而這次外洩就是這麼發生的。
+    try:
+        from shared.signed_link import verify as _sig_verify
+        if _sig_verify(path, request.values.get("exp", ""), request.values.get("sig", "")):
+            return None
+    except Exception:  # noqa: BLE001
+        pass
     provided = (request.headers.get("X-Admin-Token", "")
                 or request.values.get("token", "")).strip()
     # bytes compare: str compare_digest raises TypeError on non-ASCII input

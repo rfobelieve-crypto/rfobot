@@ -152,6 +152,7 @@ exit` 的列是真前瞻，判 Gate 只能用前者」——**這條是錯的，
 | 流動性獵取全貌（變體/配方/評分/上線路徑） | `docs/RAID_PLAYBOOK.md` |
 | V7 本體架構細節（資料層→模型→推論） | `docs/系統架構說明書.md` |
 | 多策略組合風控設計 | `docs/PORTFOLIO_RISK_FRAMEWORK.md` |
+| **祕密清冊、輪替手冊、事故紀錄** | `docs/SECURITY.md`（2026-09-05 起，新增祕密同 session 就要登記）|
 | 踩過的坑（**開工前必讀**） | `.claude/rules/mistake.md` |
 | 策略／因子研究的十道檢查（**開新研究線前必讀**） | `.claude/rules/factor-research.md` |
 | 當前任務、預註冊、凍結假設 | `TODO.md` |
