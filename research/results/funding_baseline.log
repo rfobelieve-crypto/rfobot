@@ -1,0 +1,55 @@
+  bybit:BTC:k:365: 3000
+  bybit:ETH:k:365: 3000
+  bybit:SOL:k:365: 3000
+  bybit:XRP:k:365: 3000
+  bybit:DOGE:k:365: 3000
+  bybit:BNB:k:365: 3000
+  bybit:ADA:k:365: 3000
+  bybit:LINK:k:365: 3000
+  bybit:AVAX:k:365: 3000
+  bybit:SUI:k:365: 3000
+  bybit:LTC:k:365: 3000
+  bybit:TRX:k:365: 3000
+  bybit:DOT:k:365: 3000
+  bybit:NEAR:k:365: 3000
+  bybit:APT:k:365: 3000
+  bybit:UNI:k:365: 3000
+  bybit:AAVE:k:365: 3000
+  bybit:ARB:k:365: 3000
+  bybit:OP:k:365: 3000
+  bybit:PEPE:k:365: 0
+  okx:BTC:k:365: 2200
+  okx:ETH:k:365: 2200
+  okx:SOL:k:365: 2200
+  okx:XRP:k:365: 2200
+  okx:DOGE:k:365: 2200
+  okx:BNB:k:365: 2200
+  okx:ADA:k:365: 2200
+  okx:LINK:k:365: 2200
+  okx:AVAX:k:365: 2200
+  okx:SUI:k:365: 2200
+  okx:LTC:k:365: 2200
+  okx:TRX:k:365: 2200
+  okx:DOT:k:365: 2200
+  okx:NEAR:k:365: 2200
+  okx:APT:k:365: 2200
+  okx:UNI:k:365: 2200
+  okx:AAVE:k:365: 2200
+  okx:ARB:k:365: 2200
+  okx:OP:k:365: 2200
+  okx:PEPE:k:365: 2200
+============================================================================================================
+  路徑 B Step 1：被動基準（365 天，8h 桶，含 basis）｜停止條件：maker 層年化 < 5% 整條停
+============================================================================================================
+  場館對                  幣數     桶數   |diff|中位    換邊/年   funding年化    basis年化 total(maker)     MDD  Sharpe
+  binance-bybit        19  20786       0.37     492      +6.02%     +2.60%      -11.06%-211.15%   -8.36
+  binance-okx          19   5339       0.30     493      +4.65%     +0.94%      -14.11% -69.17%  -10.47
+  binance-bitget       19   5111       0.38     419      +5.82%     +4.82%       -6.12% -31.71%   -2.70
+  bybit-okx            19   5339       0.33     502      +4.95%     +1.77%      -13.37% -65.30%  -11.47
+  bybit-bitget         19   5111       0.41     455      +6.19%     +4.52%       -7.51% -35.14%   -3.59
+  okx-bitget           20   5380       0.33     460      +5.47%     +3.45%       -9.46% -46.99%   -4.65
+
+  最佳對：binance-bitget  maker 年化 -6.12%
+  ❌ 停止條件：maker 層年化 ≥ 5%
+  → Step 1 未過（maker 層年化 < 5%）——依 PREREG B.9 整條線停止
+  wrote C:\Users\rfo\Desktop\flowbot\flow_system\research\results\funding_baseline.json
