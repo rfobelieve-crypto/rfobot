@@ -56,6 +56,27 @@ def load_config():
         }
 
     if not os.path.exists(CONFIG_PATH):
+        # 2026-09-05：Telegram 帳號遭盜用，全線斷流。這支程式同時跑 TradingView
+        # webhook、Flask 路由、OKX 對帳、outcome tracker——**那些不該被一個已經
+        # 被我們自己關掉的頻道綁著開不了機**。所以斷流期間缺 token 不是致命錯誤，
+        # 用佔位字串開機、大聲留痕，等帳號救回、token 輪替後再把變數設回去。
+        try:
+            from shared.tg_kill import tg_blocked as _tgb
+        except Exception:  # noqa: BLE001
+            def _tgb():
+                return True
+        if _tgb():
+            print("[TG-CUTOVER] 沒有 TELEGRAM_BOT_TOKEN，但 Telegram 已斷流——"
+                  "以佔位 token 開機；送出全封、兩個 webhook 回 403。"
+                  "帳號救回並輪替 token 後，把變數設回去即可恢復。", flush=True)
+            return {
+                "telegram_bot_token": "TELEGRAM-CUTOVER-NO-TOKEN",
+                "telegram_chat_id": "",
+                "debug": False,
+                "port": int(os.getenv("PORT", "5000") or 5000),
+                "allowed_users": [],
+                "source": "telegram-cutover-placeholder",
+            }
         raise FileNotFoundError(
             "找不到 config.json，且環境變數 TELEGRAM_BOT_TOKEN 也未設定。"
         )
