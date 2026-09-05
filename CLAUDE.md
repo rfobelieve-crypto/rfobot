@@ -818,6 +818,12 @@ Desktop/linkedin_posts/*.docx        ← 授權格式（人寫的）
   → npm run build 驗證 → push origin **master**
 ```
 
+**第二條內容流（2026-09-05 起）：陣亡名冊**——`/writeups` 文章下方那一節
+`flow_system/assets/research_nogo.json`（真相源，手工從 TODO.md 判決節策展）
+→ 複製到 `../product-site/content/research_nogo.json` → build → push master。
+**每次 TODO 新增一個 NO-GO／FAIL／無效判決，同一個 session 就加一條**，
+不留到「之後一起」。狀態欄固定用那幾個字，公開面規則同上（無美元／張數／內部）。
+
 **中間那個「手動加一筆」是實際發生過的斷點**：2026-09-01 發現 ep5/6/7
 三篇 docx 早就寫完、躺了六週沒上站，因為沒人把它們加進清單，而**網站看
 起來完全正常**（見 mistake.md 同日）。所以：**寫完一篇 docx 的當下就走完
