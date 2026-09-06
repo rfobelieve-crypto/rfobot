@@ -131,13 +131,26 @@ SEP_EXIT = datetime(2026, 9, 5, tzinfo=timezone.utc)
 
 
 def _n_liq_events() -> int:
-    """路徑 C 的進度＝已錄到的強平筆數。權威值就是這張表，沒有第二份實作。"""
+    """路徑 C 的進度＝**級聯候選數**，不是強平筆數。
+
+    2026-09-06 抓到的錯：第一版數 COUNT(*)，一天就顯示 9,974/300 到期——但門檻
+    300 是「級聯事件」，一個級聯裡有幾十筆強平。這是 mistake.md 2026-09-03
+    「把分鐘當交易」的同一個錯，同一個人隔天再犯。
+    正式定義（PREREG_C）是 liq_z ≥ 5 且單邊 ≥80%，需要 30 天基線；基線不夠時用
+    粗代理：(幣, 分鐘) 格內單邊 ≥80% 且名目 ≥ $100k。代理只用於顯示進度，
+    判決由 C 的分析程式擁有。
+    """
     from shared.db import get_db_conn as _gdb          # 本檔慣例：區域 import
     try:
         conn = _gdb()
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) n FROM liq_events")
+                cur.execute(
+                    "SELECT COUNT(*) n FROM ("
+                    "  SELECT symbol, FLOOR(ts_event/60000) m, SUM(notional_usd) tot, "
+                    "         SUM(CASE WHEN side='BUY' THEN notional_usd ELSE 0 END) b "
+                    "  FROM liq_events GROUP BY 1,2"
+                    ") t WHERE tot >= 100000 AND (b/tot >= 0.8 OR b/tot <= 0.2)")
                 return int((cur.fetchone() or {}).get("n", 0))
         finally:
             conn.close()
@@ -147,18 +160,43 @@ def _n_liq_events() -> int:
 
 
 def _n_lighter() -> int:
-    """路徑 A 的進度＝已錄的 250ms 取樣列數 / 240（換算成分鐘）。"""
+    """路徑 A 的進度＝**訊號分鐘數**（|ret_60| 超過 trailing 第 95 百分位），
+    不是錄製分鐘數。2026-09-06 抓到：第一版顯示 1,240/60，讀起來像完成二十倍，
+    其實 1,240 是錄了幾分鐘。門檻 60 是 PREREG 的「訊號分鐘 ≥ 60」。
+    基線用 expanding 分位（至少 6 小時），資料變多後自然收斂到 7 天 trailing。
+    """
+    import csv
     d = ROOT / "research" / "exit_paths" / "logs" / "lighter"
     if not d.exists():
         return 0
-    n = 0
-    for f in d.glob("*.csv"):
+    per_min = {}
+    for f in sorted(d.glob("*.csv")):
         try:
-            with open(f, "rb") as fh:
-                n += max(sum(1 for _ in fh) - 1, 0)
+            with open(f, encoding="utf-8", newline="") as fh:
+                rd = csv.DictReader(fh)
+                if not rd.fieldnames or "l_bid" not in rd.fieldnames:
+                    continue
+                for r in rd:
+                    try:
+                        per_min[int(r["ts_ms"]) // 60000] = (
+                            (float(r["l_bid"]) + float(r["l_ask"])) / 2)
+                    except (TypeError, ValueError):
+                        continue
         except Exception:  # noqa: BLE001
-            pass
-    return n // 240
+            continue
+    ks = sorted(per_min)
+    if len(ks) < 360:                       # 不足 6 小時，門檻不可信
+        return 0
+    vals = [per_min[k] for k in ks]
+    n, hist = 0, []
+    for i in range(60, len(vals)):
+        r = abs(vals[i] / vals[i - 60] - 1)
+        hist.append(r)
+        if len(hist) >= 360:                # 6 小時基線
+            base = sorted(hist[-10080:])    # 最多 7 天
+            if r > base[int(0.95 * (len(base) - 1))]:
+                n += 1
+    return n
 
 
 def build():
@@ -206,17 +244,9 @@ def build():
             "days": q2.get("days", 0), "gate_days": q2.get("gate_days", 30),
             "note": "已有一批 11 筆的反例（55%），寫進註冊書不得遺忘",
         },
-        {
-            "id": "地形扳機", "line": "V7", "title": "地形濾網上線扳機",
-            "hypothesis": "保留 vs 否決的勝率差 ≥8pp 且新訊號 ≥60 筆",
-            "why": "地形四維過了三關但仍是 display-only，扳機決定能否進場規則",
-            "registered": "2026-08-02", "source": "json",
-            "n": veto.get("strong_since_trigger", 0),
-            "gate_n": veto.get("trigger_target", 60),
-            "days": round(_days_since(datetime(2026, 8, 2, tzinfo=timezone.utc)), 1),
-            "gate_days": None,
-            "note": "看板主數字是已結算的；剛開火的訊號要等約 4 小時才會動",
-        },
+        # 地形扳機 2026-09-04 已結案（設計上判不出來，SE 11.6pp > 門檻 8pp），
+        # 移到 settled；文字直接用計分器 v7_raid_veto.TRIGGER_STATUS。
+        # 2026-09-06 才移：看板一直顯示 61/60 到期，讓操作者以為它累積完成了。
         {
             # 2026-09-02: variant B judged FAIL (see settled). The formal track
             # (variant A, no filter, core9, frozen 2026-07-28) is what is still
@@ -354,23 +384,31 @@ def build():
             "note": "判準凍結後才拉 180 天回填：回填只作背景不判決（它的中位"
                     "已低於門檻，但那不是這個窗口的答案）；只錄不交易",
         })
-    open_items.append({
-        "id": "0.75", "line": "套利（第四線）", "title": "兩場館溢價錄製",
-        "hypothesis": "SNDK 在 Entropy 與 Robinhood 鏈之間的溢價，扣費後有可交易的肉",
-        "why": "新場館=定價未磨平+零費率補貼期；Entropy 全是股票/私募永續（含 OpenAI/Anthropic）",
-        "registered": "2026-08-28", "source": "count",
-        "n": arb_min, "gate_n": 7 * 1440,
-        "days": round(_days_since(datetime(2026, 8, 28, 10, 28,
-                                           tzinfo=timezone.utc)), 1),
-        "gate_days": 7,
-        "note": ("判準已凍結（≥1bps 帶、日均≥10 次、兩半皆成立）；只錄不交易，"
-                 "下單路徑未經審計前不碰錢"
-                 + (f"｜同判準的家族還有 {len(_fam_live)} 個配對在錄"
-                    f"（{'、'.join(_fam_live)}，各約 "
-                    f"{min(_fam_live.values())//60} 小時），"
-                    f"含 BTC 對照組——全部報告不挑" if _fam_live else "")),
-    })
+    # 0.75 的判決由 arb repo 的 premium_verdict.py 擁有並每小時重算，其 JSON 已
+    # 有 verdict 欄。看板改到 settled 轉述它，不再當進行中的時鐘——時鐘過了門檻
+    # 還一直數（12,397/10,080），讓操作者以為「累積完成、還沒人判」（2026-09-06）。
+    _arb_v = {}
+    try:                                    # 判決檔在 arb repo，唯一知道位置的是 arb_home
+        from research import arb_home as _ah
+        _arb_v = json.loads((_ah.RESULTS / "arb_premium_verdict.json")
+                            .read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        print(f"[WARN] arb verdict unreadable: {e}", flush=True)
+    try:
+        from research.v7_raid_veto import TRIGGER_STATUS as _terrain_status
+    except Exception:  # noqa: BLE001
+        _terrain_status = "trigger CLOSED 2026-09-04 — inconclusive by design"
     settled = [
+        # 2026-09-04：地形扳機結案。不是 FAIL 是「設計上判不出來」——門檻 8pp 而
+        # 註冊樣本下的 SE 是 11.6pp。時鐘行不刪，改印結案理由（mistake.md
+        # 2026-09-04：消失的時鐘會被讀成「有人採用了它」）。文字來自計分器。
+        {"id": "地形扳機", "line": "V7", "title": "地形濾網上線扳機",
+         "verdict": "無效判決（設計缺陷）", "tone": "warn",
+         "text": str(_terrain_status)},
+        {"id": "0.75", "line": "套利（第四線）", "title": "兩場館溢價錄製",
+         "verdict": "已判（計分器每小時重算）", "tone": "warn",
+         "text": str(_arb_v.get("verdict") or _arb_v.get("summary")
+                     or "計分器尚未產出 verdict 欄")[:400]},
         # 2026-08-27 的一整輪:十二個候選、兩份 TradingView 指標、
         # 依預註冊零個過關。全部列出——只顯示存活者的看板是在對「過程」說謊。
         {"id": "0.71", "line": "流動性獵取", "title": "流動性是線,不是區間",
