@@ -85,3 +85,6 @@ research/results/arb_watchdog.log
 research/results/*_cache.json
 research/results/funding_raw_cache.json
 research/exit_paths/logs/
+
+# TODO 1.00 POC study: regenerable from .cache + poc_profile.py (8-9MB each)
+research/results/poc_profile/events*.csv
