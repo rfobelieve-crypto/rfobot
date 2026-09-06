@@ -64,10 +64,14 @@ def main():
     rng = np.random.default_rng(a.seed)
     pick = sorted(str(x) for x in rng.choice(days, size=min(a.days, len(days)),
                                              replace=False))
+    # L3 looks back 72h and the volume window L1 has been observed out to 54h,
+    # so a reference day needs THREE predecessors, not one.  Without them the
+    # tick "truth" would be computed on a truncated window -- silently wrong.
     want = []
     for d in pick:
-        prev = (pd.Timestamp(d) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-        want += [prev, d]
+        want.append(d)
+        for k in (1, 2, 3):
+            want.append((pd.Timestamp(d) - pd.Timedelta(days=k)).strftime("%Y-%m-%d"))
     want = sorted(set(want))
 
     got, mb, fail = 0, 0.0, []

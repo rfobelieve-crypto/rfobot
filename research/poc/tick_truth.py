@@ -48,6 +48,8 @@ TICKS = HERE / "data" / "ticks"
 BARS = HERE / "data" / "bars"
 OUT = HERE / "data" / "quality"
 MIN_MS = 60_000
+DAY_MS = 86_400_000
+LOOKBACKS = {"L1": ("volume", 0.5), "L2": ("time", 24), "L3": ("time", 72)}
 COLS = ["agg_id", "price", "quantity", "first_id", "last_id",
         "transact_time", "is_buyer_maker", "is_best_match"]
 
@@ -95,7 +97,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sym", default="BTC")
     ap.add_argument("--per-day", type=int, default=10)
-    ap.add_argument("--lookback-h", type=float, default=24.0)
+    ap.add_argument("--lookbacks", default="L1,L2,L3")
     ap.add_argument("--seed", type=int, default=20260906)
     a = ap.parse_args()
 
@@ -106,9 +108,21 @@ def main():
     atrh = bdf.set_index("ts")["atr_h14"]
     vol = bdf.set_index("ts")["volume"]
 
+    _v = np.nan_to_num(bdf["volume"].to_numpy(float), nan=0.0)
+    _cum = np.concatenate([[0.0], np.cumsum(_v)])
+    _ts = bdf["ts"].to_numpy(np.int64)
+
+    def adv_at(t_ref):
+        hi = int(np.searchsorted(_ts, t_ref - MIN_MS, side="right"))
+        lo = int(np.searchsorted(_ts, t_ref - 30 * DAY_MS, side="left"))
+        return (_cum[hi] - _cum[lo]) / 30.0 if hi > lo else None
+
+    wanted = [x.strip() for x in a.lookbacks.split(",") if x.strip()]
     have = sorted(p.stem.split("_", 1)[1] for p in TICKS.glob(f"{a.sym}_*.zip"))
+    hs = set(have)
     ref_days = [d for d in have
-                if (pd.Timestamp(d) - pd.Timedelta(days=1)).strftime("%Y-%m-%d") in set(have)]
+                if all((pd.Timestamp(d) - pd.Timedelta(days=k)).strftime("%Y-%m-%d") in hs
+                       for k in (1, 2, 3))]
     if not ref_days:
         sys.exit("no usable tick days -- run fetch_ticks.py")
     rng = np.random.default_rng(a.seed)
@@ -116,15 +130,21 @@ def main():
 
     rows, xcheck, units = [], [], set()
     for day in ref_days:
-        prev = (pd.Timestamp(day) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-        A, B = load_day(a.sym, prev), load_day(a.sym, day)
-        if A is None or B is None:
+        parts = []
+        for k in (3, 2, 1, 0):
+            dd = (pd.Timestamp(day) - pd.Timedelta(days=k)).strftime("%Y-%m-%d")
+            L = load_day(a.sym, dd)
+            if L is None:
+                parts = None
+                break
+            units.add(L[3])
+            parts.append(L)
+        if parts is None:
             continue
-        units.add(A[3])
-        units.add(B[3])
-        t_px = np.concatenate([A[0], B[0]])
-        t_q = np.concatenate([A[1], B[1]])
-        t_ts = np.concatenate([A[2], B[2]])
+        t_px = np.concatenate([x[0] for x in parts])
+        t_q = np.concatenate([x[1] for x in parts])
+        t_ts = np.concatenate([x[2] for x in parts])
+        tick_cover_from = int(t_ts.min())
         day0 = int(pd.Timestamp(day, tz="UTC").value // 1_000_000)
         for m in sorted(rng.choice(np.arange(0, 1440), size=a.per_day, replace=False)):
             t_ref = day0 + int(m) * MIN_MS
@@ -134,20 +154,29 @@ def main():
             sel = (t_ts >= mstart) & (t_ts < t_ref)
             if sel.any() and mstart in vol.index and vol[mstart] > 0:
                 xcheck.append(abs(t_q[sel].sum() - vol[mstart]) / vol[mstart])
-            w = (t_ts >= t_ref - int(a.lookback_h * 3600_000)) & (t_ts < t_ref)
-            if w.sum() < 1000:
+            atr = atrh.get(t_ref)
+            if atr is None or not np.isfinite(atr) or atr <= 0:
                 continue
-            for tag, atr in (("atr_1h", atr1.get(t_ref)), ("atr_h14", atrh.get(t_ref))):
-                if atr is None or not np.isfinite(atr) or atr <= 0:
-                    continue
-                bs = max(tick, atr / 20.0)
-                truth = tick_poc(t_px[w], t_q[w], bs)
-                pu = build_profile(bars, t_ref, ("time", a.lookback_h), "uniform", bs)
-                pc = build_profile(bars, t_ref, ("time", a.lookback_h), "close", bs)
+            bs = max(tick, atr / 20.0)
+            for lname in wanted:
+                pu = build_profile(bars, t_ref, LOOKBACKS[lname], "uniform", bs,
+                                   avg_daily_volume=adv_at(t_ref))
+                pc = build_profile(bars, t_ref, LOOKBACKS[lname], "close", bs,
+                                   avg_daily_volume=adv_at(t_ref))
                 if pu is None or pc is None:
                     continue
-                rows.append(dict(t_ref=t_ref, day=day, atr_kind=tag, atr=float(atr),
-                                 bin_size=bs, n_prints=int(w.sum()),
+                # the tick window must be the SAME window the bar profile used,
+                # and it must be FULLY covered by the prints on disk -- a
+                # truncated truth is worse than no truth
+                if pu.first_ms < tick_cover_from:
+                    continue
+                w = (t_ts >= pu.first_ms) & (t_ts < t_ref)
+                if w.sum() < 1000:
+                    continue
+                truth = tick_poc(t_px[w], t_q[w], bs)
+                rows.append(dict(t_ref=t_ref, day=day, lookback=lname,
+                                 atr=float(atr), bin_size=bs, nbars=int(pu.n_bars),
+                                 n_prints=int(w.sum()),
                                  poc_tick=truth, poc_uniform=pu.poc, poc_close=pc.poc,
                                  err_uniform=abs(pu.poc - truth) / atr,
                                  err_close=abs(pc.poc - truth) / atr,
@@ -174,14 +203,15 @@ def main():
 
     summary = {"instrument_guard": {"n": int(len(xa)), "median": float(np.median(xa)),
                                     "max": float(xa.max()), "units": sorted(units)},
-               "n_days": int(d.day.nunique()), "lookback_h": a.lookback_h}
-    for tag, g in d.groupby("atr_kind"):
+               "n_days": int(d.day.nunique()), "bin_basis": "atr_h14"}
+    for tag, g in d.groupby("lookback"):
         def q(x):
             return dict(median=float(np.median(x)), mean=float(np.mean(x)),
                         q75=float(np.percentile(x, 75)), q90=float(np.percentile(x, 90)),
                         max=float(np.max(x)))
         summary[tag] = dict(n=int(len(g)), bin_size_median=float(g.bin_size.median()),
                             atr_median=float(g.atr.median()),
+                            nbars_median=float(g.nbars.median()),
                             err_uniform=q(g.err_uniform), err_close=q(g.err_close),
                             disagree=q(g.disagree),
                             uniform_beats_close=float((g.err_uniform < g.err_close).mean()),
