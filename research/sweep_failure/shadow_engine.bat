@@ -78,4 +78,4 @@ REM 2026-09-05 (TODO 0.88d): dealer gamma (GEX) snapshot from Deribit's public
 REM book summary. V7's one decidable weakness is chase-vs-fade (47%% vs 69%%);
 REM gamma is the mechanism candidate. No history exists anywhere, so record.
 python research\gex_recorder.py >> research\results\sweep_shadow_run.log 2>&1
-python research7_regime_q2_clock.py >> researchesults\sweep_shadow_run.log 2>&1
+python research\v7_regime_q2_clock.py >> research\results\sweep_shadow_run.log 2>&1
