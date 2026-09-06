@@ -1,9 +1,9 @@
 {
  "rule": "在 TREND_UP 格只接受 DOWN 訊號（擋掉 UP 訊號）",
  "cell": "TREND_UPxUP",
- "n": 0,
+ "n": 3,
  "gate_n": 60,
- "days": 4.7,
+ "days": 11.1,
  "gate_days": 30,
  "gate_met": false,
  "limits": [

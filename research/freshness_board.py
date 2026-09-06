@@ -116,6 +116,15 @@ REGISTRY = [
     # 2026-09-05 (出路研究線 A/C): 兩個 24/7 錄製器。judged by their own
     # self-report, not by artifact age -- a quiet market and a dead websocket
     # leave the same blank (mistake.md 2026-09-03).
+    # 2026-09-06 看板覆核抓到兩個「從未被排程」的計分器：Q2 時鐘手動跑過一次就
+    # 停在 09-01，Gate F 的月度計分器根本不在月度 cmd 裡。freshness 對「從未開始」
+    # 是瞎的（mistake.md 2026-09-01），所以把它們的產物登記進來——下次再停會變紅。
+    ("v7 Q2 clock json (§0.60)", "file",
+     "research/results/v7_regime_q2_clock.json", 2.5,
+     "每小時 shadow_engine.bat 的 v7_regime_q2_clock.py；紅 = 計分器停了"),
+    ("sweep_forward gate json (Gate F)", "file",
+     "research/results/sweep_forward_gate.json", 24 * 36,
+     "每月 5 號 run_monthly_revalidation.cmd 的 sweep_forward.py；紅 = 月度沒跑"),
     ("liq recorder flag (路徑C)", "json_flag",
      "research/results/liq_last.json:ok", 1.0,
      "OKX+Bybit 強平推送錄製器自報；紅 = WS 斷或 DB 寫入失敗"),
@@ -145,9 +154,14 @@ REGISTRY = [
     ("indicator bars", "db",
      "indicator_history:dt", 2.5,
      "V7 inference alive (the honest liveness witness)"),
-    ("okx balance snapshots", "db",
-     "v7_okx_balance_snapshots:ts", 1.5,
-     "executor WS alive — the aliveness signal per mistake 2026-07-28"),
+    # 2026-09-06 退役（不是刪除）：OKX 帳戶 2026-08-18 14:15:39 一秒內階躍到 $0
+    # （提領，操作者 08-21 決定改用 Bitget），executor 對空帳戶報了 18 天 $0；
+    # 09-05 的 Railway 重新部署讓它重跑 kill 檢查 → CAP-4 −100% → DEMOTE → WS 停。
+    # 一個永遠紅的列跟壞掉的列一樣沒用（mistake.md 2026-09-03），所以門檻拉到
+    # 「不會紅」但列保留——帳戶再入金、executor 重啟時把 1.5 改回來。
+    ("okx balance snapshots (retired 09-06)", "db",
+     "v7_okx_balance_snapshots:ts", 24 * 3650,
+     "OKX 帳戶 08-18 起 $0、executor 09-05 DEMOTED；入金重啟後把門檻改回 1.5h"),
     ("cloud train parity", "db",
      "train_parity:updated_at", 2.5,
      "cloud recorder alive (weakness-#1 migration; RED until service up)"),

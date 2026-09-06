@@ -24,6 +24,15 @@
 | 同時持倉 | **1 筆** | `max_position_count` |
 | 出場 | 3×ATR trailing、opp_signal 反向、conviction_decay(2 根) | `okx/executor.py` |
 
+**OKX 帳戶自 2026-08-18 起為 $0、executor 2026-09-05 DEMOTED（2026-09-06 查明）**：
+`v7_okx_balance_snapshots` 顯示權益在 08-18 14:15:39 **一秒內**從 >$1 階躍到 $0——
+提領，對上 08-21「改用 Bitget」的決定。之後 executor 對空帳戶報了 18 天 $0
+（WS 活著、看板綠著）。09-05 的 Railway 重新部署讓它重跑 kill 檢查 → CAP-4
+−100% → **DEMOTE 終態、WS 停止**。這是設計行為不是故障；freshness 那列已退役
+（門檻拉高、列保留），帳戶再入金時改回。下面那段 $776 的描述是 08-13 的快照，
+**已過時**。連帶：09-05 Telegram 帳號被盜時 OKX 早已是空的，攻擊者無物可取，
+API 金鑰到 09-05 08:31 UTC 仍正常讀到餘額。
+
 **executor 現在是停的（2026-08-13 使用者決定，不是故障）**：08-11 中午使用者
 手動交易把權益從 $299 推到 $763（+08-12 入金 $13 → **$776**），對 $274 基準
 超過 1.5x → **CAP-2 over-funding HALT 每小時觸發**（kill_log 已 211 筆，這是
