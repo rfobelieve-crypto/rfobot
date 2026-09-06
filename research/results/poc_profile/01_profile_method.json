@@ -1,0 +1,25 @@
+{
+  "BTC": {
+    "n": 580,
+    "uniform_median": 0.049999999999991614,
+    "uniform_mean": 0.13689655172413887,
+    "uniform_q90": 0.30000000000000115,
+    "uniform_frac_same_bin": 0.46379310344827585,
+    "altclose_median": 0.3000000000000002,
+    "altclose_q90": 2.7499999999999876
+  },
+  "ETH": {
+    "n": 584,
+    "uniform_median": 0.04999999999999887,
+    "uniform_mean": 0.20821917808219176,
+    "uniform_q90": 0.40000000000000197,
+    "uniform_frac_same_bin": 0.3835616438356164,
+    "altclose_median": 0.34999999999999376,
+    "altclose_q90": 2.8999999999999995
+  },
+  "_anchor": {
+    "median_displacement_atr": 0.04999999999999524,
+    "guard_threshold_3x": 0.14999999999998573,
+    "note": "amendment C: q75-q25 of poc_dist must exceed guard_threshold_3x"
+  }
+}
