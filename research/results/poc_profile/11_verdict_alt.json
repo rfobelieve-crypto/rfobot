@@ -1,0 +1,121 @@
+{
+  "sellside": {
+    "verdict": "REJECT",
+    "n_legs_pass": 0,
+    "legs": {
+      "L1": {
+        "delta": -0.2786787863969089,
+        "ci_lo": -0.6492762366558184,
+        "ci_hi": -0.011713416684693249,
+        "a_ci": false,
+        "a_econ": false,
+        "b_t": -3.183459220630163,
+        "b_pass": false,
+        "b_reject": false,
+        "c_agree": 5,
+        "c_pass": true,
+        "leg_pass": false
+      },
+      "L2": {
+        "delta": -0.3161040560987106,
+        "ci_lo": -0.6022382800975533,
+        "ci_hi": -0.10350489292333616,
+        "a_ci": false,
+        "a_econ": false,
+        "b_t": -3.063937035686842,
+        "b_pass": false,
+        "b_reject": false,
+        "c_agree": 5,
+        "c_pass": true,
+        "leg_pass": false
+      },
+      "L3": {
+        "delta": -0.2257654552028933,
+        "ci_lo": -0.6304924684825461,
+        "ci_hi": 0.031580892864397456,
+        "a_ci": false,
+        "a_econ": false,
+        "b_t": -1.0613012044355725,
+        "b_pass": false,
+        "b_reject": true,
+        "c_agree": 5,
+        "c_pass": true,
+        "leg_pass": false
+      }
+    },
+    "n": 6608
+  },
+  "buyside": {
+    "verdict": "REJECT",
+    "n_legs_pass": 0,
+    "legs": {
+      "L1": {
+        "delta": 0.10195081774168802,
+        "ci_lo": 0.003346087101994684,
+        "ci_hi": 0.21430762057126726,
+        "a_ci": true,
+        "a_econ": true,
+        "b_t": 2.0130413969532652,
+        "b_pass": false,
+        "b_reject": false,
+        "c_agree": 3,
+        "c_pass": false,
+        "leg_pass": false
+      },
+      "L2": {
+        "delta": 0.1170147097401113,
+        "ci_lo": 0.008152239560566158,
+        "ci_hi": 0.2238404242244418,
+        "a_ci": true,
+        "a_econ": true,
+        "b_t": 1.7048567793639788,
+        "b_pass": false,
+        "b_reject": false,
+        "c_agree": 4,
+        "c_pass": true,
+        "leg_pass": false
+      },
+      "L3": {
+        "delta": 0.02612269966674124,
+        "ci_lo": -0.11850419009451349,
+        "ci_hi": 0.1816759239162925,
+        "a_ci": false,
+        "a_econ": false,
+        "b_t": -1.5426973469154148,
+        "b_pass": false,
+        "b_reject": false,
+        "c_agree": 3,
+        "c_pass": false,
+        "leg_pass": false
+      }
+    },
+    "n": 6420
+  },
+  "_bh": {
+    "n_tests_here": 6,
+    "crit": 0.016666666666666666,
+    "keys": [
+      "beta1_sellside_L1",
+      "beta1_sellside_L2",
+      "beta1_sellside_L3",
+      "beta1_buyside_L1",
+      "beta1_buyside_L2",
+      "beta1_buyside_L3"
+    ],
+    "passed": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "_criteria": {
+    "econ_anchor": 0.089,
+    "tau_main": 3600,
+    "lookback_main": "L2",
+    "B": 2000,
+    "ci": "day-clustered bootstrap"
+  }
+}
