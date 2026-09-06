@@ -2005,13 +2005,43 @@ Windows 路徑段（`\results`、`\v7_...`、`\tasks`）是高危組合。08-19 
 
 ---
 
+## 2026-09-06: 排程每 5 分鐘彈一個視窗——用 schtasks 建的工作預設是互動式
+
+**What happened:**
+使用者問「電腦怎麼一直有 cmd.exe 跳出來」。查出來是我當天早上用
+`schtasks /Create` 建的 `FlowBot_ExitPathsWatchdog`（每 5 分鐘）——**schtasks 建
+的工作 `LogonType=Interactive`，每次觸發都開一個主控台視窗**。加上既有的
+`EntropyArbWatchdog`（也是 5 分鐘）與 `SweepShadow`（每小時、會開著跑很久），
+桌面上一天彈幾百次。
+
+**修的過程本身有兩個教訓：**
+1. 正規解法是把 `LogonType` 改成 **S4U**（背景執行、不需存密碼），但
+   `Set-ScheduledTask -Principal` **需要管理員權限**，三個工作全部「存取被拒」。
+2. 退而求其次用 VBS 包裝器（`wscript.exe` 本身無主控台，`sh.Run cmd, 0` 隱藏
+   視窗）。第一版寫 `sh.Run cmd, 0, False`（不等待）——**排程回 0、什麼都沒發生**。
+   `LastTaskResult: 0` 在這裡完全不構成證據，因為 VBS 立刻結束、排程立刻回 0。
+   改成 `sh.Run(cmd, 0, True)` 才真的啟動子行程。
+
+**驗證方式（唯一算數的那個）**：殺掉一個錄製器 → 確認 0 個存活 → **只用排程觸發**
+→ 確認 1 個存活，且期間 cmd/powershell 行程數不變（18 → 18，沒有視窗彈出）。
+
+**Rule:** 用 `schtasks` 或 `Register-ScheduledTask` 建高頻工作時，**預設會彈視窗**
+——沒有管理員權限就用 `wscript.exe` + VBS 包裝（`Run(cmd, 0, True)`，**必須等待**，
+不等待的版本不會啟動任何東西）。而任何「工作有沒有真的執行」的判斷，
+判準永遠是**它該產生的副作用**（行程被拉起來、log 多一行、產物 mtime 變新），
+不是 `LastTaskResult`——非同步啟動器的回傳值跟被啟動的東西無關。
+
+---
+
 ## 2026-09-06: 同一則訊息裡引用 2026-08-20 的規則，然後犯了它——而「驗證」只數行尾
 
 **What happened:**
 把 `v7_regime_q2_clock.py` 附加進 `shadow_engine.bat` 時，用了
 `python - <<'PY'` 的 heredoc 寫 bytes。落到檔案裡的是
 `python research␋7_regime_q2_clock.py >> research␍esults\...`
-——**`7_` 的 `` 變成垂直定位符 0x0B、`esults` 的 `` 變成 CR**。
+——**`7_` 的 `` 變成垂直定位符 0x0B、`
+esults` 的 `
+` 變成 CR**。
 這**逐字就是 mistake.md 2026-08-20 那條**，而我在同一則訊息裡引用了它
 （「bat 用 bytes 附加，保 CRLF」）。
 
