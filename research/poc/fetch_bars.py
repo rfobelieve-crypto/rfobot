@@ -2,7 +2,7 @@
 """Stage 0a — pull raw 1-minute klines for the core9 basket.
 
 Writes research/poc/data/raw/{COIN}_1m.csv (gitignored), columns
-    open_ms, open, high, low, close, volume, n_trades
+    open_ms, open, high, low, close, volume, n_trades, taker_buy_base
 open_ms is the bar's OPEN time in milliseconds, exactly as Binance returns it;
 no unit guessing downstream (mistake.md 2026-04-12).
 
@@ -66,12 +66,19 @@ def fetch(sym, start_ms, end_ms, path):
     with open(path, "a", newline="") as f:
         w = csv.writer(f)
         if fresh:
-            w.writerow(["open_ms", "open", "high", "low", "close", "volume", "n_trades"])
+            w.writerow(["open_ms", "open", "high", "low", "close", "volume",
+                        "n_trades", "taker_buy_base"])
         while cur < end_ms:
             d = get(f"{BASE}?symbol={sym}USDT&interval=1m&startTime={cur}&limit=1000")
             if not d:
                 break
-            rows = [(int(k[0]), k[1], k[2], k[3], k[4], k[5], k[8])
+            # field[9] = taker buy base asset volume, i.e. volume where the
+            # BUYER was the taker.  It is the matching engine's own maker/taker
+            # flag, not a tick-rule guess: verified 2026-09-06 against this
+            # repo's aggTrades `is_buyer_maker` over 1,440 minutes --
+            # max relative error 4.8e-16, delta correlation 1.0000000000.
+            # delta = 2 * taker_buy_base - volume
+            rows = [(int(k[0]), k[1], k[2], k[3], k[4], k[5], k[8], k[9])
                     for k in d if int(k[0]) + STEP_MS <= end_ms]
             w.writerows(rows)
             new += len(rows)

@@ -24,6 +24,9 @@
        若 A 與 B 幾乎相同 -> 清算沒有新增資訊。
        兩者都不同 -> 合取是單位。
 
+    註:A/B 的方向欄以 side 取符號(延續為正);C 沒有 side,方向欄不可與 A/B 比,
+    只有 |r| 可比。
+
     **這是刻畫，不是可行動的判決。** 任何要拿去改規則的主張都要走它自己的
     預註冊。這裡只回答「我們在測的是什麼」。
 
@@ -129,8 +132,11 @@ def main():
         ev = ev[(ev.t_sweep >= lo_ms + 86_400_000) & (ev.t_sweep <= hi_ms - TAU)]
         et = ev["t_sweep"].to_numpy(np.int64)
         eliq = wsum_at(et)
-        thr = np.percentile(u[u > 0], 90)          # 「有清算」的門檻
-        thr_lo = np.percentile(u[u > 0], 25)
+        # 門檻必須跟被比較的量同尺度:窗口總和要對窗口總和的分布比,不能對
+        # 單一分鐘的分位數比(2026-09-06 第一版就是這樣把 B 組清成 n=1 的)。
+        all_w = wsum_at(w)
+        thr_lo = np.percentile(all_w, 10)          # 「幾乎無清算」= 窗口和的 p10
+        thr_hi = np.percentile(all_w, 50)
 
         # C 組：清算爆發但遠離任何事件
         allev = pd.read_parquet(EVENTS / f"{sym}.parquet", columns=["t_sweep"])
@@ -140,28 +146,37 @@ def main():
         dprev = np.where(idx > 0, w - aet[np.clip(idx - 1, 0, len(aet) - 1)], 1 << 60)
         dnext = np.where(idx < len(aet), aet[np.clip(idx, 0, len(aet) - 1)] - w, 1 << 60)
         far = np.minimum(dprev, dnext) / MIN_MS > GUARD_MIN
-        cmask = far & (wsum >= np.median(eliq[eliq > 0])) & (w <= hi_ms - TAU)
+        cmask = far & (wsum >= np.median(eliq)) & (w <= hi_ms - TAU)
 
-        def fwd(anchors):
+        sides = ev["side"].to_numpy()
+        cont = np.where(sides == "sellside", -1.0, 1.0)
+
+        def fwd(anchors, sign=None):
             out = []
-            for t in anchors:
+            for k, t in enumerate(anchors):
                 i, j = pos.get(int(t) - MIN_MS), pos.get(int(t) + TAU - MIN_MS)
                 if i is None or j is None:
                     continue
                 a = atr[i]
                 if not np.isfinite(a) or a <= 0:
                     continue
-                out.append((cl[j] - cl[i]) / a)
+                s = 1.0 if sign is None else sign[k]
+                out.append(s * (cl[j] - cl[i]) / a)
             return np.array(out)
 
+        mA = eliq >= thr_hi
+        mB = eliq <= thr_lo
+        print(f"    門檻(窗口和): p10=${thr_lo:,.0f}  p50=${thr_hi:,.0f}   "
+              f"事件落在 A={int(mA.sum())}  B={int(mB.sum())}  "
+              f"中間={int(len(et)-mA.sum()-mB.sum())}")
         groups = {
-            "A 插針+清算": fwd(et[eliq >= np.median(eliq[eliq > 0])]),
-            "B 插針+幾乎無清算": fwd(et[eliq <= thr_lo]),
+            "A 插針+清算": fwd(et[mA], cont[mA]),
+            "B 插針+幾乎無清算": fwd(et[mB], cont[mB]),
             "C 清算+無插針": fwd(w[cmask]),
         }
         print(f"  {sym}")
         print(f"    {'組':22s} {'n':>6s} {'|r| 中位':>10s} {'|r| q90':>10s} "
-              f"{'r 中位':>9s} {'r std':>8s}")
+              f"{'延續r中位':>10s} {'r std':>8s}")
         for name, x in groups.items():
             if len(x) < 20:
                 print(f"    {name:22s} {len(x):6d}   (樣本不足)")
