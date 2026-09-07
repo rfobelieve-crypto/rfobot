@@ -150,7 +150,7 @@ def build(sym, half_life_d, placebo=False, side=None):
         xs.append(swept)
         ys.append(max(0.0, -d_oi))         # 只看減少
         vs.append(vol)
-        ds.append(pd.Timestamp(t, unit="ms", tz="UTC").strftime("%Y-%m-%d"))
+        ds.append(t // 86_400_000)
 
         # --- 投影新的清算位（只在 OI 增加時）------------------------------
         if d_oi <= 0:
@@ -183,53 +183,87 @@ def build(sym, half_life_d, placebo=False, side=None):
     if placebo:
         # 位置安慰劑：總質量與時間結構不變，只把「掃到多少」重新洗牌
         X = RNG.permutation(X)
-    return X, np.array(ys), np.array(vs), np.array(ds)
+    return X, np.array(ys), np.array(vs), np.array(ds, dtype=np.int64)
 
 
-def day_boot_slope(X, Y, V, days, b=1000):
-    """Y ~ X + V 的 X 係數（含截距），日聚類 bootstrap。
+def day_stats(X, Y, V, days):
+    """把每一天壓成 OLS 的充分統計量：G_d = sum a a^T（3x3）、c_d = sum a y。
 
-    用**正規方程**（3x3 解）不用 lstsq：lstsq 走 SVD，對 240 萬 x 3 的矩陣
-    每次要數百毫秒，1000 次重抽 x 七個呼叫 = 幾小時。三欄的正規方程在數值上
-    對這個規模完全夠用，而且每次重抽只要三個 O(n) 的內積。
+    為什麼不用逐列重抽：第一版每次 bootstrap 都對 240 萬列做 fancy indexing
+    建新矩陣，1000 次 x 七個呼叫 —— 記憶體被吃爆（工作被系統殺掉）。
+    OLS 的正規方程是**可加的**，所以按日預先累積之後，每次重抽只是把幾百個
+    3x3 小矩陣加起來：記憶體 O(日數)，每次重抽 O(日數) 而不是 O(列數)。
+    數值上完全等價。
     """
-    A = np.column_stack([X, V, np.ones(len(X))])
+    uq, inv = np.unique(days, return_inverse=True)
+    nd = len(uq)
+    G = np.zeros((nd, 3, 3))
+    c = np.zeros((nd, 3))
+    A = np.empty((len(X), 3))
+    A[:, 0] = X
+    A[:, 1] = V
+    A[:, 2] = 1.0
+    for k in range(3):
+        for j in range(3):
+            G[:, k, j] = np.bincount(inv, weights=A[:, k] * A[:, j], minlength=nd)
+        c[:, k] = np.bincount(inv, weights=A[:, k] * Y, minlength=nd)
+    return G, c, uq
 
-    def slope(idx):
-        a = A[idx]
-        g = a.T @ a
+
+def boot_slope_from_days(G, c, b=1000):
+    """從日層級充分統計量做日聚類 bootstrap，取 X 的係數。"""
+    def solve(g, v):
         try:
-            return float(np.linalg.solve(g, a.T @ Y[idx])[0])
+            return float(np.linalg.solve(g, v)[0])
         except np.linalg.LinAlgError:
             return np.nan
 
-    uq, inv = np.unique(days, return_inverse=True)
-    ix = [np.where(inv == k)[0] for k in range(len(uq))]
-    point = slope(np.arange(len(X)))
+    nd = len(G)
+    point = solve(G.sum(axis=0), c.sum(axis=0))
     reps = np.empty(b)
     for i in range(b):
-        p = RNG.integers(0, len(uq), len(uq))
-        reps[i] = slope(np.concatenate([ix[k] for k in p]))
+        p = RNG.integers(0, nd, nd)
+        reps[i] = solve(G[p].sum(axis=0), c[p].sum(axis=0))
     reps = reps[np.isfinite(reps)]
+    if len(reps) < b // 2:
+        return point, float("nan"), float("nan")
     return point, float(np.percentile(reps, 2.5)), float(np.percentile(reps, 97.5))
 
 
 def pooled(half_life, placebo=False, side=None):
-    X, Y, V, D = [], [], [], []
+    """逐幣建、逐幣標準化、立刻壓成日層級統計量後丟掉原始列。
+
+    標準化是必要的：OI 與成交量的單位跨幣差幾個數量級，不標準化整個池化
+    迴歸就是被 BTC 主導（等於只測了一個幣）。
+    """
+    # 依**日曆日**累積，跨幣合併到同一天：市場級衝擊會同時打九個幣，
+    # 若九個幣的同一天被當成九個獨立的群重抽，CI 會被系統性低估
+    # （sweep_forward 也是為了同一件事從 iid CI 改成日聚類，VIF 2.95）。
+    acc: dict[int, list] = {}
+    n_rows = 0
     for sym in ec.CORE9:
         r = build(sym, half_life, placebo=placebo, side=side)
         if r is None:
             continue
-        # 逐幣標準化（OI 與量的單位跨幣差幾個數量級，不標準化就是被 BTC 主導）
         x, y, v, d = r
-        sx = np.std(x) or 1.0
-        sy = np.std(y) or 1.0
-        sv = np.std(v) or 1.0
-        X.append(x / sx); Y.append(y / sy); V.append(v / sv); D.append(d)
-    if not X:
+        sx = float(np.std(x)) or 1.0
+        sy = float(np.std(y)) or 1.0
+        sv = float(np.std(v)) or 1.0
+        G, c, uq = day_stats(x / sx, y / sy, v / sv, d)
+        for i, dd in enumerate(uq):
+            e = acc.get(int(dd))
+            if e is None:
+                acc[int(dd)] = [G[i].copy(), c[i].copy()]
+            else:
+                e[0] += G[i]
+                e[1] += c[i]
+        n_rows += len(x)
+        del x, y, v, d, r, G, c
+    if not acc:
         return None
-    return (np.concatenate(X), np.concatenate(Y),
-            np.concatenate(V), np.concatenate(D))
+    keys = sorted(acc)
+    return (np.array([acc[k][0] for k in keys]),
+            np.array([acc[k][1] for k in keys]), n_rows)
 
 
 def main():
@@ -240,18 +274,19 @@ def main():
     p = pooled(HL_MAIN)
     if p is None:
         sys.exit("資料不足")
-    X, Y, V, D = p
-    b1, lo1, hi1 = day_boot_slope(X, Y, V, D)
+    G1, c1, n1 = p
+    b1, lo1, hi1 = boot_slope_from_days(G1, c1)
     v1 = "PASS" if lo1 > 0 else ("REJECT" if hi1 < 0 else "INCONCLUSIVE")
-    print(f"   n={len(X):,}  X 係數 {b1:+.4f}  日聚類 CI [{lo1:+.4f}, {hi1:+.4f}]"
-          f"  -> {v1}")
-    res["G1"] = dict(slope=b1, ci=[lo1, hi1], n=int(len(X)), verdict=v1)
+    print(f"   n={n1:,} 個 5 分鐘區間、{len(G1):,} 個 UTC 日   "
+          f"X 係數 {b1:+.4f}  日聚類 CI [{lo1:+.4f}, {hi1:+.4f}]  -> {v1}")
+    res["G1"] = dict(slope=b1, ci=[lo1, hi1], n=int(n1), days=int(len(G1)),
+                     verdict=v1)
 
     print()
     print("=== G2 位置安慰劑（必須含零，否則 G1 不解讀）===")
     pp = pooled(HL_MAIN, placebo=True)
-    Xp, Yp, Vp, Dp = pp
-    b2, lo2, hi2 = day_boot_slope(Xp, Yp, Vp, Dp)
+    G2, c2, _ = pp
+    b2, lo2, hi2 = boot_slope_from_days(G2, c2)
     v2 = "PASS（含零）" if (lo2 <= 0 <= hi2) else "**FAIL — 位置無資訊，G1 不解讀**"
     print(f"   X 係數 {b2:+.4f}  CI [{lo2:+.4f}, {hi2:+.4f}]  -> {v2}")
     res["G2"] = dict(slope=b2, ci=[lo2, hi2], verdict=v2)
@@ -264,7 +299,7 @@ def main():
         if ps is None:
             print(f"   {s}: 資料不足")
             continue
-        bs, los, his = day_boot_slope(*ps)
+        bs, los, his = boot_slope_from_days(ps[0], ps[1])
         dirs[s] = dict(slope=bs, ci=[los, his])
         print(f"   {s:5s}  係數 {bs:+.4f}  CI [{los:+.4f}, {his:+.4f}]")
     if len(dirs) == 2:
@@ -279,7 +314,7 @@ def main():
         ph = pooled(hl)
         if ph is None:
             continue
-        bh, loh, hih = day_boot_slope(*ph)
+        bh, loh, hih = boot_slope_from_days(ph[0], ph[1])
         sens[str(hl)] = dict(slope=bh, ci=[loh, hih])
         print(f"   半衰期 {hl:4.0f} 天  係數 {bh:+.4f}  CI [{loh:+.4f}, {hih:+.4f}]")
     res["G4"] = sens
