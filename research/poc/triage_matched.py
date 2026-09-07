@@ -240,9 +240,11 @@ def report(d, tried, matched, stem):
               f"（應仍貼零，|差| < 0.05）-> {'PASS' if ok4 else '**FAIL — 配對本身在製造效應**'}")
         res["M4"] = dict(diff=f60["diff"], passed=bool(ok4))
 
-    (OUT / "triage_matched.json").write_text(
+    Path(str(stem) + ".json").write_text(
         json.dumps(res, indent=2, default=float), encoding="utf-8")
-    print("\nwritten ->", OUT / "triage_matched.json")
+    print()
+    print("written ->", str(stem) + ".json")
+    return res
 
 
 if __name__ == "__main__":
