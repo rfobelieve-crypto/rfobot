@@ -204,6 +204,16 @@ def build():
     q2 = _json("v7_regime_q2_clock.json") or {}
     veto = _json("v7_veto_clock.json") or {}
     gf = _json("sweep_forward_gate.json") or {}
+    # 交會事件前瞻時鐘（TODO §1.03）。它的 JSON 在 poc/data/results 底下
+    # （那個目錄是 gitignore 的大檔區），所以走絕對路徑而不是 RES。
+    try:
+        import json as _j
+        _cj = (Path(__file__).resolve().parent / "poc" / "data"
+               / "results" / "conj_clock.json")
+        cj = _j.loads(_cj.read_text(encoding="utf-8")) if _cj.exists() else {}
+    except Exception as _e:                      # 顯示層不可靜默失敗
+        print("[WARN] conj_clock.json unavailable:", _e)
+        cj = {}
     _ec = _e_clock()   # variant A, owned by sweep_forward.py
     open_items = [
         {
@@ -235,6 +245,31 @@ def build():
             "days": round(_days_since(SEP_59), 1), "gate_days": 30,
             "note": "⚠ 2026-09-07 判決（TODO §1.02）：**此時鐘測的是已知不可執行的進場價**。凍結引擎在 57.9% 的交易上記「成交在價位」，而市場當時距離價位中位 42.6 bps，那個價格拿不到；用真實可成交價重算 +0.0365R → −0.0483R、0/9 幣為正。決定：**跑完當歷史紀錄，不重開**——提前結案會讓「舊定義下到底會不會過」永遠沒有答案。若換進場價，新定義另開時鐘，不得沿用本樣本。壞的是進場價不是訊號（engine_audit 六項全過）。 "
                     "提出這條規則用掉的樣本已作廢，只採 08-26 之後的新成交",
+        },
+        {
+            "id": "交會事件", "line": "流動性獵取",
+            "title": "插針 × 強制銷毀的交會（TODO §1.03）",
+            "hypothesis": "掃單與強制流**同時**發生時，事後 60 分鐘的價格延續"
+                          "顯著大於同日同幅度對照",
+            "why": "分流顯示單獨的掃單（+0.039）與單獨的強制流（+0.021）都貼零，"
+                   "交會是 +0.349 —— 母現象是交會不是任一單獨",
+            "registered": "2026-09-07", "source": "json",
+            "n": cj.get("n", 0), "gate_n": cj.get("n_target", 300),
+            "days": _days_since(datetime(2026, 9, 7, tzinfo=timezone.utc)),
+            "gate_days": None,
+            "ci_low": (cj.get("ci") or [None, None])[0],
+            "mean_r": cj.get("mean"),
+            "pos": cj.get("coins_pos"), "pos_of": cj.get("coins_total"),
+            "scored_at": cj.get("asof"),
+            "note": "⚠ **即使 PASS 也還不能交易**：可執行窗口只有 2 分鐘"
+                    "（扣成本後 CI 下緣仍 > 0 的最大延遲），而現行訊號管線是"
+                    "每小時批次、平均延遲 32 分鐘，那時效應只剩 29.5%、扣成本後"
+                    "CI 下緣 −0.0716。**本時鐘測的是訊號在不在，不是能不能交易**"
+                    "（conj_pipeline.py，TODO §1.03）。要交易必須先把偵測→發布"
+                    "壓到 2 分鐘內。 "
+                    "單位是 ATR 不是 R（事件研究量價格移動，不經過成交假設）；"
+                    "功效已算：1 個月 MDE 0.49 > 效應 0.35（不可能有答案），"
+                    "4 個月 MDE 0.25 < 0.35，所以門檻是 300 不是 60",
         },
         {
             "id": "0.60 Q2", "line": "V7", "title": "上漲趨勢只收看空訊號",
