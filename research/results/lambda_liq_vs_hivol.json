@@ -1,0 +1,114 @@
+{
+ "thr": 50000,
+ "hours": 21.619565,
+ "per_coin": {
+  "BTC-USD": {
+   "liq_minutes": 11,
+   "hivol_minutes": 6,
+   "n_liq_fill": 10,
+   "n_hivol_fill": 11,
+   "lam_liq": 11.118517926087645,
+   "lam_hivol": -1.463307167976547
+  },
+  "ETH-USD": {
+   "liq_minutes": 10,
+   "hivol_minutes": 65,
+   "n_liq_fill": 10,
+   "n_hivol_fill": 10,
+   "lam_liq": 11.106468655211994,
+   "lam_hivol": 8.581037098740008
+  },
+  "SOL-USD": {
+   "liq_minutes": 3,
+   "hivol_minutes": 64,
+   "n_liq_fill": 1,
+   "n_hivol_fill": 102,
+   "lam_liq": -27.67258957180276,
+   "lam_hivol": 4.844787559250319
+  },
+  "XRP-USD": {
+   "liq_minutes": 5,
+   "hivol_minutes": 49,
+   "n_liq_fill": 4,
+   "n_hivol_fill": 86,
+   "lam_liq": -1.063504659321942,
+   "lam_hivol": 2.7021960762857584
+  },
+  "DOGE-USD": {
+   "liq_minutes": 10,
+   "hivol_minutes": 770,
+   "n_liq_fill": 9,
+   "n_hivol_fill": 1243,
+   "lam_liq": 24.932074051740873,
+   "lam_hivol": 11.691244886744263
+  },
+  "ADA-USD": {
+   "liq_minutes": 0,
+   "hivol_minutes": 386,
+   "n_liq_fill": 0,
+   "n_hivol_fill": 637,
+   "lam_liq": NaN,
+   "lam_hivol": 0.551622520140414
+  },
+  "LINK-USD": {
+   "liq_minutes": 1,
+   "hivol_minutes": 417,
+   "n_liq_fill": 0,
+   "n_hivol_fill": 633,
+   "lam_liq": NaN,
+   "lam_hivol": 5.382051095314234
+  },
+  "SUI-USD": {
+   "liq_minutes": 0,
+   "hivol_minutes": 763,
+   "n_liq_fill": 0,
+   "n_hivol_fill": 1291,
+   "lam_liq": NaN,
+   "lam_hivol": 2.4148919503551696
+  },
+  "UNI-USD": {
+   "liq_minutes": 10,
+   "hivol_minutes": 528,
+   "n_liq_fill": 10,
+   "n_hivol_fill": 810,
+   "lam_liq": 168.15406647116566,
+   "lam_hivol": 27.67541069223818
+  },
+  "AAVE-USD": {
+   "liq_minutes": 1,
+   "hivol_minutes": 412,
+   "n_liq_fill": 1,
+   "n_hivol_fill": 635,
+   "lam_liq": 181.90504189328195,
+   "lam_hivol": 1.563071794532743
+  }
+ },
+ "groups": {
+  "LIQ_對側": {
+   "n_main": 45,
+   "n_strict": 45,
+   "lam_main": 50.625725126100264,
+   "lam_strict": 50.57857421962413
+  },
+  "LIQ_錯側": {
+   "n_main": 40,
+   "n_strict": 40,
+   "lam_main": -34.072877060891116,
+   "lam_strict": -34.072877060891116
+  },
+  "HIVOL": {
+   "n_main": 5458,
+   "n_strict": 5380,
+   "lam_main": 8.357268088453644,
+   "lam_strict": 9.706333553411065
+  },
+  "ALL": {
+   "n_main": 7350,
+   "n_strict": 7206,
+   "lam_main": 6.211639246943274,
+   "lam_strict": 7.912842357606407
+  }
+ },
+ "verdict": "INCONCLUSIVE（n 不足，滿 7 天再跑）",
+ "n_liq_fills": 45
+}

@@ -1549,3 +1549,304 @@ tracked signals             1.3h  336.0h  ok
 [TG-CUTOVER] blocked outbound telegram from okx.send_critical (帳號遭盜用 2026-09-05；設 TELEGRAM_REENABLE=I_ROTATED_ALL_TOKENS 才恢復)
 [WARN] freshness alert NOT delivered: Freshness board transition:
   RED: okx balance snapshots (age 2.8h, limit 2h) — executor WS alive — the aliveness signal per mistake 2026-07-28
+freshness board — 2026-09-05 17:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           0.2h    2.5h  ok
+basis obs (§0.91)           0.2h    2.5h  ok
+gex snapshots (§0.88d)      0.3h    2.5h  ok
+gex recorder flag (§0.88d)      0.2h    2.5h  ok
+liq recorder flag (路徑C)      0.0h    1.0h  ok
+lighter recorder flag (路徑A)      0.0h    1.0h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots       8.8h    1.5h  RED  <-- executor WS alive — the aliveness signal per mistake 2026-07
+cloud train parity          0.2h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     41.0h   48.0h  ok
+coinglass parquets         21.3h   48.0h  ok
+daily collect log          15.7h   30.0h  ok
+freshness board self        6.0h    7.0h  ok
+revalidation report        16.3h  840.0h  ok
+portfolio clocks           27.9h  195.0h  ok
+tracked signals             6.3h  336.0h  ok
+
+1 red / 37 tracked: okx balance snapshots
+freshness board — 2026-09-05 23:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           0.2h    2.5h  ok
+basis obs (§0.91)           0.2h    2.5h  ok
+gex snapshots (§0.88d)      0.3h    2.5h  ok
+gex recorder flag (§0.88d)      0.2h    2.5h  ok
+liq recorder flag (路徑C)      0.0h    1.0h  ok
+lighter recorder flag (路徑A)      0.0h    1.0h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots      14.8h    1.5h  RED  <-- executor WS alive — the aliveness signal per mistake 2026-07
+cloud train parity          0.2h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     23.0h   48.0h  ok
+coinglass parquets          3.3h   48.0h  ok
+daily collect log           3.3h   30.0h  ok
+freshness board self        6.0h    7.0h  ok
+revalidation report        22.3h  840.0h  ok
+portfolio clocks           33.9h  195.0h  ok
+tracked signals            12.3h  336.0h  ok
+
+1 red / 37 tracked: okx balance snapshots
+freshness board — 2026-09-06 05:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           0.2h    2.5h  ok
+basis obs (§0.91)           0.2h    2.5h  ok
+gex snapshots (§0.88d)      0.3h    2.5h  ok
+gex recorder flag (§0.88d)      0.2h    2.5h  ok
+v7 Q2 clock json (§0.60)      0.2h    2.5h  ok
+sweep_forward gate json (Gate F)      2.6h  864.0h  ok
+liq recorder flag (路徑C)      0.0h    1.0h  ok
+lighter recorder flag (路徑A)      0.0h    1.0h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots (retired 09-06)     20.8h 87600.0h  ok
+cloud train parity          0.2h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     29.0h   48.0h  ok
+coinglass parquets          9.3h   48.0h  ok
+daily collect log           9.3h   30.0h  ok
+freshness board self        1.9h    7.0h  ok
+revalidation report        28.3h  840.0h  ok
+portfolio clocks           39.9h  195.0h  ok
+tracked signals            18.3h  336.0h  ok
+
+0 red / 39 tracked
+freshness board — 2026-09-06 11:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           0.2h    2.5h  ok
+basis obs (§0.91)           0.2h    2.5h  ok
+gex snapshots (§0.88d)      0.3h    2.5h  ok
+gex recorder flag (§0.88d)      0.2h    2.5h  ok
+v7 Q2 clock json (§0.60)      0.2h    2.5h  ok
+sweep_forward gate json (Gate F)      8.6h  864.0h  ok
+liq recorder flag (路徑C)      0.0h    1.0h  ok
+lighter recorder flag (路徑A)      0.0h    1.0h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots (retired 09-06)     26.8h 87600.0h  ok
+cloud train parity          0.2h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     35.0h   48.0h  ok
+coinglass parquets         15.3h   48.0h  ok
+daily collect log          15.3h   30.0h  ok
+freshness board self        6.0h    7.0h  ok
+revalidation report        34.3h  840.0h  ok
+portfolio clocks           45.9h  195.0h  ok
+tracked signals            24.3h  336.0h  ok
+
+0 red / 39 tracked
+freshness board — 2026-09-06 17:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           0.2h    2.5h  ok
+basis obs (§0.91)           0.2h    2.5h  ok
+gex snapshots (§0.88d)      0.3h    2.5h  ok
+gex recorder flag (§0.88d)      0.2h    2.5h  ok
+v7 Q2 clock json (§0.60)      0.2h    2.5h  ok
+sweep_forward gate json (Gate F)     14.6h  864.0h  ok
+liq recorder flag (路徑C)      0.0h    1.0h  ok
+lighter recorder flag (路徑A)      0.0h    1.0h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots (retired 09-06)     32.8h 87600.0h  ok
+cloud train parity          0.2h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     41.0h   48.0h  ok
+coinglass parquets         21.3h   48.0h  ok
+daily collect log          21.3h   30.0h  ok
+freshness board self        6.0h    7.0h  ok
+revalidation report        40.3h  840.0h  ok
+portfolio clocks           51.9h  195.0h  ok
+tracked signals             2.3h  336.0h  ok
+
+0 red / 39 tracked
+freshness board — 2026-09-06 23:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           4.2h    2.5h  RED  <-- skip-vs-taken scoring surface; silent staleness = consumer s
+basis obs (§0.91)           0.2h    2.5h  ok
+gex snapshots (§0.88d)      0.3h    2.5h  ok
+gex recorder flag (§0.88d)      0.2h    2.5h  ok
+v7 Q2 clock json (§0.60)      0.2h    2.5h  ok
+sweep_forward gate json (Gate F)     20.6h  864.0h  ok
+liq recorder flag (路徑C)      0.0h    1.0h  ok
+lighter recorder flag (路徑A)      0.0h    1.0h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots (retired 09-06)     38.8h 87600.0h  ok
+cloud train parity          0.2h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     23.0h   48.0h  ok
+coinglass parquets          3.3h   48.0h  ok
+daily collect log           3.3h   30.0h  ok
+freshness board self        6.0h    7.0h  ok
+revalidation report        46.3h  840.0h  ok
+portfolio clocks           57.9h  195.0h  ok
+tracked signals             6.3h  336.0h  ok
+
+1 red / 39 tracked: raid outcomes row
+[TG-CUTOVER] blocked outbound telegram from okx.send_critical (帳號遭盜用 2026-09-05；設 TELEGRAM_REENABLE=I_ROTATED_ALL_TOKENS 才恢復)
+[WARN] freshness alert NOT delivered: Freshness board transition:
+  RED: raid outcomes row (age 4.2h, limit 2h) — skip-vs-taken scoring surface; silent staleness = consumer silently scores against stale outcomes
+freshness board — 2026-09-07 05:20 UTC
+artifact                    age   limit  status
+bat-train heartbeat         0.2h    2.5h  ok
+sweep shadow log            0.2h    2.5h  ok
+kline caches                0.2h    3.5h  ok
+weather station row         0.1h    2.5h  ok
+raid signals row            0.1h    2.5h  ok
+v7 veto clock row           0.2h    2.5h  ok
+raid outcomes row           1.2h    2.5h  ok
+basis obs (§0.91)           0.2h    2.5h  ok
+gex snapshots (§0.88d)      0.3h    2.5h  ok
+gex recorder flag (§0.88d)      0.2h    2.5h  ok
+v7 Q2 clock json (§0.60)      0.2h    2.5h  ok
+sweep_forward gate json (Gate F)      3.8h  864.0h  ok
+conj clock flag (交會前瞻)      2.1h   30.0h  ok
+liq recorder flag (路徑C)      0.0h    1.0h  ok
+lighter recorder flag (路徑A)      0.0h    1.0h  ok
+v7 export pipe (§0.81)      0.2h    2.5h  ok
+ops board row               0.2h    2.5h  ok
+arb status row              0.2h    2.5h  ok
+prereg board row            0.2h    2.5h  ok
+degradation guard           0.3h    2.5h  ok
+indicator bars              1.3h    2.5h  ok
+okx balance snapshots (retired 09-06)     44.8h 87600.0h  ok
+cloud train parity          0.2h    2.5h  ok
+arb recorder (§0.75)        0.0h    1.0h  ok
+arb recorder NBIS (§0.75)      0.0h    1.0h  ok
+arb recorder ANTH (§0.75)      0.0h    1.0h  ok
+arb recorder BTC (§0.75)      0.0h    1.0h  ok
+arb recorder ZEC (§0.75)      0.0h    1.0h  ok
+arb recorder NEAR (§0.75)      0.0h    1.0h  ok
+arb recorder HYPE (§0.75)      0.0h    1.0h  ok
+arb recorder GOLD_LL (§1.02)      0.0h    1.0h  ok
+arb recorder NVDA_LL (§1.02)      0.0h    1.0h  ok
+arb scanner (§0.75b)        0.0h    0.5h  ok
+coinglass parquet CONTENT     29.0h   48.0h  ok
+coinglass parquets          9.3h   48.0h  ok
+daily collect log           9.3h   30.0h  ok
+freshness board self        2.2h    7.0h  ok
+revalidation report        52.3h  840.0h  ok
+portfolio clocks            3.7h  195.0h  ok
+tracked signals            12.3h  336.0h  ok
+
+0 red / 40 tracked

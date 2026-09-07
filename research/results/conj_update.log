@@ -1,0 +1,60 @@
+[2026/09/07 �g�@ 11:07:48.89] conj_update start 
+[fetch_bars] rc=0
+    ADA   +       7 bars       0s  -> ADA_1m.csv
+    LINK  +       7 bars       0s  -> LINK_1m.csv
+    AVAX  +       7 bars       0s  -> AVAX_1m.csv
+[bars] rc=0
+    AVAX  rows=1,346,287 gap=0.0000% zerovol=0.3951% volxcheck_max=0.0000%  asserts=ok  -> PASS
+    
+    Stage 0 gate: ALL PASS
+[fetch_oi] rc=0
+          first missing: [('2026-09-06', 404)]
+    AVAX  rows= 268,859  +      0  missing_days=1 (404=1)      0s
+          first missing: [('2026-09-06', 404)]
+[conj_clock] rc=0
+    樣本 < 30，無法計算日聚類 CI。累積中。
+    
+    written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock.json
+
+flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_last.json   ok=True  reason=ok
+[2026/09/07 �g�@ 11:08:55.25] conj_update end rc=0 
+[2026/09/07 �g�@ 11:09:32.25] conj_update start 
+[fetch_bars] rc=0
+    ADA   +       2 bars       0s  -> ADA_1m.csv
+    LINK  +       2 bars       0s  -> LINK_1m.csv
+    AVAX  +       2 bars       0s  -> AVAX_1m.csv
+[bars] rc=0
+    AVAX  rows=1,346,289 gap=0.0000% zerovol=0.3951% volxcheck_max=0.0000%  asserts=ok  -> PASS
+    
+    Stage 0 gate: ALL PASS
+[fetch_oi] rc=0
+          first missing: [('2026-09-06', 404)]
+    AVAX  rows= 268,859  +      0  missing_days=1 (404=1)      0s
+          first missing: [('2026-09-06', 404)]
+[conj_clock] rc=0
+    樣本 < 30，無法計算日聚類 CI。累積中。
+    
+    written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock.json
+
+flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_last.json   ok=True  reason=ok
+[2026/09/07 �g�@ 11:10:42.80] conj_update end rc=0 
+[2026/09/07 �g�@ 11:11:16.36] conj_update start 
+[fetch_bars] rc=0
+    ADA   +       2 bars       0s  -> ADA_1m.csv
+    LINK  +       2 bars       0s  -> LINK_1m.csv
+    AVAX  +       2 bars       0s  -> AVAX_1m.csv
+[bars] rc=0
+    AVAX  rows=1,346,291 gap=0.0000% zerovol=0.3951% volxcheck_max=0.0000%  asserts=ok  -> PASS
+    
+    Stage 0 gate: ALL PASS
+[fetch_oi] rc=0
+          first missing: [('2026-09-06', 404)]
+    AVAX  rows= 268,859  +      0  missing_days=1 (404=1)      0s
+          first missing: [('2026-09-06', 404)]
+[conj_clock] rc=0
+    樣本 < 30，無法計算日聚類 CI。累積中。
+    
+    written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock.json
+
+flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_last.json   ok=True  reason=ok
+[2026/09/07 �g�@ 11:12:26.14] conj_update end rc=0 

@@ -22,16 +22,16 @@
   },
   "moderate": {
    "tier": "Moderate",
-   "kept_wr": 50.8,
-   "veto_wr": 40.3,
-   "gap_pp": 10.5,
-   "n_kept": 132,
-   "n_veto": 77,
-   "since_trigger": 84,
+   "kept_wr": 50.7,
+   "veto_wr": 39.7,
+   "gap_pp": 11.0,
+   "n_kept": 136,
+   "n_veto": 73,
+   "since_trigger": 88,
    "trigger_target": 60,
    "gap_threshold_pp": 8.0,
-   "since_trigger_fired": 86
+   "since_trigger_fired": 88
   }
  },
- "asof_utc": "2026-09-05 15:06"
+ "asof_utc": "2026-09-07 08:06"
 }

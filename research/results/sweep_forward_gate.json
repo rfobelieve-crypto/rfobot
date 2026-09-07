@@ -2,14 +2,14 @@
   "variant": "A",
   "universe": "core9",
   "freeze": "2026-07-28",
-  "n": 320,
+  "n": 326,
   "gate_n": 1400,
-  "mean_r": 0.026,
-  "wr": 58.1,
-  "ci_low": -0.0982,
-  "ci_high": 0.1506,
-  "pos": 5,
+  "mean_r": 0.0274,
+  "wr": 58.0,
+  "ci_low": -0.0887,
+  "ci_high": 0.1514,
+  "pos": 4,
   "pos_of": 9,
   "status": "accumulating",
-  "asof_utc": "2026-09-06T02:46:17Z"
+  "asof_utc": "2026-09-07T01:31:28Z"
 }
