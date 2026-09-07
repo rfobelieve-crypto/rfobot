@@ -132,6 +132,14 @@ REGISTRY = [
     ("conj clock flag (交會前瞻)", "json_flag",
      "research/poc/data/results/conj_clock_last.json:ok", 30.0,
      "research/poc/conj_update.py 自報;紅 = 沒跑、抓取失敗、或資料 STALE"),
+    # 2026-09-07 交會事件的分鐘級 shadow 偵測器(TODO 1.03)。每分鐘跑,
+    # 目的是累積**真實端到端延遲**——2 分鐘的預算不能靠估算結案。
+    # 它正常的輸出是 events=0(交會約每幣每 2.5 天一次),所以「有沒有產出
+    # 資料」分不出死活;判準必須是它自報的 {ok,reason}(mistake.md 2026-09-03)。
+    # 門檻 0.5h:每分鐘跑的東西超過半小時沒回報就是排程或啟動器死了。
+    ("conj watch flag (交會 shadow)", "json_flag",
+     "research/poc/data/results/conj_watch_last.json:ok", 0.5,
+     "conj_watch.py 每分鐘自報;紅 = 排程沒跑、Binance 抓取失敗、或 DB 寫入失敗"),
     ("liq recorder flag (路徑C)", "json_flag",
      "research/results/liq_last.json:ok", 1.0,
      "OKX+Bybit 強平推送錄製器自報；紅 = WS 斷或 DB 寫入失敗"),
