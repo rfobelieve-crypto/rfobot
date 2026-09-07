@@ -88,7 +88,21 @@ def main():
     rows = []
     tried = matched = 0
     for sym in ec.CORE9:
-        cand, ts, cl, at, day = ec.detect_all(sym, liq)
+        cand, ts, cl, at, day, _q = ec.detect_all(sym, liq)
+        a, b = collect_symbol(sym, cand, ts, cl, at, rows)
+        tried += a
+        matched += b
+
+    d = pd.DataFrame(rows)
+    report(d, tried, matched, OUT / "triage_matched")
+
+
+def collect_symbol(sym, cand, ts, cl, at, rows):
+    """一個幣的配對與計分。抽出來共用 —— 因果門檻版（`conj_causal.py`）
+    必須走**同一套配對**，否則兩份實作會安靜地不同意（mistake.md 2026-08-26）。
+    內容逐行來自原本 main() 的迴圈，行為未變。"""
+    tried = matched = 0
+    if True:
         n = len(ts)
         pairs = []
         for nm in et.NAMES:
@@ -100,7 +114,7 @@ def main():
         moments = et.cluster(pairs)
         ev_minutes = np.array(sorted({a for a, _ in moments}), dtype=np.int64)
         if len(ev_minutes) == 0:
-            continue
+            return tried, matched
 
         # 事前 5 分鐘移動幅度（全序列，向量化）—— 只用 m 之前的資訊
         idx = np.arange(n)
@@ -152,9 +166,12 @@ def main():
                                   if ac > 0 else np.nan)
             rows.append(row)
 
-    d = pd.DataFrame(rows)
+    return tried, matched
+
+
+def report(d, tried, matched, stem):
     OUT.mkdir(parents=True, exist_ok=True)
-    d.to_parquet(OUT / "triage_matched.parquet", index=False)
+    d.to_parquet(str(stem) + ".parquet", index=False)
     rate = matched / tried if tried else 0.0
     relgap = float((np.abs(d.pre_e - d.pre_c) / d.pre_e).median())
     print(f"配對 {matched:,} / {tried:,} = {rate*100:.1f}%   "

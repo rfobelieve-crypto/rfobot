@@ -95,7 +95,7 @@ def main():
     rows = {}          # sig -> {tau: {"r": [], "day": []}}
     sig_n = {}
     for sym in ec.CORE9:
-        cand, ts, cl, at, day = ec.detect_all(sym, liq)
+        cand, ts, cl, at, day, _q = ec.detect_all(sym, liq)
         pairs = []
         for n in NAMES:
             v = cand.get(n)

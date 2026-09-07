@@ -161,7 +161,13 @@ def detect_all(sym, liq):
     ev = pd.read_parquet(EVENTS / f"{sym}.parquet", columns=["t_sweep"])
     cand["sweep"] = np.searchsorted(ts, ev["t_sweep"].to_numpy(np.int64) - MIN_MS)
 
-    return cand, ts, cl, at, day
+    # 2026-09-07 附加：把**原始量值**一併回傳。因果版門檻（滾動 30 日分位）
+    # 必須用同一份量值重新切門檻，不能自己再算一遍（mistake.md 2026-08-26）。
+    # cand 的算法一個字沒動 —— 25 格逐格驗證過與重構前相同。
+    q = {"delta_ext": ad, "vol_burst": vs, "oi_crash": oc}
+    if "liq_burst" in cand:
+        q["liq_burst"] = np.nan_to_num(lsum, nan=-1.0)
+    return cand, ts, cl, at, day, q
 
 
 def main():
@@ -177,7 +183,7 @@ def main():
     per_type = {k: {} for k in names}
 
     for sym in CORE9:
-        cand, ts, cl, at, day = detect_all(sym, liq)
+        cand, ts, cl, at, day, _q = detect_all(sym, liq)
         for name, idx in cand.items():
             idx = cooldown_filter(np.sort(idx))
             for tau in TAUS:
