@@ -51,6 +51,25 @@ import sweep_core as sc  # noqa: E402
 CACHE = HERE / ".cache"
 OUT = HERE.parents[0] / "results"
 CORE9 = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "LINK", "AVAX"]
+# 清算流分級表（research/poc/sweep_liq_filter.py 產生）。**預先算好再讀**，
+# 不在這裡重算：偵測要載入分鐘 bar + OI 並跑滾動門檻，網頁路由的 110 秒等不起。
+LIQ_GRADE = (HERE.parents[0] / "poc" / "data" / "results"
+             / "sweep_liq_filter.parquet")
+
+
+def _load_grade(sym):
+    """{fill_ts(秒): 穿越分鐘 ±5 分內的清算流事件數}。缺檔就回空。"""
+    try:
+        import pandas as _pd
+        if not LIQ_GRADE.exists():
+            return {}
+        g = _pd.read_parquet(LIQ_GRADE, columns=["sym", "fill_ts", "n_near"])
+        g = g[g["sym"] == sym]
+        return {int(a) // 1000: int(b)
+                for a, b in zip(g["fill_ts"], g["n_near"])}
+    except Exception as e:                      # 顯示層不可靜默失敗
+        print(f"[WARN] liq grade unavailable: {e}")
+        return {}
 
 
 def to_day(ts_sec):
@@ -81,6 +100,7 @@ def build(sym, t_from, t_to):
     """回測跑**全歷史**（ATR 與樞紐需要完整前文），之後才裁切顯示窗。"""
     bars = load_bars(sym)
     det = sc.backtest_symbol(bars, detail=True)
+    grade = _load_grade(sym)
 
     lo = t_from or bars[0][0]
     hi = t_to or bars[-1][0]
@@ -135,13 +155,28 @@ def build(sym, t_from, t_to):
             pierce=round(t["pierce"], 4), R=round(t["R"], 4),
             stopped=bool(t["stopped"]),
             t_fill=int(t["fill_ts"]), t_sweep=int(t["sweep_ts"]),
-            t_exit=int(t["exit_ts"]), t_origin=int(t["origin_ts"])))
+            t_exit=int(t["exit_ts"]), t_origin=int(t["origin_ts"]),
+            n_flow=int(grade.get(int(t["fill_ts"]), -1))))
 
     m_view = sc.metrics([t["R"] for t in tr])
     m_all = sc.metrics([t["R"] for t in det])
+    # 分組績效在**伺服器端**用同一個 sc.metrics 算好，JS 只負責切換顯示——
+    # 在前端重寫一份指標就是第二份實作，遲早會跟計分器不同意
+    # （mistake.md 2026-08-26）。
+    def _grp(pred, src):
+        rs = [x["R"] for x in src if pred(int(grade.get(int(x["fill_ts"]), -1)))]
+        return sc.metrics(rs) if len(rs) >= 2 else None
+    groups = {
+        "all": dict(view=m_view, all=m_all),
+        "n0": dict(view=_grp(lambda n: n == 0, tr),
+                   all=_grp(lambda n: n == 0, det)),
+        "n3": dict(view=_grp(lambda n: n >= 3, tr),
+                   all=_grp(lambda n: n >= 3, det)),
+    }
     return dict(sym=sym, candles=candles, levels=levels, markers=markers,
                 trades=trades, equity=eq,
-                stats_view=m_view, stats_all=m_all,
+                stats_view=m_view, stats_all=m_all, groups=groups,
+                has_grade=bool(grade),
                 span=[to_day(view[0][0]), to_day(view[-1][0])],
                 n_bars_all=len(bars),
                 span_all=[to_day(bars[0][0]), to_day(bars[-1][0])],
@@ -219,6 +254,11 @@ tbody tr.sel{background:#1c2530}
   <button id="btnWin">只看賺</button>
   <button id="btnLose">只看賠</button>
   <button id="btnClear">清除選取</button>
+  <span style="width:100%"></span>
+  <span style="color:var(--dim)">清算流分級：</span>
+  <button id="btnG0">無清算流（0）</button>
+  <button id="btnG3">有清算流（3+）</button>
+  <button id="btnGA" class="on">不分</button>
   <span id="dense"></span>
 </div>
 
@@ -230,7 +270,7 @@ tbody tr.sel{background:#1c2530}
 <thead><tr>
 <th>#</th><th>方向</th><th>掃單時刻</th><th>等</th><th>持</th>
 <th>價位</th><th>進場</th><th>停損</th><th>出場</th>
-<th>穿透(ATR)</th><th>ATR</th><th>R</th><th>結束於</th>
+<th>穿透(ATR)</th><th>清算流</th><th>ATR</th><th>R</th><th>結束於</th>
 </tr></thead><tbody id="tb"></tbody></table></div>
 
 <div class="note">
@@ -240,13 +280,30 @@ tbody tr.sel{background:#1c2530}
 「等」＝掃單到成交的小時數（上限 W），「持」＝成交到出場的小時數（上限 HOLD）。
 </div>
 
+<div class="note">
+<b>清算流分級（2026-09-07 驗證，<span class="neg">尚未改變任何規則</span>）</b>：
+「清算流」＝穿越那一分鐘 ±5 分內，主動量極端／量能爆發／OI 崩落三種因果門檻
+事件的個數，<b>嚴格早於成交</b>（成交在掃單 bar 之後的 1–8 根）。
+事件層面上，純掃單在 5 分鐘是<b>反轉</b>（−0.033 ATR）、伴隨清算流是強烈<b>延續</b>
+（+0.187，60 分鐘 +0.278）——而本策略是反轉策略。
+但在引擎的<b>真實交易</b>上：0 個 <span class="pos">+0.0444 R</span>
+[+0.0164,+0.0731]、9/9 幣；3+ 個 +0.0318 [−0.0024,+0.0685]、7/9 幣；
+差值 +0.0126 <b>CI [−0.0333,+0.0575] 含零 → INCONCLUSIVE</b>。
+差值的 MDE 是 0.045 R 而整條 edge 只有 0.037 R，所以這個檢定<b>分辨不出比
+整個 edge 還小的差異</b>——是設計上做不出判決，不是「沒有效果」。
+機制：<b>回踩與延續在構造上互斥</b>——成交率隨清算流事件數單調下降
+（91.8% → 84.6%，九幣同向），延續最猛的價格一去不回，引擎根本沒有部位；
+全體 12% 的掃單從未成交，從不出現在這張圖上。
+</div>
+
 </div>
 <script>
 const D = __DATA__;
 const fmtP = v => v >= 1000 ? v.toFixed(1) : v >= 1 ? v.toFixed(3) : v.toFixed(5);
 
 function kpis(){
-  const a = D.stats_view, b = D.stats_all;
+  const G = (D.groups && D.groups[grp]) || {};
+  const a = G.view || D.stats_view, b = G.all || D.stats_all;
   if(!a){document.getElementById('kpis').innerHTML =
     '<div class="kpi"><b>0</b><span>這段期間沒有交易</span></div>'; return;}
   const cell = (v,k,s,cls) => `<div class="kpi"><b class="${cls||''}">${v}</b>`+
@@ -277,8 +334,12 @@ for(const L of D.levels){
     priceLineVisible:false,crosshairMarkerVisible:false}).setData(L.pts);
 }
 
-let filt = 'all';
-const keep = t => filt==='all' || (filt==='win' ? t.R>0 : t.R<=0);
+let filt = 'all';       // 賺賠
+let grp  = 'all';       // 清算流分級
+const keepWL = t => filt==='all' || (filt==='win' ? t.R>0 : t.R<=0);
+const keepG  = t => grp==='all' || (grp==='n0' ? t.n_flow===0
+                                               : t.n_flow>=3);
+const keep = t => keepWL(t) && keepG(t);
 function drawMarkers(){
   const vis = D.trades.filter(keep);
   const ids = new Set(vis.map(t=>t.id));
@@ -329,6 +390,8 @@ function table(){
     `<td>${t.sweep}</td><td>${t.wait}</td><td>${t.held}</td>`+
     `<td>${fmtP(t.level)}</td><td>${fmtP(t.entry)}</td><td>${fmtP(t.stop)}</td>`+
     `<td>${fmtP(t.exit_px)}</td><td>${t.pierce.toFixed(3)}</td>`+
+    `<td class="${t.n_flow<0?'':(t.n_flow===0?'pos':(t.n_flow>=3?'neg':''))}">`+
+    `${t.n_flow<0?'—':t.n_flow}</td>`+
     `<td>${fmtP(t.atr)}</td>`+
     `<td class="${t.R>0?'pos':'neg'}">${t.R.toFixed(4)}</td>`+
     `<td>${t.stopped?'停損':'時間'}</td></tr>`).join('');
@@ -346,6 +409,15 @@ function setF(f, btn){
 btnAll.onclick=()=>setF('all','btnAll');
 btnWin.onclick=()=>setF('win','btnWin');
 btnLose.onclick=()=>setF('lose','btnLose');
+function setG(g, btn){
+  grp = g;
+  for(const b of ['btnG0','btnG3','btnGA'])
+    document.getElementById(b).classList.toggle('on', b===btn);
+  kpis(); drawMarkers(); table();
+}
+btnG0.onclick=()=>setG('n0','btnG0');
+btnG3.onclick=()=>setG('n3','btnG3');
+btnGA.onclick=()=>setG('all','btnGA');
 btnClear.onclick=()=>{clearLines();chart.timeScale().fitContent();
   document.getElementById('sel').textContent='點下方任一列 —— 圖表跳到那一筆，並畫出它的價位、進場、停損、出場四條線。';};
 
