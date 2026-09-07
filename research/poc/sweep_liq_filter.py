@@ -134,18 +134,45 @@ def main():
         )) if any(len(caus.get(k, [])) for k in FLOW) else np.array([], np.int64)
         flow_ts = mts[flow_min] if len(flow_min) else np.array([], np.int64)
 
+        mb = pd.read_parquet(BARS / f"{sym}.parquet",
+                             columns=["ts", "high", "low"])
+        bts = mb["ts"].to_numpy(np.int64)
+        bhi = np.nan_to_num(mb["high"].to_numpy(float), nan=-np.inf)
+        blo = np.nan_to_num(mb["low"].to_numpy(float), nan=np.inf)
+
         b1 = sc.load_csv(str(HERE.parents[0] / "sweep_failure" / ".cache"
                              / f"{sym}USDT_1h.csv"))
         for t in sc.backtest_symbol(b1, detail=True):
             h0 = int(t["sweep_ts"]) * 1000          # 1h 快取的 time 是秒
             h1 = h0 + HOUR_MS
-            # 掃單 bar 之內有沒有清算流 —— 嚴格早於成交（成交在 j+1..j+W）
-            i0 = int(np.searchsorted(flow_ts, h0, side="left"))
-            i1 = int(np.searchsorted(flow_ts, h1, side="left"))
+            # 寬窗：掃單 bar 整根小時（第一版用的，保留並列報告）
+            w0 = int(np.searchsorted(flow_ts, h0, side="left"))
+            w1 = int(np.searchsorted(flow_ts, h1, side="left"))
+
+            # 窄窗：真正的**穿越分鐘** +-5 分鐘。
+            # 第一版只有寬窗，60.2% 的掃單 bar 都算「有流」——而定義出 +0.278
+            # 的那個效應用的是 +-5 分鐘、只佔 8.7% 的時刻。用一小時分組等於把
+            # 交會與非交會混在一起再問有沒有差。這是儀器與假設不匹配，不是結果。
+            a = int(np.searchsorted(bts, h0, side="left"))
+            z = int(np.searchsorted(bts, h1, side="left"))
+            lvl = float(t["level"])
+            pm = -1
+            if z > a:
+                seg = (bhi[a:z] > lvl) if t["kind"] == "buy" else (blo[a:z] < lvl)
+                nz = np.flatnonzero(seg)
+                if len(nz):
+                    pm = int(bts[a + int(nz[0])])
+            if pm > 0:
+                n0 = int(np.searchsorted(flow_ts, pm - 5 * 60_000, side="left"))
+                n1 = int(np.searchsorted(flow_ts, pm + 5 * 60_000, side="right"))
+                n_near = n1 - n0
+            else:
+                n_near = -1                      # 找不到穿越分鐘（分鐘資料缺）
             rows.append(dict(
                 sym=sym, R=float(t["R"]), side=t["side"],
                 pierce=float(t["pierce"]), stopped=bool(t["stopped"]),
-                has_flow=bool(i1 > i0), n_flow=int(i1 - i0),
+                has_flow=bool(w1 > w0), n_flow=int(w1 - w0),
+                n_near=int(n_near), pierce_ts=pm,
                 fill_ts=int(t["fill_ts"]) * 1000,
                 day=pd.Timestamp(int(t["sweep_ts"]) * 1000, unit="ms",
                                  tz="UTC").strftime("%Y-%m-%d")))
@@ -204,6 +231,40 @@ def main():
     print(f"F4 反向對照（同比例隨機標記）：{m4:+.4f} "
           f"CI [{l4:+.4f}, {h4:+.4f}]  -> {v4}")
     res["F4"] = dict(diff=m4, ci=[l4, h4], verdict=v4)
+
+    print()
+    print("=== 窄窗（穿越分鐘 ±5 分）：依清算流事件個數分級，全格報告 ===")
+    print()
+    ok = d[d.n_near >= 0]
+    print(f"  可定位穿越分鐘的交易 {len(ok):,} / {len(d):,}")
+    print()
+    print(f"{'流事件數':>8s} {'n':>7s} {'佔比':>7s} {'meanR':>9s} "
+          f"{'日聚類 CI95':>24s} {'逐幣為正':>9s}")
+    buckets = [(0, 0, "0"), (1, 1, "1"), (2, 2, "2"), (3, 10**9, "3+")]
+    grade = {}
+    for lo_k, hi_k, lab in buckets:
+        g = ok[(ok.n_near >= lo_k) & (ok.n_near <= hi_k)]
+        if len(g) < 30:
+            print(f"{lab:>8s} {len(g):7,d}  (n<30)")
+            continue
+        m, lo, hi, _ = day_ci(g.R.to_numpy(), g.day.to_numpy())
+        pc = g.groupby("sym").R.mean()
+        grade[lab] = dict(n=int(len(g)), share=len(g) / len(ok), mean=m,
+                          ci=[lo, hi], coins_pos=int((pc > 0).sum()))
+        print(f"{lab:>8s} {len(g):7,d} {len(g)/len(ok)*100:6.2f}% {m:+9.4f}  "
+              f"[{lo:+.4f}, {hi:+.4f}] {int((pc>0).sum()):>7d}/9")
+    res["graded_near"] = grade
+    if "0" in grade and "3+" in grade:
+        z0 = ok[ok.n_near == 0]
+        z3 = ok[ok.n_near >= 3]
+        mg, glo, ghi = diff_ci(z0.R.to_numpy(), z0.day.to_numpy(),
+                               z3.R.to_numpy(), z3.day.to_numpy())
+        vg = ("PASS" if glo > 0 else
+              "**反向**" if ghi < 0 else "INCONCLUSIVE")
+        print()
+        print(f"  極端對比（0 個 − 3+ 個）：{mg:+.4f} "
+              f"CI [{glo:+.4f}, {ghi:+.4f}]  -> {vg}")
+        res["graded_extreme"] = dict(diff=mg, ci=[glo, ghi], verdict=vg)
 
     print()
     print("=== 逐幣（meanR）===")
