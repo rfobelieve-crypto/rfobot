@@ -187,13 +187,22 @@ def build(sym, half_life_d, placebo=False, side=None):
 
 
 def day_boot_slope(X, Y, V, days, b=1000):
-    """Y ~ X + V 的 X 係數（含截距），日聚類 bootstrap。"""
+    """Y ~ X + V 的 X 係數（含截距），日聚類 bootstrap。
+
+    用**正規方程**（3x3 解）不用 lstsq：lstsq 走 SVD，對 240 萬 x 3 的矩陣
+    每次要數百毫秒，1000 次重抽 x 七個呼叫 = 幾小時。三欄的正規方程在數值上
+    對這個規模完全夠用，而且每次重抽只要三個 O(n) 的內積。
+    """
+    A = np.column_stack([X, V, np.ones(len(X))])
+
     def slope(idx):
-        A = np.column_stack([X[idx], V[idx], np.ones(len(idx))])
+        a = A[idx]
+        g = a.T @ a
         try:
-            return float(np.linalg.lstsq(A, Y[idx], rcond=None)[0][0])
+            return float(np.linalg.solve(g, a.T @ Y[idx])[0])
         except np.linalg.LinAlgError:
             return np.nan
+
     uq, inv = np.unique(days, return_inverse=True)
     ix = [np.where(inv == k)[0] for k in range(len(uq))]
     point = slope(np.arange(len(X)))
