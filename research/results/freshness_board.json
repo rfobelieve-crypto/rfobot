@@ -1,9 +1,9 @@
 {
- "asof_utc": "2026-09-07 23:07",
+ "asof_utc": "2026-09-07 23:20",
  "rows": [
   {
    "name": "bat-train heartbeat",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -11,7 +11,7 @@
   },
   {
    "name": "sweep shadow log",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -19,7 +19,7 @@
   },
   {
    "name": "kline caches",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 3.5,
    "ok": true,
    "detail": "BTCUSDT_1h.csv",
@@ -27,7 +27,7 @@
   },
   {
    "name": "weather station row",
-   "age_h": 0.0,
+   "age_h": 0.1,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -35,7 +35,7 @@
   },
   {
    "name": "raid signals row",
-   "age_h": 0.0,
+   "age_h": 0.1,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -43,7 +43,7 @@
   },
   {
    "name": "v7 veto clock row",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -51,7 +51,7 @@
   },
   {
    "name": "raid outcomes row",
-   "age_h": 1.0,
+   "age_h": 1.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -59,7 +59,7 @@
   },
   {
    "name": "basis obs (§0.91)",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -67,7 +67,7 @@
   },
   {
    "name": "gex snapshots (§0.88d)",
-   "age_h": 0.1,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -75,7 +75,7 @@
   },
   {
    "name": "gex recorder flag (§0.88d)",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "BTC spot 79,507 net GEX(±5%) +$196.8M flip 79,528 n=778 | ET",
@@ -83,7 +83,7 @@
   },
   {
    "name": "v7 Q2 clock json (§0.60)",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -91,7 +91,7 @@
   },
   {
    "name": "sweep_forward gate json (Gate F)",
-   "age_h": 21.6,
+   "age_h": 21.8,
    "max_h": 864,
    "ok": true,
    "detail": "",
@@ -99,7 +99,7 @@
   },
   {
    "name": "conj clock flag (交會前瞻)",
-   "age_h": 1.6,
+   "age_h": 1.8,
    "max_h": 30.0,
    "ok": true,
    "detail": "ok",
@@ -126,12 +126,12 @@
    "age_h": 0.0,
    "max_h": 1.0,
    "ok": true,
-   "detail": "rows_today=55920 binance_stale=0s bitget_stale=0s",
+   "detail": "rows_today=58800 binance_stale=0s bitget_stale=48s",
    "note": "Lighter L2 × Binance 現貨 250ms 取樣；紅 = 任一側無幀"
   },
   {
    "name": "v7 export pipe (§0.81)",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "HTTP 200, 4 events for Rfo",
@@ -139,7 +139,7 @@
   },
   {
    "name": "ops board row",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -147,7 +147,7 @@
   },
   {
    "name": "arb status row",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -155,7 +155,7 @@
   },
   {
    "name": "prereg board row",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -163,7 +163,7 @@
   },
   {
    "name": "degradation guard",
-   "age_h": 0.1,
+   "age_h": 0.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -171,7 +171,7 @@
   },
   {
    "name": "indicator bars",
-   "age_h": 1.1,
+   "age_h": 1.3,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -179,7 +179,7 @@
   },
   {
    "name": "okx balance snapshots (retired 09-06)",
-   "age_h": 62.6,
+   "age_h": 62.8,
    "max_h": 87600,
    "ok": true,
    "detail": "",
@@ -187,7 +187,7 @@
   },
   {
    "name": "cloud train parity",
-   "age_h": 0.0,
+   "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
    "detail": "",
@@ -275,7 +275,7 @@
   },
   {
    "name": "coinglass parquet CONTENT",
-   "age_h": 22.8,
+   "age_h": 23.0,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_fear_greed_daily.parquet",
@@ -283,7 +283,7 @@
   },
   {
    "name": "coinglass parquets",
-   "age_h": 3.1,
+   "age_h": 3.3,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_oi_1h.parquet",
@@ -291,7 +291,7 @@
   },
   {
    "name": "daily collect log",
-   "age_h": 3.1,
+   "age_h": 3.3,
    "max_h": 30.0,
    "ok": true,
    "detail": "",
@@ -299,7 +299,7 @@
   },
   {
    "name": "freshness board self",
-   "age_h": 5.8,
+   "age_h": 0.2,
    "max_h": 7.0,
    "ok": true,
    "detail": "",
@@ -307,7 +307,7 @@
   },
   {
    "name": "revalidation report",
-   "age_h": 70.1,
+   "age_h": 70.3,
    "max_h": 840.0,
    "ok": true,
    "detail": "quarterly_revalidation_20260905.md",
@@ -315,7 +315,7 @@
   },
   {
    "name": "portfolio clocks",
-   "age_h": 21.5,
+   "age_h": 21.7,
    "max_h": 195.0,
    "ok": true,
    "detail": "",
@@ -323,7 +323,7 @@
   },
   {
    "name": "tracked signals",
-   "age_h": 2.1,
+   "age_h": 2.3,
    "max_h": 336.0,
    "ok": true,
    "detail": "",
