@@ -156,6 +156,10 @@ def collect_symbol(sym, cand, ts, cl, at, rows):
             row = dict(sym=sym, lane=lane,
                        day=pd.Timestamp(int(ts[a]), unit="ms",
                                         tz="UTC").strftime("%Y-%m-%d"),
+                       # 2026-09-07 附加：容量關要算的是**同一個持有窗內的
+                       # 重疊**，不是同日總量。少了毫秒時戳就只能用日總量近似，
+                       # 而那個近似對真正的問題免疫（級聯會同時打九個幣）。
+                       ts_ms=int(ts[a]),
                        pre_e=float(me), pre_c=float(premove[j]))
             for tau in TAUS:
                 ae = float(at[a])

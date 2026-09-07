@@ -125,6 +125,13 @@ REGISTRY = [
     ("sweep_forward gate json (Gate F)", "file",
      "research/results/sweep_forward_gate.json", 24 * 36,
      "每月 5 號 run_monthly_revalidation.cmd 的 sweep_forward.py；紅 = 月度沒跑"),
+    # 2026-09-07 交會事件時鐘(TRIAGE.md)。它需要分鐘 bar + OI,而三個抓取器
+    # 從來沒被任何排程叫到過(grep .bat/.ps1/.vbs 零命中)——時鐘會永遠停在
+    # 0/300 而且不會有任何燈變紅。照 mistake.md 2026-09-01 的建議,把
+    # 「從未開始」翻譯成「某個數字不對」:更新器自報旗標,這一列讀它。
+    ("conj clock flag (交會前瞻)", "json_flag",
+     "research/poc/data/results/conj_clock_last.json:ok", 30.0,
+     "research/poc/conj_update.py 自報;紅 = 沒跑、抓取失敗、或資料 STALE"),
     ("liq recorder flag (路徑C)", "json_flag",
      "research/results/liq_last.json:ok", 1.0,
      "OKX+Bybit 強平推送錄製器自報；紅 = WS 斷或 DB 寫入失敗"),
