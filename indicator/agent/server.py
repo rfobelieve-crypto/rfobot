@@ -552,6 +552,39 @@ async def public_liquidity_map_route(request: Request) -> Response:
         token=INDICATOR_ADMIN_TOKEN)
 
 
+#   backtest-chart — HTML proxy of the indicator's回測檢視器. Unlike
+#                    liquidity-map (a live map, pinned to BTC) this one is
+#                    HISTORICAL: it draws every trade the frozen engine
+#                    actually took, so the operator can eyeball whether the
+#                    entries and exits sit where the rules say they should.
+#                    Symbol IS passed through here, but only over core9 and
+#                    with `days` PINNED server-side — that bounds the origin
+#                    to 9 cache keys instead of the 29 x N the liquidity-map
+#                    comment warns about. Range control lives inside the page
+#                    (zoom/pan), not in the URL.
+_backtest_cache: dict = {}          # {SYM: {"bytes": ..., "ts": ...}}
+_BACKTEST_CACHE_TTL_S = 1800.0      # historical output; 30 min is plenty
+_BACKTEST_CORE9 = ("BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA",
+                   "LINK", "AVAX")
+_BACKTEST_DAYS = 90                 # pinned: one cache key per symbol
+
+
+@mcp.custom_route("/public/backtest-chart", methods=["GET"])
+async def public_backtest_chart_route(request: Request) -> Response:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
+    sym = (request.query_params.get("symbol") or "BTC").strip().upper()
+    if sym not in _BACKTEST_CORE9:
+        sym = "BTC"                 # never 4xx a chart embed; fall back
+    cache = _backtest_cache.setdefault(sym, {"bytes": None, "ts": 0.0})
+    return await _proxy_html(
+        cache, _BACKTEST_CACHE_TTL_S,
+        f"{INDICATOR_BASE_URL}/research/backtest"
+        f"?symbol={sym}&days={_BACKTEST_DAYS}",
+        token=INDICATOR_ADMIN_TOKEN)
+
+
 _sweep_status_cache: dict = {"data": None, "ts": 0.0}
 _SWEEP_STATUS_CACHE_TTL_S = 300.0
 
