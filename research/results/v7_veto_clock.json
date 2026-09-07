@@ -18,7 +18,7 @@
    "since_trigger": 61,
    "trigger_target": 60,
    "gap_threshold_pp": 8.0,
-   "since_trigger_fired": 61
+   "since_trigger_fired": 62
   },
   "moderate": {
    "tier": "Moderate",
@@ -30,8 +30,8 @@
    "since_trigger": 88,
    "trigger_target": 60,
    "gap_threshold_pp": 8.0,
-   "since_trigger_fired": 88
+   "since_trigger_fired": 90
   }
  },
- "asof_utc": "2026-09-07 16:06"
+ "asof_utc": "2026-09-07 23:06"
 }

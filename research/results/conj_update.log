@@ -58,3 +58,23 @@ flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_
 
 flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_last.json   ok=True  reason=ok
 [2026/09/07 �g�@ 11:12:26.14] conj_update end rc=0 
+[2026/09/08 �g�G  5:30:01.98] conj_update start 
+[fetch_bars] rc=0
+    ADA   +    1099 bars       0s  -> ADA_1m.csv
+    LINK  +    1099 bars       0s  -> LINK_1m.csv
+    AVAX  +    1099 bars       0s  -> AVAX_1m.csv
+[bars] rc=0
+    AVAX  rows=1,347,390 gap=0.0000% zerovol=0.3948% volxcheck_max=0.0000%  asserts=ok  -> PASS
+    
+    Stage 0 gate: ALL PASS
+[fetch_oi] rc=0
+    ADA   rows= 269,147  +    288  missing_days=0 (404=0)      1s
+    LINK  rows= 269,147  +    288  missing_days=0 (404=0)      1s
+    AVAX  rows= 269,147  +    288  missing_days=0 (404=0)      1s
+[conj_clock] rc=0
+    樣本 < 30，無法計算日聚類 CI。累積中。
+    
+    written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock.json
+
+flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_last.json   ok=True  reason=ok
+[2026/09/08 �g�G  5:31:25.08] conj_update end rc=0 
