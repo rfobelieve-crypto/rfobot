@@ -1,5 +1,29 @@
 # -*- coding: utf-8 -*-
-"""掛單成交率與逆選擇，依穿透深度分層 —— 那 0.0568 R 拿不拿得到。
+"""
+========================================================================
+2026-09-07 **P1／P2 作廢（VOID）** —— 判決不是「不好看」，是儀器問錯方向
+========================================================================
+P3 儀器關通過（δ=0 逐筆重現凍結引擎，max|ΔR| = 0）。但 P1／P2 不可解讀：
+
+1) **分層變數就是結果本身（套套邏輯）**
+   δ 量的是「價格從價位往**穿越方向**走了多深」，而這條規則的獲利方向
+   *就是*穿越方向（買側被掃 -> 做空 -> 價格往下＝賺）。實測
+   Spearman(最大穿透, R) = **+0.6884**，五分位 −0.466 / −0.246 / −0.038
+   / +0.218 / +0.714 單調。所以「δ 越大成交組 meanR 越高」
+   （+0.0364 -> +0.0501）是定義帶來的，不是撮合帶來的。
+   同族前例：`absorb_matched.py` 的 λ 分子含價格移動。
+
+2) **成交模型問錯了方向**
+   我模擬的是「價格往獲利方向走多深才算成交」。真正的掛單問題相反：
+   限價單掛在 lvl，要靠價格**朝它走過來**才會成交，而那個方向對已進場
+   的部位是不利的。量到的實情：下單當下（掃單 bar 收盤）價格已經在
+   價位另一側的比例是 **59.35%** —— 那些交易的掛單根本不會成交，
+   要等價格回頭；而凍結引擎照樣記成「成交在價位」。
+
+因此本檔的 P1／P2 **不進任何判決**，數字保留可稽核但標記作廢。
+更正後的設計另註冊於 `resting_limit.py`（下單時點、成交條件、
+未成交的處置全部重寫），不在此檔就地改判準。
+掛單成交率與逆選擇，依穿透深度分層 —— 那 0.0568 R 拿不拿得到。
 
 背景（`entry_decomp.py`，2026-09-07）
     落差 0.0568 R 全部發生在「價格碰到價位那一分鐘之內」，而拿回它的方法
@@ -23,9 +47,19 @@
         成交時刻 = **第一根**滿足該條件的分鐘；成交價 = lvl
         整個 W 窗內從未穿透 ≥ δ  ->  **未成交**（沒有部位，不是虧損）
 
-    δ = 0.00 精確重現現行 A 臂（觸價即成交）——**這是已知答案的對照組**，
-    成交率必須 ≈ 100%、meanR 必須 ≈ entry_decomp 的 R_A_full。對不上就是
-    儀器壞了，不是發現（mistake.md 2026-07-29）。
+    δ = 0.00 精確重現凍結引擎的成交 ——**這是已知答案的對照組**。
+
+    2026-09-07 儀器修正（P3 第一次跑就 FAIL，照預註冊停手後修的）
+        第一版把母體寫成「全部掃單事件」（n=13,031），而凍結引擎的母體是
+        它自己的交易集（n=7,083）——差別在 (a) 12% 的掃單在 W 窗內從未
+        回踩、本來就不成交，(b) 一次一倉的不重疊限制。兩個母體不同，
+        δ=0 的成交率 88.08%、meanR +0.0454 vs +0.0381 都是這件事的影子，
+        不是撮合模型的問題。
+        **修法是把控制組改得更嚴，不是放寬判準**：母體直接取
+        `sc.backtest_symbol(b1, detail=True)`，δ=0 必須**逐筆**重現它的 R
+        （max |ΔR| < 1e-9），成交率必須是 100%。P1/P2 兩個假設一個字沒動。
+        代價（明寫）：母體固定在凍結交易集之後，「某筆沒成交會空出槽位給
+        下一筆」這件事沒有被模擬——這讓 δ>0 的成交率是**低估**的下界。
 
     δ = 0.01 / 0.02 / 0.05 / 0.10 ATR 是逐步嚴格的佇列假設。
 
@@ -101,14 +135,12 @@ def build(sym):
     hts = np.array([int(x[0]) for x in b1], dtype=np.int64) * 1000   # 秒 -> 毫秒
 
     rows = []
-    for e in sc.detect_sweeps(b1):
+    for e in sc.backtest_symbol(b1, detail=True):   # 母體＝凍結引擎的交易集
         j, lvl = e["j"], e["level"]
-        A = atr[j]
-        if A is None or A == 0:
-            continue
+        A = e["atr"]
         kd = 1 if e["kind"] == "buy" else -1
-        d = -kd                                    # 反轉方向：買側掃單 -> 做多
-        risk = sc.DIS * A
+        d = e["d"]
+        risk = e["risk"]
 
         # 掛單存活的分鐘範圍：sweep bar 收盤之後 -> 回踩窗 W 根小時結束
         t0 = int(b1[j][0]) * 1000 + HOUR_MS        # 1h 快取的 time 是**秒**
@@ -128,7 +160,8 @@ def build(sym):
                    lvl=lvl, atr=A,
                    day=pd.Timestamp(int(b1[j][0]) * 1000, unit="ms",
                                     tz="UTC").strftime("%Y-%m-%d"),
-                   max_pierce=float(np.nanmax(pierce)) if len(pierce) else np.nan)
+                   max_pierce=float(np.nanmax(pierce)) if len(pierce) else np.nan,
+                   R_frozen=float(e["R"]))
 
         for dl in DELTAS:
             tag = f"{dl:.2f}"
@@ -140,8 +173,7 @@ def build(sym):
                     row[f"mo{mo}_{tag}"] = np.nan
                 continue
             k = i0 + int(hit[0])                   # 第一根穿透 ≥ δ 的分鐘
-            f = int(np.searchsorted([int(x[0]) * 1000 for x in b1],
-                                    int(mts[k]), side="right")) - 1
+            f = int(np.searchsorted(hts, int(mts[k]), side="right")) - 1
             if f < 0 or f + 1 >= n:
                 row[f"fill_{tag}"] = 0
                 row[f"R_{tag}"] = np.nan
@@ -199,21 +231,18 @@ def main():
 
     res = {"n": int(len(d)), "days": int(d.day.nunique())}
 
-    # ---- P3 儀器關：δ=0 必須重現 entry_decomp 的 A 臂 --------------------
-    ref = None
-    p = OUT / "entry_decomp.json"
-    if p.exists():
-        ref = json.loads(p.read_text(encoding="utf-8")).get("R_A_full", {}).get("mean")
+    # ---- P3 儀器關：δ=0 必須**逐筆**重現凍結引擎 -------------------------
     fr0 = float(d["fill_0.00"].mean())
-    m0, lo0, hi0, _ = day_ci(d["R_0.00"], days)
-    gap = abs(m0 - ref) if ref is not None else float("nan")
-    ok3 = (fr0 >= 0.99) and (not np.isfinite(gap) or gap < 0.005)
-    print("=== P3 儀器關（已知答案的對照組）===")
-    print(f"  δ=0 成交率 {fr0*100:.2f}%（需 ≥99%）   meanR {m0:+.4f}"
-          + (f"   entry_decomp R_A_full {ref:+.4f}   差 {gap:.4f}（需 <0.005）"
-             if ref is not None else "   （entry_decomp.json 不在，無法對照）"))
-    print(f"  -> {'PASS' if ok3 else '**FAIL — 停手，先修儀器**'}\n")
-    res["P3"] = dict(fill_rate=fr0, mean=m0, ref=ref, gap=gap, passed=bool(ok3))
+    worst = float(np.nanmax(np.abs(d["R_0.00"].to_numpy(float)
+                                   - d["R_frozen"].to_numpy(float))))
+    m0 = float(d["R_0.00"].mean())
+    ok3 = (fr0 >= 0.999) and (worst < 1e-9)
+    print("=== P3 儀器關（已知答案的對照組：凍結引擎自己）===")
+    print(f"  delta=0 成交率 {fr0*100:.3f}%（需 100%）   "
+          f"逐筆 max|dR| {worst:.2e}（需 <1e-9）   meanR {m0:+.4f}")
+    print(f"  -> {'PASS' if ok3 else '**FAIL - 停手，先修儀器**'}")
+    print()
+    res["P3"] = dict(fill_rate=fr0, max_abs_dR=worst, mean=m0, passed=bool(ok3))
     if not ok3:
         print("儀器沒過，以下各格不解讀。")
 
@@ -231,7 +260,7 @@ def main():
         # 未成交組的反事實：用 δ=0 規則（觸價即成交）算出的 R
         nf = ~f
         mN, loN, hiN, _ = day_ci(d.loc[nf, "R_0.00"], days[nf])
-        if nf.sum() >= 30:
+        if nf.sum() >= 30 and f.sum() >= 30:
             # 差值的 CI：兩組獨立，按日聚類各自 bootstrap 後取差
             uqF = d.loc[f, "day"].to_numpy()
             uqN = d.loc[nf, "day"].to_numpy()
@@ -305,7 +334,7 @@ def main():
     print(f"    meanR {per[tagm]['mean_fill']:+.4f}  "
           f"CI [{lo_:+.4f},{hi_:+.4f}]  成交率 {per[tagm]['fill_rate']*100:.1f}%"
           f"   -> {v2}")
-    res["P2"] = dict(verdict=v2, delta=DELTAS[-1], **per[tagm])
+    res["P2"] = dict(per[tagm], verdict=v2)
 
     print("\n=== 敏感度（不參與判準）：限價進場不付滑價 ===")
     for dl in DELTAS:

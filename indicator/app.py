@@ -1940,6 +1940,69 @@ def research_shadow_review_api():
                     "trace": _tb.format_exc()[-1500:]}), 500
 
 
+@app.route("/research/backtest", methods=["GET"])
+def research_backtest_api():
+    """凍結引擎的回測檢視器（研究用，**不是訊號**）。
+
+    與 /research/shadow-review 的差別，兩者不可互相取代：
+        shadow-review  前瞻覆盤——最近 N 小時的活地圖，回答「現在盤面上
+                       有什麼池子、哪些被掃了」
+        backtest       回測檢視——任一段歷史裡，凍結引擎**實際下過的每一筆**
+                       的價位／進場／停損／出場，回答「進出場位置對不對」
+
+    圖上每一條線都取自 sweep_core.backtest_symbol(bars, detail=True) 的
+    同一筆記錄（tests/test_backtest_detail_parity.py 釘住），所以顯示層
+    不可能與計分層漂開。Admin-guarded via the /research/ prefix.
+
+    Query params:  symbol=<BASE>（預設 BTC）
+                   days=<N>  顯示窗天數 7-720（預設 60）
+                   from/to=YYYY-MM-DD  指定絕對區間（給了就蓋掉 days）
+    """
+    from flask import request as _rq, jsonify as _js, send_file as _sf
+    import subprocess as _sp
+    import sys as _sys
+    import traceback as _tb
+
+    root = Path(__file__).resolve().parent.parent
+    script = root / "research" / "sweep_failure" / "backtest_chart.py"
+    if not script.exists():
+        return _js({"error": "research/ not present in this image"}), 501
+    allowed = {"BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "LINK", "AVAX"}
+    symbol = (_rq.args.get("symbol", "") or "BTC").strip().upper()
+    if symbol not in allowed:
+        return _js({"error": f"symbol not in core9: {symbol}",
+                    "allowed": sorted(allowed)}), 400
+    try:
+        days = max(7, min(720, int(_rq.args.get("days", "60"))))
+    except ValueError:
+        days = 60
+    argv = [_sys.executable, str(script), "--symbol", symbol,
+            "--last-days", str(days)]
+    import re as _re
+    for k, flag in (("from", "--from"), ("to", "--to")):
+        v = (_rq.args.get(k) or "").strip()
+        if v:
+            if not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+                return _js({"error": f"{k} must be YYYY-MM-DD"}), 400
+            argv += [flag, v]
+    out = root / "research" / "results" / f"backtest_{symbol}.html"
+    try:
+        out.unlink(missing_ok=True)      # never serve a stale leftover
+        r = _sp.run(argv, capture_output=True, text=True, timeout=110,
+                    cwd=str(root))
+        if r.returncode != 0 or not out.exists():
+            return _js({"error": "render failed",
+                        "stdout": (r.stdout or "")[-800:],
+                        "stderr": (r.stderr or "")[-800:]}), 500
+        return _sf(out, mimetype="text/html", max_age=0)
+    except _sp.TimeoutExpired:
+        return _js({"error": "render timed out (110s)"}), 500
+    except Exception:
+        logger.exception("backtest_route_failed")
+        return _js({"error": "backtest route crashed",
+                    "trace": _tb.format_exc()[-1500:]}), 500
+
+
 @app.route("/research/v7-clock", methods=["GET"])
 def research_v7_clock_api():
     """Adoption-trigger clock, computed on demand (research aid).

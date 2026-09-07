@@ -57,11 +57,29 @@ def to_day(ts_sec):
     return datetime.fromtimestamp(ts_sec, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
 
 
-def build(sym, t_from, t_to):
-    """回測跑**全歷史**（ATR 與樞紐需要完整前文），之後才裁切顯示窗。"""
-    bars = sc.load_csv(str(CACHE / f"{sym}USDT_1h.csv"))
+def ensure_bars(sym):
+    """Railway 的映像沒有本機快取 —— 沿用 shadow_review 既有的抓取器，
+    不另寫一份（同一份資料兩個抓法遲早會不同意，mistake.md 2026-08-01）。"""
+    p = CACHE / f"{sym}USDT_1h.csv"
+    try:
+        from shadow_review import ensure_bars as _eb
+        return _eb(sym)
+    except Exception:
+        if p.exists():
+            return p
+        raise
+
+
+def load_bars(sym):
+    bars = sc.load_csv(str(ensure_bars(sym)))
     if not bars:
         raise SystemExit(f"no bars for {sym}")
+    return bars
+
+
+def build(sym, t_from, t_to):
+    """回測跑**全歷史**（ATR 與樞紐需要完整前文），之後才裁切顯示窗。"""
+    bars = load_bars(sym)
     det = sc.backtest_symbol(bars, detail=True)
 
     lo = t_from or bars[0][0]
@@ -368,8 +386,7 @@ def main():
     for s in syms:
         t_from, t_to = parse_day(a.d_from), parse_day(a.d_to)
         if t_from is None:
-            bars = sc.load_csv(str(CACHE / f"{s}USDT_1h.csv"))
-            t_from = bars[-1][0] - a.last_days * 86400
+            t_from = load_bars(s)[-1][0] - a.last_days * 86400
         d = build(s, t_from, t_to)
         f = OUT / f"backtest_{s}.html"
         f.write_text(render(d), encoding="utf-8")
