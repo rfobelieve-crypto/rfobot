@@ -90,28 +90,38 @@ def detect_sweeps(bars):
         if all(h[i] >= h[k] for k in seg) and any(h[i] > h[k] for k in seg if k != i):
             for j in range(i + PIVOT + 1, n):
                 if h[j] > h[i]:
-                    ev.append(dict(j=j, kind="buy", level=h[i]))
+                    ev.append(dict(j=j, kind="buy", level=h[i], origin=i))
                     break
         if all(l[i] <= l[k] for k in seg) and any(l[i] < l[k] for k in seg if k != i):
             for j in range(i + PIVOT + 1, n):
                 if l[j] < l[i]:
-                    ev.append(dict(j=j, kind="sell", level=l[i]))
+                    ev.append(dict(j=j, kind="sell", level=l[i], origin=i))
                     break
     ev.sort(key=lambda e: e["j"])
     return ev
 
 
-def backtest_symbol(bars):
+def backtest_symbol(bars, detail=False):
     """Tradeable rules: retest-touch stop-entry at level, disaster stop,
     time exit. One position per symbol (non-overlapping). Returns trade list
     [(fill_ts, exit_ts, R, lvl, A, stopped, pierce, side)] with R in
-    disaster-stop units, costs included."""
+    disaster-stop units, costs included.
+
+    2026-09-07 additive, ADR: `detail=True` returns the same trades as dicts
+    carrying the intermediate values a chart needs to DRAW them (sweep bar,
+    entry/stop/exit prices, bar indices). Rules, order and arithmetic are
+    untouched — the tuple list is projected from the very same records, so a
+    viewer built on `detail` cannot drift from what the backtest scores.
+    Pinned by tests/test_backtest_detail_parity.py against the pre-refactor
+    output of all nine coins (7,083 trades, sha256 86ad51a7...).
+    """
     n = len(bars)
     h = [b[H] for b in bars]
     l = [b[L] for b in bars]
     c = [b[C] for b in bars]
     a = atr14(bars)
     trades = []
+    det = []
     last_exit = -1
     for e in detect_sweeps(bars):
         j, lvl = e["j"], e["level"]
@@ -163,8 +173,21 @@ def backtest_symbol(bars):
         # without. d=+1 pierce-down-reverted -> LONG; d=-1 -> SHORT.
         trades.append((bars[fill][0], bars[exitbar][0], R, lvl, A, stopped,
                        pierce, "LONG" if d == 1 else "SHORT"))
+        if detail:
+            det.append(dict(
+                sweep_ts=bars[j][0], fill_ts=bars[fill][0],
+                exit_ts=bars[exitbar][0],
+                j=j, fill=fill, exitbar=exitbar, origin=e["origin"],
+                origin_ts=bars[e["origin"]][0],
+                kind=e["kind"], side="LONG" if d == 1 else "SHORT", d=d,
+                level=lvl, atr=A, entry=entry, stop=stop,
+                # 從 R 反解，兩個分支同一條式子：畫在圖上的出場價與被計分的
+                # R 在構造上一致，不可能各說各話（停損那臂的成交在停損價之外）
+                exit_px=entry + d * R * risk,
+                risk=risk, R=R, stopped=stopped, pierce=pierce,
+                held=exitbar - fill, wait=fill - j))
         last_exit = exitbar
-    return trades
+    return det if detail else trades
 
 
 def metrics(trade_rs, risk_pct=1.0):
