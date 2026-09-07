@@ -1,5 +1,5 @@
 {
- "asof_utc": "2026-09-07 11:20",
+ "asof_utc": "2026-09-07 16:18",
  "rows": [
   {
    "name": "bat-train heartbeat",
@@ -78,7 +78,7 @@
    "age_h": 0.2,
    "max_h": 2.5,
    "ok": true,
-   "detail": "BTC spot 79,751 net GEX(±5%) +$128.6M flip 79,520 n=773 | ET",
+   "detail": "BTC spot 79,259 net GEX(±5%) +$180.3M flip 79,524 n=776 | ET",
    "note": "recorder self-report {ok, reason}; red = Deribit call or DB write failed"
   },
   {
@@ -91,7 +91,7 @@
   },
   {
    "name": "sweep_forward gate json (Gate F)",
-   "age_h": 9.8,
+   "age_h": 14.8,
    "max_h": 864,
    "ok": true,
    "detail": "",
@@ -99,7 +99,7 @@
   },
   {
    "name": "conj clock flag (交會前瞻)",
-   "age_h": 8.1,
+   "age_h": 13.1,
    "max_h": 30.0,
    "ok": true,
    "detail": "ok",
@@ -118,7 +118,7 @@
    "age_h": 0.0,
    "max_h": 1.0,
    "ok": true,
-   "detail": "flushed 1",
+   "detail": "flushed 3",
    "note": "OKX+Bybit 強平推送錄製器自報；紅 = WS 斷或 DB 寫入失敗"
   },
   {
@@ -126,7 +126,7 @@
    "age_h": 0.0,
    "max_h": 1.0,
    "ok": true,
-   "detail": "rows_today=163200 binance_stale=0s bitget_stale=44s",
+   "detail": "rows_today=234720 binance_stale=0s bitget_stale=0s",
    "note": "Lighter L2 × Binance 現貨 250ms 取樣；紅 = 任一側無幀"
   },
   {
@@ -179,7 +179,7 @@
   },
   {
    "name": "okx balance snapshots (retired 09-06)",
-   "age_h": 50.8,
+   "age_h": 55.8,
    "max_h": 87600,
    "ok": true,
    "detail": "",
@@ -275,7 +275,7 @@
   },
   {
    "name": "coinglass parquet CONTENT",
-   "age_h": 35.0,
+   "age_h": 40.0,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_fear_greed_daily.parquet",
@@ -283,7 +283,7 @@
   },
   {
    "name": "coinglass parquets",
-   "age_h": 15.3,
+   "age_h": 20.3,
    "max_h": 48.0,
    "ok": true,
    "detail": "cg_oi_1h.parquet",
@@ -291,7 +291,7 @@
   },
   {
    "name": "daily collect log",
-   "age_h": 15.3,
+   "age_h": 20.3,
    "max_h": 30.0,
    "ok": true,
    "detail": "",
@@ -299,7 +299,7 @@
   },
   {
    "name": "freshness board self",
-   "age_h": 2.2,
+   "age_h": 5.0,
    "max_h": 7.0,
    "ok": true,
    "detail": "",
@@ -307,7 +307,7 @@
   },
   {
    "name": "revalidation report",
-   "age_h": 58.3,
+   "age_h": 63.3,
    "max_h": 840.0,
    "ok": true,
    "detail": "quarterly_revalidation_20260905.md",
@@ -315,7 +315,7 @@
   },
   {
    "name": "portfolio clocks",
-   "age_h": 9.7,
+   "age_h": 14.7,
    "max_h": 195.0,
    "ok": true,
    "detail": "",
@@ -323,7 +323,7 @@
   },
   {
    "name": "tracked signals",
-   "age_h": 18.3,
+   "age_h": 23.3,
    "max_h": 336.0,
    "ok": true,
    "detail": "",
