@@ -200,6 +200,13 @@ header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 16px}
 h1{margin:0;font-size:19px;font-weight:600;letter-spacing:.01em}
 .tag{font-size:11px;color:var(--dim);border:1px solid var(--line);
      border-radius:3px;padding:2px 8px;font-variant-numeric:tabular-nums}
+.warn{border:1px solid var(--dn);border-left:4px solid var(--dn);
+      border-radius:4px;background:rgba(246,70,93,.06);padding:13px 16px;
+      display:flex;flex-direction:column;gap:6px}
+.warn b{color:var(--dn);font-size:13px}
+.warn p{margin:0;font-size:12px;line-height:1.6;color:var(--ink)}
+.warn .rc{display:inline-block;border:1px solid var(--dn);border-radius:3px;
+      padding:1px 7px;color:var(--dn);font-size:11px;margin-right:6px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px}
 .kpi{background:var(--pan);border:1px solid var(--line);border-radius:4px;
      padding:9px 11px;display:flex;flex-direction:column;gap:2px}
@@ -240,8 +247,27 @@ tbody tr.sel{background:#1c2530}
   <h1>__SYM__USDT · 掃單失敗回測</h1>
   <span class="tag">__SPAN__</span>
   <span class="tag">PIVOT __PIVOT__ · W __W__ · HOLD __HOLD__ · 停損 __DIS__ ATR · 滑價 __SLIP__ ATR/邊</span>
+  <span class="tag" style="border-color:var(--dn);color:var(--dn)">
+    績效重新計算中 · 進場價假設已推翻</span>
   <span class="tag">凍結規則 · 純回測 · 非訊號</span>
 </header>
+
+<div class="warn">
+  <b>⚠ 下方績效數字為高估，不得引用（2026-09-07 判決）</b>
+  <p><span class="rc">重新計算中</span>
+  高估來源是<b>進場價假設</b>，不是訊號邏輯。凍結引擎在
+  <b>57.9%</b> 的交易上記「成交在價位」，但那些交易的掃單 K 棒<b>自己已經收回
+  價位另一側</b>，市場當時距離價位<b>中位 42.6 bps</b>（成本模型 7–10 bps/腿的
+  4–6 倍）——那個價格拿不到。</p>
+  <p>用真實可成交價重算：<b>+0.0365 R → −0.0483 R</b>（日聚類 CI
+  [−0.0721, −0.0241]、<b>0/9 幣為正</b>）。第二條獨立的誠實路徑（掛限價等回踩）
+  每事件 −0.0463，同樣為負。</p>
+  <p><b>還站著的是訊號邏輯</b>：引擎自審六項全過（層級離價格中位 2.305 ATR、
+  穿透 0.525 ATR、無重複發事件），A/B 分解顯示壞的只有進場價。
+  <b>真實 edge 尚未確定</b>——要用分層表的成交率與 markout 重算一次歷史，
+  在那之前這條線<b>不提供任何績效數字</b>。判決全文
+  <code>research/poc/honest_fill.py</code>。</p>
+</div>
 
 <div class="kpis" id="kpis"></div>
 
@@ -311,9 +337,9 @@ function kpis(){
   const g = x => x >= 0 ? 'pos' : 'neg';
   document.getElementById('kpis').innerHTML = [
     cell(a.n, '交易筆數', `全期 ${b.n}`),
-    cell(a.exp.toFixed(4), '每筆 R', `全期 ${b.exp.toFixed(4)}`, g(a.exp)),
+    cell(a.exp.toFixed(4), '每筆 R（高估）', `全期 ${b.exp.toFixed(4)}`, g(a.exp)),
     cell(a.wr.toFixed(1)+'%', '勝率', `全期 ${b.wr.toFixed(1)}%`),
-    cell(isFinite(a.pf)?a.pf.toFixed(2):'∞', '獲利因子', `全期 ${isFinite(b.pf)?b.pf.toFixed(2):'∞'}`),
+    cell(isFinite(a.pf)?a.pf.toFixed(2):'∞', '獲利因子（高估）', `全期 ${isFinite(b.pf)?b.pf.toFixed(2):'∞'}`),
     cell(a.mdd.toFixed(1)+'%', '最大回落', `全期 ${b.mdd.toFixed(1)}%`),
     cell(a.t.toFixed(2), 't 值（未聚類）', `全期 ${b.t.toFixed(2)}`),
   ].join('');
