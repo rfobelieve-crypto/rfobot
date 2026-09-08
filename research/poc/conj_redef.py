@@ -117,15 +117,22 @@ def day_ci(x, days, b=2000):
     return float(x.mean()), float(np.percentile(r, 2.5)), float(np.percentile(r, 97.5))
 
 
-def groups_with_members(pairs):
+def groups_with_members(pairs, cooldown=None):
     """與 et.cluster 同一套 gap+cooldown，但**連群成員一起回傳**。
 
     et.cluster 只回 (anchor, signature)，拿不到「哪一分鐘是 sweep、哪一分鐘
     是 flow」—— 而那正是判斷「事件何時成立」需要的東西。演算法逐行照抄
     et.cluster，不得改動（改了就是第二份實作）。
+
+    `cooldown` 預設 = `et.COOLDOWN`（60 分），與凍結定義一致。
+    **傳 0 可以關掉冷卻**——那是為了看「同一波裡的後續開火」（`conj_rescue.py`
+    的第二波假設）：冷卻是為了事件研究避免重複計數而設的，它會讓「開火之後
+    再次開火」在資料上依定義為零。關掉冷卻的結果**不得**回頭餵給任何凍結
+    的計分器。
     """
     if not pairs:
         return []
+    cd = et.COOLDOWN if cooldown is None else cooldown
     prs = sorted(pairs)
     out = []
     cs = cl = prs[0][0]
@@ -141,7 +148,7 @@ def groups_with_members(pairs):
     out.append((cs, mem))
     kept, last = [], -10 ** 9
     for a, mm in out:
-        if a - last >= et.COOLDOWN:
+        if a - last >= cd:
             kept.append((a, mm))
             last = a
     return kept
