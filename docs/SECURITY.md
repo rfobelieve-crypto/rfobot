@@ -32,6 +32,7 @@
 | `ADMIN_HEAL_TOKEN` | Railway（**多個服務共用**） | `/okx-admin/heal`（重置 executor DB 狀態，POST-only 且 OKX 有倉時拒絕）、`/admin/db-health-all`、`/admin/flow-bars-export`、`/admin/backfill-gap`、全部 `/research/*`（策略輸出） |
 | `INDICATOR_ADMIN_TOKEN` | Railway | 指標服務的 admin 面 |
 | `AGENT_MCP_TOKEN` | Railway | MCP agent 的存取（唯讀下游，見 agent-boundary.md） |
+| `CONJ_FILL_TOKEN` | Railway（agent-mcp）＋產品端 jarvis | **2026-09-08 新增。** `POST /public/conj-fill`——產品端回報交會事件實盤成交（TODO §1.03）。寫的是 `agent_conj_fills`（agent 自己的命名空間）。**fail-closed**：未設定 → 端點 503 拒收，不是開放。標頭 `X-Conj-Token`，`hmac.compare_digest` 比對。它守的是實盤對帳資料的完整性——一筆假成交就能弄髒整個測試的結論 |
 
 **能讀資料的**
 

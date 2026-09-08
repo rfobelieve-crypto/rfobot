@@ -68,6 +68,41 @@ def main():
               f"I3 名目 {'PASS' if i3 else '**FAIL**'}   "
               f"I4 時刻 {'PASS' if i4 else '**FAIL**'}")
 
+    # ---- I6 相對成交的三個欄位（2026-09-08 實盤體檢加）----
+    print()
+    print("=== I6 stop_dist / hold_ms / intent_id（產品端套在成交上的三個數）===")
+    for e in cases:
+        it = cw.make_intent(e, now)
+        atr = float(e[8])
+        a1 = abs(it["stop_dist"] - cw.STOP_ATR * atr) < 1e-9
+        a2 = it["hold_ms"] == cw.HOLD_MIN * 60_000
+        a3 = it["intent_id"] == f"{e[0]}:{int(e[1])}"
+        ok_all &= a1 and a2 and a3
+        print(f"  {it['canonical_symbol']:9s} stop_dist {it['stop_dist']:.6g} "
+              f"= {it['stop_dist']/atr:.3f} ATR {'PASS' if a1 else '**FAIL**'}   "
+              f"hold_ms {it['hold_ms']} {'PASS' if a2 else '**FAIL**'}   "
+              f"intent_id {it['intent_id']} {'PASS' if a3 else '**FAIL**'}")
+
+    # ---- I7 live ATR 與研究 ATR 是同一顆（已知答案對照）----
+    print()
+    print("=== I7 atr_h14_now 截到 parquet 同一小時 vs parquet 的 atr_h14（同一顆 -> 逐位相同）===")
+    import pandas as pd
+    for sym in ("BTC", "ETH", "SOL"):
+        b = pd.read_parquet(HERE / "data" / "bars" / f"{sym}.parquet",
+                            columns=["ts", "atr_h14"])
+        last_ts = int(b["ts"].iloc[-1])
+        ref = float(b["atr_h14"].dropna().iloc[-1])
+        # 第一版拿「此刻」的 live 值去比 parquet 最後一根：差 6-13% -> FAIL。
+        # 查證後三項全 0.0000%（配方、資料源、同一小時截斷）——差的是 cache
+        # 多了一個剛收盤、剛好很大的小時。**比錯時點不是配方錯**。
+        # 所以對照必須截到 parquet 同一小時；那時兩者是同一顆，容差 0.01%。
+        live = cw.atr_h14_now(sym, hi_ts=last_ts)
+        rel = abs(live - ref) / ref if (live and ref) else float("inf")
+        good = rel < 1e-4
+        ok_all &= good
+        print(f"  {sym:4s} live {live:.6g}  parquet {ref:.6g}  差 {rel*100:.3f}% "
+              f"-> {'PASS' if good else '**FAIL —— 不是同一個配方**'}")
+
     # ---- I5 三道煞車的反向證明 ----
     print()
     print("=== I5 煞車反向證明（要看到它們擋，不是只看它們放行）===")

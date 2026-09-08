@@ -1118,13 +1118,22 @@ def public_conj_signals(limit: int = 20) -> dict[str, Any]:
     conn = _conn()
     try:
         with conn.cursor() as cur:
+            cur.execute(_CONJ_FILLS_DDL)
+            # 2026-09-08 實盤體檢：已經有成交回報的意圖**不再吐**。原版在
+            # 180 秒 TTL 內會重複吐同一筆，而 status 沒有任何路徑會變
+            # （agent 唯讀、產品端不直連 DB）——產品端若沒去重就下兩次單。
+            # 去重鍵 intent_id = symbol:anchor_ts；產品端回報成交後這裡就
+            # 看不到它了，形成閉環而不需要寫 quant 表。
             cur.execute(
-                "SELECT canonical_symbol, anchor_ts, intent_ts, expires_ts, "
-                "       side, ref_price, stop_price, exit_ts, size_base, "
-                "       signature, status "
-                "FROM conj_intents "
-                "WHERE status='NEW' AND expires_ts > %s "
-                "ORDER BY intent_ts DESC LIMIT %s",
+                "SELECT i.canonical_symbol, i.anchor_ts, i.intent_ts, "
+                "       i.expires_ts, i.side, i.ref_price, i.stop_price, "
+                "       i.stop_dist, i.exit_ts, i.hold_ms, i.size_base, "
+                "       i.signature, i.intent_id "
+                "FROM conj_intents i "
+                "LEFT JOIN agent_conj_fills f ON f.intent_id = i.intent_id "
+                "WHERE i.status='NEW' AND i.expires_ts > %s "
+                "  AND f.intent_id IS NULL "
+                "ORDER BY i.intent_ts DESC LIMIT %s",
                 (now_ms, int(limit)))
             rows = cur.fetchall() or []
     finally:
@@ -1132,6 +1141,7 @@ def public_conj_signals(limit: int = 20) -> dict[str, Any]:
     out = []
     for r in rows:
         out.append({
+            "intent_id": r["intent_id"] or f"{r['canonical_symbol']}:{int(r['anchor_ts'])}",
             "canonical_symbol": r["canonical_symbol"],
             "anchor_ts": int(r["anchor_ts"]),
             "intent_ts": int(r["intent_ts"]),
@@ -1139,12 +1149,91 @@ def public_conj_signals(limit: int = 20) -> dict[str, Any]:
             "side": r["side"],
             "ref_price": float(r["ref_price"]),
             "stop_price": float(r["stop_price"]),
+            "stop_dist": float(r["stop_dist"]) if r["stop_dist"] is not None else None,
             "exit_ts": int(r["exit_ts"]),
+            "hold_ms": int(r["hold_ms"]) if r["hold_ms"] is not None else 3_600_000,
             "size_base": float(r["size_base"]),
             "signature": r["signature"],
         })
     return {"signals": out, "count": len(out), "asof_ms": now_ms,
             "disclaimer": "not financial advice"}
+
+
+# 成交回報表 —— agent 唯一可寫的是 agent_* 命名空間（agent-boundary.md），
+# 所以本次實盤唯一要買的那個數字（成交價 vs 意圖價）落在這裡。
+# **DDL 必須與 research/poc/conj_watch.py 裡那份逐字相同**（研究端也建它，
+# 讓 intent_gate 的 LEFT JOIN 在 agent 從沒建過之前不會炸）。
+_CONJ_FILLS_DDL = """
+CREATE TABLE IF NOT EXISTS agent_conj_fills (
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    intent_id     VARCHAR(48) NOT NULL,
+    canonical_symbol VARCHAR(20) NOT NULL,
+    side          VARCHAR(6)  NOT NULL,
+    fill_price    DECIMAL(24,8) NOT NULL,
+    fill_qty      DECIMAL(28,10) NOT NULL,
+    sent_ts       BIGINT NOT NULL,
+    fill_ts       BIGINT NOT NULL,
+    venue         VARCHAR(12) NOT NULL,
+    order_id      VARCHAR(64) NULL,
+    reported_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_fill (intent_id)
+)
+"""
+
+_INTENT_ID_RE = re.compile(r"^[A-Z0-9]{2,10}-USD:\d{13}$")
+
+
+def record_conj_fill(body: dict) -> dict[str, Any]:
+    """產品端回報一筆成交。只驗形狀，不做任何策略推導（契約）。
+
+    intent_id 必須對得上一筆真實存在的意圖——否則回 404 而不是收下：
+    收下一筆對不到意圖的「成交」會讓對帳表多一列沒有參考價的東西。
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "invalid body", "_status": 400}
+    iid = str(body.get("intent_id") or "")
+    if not _INTENT_ID_RE.match(iid):
+        return {"ok": False, "error": "bad intent_id", "_status": 400}
+    try:
+        fp = float(body["fill_price"]); fq = float(body["fill_qty"])
+        st = int(body["sent_ts"]);       ft = int(body["fill_ts"])
+        venue = str(body.get("venue") or "")[:12]
+        side = str(body.get("side") or "")
+        oid = (str(body.get("order_id")) if body.get("order_id") else None)
+    except (KeyError, TypeError, ValueError):
+        return {"ok": False, "error": "missing/invalid fields", "_status": 400}
+    if not (fp > 0 and fq > 0 and st > 0 and ft >= st) or side not in ("LONG", "SHORT") or not venue:
+        return {"ok": False, "error": "field out of range", "_status": 400}
+    if _seed_mode():
+        return {"ok": True, "_source": "seed"}
+    sym = iid.split(":")[0]
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_CONJ_FILLS_DDL)
+            cur.execute("SELECT side, ref_price FROM conj_intents "
+                        "WHERE canonical_symbol=%s AND anchor_ts=%s",
+                        (sym, int(iid.split(":")[1])))
+            it = cur.fetchone()
+            if not it:
+                return {"ok": False, "error": "unknown intent", "_status": 404}
+            if it["side"] != side:
+                return {"ok": False, "error": "side mismatch vs intent",
+                        "_status": 409}
+            cur.execute(
+                "INSERT IGNORE INTO agent_conj_fills "
+                "(intent_id, canonical_symbol, side, fill_price, fill_qty, "
+                " sent_ts, fill_ts, venue, order_id) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (iid, sym, side, fp, fq, st, ft, venue, oid[:64] if oid else None))
+            dup = cur.rowcount == 0
+        conn.commit()
+    finally:
+        conn.close()
+    ref = float(it["ref_price"])
+    slip_bps = (fp - ref) / ref * 1e4 * (1 if side == "LONG" else -1)
+    return {"ok": True, "duplicate": dup, "intent_id": iid,
+            "slippage_bps_vs_ref": round(slip_bps, 3)}
 
 
 def public_research_clocks() -> dict[str, Any]:

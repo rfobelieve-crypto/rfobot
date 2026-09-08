@@ -275,6 +275,14 @@ jarvis 自己的 CLAUDE.md 第 204 行本來就寫著同一件事：
 時段，而時段與流動性相關——20-30 筆若全是白天的，量出來的成交價品質是
 偏的，那正好毀掉本測試唯一要買的東西。
 
+**2026-09-08 同日實盤體檢（使用者要求）補了六項，全部在研究端**：停損與出場改成
+**相對成交**（`stop_dist` / `hold_ms`，產品端套在 fill 上）；停損 ATR 改用
+每分鐘配方（每日表低估 19%）；`intent_id` 去重；`agent_conj_fills` ＋
+`POST /public/conj-fill`（`CONJ_FILL_TOKEN`，fail-closed）承接成交回報並
+形成端點不再重吐的閉環；`intent_gate` 不再把過期未送的 NEW 算成持倉。
+細節與表格在 TODO §1.03「實盤執行體檢」。**操作者上線前要設
+`CONJ_FILL_TOKEN`**（agent-mcp 與 jarvis 同值）。
+
 **執行架構（不新增第二份下單層）**
 
     flow_system   偵測 + 算訂單意圖 -> DB（`conj_intents`）

@@ -1189,6 +1189,42 @@ async def public_conj_signals_route(request: Request) -> JSONResponse:
     return resp
 
 
+@mcp.custom_route("/public/conj-fill", methods=["POST"])
+async def public_conj_fill_route(request: Request) -> JSONResponse:
+    """產品端回報一筆交會事件的成交（TODO §1.03 實盤執行測試，2026-09-08）。
+
+    這是本次實盤**唯一要買的東西**（成交價 vs 意圖價差幾 bps）的落點。
+    agent 只能寫 agent_* 命名空間（agent-boundary.md），所以寫
+    `agent_conj_fills`，研究端再讀它對帳；`/public/conj-signals` 也讀它，
+    回報過的意圖就不再吐 —— 去重閉環，不需要任何人寫 quant 表。
+
+    **有身分驗證，而且 fail-closed**：`CONJ_FILL_TOKEN` 沒設 -> 503 拒收，
+    不是「沒設就開放」。這是一個會被寫進實盤對帳的端點，隨便一個人 POST
+    一筆假成交進來，整個測試的結論就髒了。token 用 compare_digest 比。
+    """
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
+    import hmac as _hmac
+    expected = os.environ.get("CONJ_FILL_TOKEN", "")
+    if not expected:
+        return JSONResponse({"ok": False, "error": "fill reporting not configured"},
+                            status_code=503)
+    given = request.headers.get("X-Conj-Token", "")
+    if not _hmac.compare_digest(given, expected):
+        return JSONResponse({"ok": False, "error": "unauthorized"},
+                            status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid body"}, status_code=400)
+    result = await anyio.to_thread.run_sync(queries.record_conj_fill, body)
+    status = int(result.pop("_status", 200 if result.get("ok") else 400))
+    resp = JSONResponse(result, status_code=status)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @mcp.custom_route("/public/prereg-clocks", methods=["GET"])
 async def public_prereg_route(request: Request) -> JSONResponse:
     _rl = security.rate_gate(request)

@@ -356,8 +356,40 @@ def ensure_table(conn):
             size_base     DECIMAL(28,10) NOT NULL,
             signature     VARCHAR(40) NOT NULL,
             status        VARCHAR(12) NOT NULL DEFAULT 'NEW',
+            stop_dist     DECIMAL(24,8) NULL,
+            hold_ms       BIGINT NULL,
+            intent_id     VARCHAR(48) NULL,
             UNIQUE KEY uniq_intent (canonical_symbol, anchor_ts),
             INDEX idx_status (status, intent_ts)
+        )
+        """)
+        # 2026-09-08 實盤體檢加的三欄。CREATE TABLE IF NOT EXISTS 不會改既有表，
+        # 所以逐欄 ALTER；欄已存在（errno 1060）就略過，其他錯照拋。
+        for ddl in ("ALTER TABLE conj_intents ADD COLUMN stop_dist DECIMAL(24,8) NULL",
+                    "ALTER TABLE conj_intents ADD COLUMN hold_ms BIGINT NULL",
+                    "ALTER TABLE conj_intents ADD COLUMN intent_id VARCHAR(48) NULL"):
+            try:
+                cur.execute(ddl)
+            except Exception as ex:  # noqa: BLE001
+                if getattr(ex, "args", [None])[0] != 1060:
+                    raise
+        # 成交回報表。agent 也會建同一張（它的 agent_* 命名空間），這裡建是
+        # 為了 intent_gate 的 LEFT JOIN 在 agent 從沒建過它之前也不會炸。
+        # 兩邊 DDL 必須逐字相同（queries._CONJ_FILLS_DDL）。
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS agent_conj_fills (
+            id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+            intent_id     VARCHAR(48) NOT NULL,
+            canonical_symbol VARCHAR(20) NOT NULL,
+            side          VARCHAR(6)  NOT NULL,
+            fill_price    DECIMAL(24,8) NOT NULL,
+            fill_qty      DECIMAL(28,10) NOT NULL,
+            sent_ts       BIGINT NOT NULL,
+            fill_ts       BIGINT NOT NULL,
+            venue         VARCHAR(12) NOT NULL,
+            order_id      VARCHAR(64) NULL,
+            reported_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_fill (intent_id)
         )
         """)
         cur.execute("""
@@ -379,7 +411,41 @@ def ensure_table(conn):
     conn.commit()
 
 
-def detect_window(sym, ts, high, low, close, vol, delta, t, g, det):
+def atr_h14_now(sym, hi_ts=None):
+    """此刻的 atr_h14 —— 與 `bars.atr_hourly_wilder` **同一個配方**算在小時 K 快取上。
+
+    2026-09-08 實盤體檢抓到：意圖的停損距離用的是 thresholds.parquet 的 ATR
+    （每日重建一次），而研究驗證用的是逐分鐘的 atr_h14。實測差 2-8%、而
+    24 小時內分鐘 ATR 本身波動 17-31% —— 停損距離會偏 ±10-30%。
+    Wilder EWM(adjust=False) 依賴長歷史，240 分鐘的 live 視窗算不出來；
+    小時 K 快取有 22k 根、每小時更新，正好是它的原料。shift(1) 保證只用
+    **已收盤**的小時（與 bars.py 的「嚴格早於 t」語意一致）。
+    已知答案對照：對 parquet 最後一根 atr_h14 誤差 < 1%（見 conj_intent_check）。
+    """
+    import bars as _bars
+    p = CACHE / f"{sym}USDT_1h.csv"
+    if not p.exists():
+        return None
+    b = sc.load_csv(str(p))
+    if hi_ts is not None:
+        # 已知答案對照用：截到「含 hi_ts 的那個小時」為止，與 parquet 的
+        # atr_h14 在同一時點比。小時 K 快取的時間戳是秒（mistake.md 2026-04-12）。
+        cts = np.array([(x[0] * 1000 if x[0] < 1e12 else x[0]) for x in b],
+                       np.int64)
+        cut = int(np.searchsorted(cts, (int(hi_ts) // 3_600_000) * 3_600_000 + 1))
+        b = b[:cut]
+    h = np.array([x[sc.H] for x in b], float)
+    l = np.array([x[sc.L] for x in b], float)
+    c = np.array([x[sc.C] for x in b], float)
+    tr = _bars.true_range(h, l, c)
+    a = pd.Series(tr).ewm(alpha=1 / 14, adjust=False, min_periods=14).mean()
+    a = a.shift(1)                       # 小時 H 的 ATR 在 H 收盤才知道
+    v = float(a.iloc[-1])
+    return v if np.isfinite(v) and v > 0 else None
+
+
+def detect_window(sym, ts, high, low, close, vol, delta, t, g, det,
+                  atr_override=None):
     """一個幣、一段分鐘 K -> 要寫進 conj_events_live 的列。
 
     抽出來是為了**能被注入已知答案驗證**。交會事件約每幣每 2.5 天一次，
@@ -424,7 +490,8 @@ def detect_window(sym, ts, high, low, close, vol, delta, t, g, det):
         imp = 1 if close[a] > close[a - W] else -1
         out.append((sym + "-USD", int(ts[a]), det,
                     det - (int(ts[a]) + 60_000), sig, imp,
-                    lvl_at.get(a, 0.0), float(close[a]), float(t.atr)))
+                    lvl_at.get(a, 0.0), float(close[a]),
+                    float(atr_override) if atr_override else float(t.atr)))
     return out
 
 
@@ -442,14 +509,25 @@ def make_intent(e, det):
     px = float(px)
     atr = float(atr)
     side = "LONG" if d > 0 else "SHORT"
-    stop = px - d * STOP_ATR * atr
+    stop_dist = STOP_ATR * atr
+    stop = px - d * stop_dist
+    # 2026-09-08 實盤體檢：停損與出場都必須**相對成交**，不能錨在 close[a]。
+    #   stop_price 是研究端的參考（錨在 close[a]）；產品端真正掛的是
+    #   fill ∓ stop_dist —— 否則成交若已離 close[a] 半個 ATR，有效停損就是
+    #   0.5 或 1.5 ATR，極端時停損價在送單當下已被穿過（交易所拒單或立即觸發）。
+    #   exit 同理：研究是「進場後 60 分」，不是「錨點後 60 分」——
+    #   產品端平倉時刻 = fill_ts + hold_ms。exit_ts 只是參考。
+    #   intent_id 是去重鍵：端點在 TTL 內會重複吐同一筆，產品端必須以它去重。
     return dict(canonical_symbol=sym, anchor_ts=int(ev_ts), intent_ts=det,
                 expires_ts=int(ev_ts) + INTENT_TTL_S * 1000,
                 side=side, ref_price=px, stop_price=float(stop),
-                exit_ts=int(ev_ts) + HOLD_MIN * 60_000, atr=atr,
+                stop_dist=float(stop_dist),
+                exit_ts=int(ev_ts) + HOLD_MIN * 60_000,
+                hold_ms=HOLD_MIN * 60_000, atr=atr,
                 notional_usd=NOTIONAL_USD,
                 size_base=NOTIONAL_USD / px if px > 0 else 0.0,
-                signature=sig, status="NEW")
+                signature=sig, status="NEW",
+                intent_id=f"{sym}:{int(ev_ts)}")
 
 
 def intent_gate(conn, intents):
@@ -463,9 +541,20 @@ def intent_gate(conn, intents):
     now = int(time.time() * 1000)
     day0 = now - (now % 86_400_000)
     with conn.cursor() as cur:
-        cur.execute("SELECT canonical_symbol, COUNT(*) FROM conj_intents "
-                    "WHERE status IN ('NEW','SENT','OPEN') AND exit_ts > %s "
-                    "GROUP BY canonical_symbol", (now,))
+        # 「持倉中」的定義（2026-09-08 實盤體檢修正）：
+        #   (a) NEW 且**尚未過期**——還可能被送出去
+        #   (b) 已有成交回報（agent_conj_fills）且持有窗未到
+        # 原版把「status=NEW 且 exit_ts 未到」全算持倉：一個從沒被送出、
+        # 180 秒就過期的意圖會佔一個槽位 60 分鐘 —— 幽靈持倉擋真單。
+        # 而 status 本來就沒有任何路徑會變（agent 唯讀、產品端不直連 DB），
+        # 所以「有沒有成交」只能從產品端回報的 agent_conj_fills 推。
+        cur.execute(
+            "SELECT i.canonical_symbol, COUNT(*) FROM conj_intents i "
+            "LEFT JOIN agent_conj_fills f "
+            "  ON f.intent_id = CONCAT(i.canonical_symbol, ':', i.anchor_ts) "
+            "WHERE (f.intent_id IS NULL AND i.status='NEW' AND i.expires_ts > %s) "
+            "   OR (f.intent_id IS NOT NULL AND f.fill_ts + i.hold_ms > %s) "
+            "GROUP BY i.canonical_symbol", (now, now))
         open_by = dict(cur.fetchall() or [])
         cur.execute("SELECT COUNT(*) FROM conj_intents WHERE intent_ts >= %s",
                     (day0,))
@@ -539,7 +628,8 @@ def main():
 
             det = int(time.time() * 1000)
             for e in detect_window(sym, ts, high, low, close, vol, delta,
-                                   t, lv_by.get(sym), det):
+                                   t, lv_by.get(sym), det,
+                                   atr_override=atr_h14_now(sym)):
                 if recent_ok(conn, e[0], e[1]) is False:
                     continue
                 events.append(e)
@@ -549,11 +639,11 @@ def main():
         if keep:
             cols = ("canonical_symbol,anchor_ts,intent_ts,expires_ts,side,"
                     "ref_price,stop_price,exit_ts,atr,notional_usd,"
-                    "size_base,signature,status")
+                    "size_base,signature,status,stop_dist,hold_ms,intent_id")
             with conn.cursor() as cur:
                 cur.executemany(
                     f"INSERT IGNORE INTO conj_intents ({cols}) "
-                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                     [tuple(i[k] for k in cols.split(",")) for i in keep])
             conn.commit()
             for i in keep:

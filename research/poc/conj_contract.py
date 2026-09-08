@@ -26,14 +26,30 @@
 ===========================================================================
 產品端**可以**讀（而且只能讀）這些欄位：
 
+    intent_id         去重鍵（symbol:anchor_ts）。端點在 180 秒 TTL 內會重複吐
+                      同一筆 —— **必須以它去重**，否則下兩次單。
     canonical_symbol  哪個標的（產品端只需要一張靜態的市場代號對照表）
     side              LONG / SHORT —— **不得自己判方向**
     size_base         下多少（幣為單位）—— **不得自己算 sizing**
-    stop_price        停損觸發價 —— **不得自己算停損距離**
-    exit_ts           什麼時候平倉 —— **不得自己算持有時間**
+    stop_dist         停損**距離**（價格單位）。產品端掛的停損 =
+                      **fill − stop_dist（buy）／ fill + stop_dist（sell）**
+                      —— 相對成交價，不是相對 close[a]（2026-09-08 修）
+    hold_ms           持有時長。平倉時刻 = **fill_ts + hold_ms**（2026-09-08 修）
     expires_ts        超過這個時刻就不要送了（陳舊的單比沒有單更糟）
+    stop_price        研究端的參考停損（錨在 close[a]）—— **只用來對帳**
+    exit_ts           研究端的參考出場時刻 —— **只用來對帳**
     ref_price         研究端假設的進場價 —— **只用來對帳,不是限價**
-    anchor_ts         事件錨點,回報成交時要帶回來
+    anchor_ts         事件錨點
+
+產品端唯一被允許的算術：把 stop_dist / hold_ms **套在成交上**（一個減法、
+一個加法）。這不是推導——它套的是研究端給的數字，套在產品端唯一知道而
+研究端不知道的那件事（成交）上。
+
+產品端**必須**回報（POST /public/conj-fill，標頭 X-Conj-Token）：
+
+    intent_id / side / fill_price / fill_qty / sent_ts / fill_ts / venue
+    -> 回報後 /public/conj-signals 就不再吐這筆（去重閉環）
+    -> 研究端在 agent_conj_fills 對帳：fill_price vs ref_price 差幾 bps
 
 產品端**不得**知道、也不需要知道的（全部留在研究端）：
 
@@ -74,11 +90,26 @@ sys.path.insert(0, str(HERE.parents[1]))
 import conj_watch as cw  # noqa: E402
 
 # 產品端可以讀的欄位（白名單，加欄位要連同契約一起改）
-ALLOWED = ["canonical_symbol", "side", "size_base", "stop_price",
-           "exit_ts", "expires_ts", "ref_price", "anchor_ts"]
-# 下一張單最少需要的
-REQUIRED_FOR_ORDER = ["canonical_symbol", "side", "size_base",
-                      "stop_price", "exit_ts", "expires_ts"]
+#
+# 2026-09-08 實盤體檢改了三處，理由寫在 conj_watch.make_intent：
+#   stop_dist  停損**距離**（價格單位）。產品端掛的停損 = fill ∓ stop_dist，
+#              不是 stop_price。stop_price 錨在 close[a]，成交若已離它半個
+#              ATR，有效停損就是 0.5 或 1.5 ATR；極端時在送單當下已被穿過。
+#   hold_ms    持有時長。平倉時刻 = fill_ts + hold_ms，不是 exit_ts。
+#              研究定義是「進場後 60 分」不是「錨點後 60 分」。
+#   intent_id  去重鍵。端點在 TTL 內會重複吐同一筆，產品端**必須**以它去重；
+#              回報成交後端點就不再吐它（閉環）。
+# 這三個仍然是「研究端算好的數字」——產品端只是把它們套在**它唯一知道的
+# 那件事（成交）**上，沒有任何策略推導。
+ALLOWED = ["intent_id", "canonical_symbol", "side", "size_base",
+           "stop_dist", "hold_ms", "expires_ts",
+           "stop_price", "exit_ts", "ref_price", "anchor_ts"]
+# 下一張單最少需要的（stop_price / exit_ts 只是參考，不在必要清單）
+REQUIRED_FOR_ORDER = ["intent_id", "canonical_symbol", "side", "size_base",
+                      "stop_dist", "hold_ms", "expires_ts"]
+# 產品端必須回報的（POST /public/conj-fill，帶 X-Conj-Token）
+REQUIRED_FOR_REPORT = ["intent_id", "side", "fill_price", "fill_qty",
+                       "sent_ts", "fill_ts", "venue"]
 # 絕不可出現在產品端的研究端常數
 FORBIDDEN_CONSTANTS = ["STOP_ATR", "HOLD_MIN", "PIVOT", "MERGE_GAP",
                        "COOLDOWN", "thr_delta", "thr_vol", "vol_base_tod",
@@ -94,12 +125,21 @@ def build_order(row):
         raise ValueError(f"方向不合法: {row['side']}")
     if not (float(row["size_base"]) > 0):
         raise ValueError("張數必須 > 0")
+    if not (float(row["stop_dist"]) > 0):
+        raise ValueError("停損距離必須 > 0")
+    if not (int(row["hold_ms"]) > 0):
+        raise ValueError("持有時長必須 > 0")
+    # 產品端拿到成交價 fill、成交時刻 fill_ts 之後：
+    #   stopTrigger = fill - stopDist   (buy)  /  fill + stopDist  (sell)
+    #   closeAt     = fill_ts + holdMs
+    # 這兩個減法／加法是產品端唯一被允許的算術——它們套的是研究端給的數字。
     return {
+        "intentId": row["intent_id"],
         "market": row["canonical_symbol"],
         "side": "buy" if row["side"] == "LONG" else "sell",
         "sizeBase": float(row["size_base"]),
-        "stopTrigger": float(row["stop_price"]),
-        "closeAtMs": int(row["exit_ts"]),
+        "stopDist": float(row["stop_dist"]),
+        "holdMs": int(row["hold_ms"]),
         "dropAfterMs": int(row["expires_ts"]),
     }
 
