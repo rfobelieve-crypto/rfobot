@@ -16,10 +16,16 @@
     所以：**排程只要叫這一支就好**，不要分別叫四支。
 
 順序（每一步失敗都會被記進旗標，不會靜默）
-    1. fetch_bars.py   增量抓 1 分鐘 K 線
-    2. bars.py         重建 bars parquet（含 ATR、delta）
-    3. fetch_oi.py     增量抓 OI
-    4. conj_clock.py   計分並寫時鐘
+    1. fetch_bars.py      增量抓 1 分鐘 K 線
+    2. bars.py            重建 bars parquet（含 ATR、delta）
+    3. fetch_oi.py        增量抓 OI
+    4. levels.py          重建未消耗價位  ← 2026-09-08 補
+    5. events.py          重建掃單事件    ← 2026-09-08 補
+    6. conj_clock.py      計分並寫時鐘（「或」，凍結 09-07）
+    7. conj_clock_and.py  計分並寫時鐘（「且」，凍結 09-08）
+
+    **第 4、5 步原本不在這裡**，而它們正是時鐘的掃單來源。少了它們，
+    時鐘不是「累積得慢」是**結構上不可能累積**——見 STEPS 裡的註解。
 
 用法
     python research/poc/conj_update.py
@@ -41,6 +47,15 @@ STEPS = [
     ("fetch_bars", HERE / "fetch_bars.py", []),
     ("bars", HERE / "bars.py", []),
     ("fetch_oi", HERE / "fetch_oi.py", []),
+    # 2026-09-08 補：這兩階段**原本不在班車上**，而時鐘的掃單來源就是它們。
+    # 後果不是「累積得慢」是**結構上不可能累積**：bars 天天更新、
+    # levels/events 停在手動跑的那天(09-06)、凍結日 09-07 之後的前瞻窗
+    # 因此永遠 0 個掃單 -> 交會 = S ∧ 流量 -> 永遠 0 筆。
+    # 而旗標一直是綠的,因為「有跑的每一步都跑成功了」。
+    # 這是 mistake.md 2026-09-01 的形狀:freshness 看得到心跳,
+    # 看不到沒有心臟。同族:變體 M(註冊後從未有計分器)。
+    ("levels", HERE / "levels.py", []),
+    ("events", HERE / "events.py", []),
     ("conj_clock", HERE / "conj_clock.py", []),
     # 2026-09-08：「且」變體的並行時鐘（S ∧ D ∧ V，凍結 2026-09-08）。
     # 兩條各判各的——現行那條不作廢，它測的是被稀釋過的版本，是保守的。
