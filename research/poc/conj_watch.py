@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -92,6 +93,21 @@ MAX_DAILY = 8               # 每日意圖上限（事件率 2-3/天，8 是異�
 STOP_ATR = 1.0              # 停損距離（出場體檢選的那一格，見 TODO §1.03）
 HOLD_MIN = 60               # 時間出場
 INTENT_TTL_S = 180          # 意圖過期：超過就別送陳舊的單（死線是 2 分鐘）
+# ───────────────────── 2026-09-09：意圖層停止產生 ─────────────────────
+# `conj_redef.py` 查出這條線的進場定義是前視的：`et.cluster` 的錨點是群內
+# **最早**那一分鐘，而交會事件要到最後一個成分到齊（ready）才成立。
+#   · 事件成立晚於錨點 60.7%（中位 2 分鐘）
+#   · 進場（錨點+2）落在事件成立**之前** 22.3% —— 那一刻事件還不存在
+#   · 那 671 筆 +0.5064 -> 誠實後 +0.1094，全體 +0.2286 -> +0.1157
+# 改成誠實錨點（ready）後逐格重跑，**沒有任何可交易延遲的淨值 CI 下緣 > 0**
+# （delay 1/2/3/5/10 淨 -0.043/-0.027/-0.019/-0.048/-0.060，逐幣 2-3/9）。
+#
+# 所以現在產生的意圖，其 ref_price（= close[錨點]）是一個在送單當下已經
+# 過去的價格，而且整套規則扣成本後期望為負。**在定義修好、重新過閘之前
+# 不得產生任何意圖**——事件偵測（conj_events_live）照跑，那是 shadow 記錄。
+# 要恢復必須：(a) 錨點改 ready、(b) 重跑 conj_redef 有一格過閘、
+# (c) 回頭改 CLAUDE.md 的 override #7。設 CONJ_INTENTS=1 可強制開啟（僅測試用）。
+INTENTS_ENABLED = os.environ.get("CONJ_INTENTS", "") == "1"
 UA = {"User-Agent": "conj-watch/1.0"}
 
 
@@ -633,8 +649,13 @@ def main():
                 if recent_ok(conn, e[0], e[1]) is False:
                     continue
                 events.append(e)
-                intents.append(make_intent(e, det))
+                if INTENTS_ENABLED:
+                    intents.append(make_intent(e, det))
 
+        if not INTENTS_ENABLED and events:
+            print(f"[HALT] 意圖層已停止（2026-09-09 前視判決，見檔頭 "
+                  f"INTENTS_ENABLED）——本輪 {len(events)} 個事件只記 shadow，"
+                  f"不產生任何訂單意圖")
         keep = intent_gate(conn, intents)
         if keep:
             cols = ("canonical_symbol,anchor_ts,intent_ts,expires_ts,side,"
@@ -674,8 +695,14 @@ def main():
         "latency_ms_max": max(lat) if lat else None,
         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
     }, indent=2, ensure_ascii=False), encoding="utf-8")
+    # 意圖層狀態**無條件印**：交會事件約每幣 2.5 天一次，所以 events=0 是
+    # 常態，而「if not INTENTS_ENABLED and events」那行在 0 的時候不會印
+    # —— 那個 0 同時代表「這分鐘沒事件」與「HALT 訊息路徑壞了」，畫面上
+    # 一模一樣（mistake.md 2026-08-26 的形狀，本 session 已踩三次）。
     print(f"conj_watch: events={found}  cycle={took:.0f}ms  ok={ok}"
-          + (f"  max_latency={max(lat)}ms" if lat else ""))
+          + (f"  max_latency={max(lat)}ms" if lat else "")
+          + ("  intents=**HALTED**（2026-09-09 前視判決）"
+             if not INTENTS_ENABLED else "  intents=ON"))
     return 0 if ok else 1
 
 
