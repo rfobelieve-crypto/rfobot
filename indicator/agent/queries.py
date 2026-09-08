@@ -18,6 +18,7 @@ import os
 import re
 import secrets
 from datetime import datetime, timezone
+import time
 from typing import Any, Optional
 
 DISCLAIMER = (
@@ -1097,6 +1098,54 @@ def public_live_status() -> dict[str, Any]:
 
 # ── Public: research clocks (site ledger board, 2026-08-02) ─────────────
 # Counts only — which clock stands where. All tables whitelisted reads.
+
+def public_conj_signals(limit: int = 20) -> dict[str, Any]:
+    """交會事件的訂單意圖 —— 產品端照抄下單用（TODO §1.03，2026-09-08）。
+
+    **這個端點吐的是訂單不是規格。** 每一列的方向、張數、停損價、出場時刻
+    全部是研究端算好的；產品端不得推導任何東西，只能照抄、送出、回報成交。
+    契約與反向證明在 `research/poc/conj_contract.py`（C1-C3）。
+
+    為什麼不傳規格：這個專案被「規格用文字寫、產品端照著實作、兩邊漂開」
+    咬過兩次（§0.59 漏了 TREND_DOWN；regime_cell 四層都對只有 emit 沒有）。
+    傳訂單就沒有東西被複製，也就沒有東西會漂開。
+
+    **已過期的意圖不吐**：死線是 2 分鐘，陳舊的單比沒有單更糟。
+    """
+    if _seed_mode():
+        return {"signals": [], "count": 0, "_source": "seed"}
+    now_ms = int(time.time() * 1000)
+    conn = _conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT canonical_symbol, anchor_ts, intent_ts, expires_ts, "
+                "       side, ref_price, stop_price, exit_ts, size_base, "
+                "       signature, status "
+                "FROM conj_intents "
+                "WHERE status='NEW' AND expires_ts > %s "
+                "ORDER BY intent_ts DESC LIMIT %s",
+                (now_ms, int(limit)))
+            rows = cur.fetchall() or []
+    finally:
+        conn.close()
+    out = []
+    for r in rows:
+        out.append({
+            "canonical_symbol": r["canonical_symbol"],
+            "anchor_ts": int(r["anchor_ts"]),
+            "intent_ts": int(r["intent_ts"]),
+            "expires_ts": int(r["expires_ts"]),
+            "side": r["side"],
+            "ref_price": float(r["ref_price"]),
+            "stop_price": float(r["stop_price"]),
+            "exit_ts": int(r["exit_ts"]),
+            "size_base": float(r["size_base"]),
+            "signature": r["signature"],
+        })
+    return {"signals": out, "count": len(out), "asof_ms": now_ms,
+            "disclaimer": "not financial advice"}
+
 
 def public_research_clocks() -> dict[str, Any]:
     if _seed_mode():

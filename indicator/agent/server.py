@@ -1155,6 +1155,40 @@ async def public_arb_status_route(request: Request) -> JSONResponse:
     return resp
 
 
+@mcp.custom_route("/public/conj-signals", methods=["GET"])
+async def public_conj_signals_route(request: Request) -> JSONResponse:
+    """交會事件的訂單意圖 —— 產品端照抄下單（TODO §1.03，2026-09-08）。
+
+    **不快取。** 其他 /public/* 都快取 300 秒，這一條不行：可執行窗口是
+    **2 分鐘**（扣成本後 CI 下緣仍 > 0 的最大延遲，conj_pipeline.py），
+    5 分鐘的快取會讓每一筆訊號在送到消費者手上時就已經死了。
+    意圖本身帶 `expires_ts`，過期的在查詢層就不吐。
+
+    這裡吐的是**訂單不是規格**：方向、張數、停損價、出場時刻全部研究端
+    算好。產品端不得推導任何東西——契約與反向證明在
+    `research/poc/conj_contract.py`。
+    """
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
+    try:
+        limit = int(request.query_params.get("limit", 20))
+    except ValueError:
+        limit = 20
+    limit = max(1, min(limit, 50))
+    try:
+        payload = await anyio.to_thread.run_sync(
+            lambda: queries.public_conj_signals(limit))
+        code = 200
+    except Exception as e:  # noqa: BLE001 — degrade to 503, never crash
+        payload = {"error": f"conj signals unavailable: {type(e).__name__}"}
+        code = 503
+    resp = JSONResponse(payload, status_code=code)
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 @mcp.custom_route("/public/prereg-clocks", methods=["GET"])
 async def public_prereg_route(request: Request) -> JSONResponse:
     _rl = security.rate_gate(request)
