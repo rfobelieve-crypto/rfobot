@@ -81,6 +81,17 @@ LOOKBACK_MIN = 240
 # （注入測試 77.8%，漏掉的清一色是「錨點在 n-7 而閘門要求 >= n-6」）。
 # 跨輪去重本來就由 `recent_ok` 的 60 分冷卻 + UNIQUE KEY 負責，這裡不需要緊。
 EMIT_RECENT = 15
+
+# ── 執行參數（2026-09-08 第 7 次 override，CLAUDE.md 有完整記錄）──
+# 本層**只算訂單意圖、不送單**。送單在 jarvis（沿用既有 src/exchange/bg），
+# 在這裡再寫一份 Python 下單層是被禁止的——那是第二份實作，而且是下單層。
+NOTIONAL_USD = 150.0        # 每筆名目。$300-500 本金、最多 2 筆同時 -> <1x
+MAX_CONCURRENT = 2          # 全域同時持倉上限
+MAX_PER_SYMBOL = 1          # 同一幣不重複進場
+MAX_DAILY = 8               # 每日意圖上限（事件率 2-3/天，8 是異常煞車）
+STOP_ATR = 1.0              # 停損距離（出場體檢選的那一格，見 TODO §1.03）
+HOLD_MIN = 60               # 時間出場
+INTENT_TTL_S = 180          # 意圖過期：超過就別送陳舊的單（死線是 2 分鐘）
 UA = {"User-Agent": "conj-watch/1.0"}
 
 
@@ -330,6 +341,26 @@ def fetch_recent(sym, limit=LOOKBACK_MIN):
 def ensure_table(conn):
     with conn.cursor() as cur:
         cur.execute("""
+        CREATE TABLE IF NOT EXISTS conj_intents (
+            id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+            canonical_symbol VARCHAR(20) NOT NULL,
+            anchor_ts     BIGINT      NOT NULL,
+            intent_ts     BIGINT      NOT NULL,
+            expires_ts    BIGINT      NOT NULL,
+            side          VARCHAR(6)  NOT NULL,
+            ref_price     DECIMAL(24,8) NOT NULL,
+            stop_price    DECIMAL(24,8) NOT NULL,
+            exit_ts       BIGINT      NOT NULL,
+            atr           DECIMAL(24,8) NOT NULL,
+            notional_usd  DECIMAL(18,4) NOT NULL,
+            size_base     DECIMAL(28,10) NOT NULL,
+            signature     VARCHAR(40) NOT NULL,
+            status        VARCHAR(12) NOT NULL DEFAULT 'NEW',
+            UNIQUE KEY uniq_intent (canonical_symbol, anchor_ts),
+            INDEX idx_status (status, intent_ts)
+        )
+        """)
+        cur.execute("""
         CREATE TABLE IF NOT EXISTS conj_events_live (
             id            BIGINT AUTO_INCREMENT PRIMARY KEY,
             canonical_symbol VARCHAR(20) NOT NULL,
@@ -397,6 +428,65 @@ def detect_window(sym, ts, high, low, close, vol, delta, t, g, det):
     return out
 
 
+def make_intent(e, det):
+    """事件 -> 完整訂單意圖。**這裡不送單**，只把參數算齊。
+
+    送不出你沒算過的單：張數、方向、停損價這三個算錯就是真賠錢，而它們
+    在 2026-09-08 之前一次都沒被執行過。所以先讓它們每分鐘被算出來、
+    寫進 DB、被人看得到，再接真錢。
+
+    e = (sym, event_ts, det_ts, latency, sig, direction, level, px, atr)
+    direction: +1 = LONG, -1 = SHORT（impulse 方向，本線是順著走）
+    """
+    sym, ev_ts, _d, _lat, sig, d, _lvl, px, atr = e
+    px = float(px)
+    atr = float(atr)
+    side = "LONG" if d > 0 else "SHORT"
+    stop = px - d * STOP_ATR * atr
+    return dict(canonical_symbol=sym, anchor_ts=int(ev_ts), intent_ts=det,
+                expires_ts=int(ev_ts) + INTENT_TTL_S * 1000,
+                side=side, ref_price=px, stop_price=float(stop),
+                exit_ts=int(ev_ts) + HOLD_MIN * 60_000, atr=atr,
+                notional_usd=NOTIONAL_USD,
+                size_base=NOTIONAL_USD / px if px > 0 else 0.0,
+                signature=sig, status="NEW")
+
+
+def intent_gate(conn, intents):
+    """全域煞車：同時持倉、單幣、單日上限。任一超過就不產生意圖。
+
+    這三個上限是 override 記錄裡列的緩解措施（CLAUDE.md 2026-09-08），
+    不是可調參數——要動必須回去改那份記錄。
+    """
+    if not intents:
+        return []
+    now = int(time.time() * 1000)
+    day0 = now - (now % 86_400_000)
+    with conn.cursor() as cur:
+        cur.execute("SELECT canonical_symbol, COUNT(*) FROM conj_intents "
+                    "WHERE status IN ('NEW','SENT','OPEN') AND exit_ts > %s "
+                    "GROUP BY canonical_symbol", (now,))
+        open_by = dict(cur.fetchall() or [])
+        cur.execute("SELECT COUNT(*) FROM conj_intents WHERE intent_ts >= %s",
+                    (day0,))
+        n_today = int((cur.fetchone() or [0])[0])
+    out = []
+    live = sum(open_by.values())
+    for it in intents:
+        s = it["canonical_symbol"]
+        if n_today + len(out) >= MAX_DAILY:
+            print(f"[GATE] 每日上限 {MAX_DAILY} 已滿，跳過 {s}")
+            continue
+        if live + len(out) >= MAX_CONCURRENT:
+            print(f"[GATE] 同時持倉上限 {MAX_CONCURRENT} 已滿，跳過 {s}")
+            continue
+        if open_by.get(s, 0) >= MAX_PER_SYMBOL:
+            print(f"[GATE] {s} 已有部位，跳過")
+            continue
+        out.append(it)
+    return out
+
+
 def recent_ok(conn, sym, ev_ts):
     """跨輪的 60 分鐘冷卻：`assemble` 的冷卻只在本輪的視窗內成立。"""
     with conn.cursor() as cur:
@@ -425,6 +515,7 @@ def main():
         ensure_table(conn)
 
         events = []
+        intents = []
         for sym in CORE9:
             if sym not in thr_by:
                 continue
@@ -452,6 +543,23 @@ def main():
                 if recent_ok(conn, e[0], e[1]) is False:
                     continue
                 events.append(e)
+                intents.append(make_intent(e, det))
+
+        keep = intent_gate(conn, intents)
+        if keep:
+            cols = ("canonical_symbol,anchor_ts,intent_ts,expires_ts,side,"
+                    "ref_price,stop_price,exit_ts,atr,notional_usd,"
+                    "size_base,signature,status")
+            with conn.cursor() as cur:
+                cur.executemany(
+                    f"INSERT IGNORE INTO conj_intents ({cols}) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    [tuple(i[k] for k in cols.split(",")) for i in keep])
+            conn.commit()
+            for i in keep:
+                print(f"[INTENT] {i['canonical_symbol']} {i['side']} "
+                      f"ref={i['ref_price']:.6g} stop={i['stop_price']:.6g} "
+                      f"size={i['size_base']:.6g} (${i['notional_usd']:.0f})")
 
         if events:
             with conn.cursor() as cur:
