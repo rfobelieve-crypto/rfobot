@@ -169,9 +169,13 @@ def ledger(sym, liq=None):
             jx = end
             exit_px, stopped = float(cl[end]), False
             R = float(d * (cl[end] - ent) / A)
-        # 群內的掃單那一分鐘（錨點之後最近的一個）—— 只拿來畫價位線
+        # 群內的掃單那一分鐘（只拿來畫價位線）。
+        # 2026-09-09 收緊：原本容許錨點後 30 分鐘（6 x MERGE_GAP），但併窗
+        # 就是 5 分鐘 —— 超出的那個掃單**不屬於這一群**，畫出來的價位線會是
+        # 別的事件的。實測 1.2%（37/3,005）落在這個縫裡。寧可不畫也不畫錯：
+        # 超窗就 m=a，找不到對應事件列 -> level=None -> 該筆不畫價位線。
         k = np.searchsorted(sweep_set, a)
-        m = int(sweep_set[k]) if k < len(sweep_set) and sweep_set[k] - a <= 6 * MERGE_GAP else a
+        m = int(sweep_set[k]) if k < len(sweep_set) and sweep_set[k] - a <= MERGE_GAP else a
         t_sw = int(ts[m]) + ec.MIN_MS
         e_i = np.searchsorted(ev_ts, t_sw)
         level = origin = None
@@ -388,10 +392,18 @@ tbody tr.sel{background:#1c2530}
   <span><span class="sw" style="border-color:var(--sell)"></span>賣側價位被掃（向下穿越）</span>
   <span><span class="dot" style="background:var(--up)"></span>進場（錨點 +2 分開盤）</span>
   <span><span class="sq" style="background:var(--dn)"></span>出場（停損價或 +60 分收盤，「!」= 停損）</span>
+  <span style="width:100%"></span>
+  <span style="color:var(--amb)">⚠ 這是<b>延續</b>交易：順著突破方向進場，<b>不等回踩</b>——所以圓點
+  不會落在虛線（價位）上，而是在它外側。這跟舊的掃單失敗（回踩到價位才進）相反。</span>
   <button id="btnAll" class="on">全部交易</button>
   <button id="btnWin">只看賺</button>
   <button id="btnLose">只看賠</button>
-  <button id="btnClear">清除選取</button>
+  <span style="width:100%"></span>
+  <b>逐筆看：</b>
+  <button id="btnPrev">‹ 上一筆</button>
+  <span id="navpos" style="min-width:5em;text-align:center"></span>
+  <button id="btnNext">下一筆 ›</button>
+  <button id="btnFit">全景（90 天）</button>
   <span style="width:100%"></span>
   <span style="color:var(--dim)">簽名：</span>
   <button id="btnGA" class="on">不分</button>
@@ -432,6 +444,10 @@ const fmtP = v => v >= 1000 ? v.toFixed(1) : v >= 1 ? v.toFixed(3) : v.toFixed(5
 // script 打斷、圖一片空白而頁面其他部分照常渲染（mistake.md 2026-09-08）。
 let filt = 'all';       // 賺賠
 let grp  = 'all';       // 簽名
+// `$` 也宣告在這裡：focus() 在定義處之後才會被呼叫，但把取用工具留在
+// 檔案下半部正是上一次 TDZ 的形狀，不重複同一個佈局。
+const $ = id => document.getElementById(id);
+let cur = -1;           // 目前聚焦的交易 id（逐筆導航用）
 
 function kpis(){
   const G = (D.groups && D.groups[grp]) || {};
@@ -499,8 +515,13 @@ function focus(t){
   mk(t.entry, t.R>0?'#0ecb81':'#f6465d','進場');
   mk(t.stop, '#f6465d','停損 '+D.params.STOP+'ATR',3);
   mk(t.exit_px,'#f0b90b','出場 '+t.R.toFixed(3)+'ATR');
-  const pad = 3600*3;
+  // ±90 分鐘：一筆交易 62 分鐘，這個視野讓 5 分鐘 K 有 ~40 根、每根約 35
+  // 像素，掃單／進場／出場才分得開（±3 小時時每根只剩 15 像素，還是擠）。
+  const pad = 5400;
   chart.timeScale().setVisibleRange({from:t.t_anchor-pad, to:t.t_exit+pad});
+  cur = t.id;
+  const vis = D.trades.filter(keep), i = vis.findIndex(x=>x.id===t.id);
+  if(i>=0) $('navpos').textContent = `${i+1} / ${vis.length}`;
   document.getElementById('sel').innerHTML =
     `<b>#${t.id+1} ${t.side}</b>${t.forward?' <span class="fwd">（前瞻）</span>':''}`+
     ` · ${t.sweep} 穿過${t.level_side==='buyside'?'買側':'賣側'}價位 ${t.level===null?'—':fmtP(t.level)}`+
@@ -532,12 +553,11 @@ function table(){
 table();
 
 // 不用「id 直接當全域變數」那種瀏覽器特有寫法——J2 的替身抓不到它，
-// 而且它在真瀏覽器裡也只是碰巧能用。
-const $ = id => document.getElementById(id);
+// 而且它在真瀏覽器裡也只是碰巧能用。（`$` 宣告在檔案上方。）
 function setF(f, btn){
   filt = f;
   for(const b of ['btnAll','btnWin','btnLose']) $(b).classList.toggle('on', b===btn);
-  drawMarkers(); table();
+  drawMarkers(); table(); nav(0);
 }
 $('btnAll').onclick=()=>setF('all','btnAll');
 $('btnWin').onclick=()=>setF('win','btnWin');
@@ -545,16 +565,34 @@ $('btnLose').onclick=()=>setF('lose','btnLose');
 function setG(g, btn){
   grp = g;
   for(const b of ['btnGA','btnGand','btnGd','btnGv']) $(b).classList.toggle('on', b===btn);
-  kpis(); drawMarkers(); table();
+  kpis(); drawMarkers(); table(); nav(0);
 }
 $('btnGA').onclick=()=>setG('all','btnGA');
 $('btnGand').onclick=()=>setG('and','btnGand');
 $('btnGd').onclick=()=>setG('d','btnGd');
 $('btnGv').onclick=()=>setG('v','btnGv');
-$('btnClear').onclick=()=>{clearLines();chart.timeScale().fitContent();
-  document.getElementById('sel').textContent='點下方任一列 —— 圖表跳到那一筆，並畫出它的價位、進場、停損、出場四條線。';};
+$('btnFit').onclick=()=>{clearLines();chart.timeScale().fitContent();
+  $('navpos').textContent='全景';
+  $('sel').textContent='全景下一筆交易只有 62 分鐘 ≈ 12 根 K，標記會疊在一起 —— 用「逐筆看」或點下表任一列。';};
 
-chart.timeScale().fitContent();
+// 預設**不做 fitContent**：90 天 = 25,921 根 5 分 K 塞進一個畫面，一根 K
+// 只有 0.05 像素，而一筆交易 62 分鐘 = 12 根 K = 0.67 像素 —— 掃單／進場／
+// 出場三個標記在全景下疊成同一個點，看起來像「進出場位置不對」。
+// （2026-09-09 使用者：「回測的進出場跟我看的也差很多」。計算層逐筆對回
+// 原始 1 分鐘 bar 全部吻合，錯的是預設視野。）
+// 所以開頁就聚焦到最後一筆，並提供逐筆導航。（`cur` 宣告在檔案上方。）
+function nav(step){
+  const vis = D.trades.filter(keep);
+  if(!vis.length){ $('navpos').textContent='0 筆'; return; }
+  let i = vis.findIndex(t=>t.id===cur);
+  i = (i<0) ? vis.length-1 : Math.min(vis.length-1, Math.max(0, i+step));
+  cur = vis[i].id;
+  $('navpos').textContent = `${i+1} / ${vis.length}`;
+  focus(vis[i]);
+}
+$('btnPrev').onclick=()=>nav(-1);
+$('btnNext').onclick=()=>nav(1);
+nav(0);
 new ResizeObserver(()=>{chart.applyOptions({});eqc.applyOptions({});})
   .observe(document.body);
 </script></body></html>

@@ -93,11 +93,13 @@ globalThis.LightweightCharts={createChart:()=>{__made=true;return{
   addCandlestickSeries:()=>({setData(){},setMarkers(){},createPriceLine(){},
     removePriceLine(){},applyOptions(){}}),
   addLineSeries:()=>({setData(){},applyOptions(){}}),
-  timeScale:()=>({fitContent(){},setVisibleRange(){},applyOptions(){},
+  timeScale:()=>({fitContent(){},setVisibleRange(){__focused=true;},applyOptions(){},
     subscribeVisibleLogicalRangeChange(){},setVisibleLogicalRange(){}}),
   applyOptions(){},subscribeCrosshairMove(){},resize(){}};}};
-process.on('exit',()=>console.log('__CHART_CREATED__='+__made));
+process.on('exit',()=>{console.log('__CHART_CREATED__='+__made);
+  console.log('__FOCUSED__='+__focused);});
 """
+STUB = STUB.replace("let __made=false;", "let __made=false;let __focused=false;")
 
 
 def _html() -> str:
@@ -142,3 +144,11 @@ def test_j2_script_runs_and_creates_chart():
     assert "before initialization" not in out, out[-600:]
     assert "ReferenceError" not in out, out[-600:]
     assert "__CHART_CREATED__=true" in out, "createChart 沒被呼叫到\n" + out[-600:]
+    # J3（2026-09-09，使用者：「回測的進出場跟我看的也差很多」）
+    # 開頁必須聚焦到一筆交易，不得停在全景：90 天 = 25,921 根 5 分 K，
+    # 一根 0.05 像素，而一筆交易 62 分鐘 = 12 根 K = 0.67 像素 —— 掃單／
+    # 進場／出場疊成一個點，看起來像位置畫錯了。計算層當時逐筆對回原始
+    # 1 分鐘 bar 全部吻合，錯的是預設視野。
+    assert "__FOCUSED__=true" in out, (
+        "開頁沒有 setVisibleRange —— 預設停在全景，一筆交易只有 0.67 像素寬，"
+        "三個標記會疊成一個點\n" + out[-600:])
