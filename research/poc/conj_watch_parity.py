@@ -26,16 +26,12 @@
         A 過而 B 不過 -> 差異純粹來自門檻近似（單一 30 日 p99 vs 逐日滾動），
         那是設計取捨不是 bug，但要量出它有多大。
 
-**已知的盲點（2026-09-08 發現，尚未補成註冊的關）**
-    A/B 兩個臂**都把離線的掃單事件餵給 live 邏輯**（`fb["sweep"] = cand["sweep"]`），
-    所以「**活價位表 + 穿越測試**」——也就是熱路徑真正在跑的那條——
-    從來沒有被本檔對照過。臨時查證（2026-09-08，最近 3 天、9 幣）：
-
-        掃單那一段   live 37 vs 離線 32  = 1.16x
-        交會事件     live  6 vs 離線  5
-
-    對得上，但那是手動查的，不是這裡的關。**下次動到 levels_asof /
-    detect_window 的掃單邏輯就沒有守衛**。要補成 C 臂。
+    C 臂「掃單那一段也對嗎」 2026-09-08 補。A/B 兩臂都把**離線的掃單事件**
+        餵給 live 邏輯（`fb["sweep"] = cand["sweep"]`），所以
+        「**活價位表 + 穿越測試**」——熱路徑真正在跑的那條——原本
+        **從來沒被對照過**。C 臂改用 live 自己的掃單來源：每個小時開盤
+        重建活價位（`pivot_table` 過濾，與 `levels_asof` 逐項驗證一致），
+        再對該小時的每一分鐘做**穿越測試**。
 
 判準（跑之前寫死）
     V1 A 臂重疊率 >= 0.95  -> 組裝是同一份
@@ -44,6 +40,20 @@
        -> 預算的門檻表夠接近，可以上線
        不過 -> 門檻要改成逐日重算（每天一次，成本可接受）
     V3 差異必須逐項歸因，不得只報比率。
+    V4 C 臂重疊率 >= 0.60 且 live 獨有 <= 0.50。
+       **反向證明失敗，已知這一關抓不到穿越/水準測試的差別**：把穿越測試
+       改回水準測試（我 2026-09-07 真的犯過的那個錯），C 臂只從 90.5% 動到
+       88.6%，照樣 PASS。原因是 `assemble` 的 60 分鐘冷卻把洪水吸收掉了
+       ——水準測試讓幾乎每分鐘都算掃單，冷卻只留每小時一個，總數幾乎沒變。
+       所以 C 臂只能抓「價位表整個空掉」那類粗故障。**細的那類由 V5 抓。**
+    V5 **原始掃單筆數比**（live / 離線）必須落在 [0.3, 3.0]。
+       這一關**不穿過冷卻與交會條件**，直接量掃單那一段——水準測試會讓
+       它暴增幾十倍，當場現形。反向證明過（見下）。
+       **這是回歸守衛不是驗證關**——live 的掃單來源（分鐘級穿越活價位）
+       與離線（小時級 `detect_sweeps`）本來就是不同的偵測器，本來就不該
+       要求高重疊。門檻是照 2026-09-08 的實測校準的，用途是「下次有人動
+       `levels_asof` / `detect_window` 把它弄壞時會大聲失敗」。
+       校準當天的實測寫在下面，未來若門檻要動必須連同理由一起改。
 """
 from __future__ import annotations
 
@@ -110,6 +120,8 @@ def main():
 
     A = np.zeros(3, int)          # both, only_off, only_live
     B = np.zeros(3, int)
+    C = np.zeros(3, int)
+    RAW = [0, 0]                  # live 原始掃單 / 離線原始掃單
     rows = []
     for sym in ec.CORE9:
         if sym not in thr_by:
@@ -155,19 +167,56 @@ def main():
         fb["sweep"] = cand["sweep"]
         liveB = [a for a, s in cw.assemble(fb) if a >= lo_i]
 
+        # ---- C 臂：掃單也用 live 自己的來源（活價位 + 穿越測試）----
+        pt = cw.pivot_table(sym)
+        bh = pd.read_parquet(BARS / f"{sym}.parquet", columns=["high", "low"])
+        mhi = np.nan_to_num(bh["high"].to_numpy(float), nan=-np.inf)
+        mlo = np.nan_to_num(bh["low"].to_numpy(float), nan=np.inf)
+        sw = []
+        if pt is not None:
+            hts, conf, lvl, ishi, fp, nh, _a = pt
+            h0 = int(np.searchsorted(hts, int(bts[lo_i])))
+            for hh in range(max(h0, 1), nh):
+                al = (conf < hh) & (fp >= hh)
+                if not al.any():
+                    continue
+                lb = lvl[al & ishi]
+                ls = lvl[al & ~ishi]
+                m0 = int(np.searchsorted(bts, int(hts[hh])))
+                m1 = int(np.searchsorted(bts, int(hts[hh]) + 3_600_000))
+                if m1 <= m0:
+                    continue
+                rm = np.maximum.accumulate(mhi[m0:m1])
+                rn = np.minimum.accumulate(mlo[m0:m1])
+                for k in range(m1 - m0):
+                    pm = rm[k - 1] if k else -np.inf
+                    pn = rn[k - 1] if k else np.inf
+                    if (((lb < mhi[m0 + k]) & (lb >= pm)).any()
+                            or ((ls > mlo[m0 + k]) & (ls <= pn)).any()):
+                        sw.append(m0 + k)
+        fc = dict(fb)
+        fc["sweep"] = np.array(sw, np.int64)
+        liveC = [a for a, s in cw.assemble(fc) if a >= lo_i]
+        # V5：原始筆數,不穿過冷卻/交會（那兩層會把洪水吸收掉）
+        RAW[0] += int((np.asarray(sw, np.int64) >= lo_i).sum())
+        RAW[1] += int((np.asarray(cand["sweep"], np.int64) >= lo_i).sum())
+
         ra = compare(off, liveA)
         rb = compare(off, liveB)
+        rc = compare(off, liveC)
         A += np.array(ra)
         B += np.array(rb)
-        rows.append((sym, len(off), ra[0], ra[1], ra[2], rb[0], rb[1], rb[2]))
+        C += np.array(rc)
+        rows.append((sym, len(off), ra[0], ra[1], ra[2],
+                     rb[0], rb[1], rb[2], rc[0], rc[1], rc[2]))
 
     print(f"=== live vs 離線偵測（最近 {DAYS} 天，容差 ±{TOL_MIN} 分）===")
     print()
-    print(f"{'幣':6s} {'離線':>5s} | {'A 都抓':>6s} {'A 漏':>5s} {'A 多':>5s}"
-          f" | {'B 都抓':>6s} {'B 漏':>5s} {'B 多':>5s}")
+    print(f"{'幣':6s} {'離線':>5s} | {'A抓':>4s} {'漏':>3s} {'多':>3s}"
+          f" | {'B抓':>4s} {'漏':>3s} {'多':>3s} | {'C抓':>4s} {'漏':>3s} {'多':>3s}")
     for r in rows:
-        print(f"{r[0]:6s} {r[1]:5d} | {r[2]:6d} {r[3]:5d} {r[4]:5d}"
-              f" | {r[5]:6d} {r[6]:5d} {r[7]:5d}")
+        print(f"{r[0]:6s} {r[1]:5d} | {r[2]:4d} {r[3]:3d} {r[4]:3d}"
+              f" | {r[5]:4d} {r[6]:3d} {r[7]:3d} | {r[8]:4d} {r[9]:3d} {r[10]:3d}")
 
     def rep(nm, arr, need_rec, need_fp=None):
         both, oo, ol = arr
@@ -190,6 +239,15 @@ def main():
     okB, recB, fpB = rep("V2 B 臂（live 自己的門檻表）", B, 0.80, 0.20)
     print("   -> " + ("PASS —— 預算的門檻表夠接近，可以上線" if okB else
                       "**FAIL —— 門檻表要改成逐日重算**"))
+    okC, recC, fpC = rep("V4 C 臂（掃單也用 live 來源）", C, 0.60, 0.50)
+    print("   -> " + ("PASS —— 回歸守衛就位" if okC else
+                      "**FAIL —— live 的掃單來源與離線不一致**"))
+    ratio = RAW[0] / max(RAW[1], 1)
+    ok5 = 0.3 <= ratio <= 3.0
+    print(f"V5 原始掃單筆數 live {RAW[0]:,} / 離線 {RAW[1]:,} = {ratio:.2f}x"
+          f"（需 0.3~3.0，不穿過冷卻）")
+    print("   -> " + ("PASS" if ok5 else
+                      "**FAIL —— live 的掃單偵測跟離線不是同一件事**"))
     print()
     print("V3 歸因：A 臂量的是組裝，B 臂多出來的差就是**門檻近似**的代價"
           f"（{(recA - recB)*100:+.1f} pp）。")

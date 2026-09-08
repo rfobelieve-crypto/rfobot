@@ -85,6 +85,49 @@ UA = {"User-Agent": "conj-watch/1.0"}
 
 
 # ───────────────────────── 狀態層（預算） ─────────────────────────
+def pivot_table(sym):
+    """所有樞紐 + 它們**第一次被穿越**的小時索引（未被穿越 = n）。
+
+    2026-09-08 加：`levels_asof` 每個時間切點都要重掃一次樞紐，對照測試
+    要跑幾百個切點時是 O(切點 x n)。樞紐條件與「第一次被穿越」都跟切點
+    無關，只算一次就好；之後任何切點只是兩個比較：
+        conf < T  且  first_pierce >= T   ->  在 T 時還活著
+    這與 `sweep_core.detect_sweeps` 是同一組條件（同一份偵測）。
+    回傳 (ts_ms, conf, level, is_hi, first_pierce)，全部是 numpy 陣列。
+    """
+    p = CACHE / f"{sym}USDT_1h.csv"
+    if not p.exists():
+        return None
+    bars = sc.load_csv(str(p))
+    atr = sc.atr14(bars)
+    ts = np.array([b[0] for b in bars], np.int64)
+    if ts.max() < 1e12:                 # 小時 K 是秒，分鐘 K 是毫秒
+        ts = ts * 1000
+    h = np.array([b[sc.H] for b in bars], float)
+    l = np.array([b[sc.L] for b in bars], float)
+    n = len(bars)
+    conf_, lvl_, ishi_, fp_ = [], [], [], []
+    for i in range(sc.PIVOT, n - sc.PIVOT):
+        conf = i + sc.PIVOT
+        if conf >= n or atr[conf] is None:
+            continue
+        sh, sl = h[i - sc.PIVOT:conf + 1], l[i - sc.PIVOT:conf + 1]
+        for is_hi, lvl, piv in (
+                (True, h[i], h[i] >= sh.max() and (sh < h[i]).any()),
+                (False, l[i], l[i] <= sl.min() and (sl > l[i]).any())):
+            if not piv:
+                continue
+            w = (h[conf + 1:] > lvl) if is_hi else (l[conf + 1:] < lvl)
+            k = np.flatnonzero(w)
+            conf_.append(conf)
+            lvl_.append(float(lvl))
+            ishi_.append(bool(is_hi))
+            fp_.append(conf + 1 + int(k[0]) if len(k) else n)
+    return (ts, np.array(conf_, np.int64), np.array(lvl_, float),
+            np.array(ishi_, bool), np.array(fp_, np.int64), n,
+            float(atr[n - 1] or 0.0))
+
+
 def levels_asof(sym, hi_ts=None):
     """某個幣在某個時點「還沒被穿越」的價位表。
 
