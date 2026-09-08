@@ -923,7 +923,7 @@ Desktop/linkedin_posts/*.docx        ← 授權格式（人寫的）
 | 策略 | 頁面 | 主要元件 | 吃的端點 |
 |---|---|---|---|
 | **V7** | `/charts/v7`、`/dashboard`、`/signals`、`/track-record` | ChartDetail、V7KpiRow、**V7FilterCard**（地形四維＋扳機進度）、LiveTradesPanel | `/public/chart`、`/live-chart`、`/signal-feed`、`/signal-history`、`/live-status`、`/track-record` |
-| **流動性獵取** | `/charts/liquidity`、`/dashboard` | ChartDetail（獵取覆盤圖）、SweepKpiRow、**ShadowLedgerBoard**（5 變體 + 8 組合 + 時鐘）、ShadowTradesPanel | `/public/liquidity-map`、`/public/sweep-status` |
+| **流動性獵取** | `/charts/liquidity`、`/charts/backtest`、`/dashboard` | ChartDetail（獵取覆盤圖）、SweepKpiRow、**ShadowLedgerBoard**（5 變體 + 8 組合 + 時鐘）、ShadowTradesPanel、**BacktestChart**（2026-09-08 起預設分頁是**交會線**，舊線在第二分頁作紀錄） | `/public/liquidity-map`、`/public/sweep-status`、`/public/conj-backtest`（agent 讀 `conj_backtest_pages`，本機 conj_update 班車產出）、`/public/backtest-chart`（舊線） |
 | **撤單流** | `/charts/cancel-flow`、`/dashboard` | CancelFlowExpert、CancelFlowKpiGrid | `/public/cancel-flow-chart`、`-chart-i`、`-stats` |
 | 共通 | `/`、`/system`、`/incidents`、`/writeups`、登入註冊 | Hero、StrategyBoard、SystemDetail、Waitlist | `/public/login`、`/register`、`/waitlist` |
 

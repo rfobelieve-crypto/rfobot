@@ -61,6 +61,11 @@ STEPS = [
     # 兩條各判各的——現行那條不作廢，它測的是被稀釋過的版本，是保守的。
     # 共用同一份資料抓取，所以掛在同一班車而不是另開排程。
     ("conj_clock_and", HERE / "conj_clock_and.py", []),
+    # 2026-09-08：網站的回測檢視器改畫交會線（使用者：「歷史回測應該要顯示
+    # 交會的那個策略」）。雲端沒有分鐘 bar，所以 HTML 在這裡算好、寫進
+    # conj_backtest_pages，agent 只 SELECT。掛在時鐘之後，頁面才讀得到
+    # 剛更新的 n/300。
+    ("conj_backtest", HERE / "conj_backtest.py", ["--all", "--publish"]),
 ]
 
 

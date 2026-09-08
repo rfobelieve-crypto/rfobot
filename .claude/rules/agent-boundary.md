@@ -59,6 +59,12 @@ Files under `indicator/agent/` MUST NOT import, at any depth:
   accumulated. The board shows PROGRESS ONLY; every verdict keeps its
   single owning scorer, so no number here can drift from the one that
   decides),
+  `conj_backtest_pages` (conjunction-line backtest viewer, 2026-09-08 —
+  WRITTEN by `research/poc/conj_backtest.py --publish` on the conj_update
+  train; one rendered HTML page per core9 symbol. The page needs minute
+  bars, OI and the event tables in research/poc/data, none of which is in
+  any image, so the cloud cannot render it — same family as v7_veto_clock.
+  The agent SELECTs the html and relays it at /public/conj-backtest),
   `v7_veto_clock` (adoption-trigger clock, 2026-08-20 — WRITTEN by
   `research/v7_veto_publish.py` hourly; the cloud route could not compute
   it (needs the local kline cache, not in the image) and silently served

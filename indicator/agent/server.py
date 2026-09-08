@@ -585,6 +585,64 @@ async def public_backtest_chart_route(request: Request) -> Response:
         token=INDICATOR_ADMIN_TOKEN)
 
 
+#   conj-backtest — the SAME viewer for the conjunction line (TODO §1.03,
+#                   the rule set going to small-size live on 2026-09-08).
+#                   Unlike backtest-chart there is NO origin to proxy: the
+#                   page needs minute bars / OI / event tables that live in
+#                   research/poc/data (gitignored, not in any image). Same
+#                   off-cloud-recorder family as v7_veto_clock: the local
+#                   conj_update train renders the HTML with
+#                   research/poc/conj_backtest.py --publish and writes one
+#                   row per symbol into `conj_backtest_pages`; this route
+#                   only SELECTs it (agent-boundary.md).
+_conj_bt_cache: dict = {}
+_CONJ_BT_CACHE_TTL_S = 1800.0
+
+
+def _conj_backtest_html(sym: str) -> Optional[bytes]:
+    try:
+        from shared.db import get_db_conn
+        conn = get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT html FROM conj_backtest_pages WHERE sym=%s",
+                            (sym,))
+                row = cur.fetchone()
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001  (table absent / DB down -> 503 below)
+        return None
+    if not row:
+        return None
+    html = row["html"] if isinstance(row, dict) else row[0]
+    return html.encode("utf-8") if isinstance(html, str) else html
+
+
+@mcp.custom_route("/public/conj-backtest", methods=["GET"])
+async def public_conj_backtest_route(request: Request) -> Response:
+    _rl = security.rate_gate(request)
+    if _rl is not None:
+        return _rl
+    sym = (request.query_params.get("symbol") or "BTC").strip().upper()
+    if sym not in _BACKTEST_CORE9:
+        sym = "BTC"
+    cache = _conj_bt_cache.setdefault(sym, {"bytes": None, "ts": 0.0})
+    now = time.monotonic()
+    if cache["bytes"] is None or now - cache["ts"] > _CONJ_BT_CACHE_TTL_S:
+        fetched = await anyio.to_thread.run_sync(_conj_backtest_html, sym)
+        if fetched is not None:
+            cache["bytes"] = fetched
+            cache["ts"] = now
+    if cache["bytes"] is None:
+        resp = Response(content=b"<h3>Chart temporarily unavailable</h3>",
+                        status_code=503, media_type="text/html")
+    else:
+        resp = Response(content=cache["bytes"], media_type="text/html")
+        resp.headers["Cache-Control"] = f"public, max-age={int(_CONJ_BT_CACHE_TTL_S)}"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 _sweep_status_cache: dict = {"data": None, "ts": 0.0}
 _SWEEP_STATUS_CACHE_TTL_S = 300.0
 

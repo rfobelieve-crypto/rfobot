@@ -1458,6 +1458,31 @@ X 不一致（F向）     150  -0.1565  -0.3043  -0.2580  1/9
 算槽位與週轉，而 `max_position_count` 的排擠已經量過是**不利**的
 （taken +0.3146 vs dropped +0.4227）。**現行 60 分鐘不動。**
 
+#### 網站回測檢視器改畫交會線（2026-09-08，使用者：「歷史回測應該要顯示交會的那個策略」）
+
+`/charts/backtest` 一直畫的是舊線。新增 `research/poc/conj_backtest.py`：
+同一種檢視器，畫**現在要上實盤的那套規則**（NO-OI 母體、錨點 +2 分開盤進場、
+停損 1.0 ATR、持有 60 分、方向順 impulse）在歷史上每一筆的價位／掃單／進場／
+停損／出場，單位 ATR，「淨」扣分腿成本。
+
+- **一份實作**：組裝直接呼叫 `event_triage.cluster`，事件用 `conj_clock.frozen_cand`；
+  `tests/test_conj_backtest_parity.py` P1 要求九幣池化毛利重現 `flow_direction.py`
+  P 臂的 **+0.2275**（同一規則的另一份實作），P2/P3 逐筆反解與出場時序，
+  J1/J2 把 script 真的跑一次（J2 第一版就抓到 `btnAll` 這種「id 當全域變數」
+  的寫法在替身裡是 ReferenceError，已改成 `getElementById`）。
+- **雲端算不了**：分鐘 bar／OI／事件表都在 `research/poc/data/`（gitignored）。
+  所以走 v7_veto_clock 那一族：`conj_update` 班車最後一步 `--all --publish`
+  把 9 張 HTML 寫進 `conj_backtest_pages`，agent `/public/conj-backtest` 只 SELECT
+  （agent-boundary.md 已登記）。K 線用 5 分鐘顯示（90 天 ≈ 26k 根），規則跑在
+  1 分鐘；點單筆畫的四條線是精確價格。
+- 網站 `/charts/backtest` 改成兩個分頁：交會事件（現行，預設）／掃單失敗（已結案，
+  判決橫幅只在該分頁出現）。
+- **第一次看到的數字要如實記**：最近 90 天九幣不一致——BTC −0.28、ETH −0.25、
+  SOL −0.14 ATR（毛），BNB/XRP/DOGE/ADA/LINK/AVAX 為正（+0.14 ~ +0.67）；
+  全期各幣 +0.16 ~ +0.36。**這是顯示窗的切片，不是判決**——判決仍是時鐘的
+  配對差 CI。但它提醒一件事：三大幣最近一季在這套規則上是負的，實盤那
+  20-30 筆若集中在 BTC/ETH，量到的執行品質會疊在一段逆風上。
+
 #### 實盤執行體檢（2026-09-08，使用者：「仔細檢查獵取系統在執行交易上有沒有問題，是實盤」）
 
 昨天寫完意圖層我說「可以接真錢」——用真錢的眼光逐段再查，**五個問題，
