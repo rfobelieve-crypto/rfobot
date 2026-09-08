@@ -327,6 +327,17 @@ tbody tr.sel{background:#1c2530}
 const D = __DATA__;
 const fmtP = v => v >= 1000 ? v.toFixed(1) : v >= 1 ? v.toFixed(3) : v.toFixed(5);
 
+// 篩選狀態必須宣告在 kpis() **被呼叫之前**（2026-09-08 修）。
+// 原本 `let grp` 在下面第一次 kpis() 呼叫的 80 行之後，而 kpis() 讀 grp
+// -> `ReferenceError: Cannot access 'grp' before initialization`（let/const
+// 的暫時性死區）-> 例外把整段 script 打斷 -> 底下的 createChart 從來沒執行
+// -> **整張圖是一片空白**，而且頁面其他部分（控制項、圖例、說明）照常渲染，
+// 所以看起來像「沒有資料」不像「壞掉」。
+// 這是 mistake.md 2026-04-22 的 JS 版：補丁引用了還沒定義的名字，
+// 而語法檢查與端點回應都看不到它——只有瀏覽器 console 看得到。
+let filt = 'all';       // 賺賠
+let grp  = 'all';       // 清算流分級
+
 function kpis(){
   const G = (D.groups && D.groups[grp]) || {};
   const a = G.view || D.stats_view, b = G.all || D.stats_all;
@@ -360,8 +371,7 @@ for(const L of D.levels){
     priceLineVisible:false,crosshairMarkerVisible:false}).setData(L.pts);
 }
 
-let filt = 'all';       // 賺賠
-let grp  = 'all';       // 清算流分級
+// filt / grp 已在檔案上方宣告（kpis() 呼叫之前）——不要移回這裡。
 const keepWL = t => filt==='all' || (filt==='win' ? t.R>0 : t.R<=0);
 const keepG  = t => grp==='all' || (grp==='n0' ? t.n_flow===0
                                                : t.n_flow>=3);
