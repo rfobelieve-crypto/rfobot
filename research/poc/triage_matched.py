@@ -154,6 +154,14 @@ def collect_symbol(sym, cand, ts, cl, at, rows):
             j = int(c[np.argmin(np.abs(premove[c] - me))])
             matched += 1
             row = dict(sym=sym, lane=lane,
+                       # 2026-09-08 附加：完整簽名。`lane` 把
+                       # 「掃單+delta」與「掃單+delta+vol」壓成同一格，
+                       # 而互斥分解顯示兩者差 0.39 ATR（TODO §1.03）。
+                       # 要另開「且」變體的時鐘就需要這一欄。
+                       # **純附加**：既有消費者一律只讀 lane，行為未變
+                       # （附加後 conj_clock --insample 必須逐位重現
+                       # +0.3485，那是這次改動的已知答案對照）。
+                       sig="+".join(sorted(sig)),
                        day=pd.Timestamp(int(ts[a]), unit="ms",
                                         tz="UTC").strftime("%Y-%m-%d"),
                        # 2026-09-07 附加：容量關要算的是**同一個持有窗內的

@@ -206,14 +206,22 @@ def build():
     gf = _json("sweep_forward_gate.json") or {}
     # 交會事件前瞻時鐘（TODO §1.03）。它的 JSON 在 poc/data/results 底下
     # （那個目錄是 gitignore 的大檔區），所以走絕對路徑而不是 RES。
-    try:
-        import json as _j
-        _cj = (Path(__file__).resolve().parent / "poc" / "data"
-               / "results" / "conj_clock.json")
-        cj = _j.loads(_cj.read_text(encoding="utf-8")) if _cj.exists() else {}
-    except Exception as _e:                      # 顯示層不可靜默失敗
-        print("[WARN] conj_clock.json unavailable:", _e)
-        cj = {}
+    def _poc_json(fname):
+        """poc/data/results 底下的時鐘 JSON。**兩條交會時鐘共用這一顆**——
+        2026-09-08 加「且」變體時，原本要複製一份 try/except，那就是第二份
+        實作（本 session 已經被它咬了五次）。顯示層不可靜默失敗，失敗印 WARN。
+        """
+        try:
+            import json as _j
+            p = (Path(__file__).resolve().parent / "poc" / "data"
+                 / "results" / fname)
+            return _j.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        except Exception as _e:
+            print(f"[WARN] {fname} unavailable:", _e)
+            return {}
+
+    cj = _poc_json("conj_clock.json")
+    cja = _poc_json("conj_clock_and.json")
     _ec = _e_clock()   # variant A, owned by sweep_forward.py
     open_items = [
         {
@@ -270,6 +278,31 @@ def build():
                     "單位是 ATR 不是 R（事件研究量價格移動，不經過成交假設）；"
                     "功效已算：1 個月 MDE 0.49 > 效應 0.35（不可能有答案），"
                     "4 個月 MDE 0.25 < 0.35，所以門檻是 300 不是 60",
+        },
+        {
+            "id": "交會事件·且", "line": "流動性獵取",
+            "title": "兩個強制流訊號都出現才算（S ∧ D ∧ V）",
+            "hypothesis": "把上一條的「至少一個流事件」收緊成「兩個都要」，"
+                          "效應更大且仍然逐幣一致",
+            "why": "上一條的母體做互斥分解：兩個都開那格 +0.657、只開一個那格"
+                   "+0.120 —— 但那是**在已經看過的資料上切的子集**，所以它是"
+                   "開一條新時鐘的理由，不是證據（§0.92 判掉變體 C/D 的同一件事）",
+            "registered": "2026-09-08", "source": "json",
+            "n": cja.get("n", 0), "gate_n": cja.get("n_target", 200),
+            "days": _days_since(datetime(2026, 9, 8, tzinfo=timezone.utc)),
+            "gate_days": None,
+            "ci_low": (cja.get("ci") or [None, None])[0],
+            "mean_r": cja.get("mean"),
+            "pos": cja.get("coins_pos"), "pos_of": cja.get("coins_total"),
+            "scored_at": cja.get("asof"),
+            "note": "⚠ **證據從零起算**：那 1,075 筆 in-sample 事件永遠不計入 n、"
+                    "也不得引用為「它有效」的證據。**上一條時鐘不作廢也不被取代**"
+                    "——它測的是被稀釋過的版本，若本條為真它照樣會過，是保守的。"
+                    "兩條共用同一份偵測與配對機器，差別只有簽名那一個條件。 "
+                    "頻率約 1.16/天（上一條的 43%），門檻 200 的選法是先寫規則："
+                    "取「MDE ≤ in-sample 效應的 50%」的最小整百數"
+                    "（n=150 是 56% 不合格、n=200 是 48% 合格）。"
+                    "與上一條相同：PASS 不等於可以交易，可執行性另有一條線。",
         },
         {
             "id": "0.60 Q2", "line": "V7", "title": "上漲趨勢只收看空訊號",

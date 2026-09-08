@@ -42,6 +42,10 @@ STEPS = [
     ("bars", HERE / "bars.py", []),
     ("fetch_oi", HERE / "fetch_oi.py", []),
     ("conj_clock", HERE / "conj_clock.py", []),
+    # 2026-09-08：「且」變體的並行時鐘（S ∧ D ∧ V，凍結 2026-09-08）。
+    # 兩條各判各的——現行那條不作廢，它測的是被稀釋過的版本，是保守的。
+    # 共用同一份資料抓取，所以掛在同一班車而不是另開排程。
+    ("conj_clock_and", HERE / "conj_clock_and.py", []),
 ]
 
 
@@ -75,8 +79,11 @@ def main():
             break
         # 資料過期時 conj_clock 會自己輸出 STALE-DATA 而不是判定 —— 那不是
         # 這支的失敗，但旗標要看得見（不然「資料舊」和「一切正常」長一樣）
-        if name == "conj_clock" and "STALE-DATA" in (r.stdout or ""):
-            ok, reason = False, "conj_clock: STALE-DATA"
+        # 2026-09-08：改成 startswith —— 加「且」變體時鐘時，這一行原本
+        # 寫死 name == "conj_clock"，新時鐘吐 STALE-DATA 不會被抓到，
+        # 旗標照樣綠。新增計分器時要順手檢查有沒有守衛只認舊名字。
+        if name.startswith("conj_clock") and "STALE-DATA" in (r.stdout or ""):
+            ok, reason = False, f"{name}: STALE-DATA"
 
     FLAG.parent.mkdir(parents=True, exist_ok=True)
     FLAG.write_text(json.dumps({
