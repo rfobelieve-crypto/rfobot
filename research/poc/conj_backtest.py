@@ -73,6 +73,9 @@ import event_census as ec  # noqa: E402
 import event_triage as et  # noqa: E402
 import conj_clock as ck  # noqa: E402
 import sweep_core as sc  # noqa: E402   只借 metrics()，同一把尺
+# 2026-09-09：群成員與「事件成立時刻」的定義**只有一份**，在 conj_redef。
+# 本檔曾自己用 et.cluster 的錨點當進場時刻 —— 那是前視（TODO §1.03b）。
+import conj_redef as cr  # noqa: E402
 
 BARS = HERE / "data" / "bars"
 EVENTS = HERE / "data" / "events"
@@ -146,16 +149,23 @@ def ledger(sym, liq=None):
                          columns=["level_id", "formed_at"]).set_index("level_id")
 
     trades = []
-    for a, sig in et.cluster(pairs):
+    for a, mem in cr.groups_with_members(pairs):
+        sig = {t for _, t in mem}
         if "sweep" not in sig or not (sig & set(FLOW)):
             continue
-        if a < W or a + DELAY + HOLD >= n:
+        # **一切錨在 ready，不是 a**（2026-09-09，TODO §1.03b）。
+        # a 是群內最早那一分鐘；ready 是最後一個必要成分到齊、交會事件真正
+        # 成立的那一分鐘。用 a 當進場錨點，22.3% 的單會下在事件存在之前。
+        m_sw = min(m for m, t in mem if t == "sweep")
+        m_fl = min(m for m, t in mem if t in FLOW)
+        ready = max(m_sw, m_fl)
+        if ready < W or ready + DELAY + HOLD >= n:
             continue
-        A = float(at[a])
+        A = float(at[ready])
         if not np.isfinite(A) or A <= 0:
             continue
-        d = float(np.sign(cl[a] - cl[a - W]) or 1.0)
-        j0 = a + DELAY
+        d = float(np.sign(cl[ready] - cl[ready - W]) or 1.0)
+        j0 = ready + DELAY
         ent = float(op[j0])
         end = j0 + HOLD
         adv = ((ent - lo[j0 + 1:end + 1]) if d > 0
@@ -169,6 +179,8 @@ def ledger(sym, liq=None):
             jx = end
             exit_px, stopped = float(cl[end]), False
             R = float(d * (cl[end] - ent) / A)
+        a_early = a           # 群內最早那一分鐘（只拿來顯示前視延遲）
+        a = ready             # 以下一律以成立時刻為錨點
         # 群內的掃單那一分鐘（只拿來畫價位線）。
         # 2026-09-09 收緊：原本容許錨點後 30 分鐘（6 x MERGE_GAP），但併窗
         # 就是 5 分鐘 —— 超出的那個掃單**不屬於這一群**，畫出來的價位線會是
@@ -197,6 +209,8 @@ def ledger(sym, liq=None):
             entry_ts=int(ts[j0]), entry=ent, atr=A, stop=float(stop_px),
             exit_ts=int(ts[jx]), exit_px=float(exit_px), stopped=stopped,
             held=int(jx - j0), R=float(R), cost_bps=leg,
+            lag_min=int(ready - a_early),
+            sweep_first=bool(m_sw <= m_fl),
             R_net=float(R - cost),
             forward=bool(ts[a] >= ck.FREEZE_MS)))
     return trades, b
@@ -325,10 +339,10 @@ header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 16px}
 h1{margin:0;font-size:19px;font-weight:600;letter-spacing:.01em}
 .tag{font-size:11px;color:var(--dim);border:1px solid var(--line);
      border-radius:3px;padding:2px 8px;font-variant-numeric:tabular-nums}
-.stat{border:1px solid var(--amb);border-left:4px solid var(--amb);
-      border-radius:4px;background:rgba(240,185,11,.05);padding:11px 14px;
+.stat{border:1px solid var(--dn);border-left:4px solid var(--dn);
+      border-radius:4px;background:rgba(246,70,93,.06);padding:11px 14px;
       display:flex;flex-direction:column;gap:5px}
-.stat b{color:var(--amb);font-size:13px}
+.stat b{color:var(--dn);font-size:13px}
 .stat p{margin:0;font-size:12px;line-height:1.6}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px}
 .kpi{background:var(--pan);border:1px solid var(--line);border-radius:4px;
@@ -369,20 +383,32 @@ tbody tr.sel{background:#1c2530}
 <header>
   <h1>__SYM__USDT · 交會事件回測</h1>
   <span class="tag">__SPAN__</span>
-  <span class="tag">掃單 ∧ (主動量極端 ∨ 量能爆發) · 進場 錨點+__DELAY__分開盤 · 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
+  <span class="tag">掃單 ∧ (主動量極端 ∨ 量能爆發) · 進場 <b>成立時刻</b>+__DELAY__分開盤 · 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
+  <span class="tag" style="border-color:var(--dn);color:var(--dn)">執行暫停 · 誠實定義下扣成本為負</span>
   <span class="tag">K 線 __CM__ 分鐘（顯示用）· 規則跑在 1 分鐘</span>
   <span class="tag">凍結規則 · 純回測 · 非訊號</span>
 </header>
 
 <div class="stat">
-  <b>狀態：in-sample 回測 ＋ 凍結日（__FREEZE__）之後的前瞻樣本 __NFWD__ 筆</b>
-  <p>這是<b>現在要上小額實盤的那一套規則</b>（conj_watch → jarvis），畫的是它在歷史上
-  每一筆會怎麼進、怎麼出。單位是 <b>ATR</b>（小時 ATR(14)）：+0.20 代表平均每筆賺
-  0.2 個 ATR；停損一次 = −1.0。「淨」= 毛利減掉這一筆自己那條腿的成本
-  （進場 7 bps；時間出場 +3、停損出場 +10）。</p>
-  <p>前瞻時鐘另有自己的判準（配對差、日聚類 CI、n ≥ 300），__CLOCK__——
-  <b>本頁的交易 R 不是時鐘的證據</b>，凍結日之後那幾筆在表上標「前瞻」，
-  數字太少，不要拿來下結論。</p>
+  <b>⚠ 執行暫停中（2026-09-09 判決）—— 本頁畫的是<u>誠實定義</u>，前一版是前視的</b>
+  <p>前一版把事件錨點取成群內<b>最早</b>那一分鐘，然後在「錨點 +2 分」進場。
+  但交會事件要到<b>最後一個成分到齊</b>才成立：流量在 t 開火、掃單在 t+3 時，
+  錨點是 t，而 t+2 那一刻掃單還沒發生 —— <b>那張單不可能下得出來</b>。
+  實測進場早於事件成立佔 <b>22.3%</b>，那些筆 +0.5064 誠實化後只剩 +0.1094；
+  全體 <b>+0.2286 → +0.1157</b>，<b>一半的 edge 是這個前視造出來的</b>。</p>
+  <p>本頁已全部改用<b>成立時刻</b>當錨點。誠實定義下逐格重跑，<b>沒有任何可交易
+  延遲的淨值信賴區間下緣大於零</b>（延遲 1/2/3/5/10 分的淨值 −0.043 / −0.027 /
+  −0.019 / −0.048 / −0.060，逐幣僅 2-3/9）→ <b>扣成本後不可交易</b>。
+  <code>conj_watch</code> 的下單意圖層已停，小額實盤暫停。</p>
+  <p><b>還站著的是訊號</b>：毛利每一格都是正的、信賴區間下緣離零（+0.031 ~ +0.055）
+  —— <b>訊號有效性沒有被推翻</b>，壞的是這個 edge 比成本小。與舊的掃單失敗線
+  同一種結局。判決全文 <code>research/poc/conj_redef.py</code>。</p>
+  <p style="color:var(--dim)">單位是 <b>ATR</b>（小時 ATR(14)）：+0.20 代表平均每筆賺
+  0.2 個 ATR，停損一次 = −1.0。「淨」扣掉這一筆自己那條腿的成本（進場 7 bps；
+  時間出場 +3、停損出場 +10）。進場 = <b>成立時刻 +__DELAY__ 分</b>那根的開盤。
+  前瞻時鐘（__CLOCK__）量的是<b>配對差</b>、事件研究口徑，證明「交會之後有延續」，
+  <b>不是</b>「這個延續交易得到」——<b>本頁的交易 R 不是時鐘的證據，反之亦然</b>。
+  凍結日 __FREEZE__ 之後的前瞻樣本 __NFWD__ 筆在表上標「前瞻」。</p>
 </div>
 
 <div class="kpis" id="kpis"></div>

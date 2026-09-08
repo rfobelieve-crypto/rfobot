@@ -32,7 +32,13 @@ POC = HERE.parent
 sys.path.insert(0, str(POC))
 import conj_backtest as cb  # noqa: E402
 
-REF = POC / "data" / "results" / "flow_direction.json"
+# 2026-09-09：參考值換成 `conj_redef.py` 的**誠實**定義（進場錨在事件
+# 成立時刻）。原本對的是 `flow_direction.py` 的 +0.2275，而那是舊錨點
+# （群內最早那一分鐘）——TODO §1.03b 判定它是前視：22.3% 的交易在進場
+# 當下事件還不存在，一半的 edge 由此而來。**換參考值不是放寬容差**，
+# 是比對的對象本來就該是誠實那個。
+REF = POC / "data" / "results" / "conj_redef.json"
+LOOKAHEAD_REF = 0.2286        # 舊錨點的值，必須**明顯偏離**它
 OUT = POC.parents[0] / "results" / "conj_backtest_BTC.html"
 TOL = 0.005
 
@@ -44,15 +50,30 @@ def ledgers():
     return {s: cb.ledger(s)[0] for s in cb.CORE9}
 
 
-def test_p1_pooled_mean_matches_flow_direction(ledgers):
+def test_p1_pooled_mean_matches_honest_redef(ledgers):
+    """P1 池化毛利 == conj_redef 誠實定義的同一格（delay=DELAY）。"""
     if not REF.exists():
-        pytest.skip("flow_direction.json 不在，先跑 flow_direction.py")
-    ref = json.loads(REF.read_text(encoding="utf-8"))["arms"]["P 價格定方向"]
+        pytest.skip("conj_redef.json 不在，先跑 conj_redef.py")
+    j = json.loads(REF.read_text(encoding="utf-8"))
+    ref = j["delays"][str(cb.DELAY)]["gross"]
     rs = [t["R"] for s in cb.CORE9 for t in ledgers[s]]
     m = float(np.mean(rs))
-    assert abs(m - ref["mean"]) < TOL, (
-        f"池化毛利 {m:+.4f} vs flow_direction P 臂 {ref['mean']:+.4f}"
-        f"（n {len(rs)} vs {ref['n']}）—— 第二份實作不同意，不得上網站")
+    assert abs(m - ref) < TOL, (
+        f"池化毛利 {m:+.4f} vs conj_redef delay={cb.DELAY} {ref:+.4f}"
+        f"（n {len(rs)} vs {j['n']}）—— 兩份實作不同意，不得上網站")
+
+
+def test_p1b_not_the_lookahead_anchor(ledgers):
+    """P1b 反向：進場若改回群內最早那一分鐘（前視），這一關必須紅。
+
+    TODO §1.03b：舊錨點的池化毛利是 +0.2286，誠實的是 +0.1157 —— 差
+    0.1129，遠大於容差。任何把錨點改回 `a` 的改動都會落回前視值。
+    """
+    rs = [t["R"] for s in cb.CORE9 for t in ledgers[s]]
+    m = float(np.mean(rs))
+    assert abs(m - LOOKAHEAD_REF) > 10 * TOL, (
+        f"池化毛利 {m:+.4f} 落在前視值 {LOOKAHEAD_REF:+.4f} 上 —— "
+        f"進場錨點被改回群內最早那一分鐘了（22.3% 的單會下在事件成立之前）")
 
 
 def test_p2_r_solves_back_from_prices(ledgers):
