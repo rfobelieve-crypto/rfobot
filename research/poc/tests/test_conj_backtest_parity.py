@@ -220,3 +220,21 @@ def test_j2_script_runs_and_creates_chart():
     assert "__FOCUSED__=true" in out, (
         "開頁沒有 setVisibleRange —— 預設停在全景，一筆交易只有 0.67 像素寬，"
         "三個標記會疊成一個點\n" + out[-600:])
+
+
+def test_j4_no_operator_quotes_in_public_page():
+    """J4（2026-09-09）：HTML 模板裡的註解會**原樣印進公開頁面的原始碼**。
+
+    實際發生過：`kpis()` 裡一段解釋大小字為什麼對調的註解，逐字引用了操作者
+    在對話裡說的話，跟著九個頁面一起發到公開端點。註解寫在 Python 那一側
+    不會有這個問題，寫在模板字串裡就會。
+
+    這道守衛只擋**最明確的那一類**（引用操作者、內部對話），不擋
+    `mistake.md` / `TODO §` 這種文件指標 —— 後者是刻意公開的判決出處。
+    """
+    h = _html()
+    bad = [p for p in ("使用者：「", "使用者:「", "使用者說", "他說「", "原話")
+           if p in h]
+    assert not bad, (
+        "公開頁面的原始碼裡出現操作者引述：" + "、".join(bad) +
+        "。這類說明要寫在產生器的 Python 註解裡，不要寫進 HTML 模板。")
