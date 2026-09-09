@@ -122,59 +122,50 @@ def walk(op, hi, lo, cl, n, rd, d, A, lvl, rule, cost=True):
 
 
 def build(sym):
-    liq = cb._empty_liq()
-    cand, ts, cl, at, _ = ck.frozen_cand(sym, liq)
+    """交易來自 `cb.ledger`，**不另外對一次價位**。
+
+    第一版自己用 `t_sweep` 去配被掃價位，結果一筆都對不上（事件列的
+    `t_sweep` 是分鐘戳 **+1 分鐘**，而且是精確相等比對）—— 那是這個專案
+    咬過五次的「第二份實作」。ledger 已經把 `level` 算好了，直接用它，
+    本檔只負責**重走出場**。
+    """
+    tr, _ = cb.ledger(sym, arm="A")
     b = pd.read_parquet(cb.BARS / f"{sym}.parquet",
-                        columns=["open", "high", "low", "close"])
+                        columns=["ts", "open", "high", "low", "close"])
+    bts = b["ts"].to_numpy(np.int64)
     op = b["open"].to_numpy(float)
     hi = np.nan_to_num(b["high"].to_numpy(float), nan=-np.inf)
     lo = np.nan_to_num(b["low"].to_numpy(float), nan=np.inf)
     cls = b["close"].to_numpy(float)
-    n = len(ts)
-
-    ev = pd.read_parquet(cb.EVENTS / f"{sym}.parquet",
-                         columns=["t_sweep", "sweep_lvl"]).sort_values("t_sweep")
-    ev_ts = ev["t_sweep"].to_numpy(np.int64)
-    ev_lv = ev["sweep_lvl"].to_numpy(float)
-
-    pairs = [(int(m), "sweep")
-             for m in ec.cooldown_filter(np.sort(cand["sweep"]))]
-    for nm in cb.FLOW:
-        v = cand.get(nm)
-        if v is not None and len(v):
-            for m in ec.cooldown_filter(np.sort(v)):
-                pairs.append((int(m), nm))
+    n = len(bts)
 
     rows = []
-    flowm = set(cb.FLOW)
-    for _a, mem in cr.groups_with_members(pairs):
-        s = {x for _, x in mem}
-        if "sweep" not in s or not (s & flowm):
+    for t in tr:
+        if t["sigk"] != "and" or not t.get("level"):
+            continue                       # 只跑 SDV，且要有被掃價位
+        ready = int(np.searchsorted(bts, int(t["anchor_ts"])))
+        if ready >= n or int(bts[ready]) != int(t["anchor_ts"]):
             continue
-        if not ({"delta_ext", "vol_burst"} <= s):
-            continue                       # 只跑 SDV（三者齊發）
-        m_sw = min(m for m, x in mem if x == "sweep")
-        ready = max(m_sw, min(m for m, x in mem if x in flowm))
         if ready < cb.W or ready + cb.DELAY + cb.HOLD >= n:
             continue
-        A = float(at[ready])
-        if not np.isfinite(A) or A <= 0:
+        A = float(t["atr"])
+        lvl = float(t["level"])
+        if not (A > 0 and np.isfinite(A) and lvl > 0 and np.isfinite(lvl)):
             continue
-        # 被掃的價位：取掃單那一分鐘對應的事件列
-        j = int(np.searchsorted(ev_ts, int(ts[m_sw]), "right")) - 1
-        if j < 0 or abs(int(ev_ts[j]) - int(ts[m_sw])) > 60_000:
-            continue                       # 對不上就跳過，不猜
-        lvl = float(ev_lv[j])
-        if not np.isfinite(lvl) or lvl <= 0:
-            continue
-        d = 1.0 if cl[ready] > cl[ready - cb.W] else -1.0
+        d = 1.0 if t["side"] == "LONG" else -1.0
         base, bk, _ = walk(op, hi, lo, cls, n, ready, d, A, lvl, None)
+        # 自曝檢查：本檔重走出來的無規則版本，必須等於 ledger 計分的那一筆。
+        # 對不上就是我又寫了第二份實作，當場現形而不是安靜地給個像樣的數字。
+        if abs(base - float(t["R_net"])) > 1e-9:
+            raise AssertionError(
+                f"{sym} {t['anchor_ts']}: 重走 {base:.10f} != ledger "
+                f"{float(t['R_net']):.10f} —— 出場邏輯已經分岔")
         ff, fk, fn = walk(op, hi, lo, cls, n, ready, d, A, lvl, "failfast")
         ma, mk, mn = walk(op, hi, lo, cls, n, ready, d, A, lvl, "mae")
         b0, _, _ = walk(op, hi, lo, cls, n, ready, d, A, lvl, None, cost=False)
         f0, _, _ = walk(op, hi, lo, cls, n, ready, d, A, lvl, "failfast", cost=False)
-        rows.append(dict(sym=sym, ts=int(ts[ready]),
-                         day=pd.Timestamp(int(ts[ready]), unit="ms", tz="UTC")
+        rows.append(dict(sym=sym, ts=int(bts[ready]),
+                         day=pd.Timestamp(int(bts[ready]), unit="ms", tz="UTC")
                               .strftime("%Y-%m-%d"),
                          base=base, ff=ff, mae=ma,
                          base0=b0, ff0=f0,
