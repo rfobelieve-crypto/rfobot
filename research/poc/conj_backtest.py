@@ -40,7 +40,7 @@
 畫什麼（全部來自同一筆記錄）
     ┈┈  價位線     從樞紐形成（formed_at）延伸到被掃那一分鐘
     ▽▲  掃單       第一次穿越價位的那分鐘
-    ●   進場       ready + 11 分開盤（等它走出 0.5 ATR 之後）
+    ●   進場       ready + 3 分開盤（A 臂＝現行規格）
     ✕   出場       停損價（停損）或 +480 分收盤（時間）
     K 線用 **5 分鐘**（顯示用；規則跑在 1 分鐘上）。標記對齊到所在的
     5 分鐘 K；點選單筆時畫出精確價位／進場／停損／出場四條水平線，
@@ -406,7 +406,24 @@ h1{margin:0;font-size:19px;font-weight:600;letter-spacing:.01em}
 .kpi b{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
 .kpi span{font-size:11px;color:var(--dim)}
 .kpi small{font-size:10.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+#cbox{position:relative}
 #c{height:520px;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+/* 全螢幕：優先用原生 API（:fullscreen）；被 iframe 政策擋掉時退回 .fs，
+   在頁面內用 position:fixed 撐滿——嵌在網站裡時那就是撐滿 iframe。 */
+#cbox:fullscreen,#cbox.fs{background:var(--bg);padding:8px;
+  display:flex;flex-direction:column}
+#cbox.fs{position:fixed;inset:0;z-index:9999}
+#cbox:fullscreen #c,#cbox.fs #c{flex:1;height:auto;border-radius:0}
+.fsbar{position:absolute;top:8px;right:10px;z-index:10;display:flex;gap:6px;
+  align-items:center;font-size:11px}
+.fsbar button{font:inherit;background:rgba(11,14,17,.82);color:var(--dim);
+  border:1px solid var(--line);border-radius:3px;padding:3px 9px;cursor:pointer}
+.fsbar button:hover{color:var(--ink);border-color:#2b3542}
+.fsbar .fsonly{display:none}
+#cbox:fullscreen .fsbar .fsonly,#cbox.fs .fsbar .fsonly{display:inline-flex}
+#cbox:fullscreen .fsbar span.fsonly,#cbox.fs .fsbar span.fsonly{
+  display:inline-block;min-width:4.5em;text-align:center;color:var(--dim);
+  font-variant-numeric:tabular-nums}
 #eq{height:150px;border:1px solid var(--line);border-radius:4px;overflow:hidden}
 .bar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;
      font-size:11.5px;color:var(--dim)}
@@ -517,7 +534,15 @@ tbody tr.sel{background:#1c2530}
   <span id="dense"></span>
 </div>
 
-<div id="c"></div>
+<div id="cbox">
+  <div class="fsbar">
+    <button id="fsPrev" class="fsonly" title="上一筆">‹ 上一筆</button>
+    <span id="fsPos" class="fsonly"></span>
+    <button id="fsNext" class="fsonly" title="下一筆">下一筆 ›</button>
+    <button id="btnFS">⛶ 全螢幕</button>
+  </div>
+  <div id="c"></div>
+</div>
 <div id="eq"></div>
 <div class="note" id="sel">點下方任一列 —— 圖表跳到那一筆，並畫出它的價位、進場、停損、出場四條線。</div>
 
@@ -544,6 +569,11 @@ tbody tr.sel{background:#1c2530}
 const D = __DATA__;
 const fmtP = v => v >= 1000 ? v.toFixed(1) : v >= 1 ? v.toFixed(3) : v.toFixed(5);
 
+// 位置文字有兩個出口（一般工具列 + 全螢幕浮層），統一走這一顆，
+// 免得兩邊各寫一次然後安靜地不同意。
+function setPos(txt){ const a=document.getElementById('navpos'),
+                      b=document.getElementById('fsPos');
+  if(a) a.textContent=txt; if(b) b.textContent=txt; }
 // 篩選狀態宣告在 kpis() **被呼叫之前**——let/const 的暫時性死區會把整段
 // script 打斷、圖一片空白而頁面其他部分照常渲染（mistake.md 2026-09-08）。
 let filt = 'all';       // 賺賠
@@ -635,7 +665,7 @@ function focus(t){
   chart.timeScale().setVisibleRange({from:t.t_anchor-pad, to:t.t_exit+pad});
   cur = t.id;
   const vis = D.trades.filter(keep), i = vis.findIndex(x=>x.id===t.id);
-  if(i>=0) $('navpos').textContent = `${i+1} / ${vis.length}`;
+  if(i>=0) setPos(`${i+1} / ${vis.length}`);
   document.getElementById('sel').innerHTML =
     `<b>#${t.id+1} ${t.side}</b>${t.forward?' <span class="fwd">（前瞻）</span>':''}`+
     ` · ${t.sweep} 穿過${t.level_side==='buyside'?'買側':'賣側'}價位 ${t.level===null?'—':fmtP(t.level)}`+
@@ -686,7 +716,7 @@ $('btnGand').onclick=()=>setG('and','btnGand');
 $('btnGd').onclick=()=>setG('d','btnGd');
 $('btnGv').onclick=()=>setG('v','btnGv');
 $('btnFit').onclick=()=>{clearLines();chart.timeScale().fitContent();
-  $('navpos').textContent='全景';
+  setPos('全景');
   $('sel').textContent='全景下一筆交易只有 62 分鐘 ≈ 12 根 K，標記會疊在一起 —— 用「逐筆看」或點下表任一列。';};
 
 // 預設**不做 fitContent**：90 天 = 25,921 根 5 分 K 塞進一個畫面，一根 K
@@ -696,17 +726,56 @@ $('btnFit').onclick=()=>{clearLines();chart.timeScale().fitContent();
 // 所以開頁就聚焦到最後一筆，並提供逐筆導航。（`cur` 宣告在檔案上方。）
 function nav(step){
   const vis = D.trades.filter(keep);
-  if(!vis.length){ $('navpos').textContent='0 筆'; return; }
+  if(!vis.length){ setPos('0 筆'); return; }
   let i = vis.findIndex(t=>t.id===cur);
   i = (i<0) ? vis.length-1 : Math.min(vis.length-1, Math.max(0, i+step));
   cur = vis[i].id;
-  $('navpos').textContent = `${i+1} / ${vis.length}`;
+  setPos(`${i+1} / ${vis.length}`);
   focus(vis[i]);
 }
 $('btnPrev').onclick=()=>nav(-1);
 $('btnNext').onclick=()=>nav(1);
+$('fsPrev').onclick=()=>nav(-1);
+$('fsNext').onclick=()=>nav(1);
 nav(0);
-new ResizeObserver(()=>{chart.applyOptions({});eqc.applyOptions({});})
+
+// ── 全螢幕 ────────────────────────────────────────────────────────────
+// 兩條路徑：原生 Fullscreen API（獨立開啟時、或 iframe 帶了 allowfullscreen
+// 時可用），失敗就退回 .fs（position:fixed 撐滿）。嵌在網站裡而父層沒給
+// 權限時，退路撐滿的是 iframe 那個框——仍然比 520px 高的圖好用很多。
+// 圖表不會自己跟著容器變大：LightweightCharts 要被明確告知新尺寸，
+// 所以每次切換都重算一次 #c 的實際框並 resize()。
+const cbox=$('cbox'), btnFS=$('btnFS');
+function fsSize(){
+  const r=$('c').getBoundingClientRect();
+  if(r.width>0 && r.height>0) chart.resize(r.width, r.height);
+}
+function fsLabel(on){ btnFS.textContent = on ? '⛶ 離開全螢幕' : '⛶ 全螢幕'; }
+function fsOn(){ return !!(document.fullscreenElement===cbox
+                           || cbox.classList.contains('fs')); }
+function fsFallback(on){ cbox.classList.toggle('fs', on); fsLabel(on);
+                         setTimeout(fsSize,0); }
+btnFS.onclick=function(){
+  if(fsOn()){
+    if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+    else fsFallback(false);
+    return;
+  }
+  if(cbox.requestFullscreen){
+    const p=cbox.requestFullscreen();
+    if(p && p.catch) p.catch(()=>fsFallback(true)); // 政策擋掉 -> 退路
+  } else fsFallback(true);
+};
+document.addEventListener('fullscreenchange',function(){
+  const on=!!document.fullscreenElement;
+  if(on) cbox.classList.remove('fs');   // 原生生效就不要疊 CSS 那層
+  fsLabel(on); setTimeout(fsSize,0);
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape' && cbox.classList.contains('fs')) fsFallback(false);
+});
+
+new ResizeObserver(()=>{chart.applyOptions({});eqc.applyOptions({});fsSize();})
   .observe(document.body);
 </script></body></html>
 """
