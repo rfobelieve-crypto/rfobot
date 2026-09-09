@@ -15,28 +15,32 @@
             （時鐘 conj_clock 註冊的是含 oi_crash 的版本；OI 粒度 5 分鐘、
               結構上進不了 2 分鐘死線，所以**實盤跑的是 NO-OI**，本頁畫的
               也是它。conj_clock_and 的「且」變體 = 本頁的 S+D+V 那一格。）
-    組裝    `event_triage.cluster`（相鄰 ≤5 分併為一時刻、錨點取最早、
-            時刻之間 60 分冷卻）—— 直接呼叫同一顆
-    方向    impulse = sign(close(a) − close(a−5))  順著走（延續交易）
-    進場    錨點 +2 分那根的**開盤**（規格延遲；conj_watch 的 ref_price）
-    停損    1.0 × ATR_h14(a)，以分鐘高低價判定，從進場**下一根**起
-    出場    停損，或進場後 60 分那根的收盤，先到者
-    單位    ATR（不是舊線的 R = 3.5 ATR）。+0.20 = 平均每筆賺 0.2 個小時 ATR
+    組裝    `conj_redef.groups_with_members`（與判決端同一顆）
+    訊號時刻 **ready** = 最後一個必要成分到齊那一分鐘。**不是群內最早那一分鐘**
+            —— 用最早那個會讓 22.3% 的單下在事件成立之前（前視，§1.03b）
+    方向    **等它走出來再跟**：ready 之後 10 分鐘，若已走超過 0.5 ATR，
+            順著那個方向進場；沒走出來就不交易。
+            （使用者 2026-09-09：「我不用一定要知道方向，只要知道獵取後怎麼走」。
+              樣本外命中率 48.6% -> 51.0%、逐幣 7/9 -> 9/9、
+              資金曲線最大回落 47.0% -> 26.5%）
+    進場    ready + 11 分那根的**開盤**（限價，成交率 97.8%）
+    停損    3.0 × ATR_h14(ready)，分鐘高低價判定，從進場**下一根**起
+    出場    停損，或進場後 480 分那根的收盤，先到者
+    單位    ATR。+0.30 = 平均每筆賺 0.3 個小時 ATR（≈ 0.28% 名目）
 
-    已知答案對照（`tests/test_conj_backtest_parity.py` P1）：
-    池化毛利必須重現 `flow_direction.py` P 臂的 **+0.2275**（同一條規則，
-    同一個母體）。對不上代表本檔是第二份實作而且不同意，不得上網站。
-
-成本（凍結分腿模型 `sweep_forward.SCEN` 情境 A，2026-09-08 §1.03 更正）
-    進場 7 bps ／ 時間出場 3 bps ／ 停損出場 10 bps
-    逐筆換算：cost_ATR = bps/1e4 × entry / ATR   （逐幣真實 bps，不用統一單位）
+成本（Bitget 標準 maker/taker，2026-09-09）
+    進場 2 ／ 時間出場 2 ／ 停損出場 6 bps。限價成交率 97.8% 已量過。
+    逐筆換算：cost_ATR = bps/1e4 × entry / ATR
     表上「淨」= 毛 − 這一筆自己那條腿的成本
+
+    已知答案對照（`tests/test_conj_backtest_parity.py`）：A 臂與測試裡一支
+    **獨立的逐筆 for 迴圈**逐位比對；R 與出場價互相反解；停損時序。
 
 畫什麼（全部來自同一筆記錄）
     ┈┈  價位線     從樞紐形成（formed_at）延伸到被掃那一分鐘
     ▽▲  掃單       第一次穿越價位的那分鐘
-    ●   進場       錨點 +2 分開盤
-    ✕   出場       停損價（停損）或 +60 分收盤（時間）
+    ●   進場       ready + 11 分開盤（等它走出 0.5 ATR 之後）
+    ✕   出場       停損價（停損）或 +480 分收盤（時間）
     K 線用 **5 分鐘**（顯示用；規則跑在 1 分鐘上）。標記對齊到所在的
     5 分鐘 K；點選單筆時畫出精確價位／進場／停損／出場四條水平線，
     上方文字給精確到分鐘的時刻。
@@ -87,13 +91,27 @@ CORE9 = list(ec.CORE9)
 # 規則常數 —— 與 conj_watch.py 同值。這裡不 import conj_watch（它會連 DB、
 # 抓 Binance），但 parity 測試會斷言兩邊的數字相等。
 W = 5
-DELAY = 2
-STOP = 1.0
-HOLD = 60
+# 2026-09-09 定案（TODO §1.03d/f）:先前的 DELAY=2 / STOP=1.0 / HOLD=60 是
+# 錯的出場設定 —— 1 ATR 停損砍掉左尾、60 分持有砍掉右尾,那才是把這條線
+# 壓在水面下的主因,不是成本也不是訊號。
+#   停損 3 ATR:觸發率 18%,樣本外「停損放寬」的相關性只有 +0.120,
+#              所以不需要更寬;3 ATR 保留風險單位,接得進 sizing 與 kill switch
+#   持有 480 分:毛利隨持有單調上升,樣本外單調性 +0.907(比樣本內還強)
+DELAY = 3
+STOP = 3.0
+HOLD = 480
+# C 臂（使用者 2026-09-09:「我不用一定要知道方向,只要知道獵取後怎麼走」）
+# 不在事件當下猜方向,等 K 分鐘、看它實際走了多少,超過門檻才順著跟。
+# 樣本外:命中率 48.6% -> 51.0%、毛利 +0.216 -> +0.305、逐幣 7/9 -> 9/9,
+# 而且資金曲線最大回落 47.0% -> 26.5%(2x/3 槽)。
+C_WAIT = 10          # 事件成立後等幾分鐘
+C_MOVE = 0.5         # 這段期間至少要走幾個 ATR 才進場
 FLOW = ("delta_ext", "vol_burst")
 MERGE_GAP = et.MERGE_GAP
 # 分腿成本（bps）：sweep_forward.SCEN 情境 A
-COST_ENTRY, COST_TIME, COST_STOP = 7.0, 3.0, 10.0
+# Bitget 標準 maker/taker(2026-09-09 起):進場與時間出場掛限價、
+# 停損吃單。限價成交率已量過 97.8%(conj_rescue C3)。
+COST_ENTRY, COST_TIME, COST_STOP = 2.0, 2.0, 6.0
 CANDLE_MIN = 5
 TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS conj_backtest_pages (
@@ -117,11 +135,15 @@ def to_day(ts_ms):
     return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
 
 
-def ledger(sym, liq=None):
+def ledger(sym, liq=None, arm="C"):
     """一個幣的完整交易帳（全歷史）。回傳 (trades, bars_df)。
 
-    規則逐行對應 `flow_direction.py` 的 P 臂 —— 那支已用 +0.2275 對過
-    規格，本函式的輸出再由 parity 測試對回去。
+    arm="A"  事件成立 +3 分進場，方向 = 事件前 5 分鐘動能（原規格）
+    arm="C"  事件成立後等 10 分鐘，走超過 0.5 ATR 才進，**順著它實際走的方向**
+             （2026-09-09 使用者提出：不預測方向，等它走出來再跟）
+
+    兩臂唯一的差異是「方向怎麼決定、什麼時候進場」；停損、持有、成本全同。
+    `tests/test_conj_backtest_parity.py` 對 A 臂釘住 `conj_redef` 的誠實值。
     """
     liq = _empty_liq() if liq is None else liq
     cand, ts, cl, at, _day = ck.frozen_cand(sym, liq)
@@ -159,13 +181,20 @@ def ledger(sym, liq=None):
         m_sw = min(m for m, t in mem if t == "sweep")
         m_fl = min(m for m, t in mem if t in FLOW)
         ready = max(m_sw, m_fl)
-        if ready < W or ready + DELAY + HOLD >= n:
+        if ready < W or ready + max(DELAY, C_WAIT + 1) + HOLD >= n:
             continue
         A = float(at[ready])
         if not np.isfinite(A) or A <= 0:
             continue
-        d = float(np.sign(cl[ready] - cl[ready - W]) or 1.0)
-        j0 = ready + DELAY
+        if arm == "C":
+            mv = (cl[ready + C_WAIT] - cl[ready]) / A
+            if abs(mv) < C_MOVE:
+                continue                      # 沒走出來就不進場
+            d = float(np.sign(mv) or 1.0)
+            j0 = ready + C_WAIT + 1
+        else:
+            d = float(np.sign(cl[ready] - cl[ready - W]) or 1.0)
+            j0 = ready + DELAY
         ent = float(op[j0])
         end = j0 + HOLD
         adv = ((ent - lo[j0 + 1:end + 1]) if d > 0
@@ -319,6 +348,7 @@ def build(sym, t_from_ms, t_to_ms, liq=None):
                 asof_ts=last_ts, n_all=len(trades), n_view=len(tr),
                 n_forward=n_fwd, freeze_day=ck.FREEZE_DAY, clock=clock,
                 params=dict(DELAY=DELAY, STOP=STOP, HOLD=HOLD, W=W,
+                            C_WAIT=C_WAIT, C_MOVE=C_MOVE,
                             COST=[COST_ENTRY, COST_TIME, COST_STOP],
                             CANDLE_MIN=CANDLE_MIN))
 
@@ -383,32 +413,31 @@ tbody tr.sel{background:#1c2530}
 <header>
   <h1>__SYM__USDT · 交會事件回測</h1>
   <span class="tag">__SPAN__</span>
-  <span class="tag">掃單 ∧ (主動量極端 ∨ 量能爆發) · 進場 <b>成立時刻</b>+__DELAY__分開盤 · 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
-  <span class="tag" style="border-color:var(--dn);color:var(--dn)">執行暫停 · 誠實定義下扣成本為負</span>
+  <span class="tag">掃單 ∧ (主動量極端 ∨ 量能爆發) · <b>成立後等 __CW__ 分、走超過 __CM__ ATR 才進</b> · 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
+  <span class="tag">成本 Bitget maker 2/2/6 bps · 限價成交率 97.8%</span>
+  <span class="tag" style="border-color:var(--amb);color:var(--amb)">執行暫停中 · 樣本外 CI 下緣仍含零</span>
   <span class="tag">K 線 __CM__ 分鐘（顯示用）· 規則跑在 1 分鐘</span>
   <span class="tag">凍結規則 · 純回測 · 非訊號</span>
 </header>
 
 <div class="stat">
-  <b>⚠ 執行暫停中（2026-09-09 判決）—— 本頁畫的是<u>誠實定義</u>，前一版是前視的</b>
-  <p>前一版把事件錨點取成群內<b>最早</b>那一分鐘，然後在「錨點 +2 分」進場。
-  但交會事件要到<b>最後一個成分到齊</b>才成立：流量在 t 開火、掃單在 t+3 時，
-  錨點是 t，而 t+2 那一刻掃單還沒發生 —— <b>那張單不可能下得出來</b>。
-  實測進場早於事件成立佔 <b>22.3%</b>，那些筆 +0.5064 誠實化後只剩 +0.1094；
-  全體 <b>+0.2286 → +0.1157</b>，<b>一半的 edge 是這個前視造出來的</b>。</p>
-  <p>本頁已全部改用<b>成立時刻</b>當錨點。誠實定義下逐格重跑，<b>沒有任何可交易
-  延遲的淨值信賴區間下緣大於零</b>（延遲 1/2/3/5/10 分的淨值 −0.043 / −0.027 /
-  −0.019 / −0.048 / −0.060，逐幣僅 2-3/9）→ <b>扣成本後不可交易</b>。
-  <code>conj_watch</code> 的下單意圖層已停，小額實盤暫停。</p>
-  <p><b>還站著的是訊號</b>：毛利每一格都是正的、信賴區間下緣離零（+0.031 ~ +0.055）
-  —— <b>訊號有效性沒有被推翻</b>，壞的是這個 edge 比成本小。與舊的掃單失敗線
-  同一種結局。判決全文 <code>research/poc/conj_redef.py</code>。</p>
-  <p style="color:var(--dim)">單位是 <b>ATR</b>（小時 ATR(14)）：+0.20 代表平均每筆賺
-  0.2 個 ATR，停損一次 = −1.0。「淨」扣掉這一筆自己那條腿的成本（進場 7 bps；
-  時間出場 +3、停損出場 +10）。進場 = <b>成立時刻 +__DELAY__ 分</b>那根的開盤。
-  前瞻時鐘（__CLOCK__）量的是<b>配對差</b>、事件研究口徑，證明「交會之後有延續」，
-  <b>不是</b>「這個延續交易得到」——<b>本頁的交易 R 不是時鐘的證據，反之亦然</b>。
-  凍結日 __FREEZE__ 之後的前瞻樣本 __NFWD__ 筆在表上標「前瞻」。</p>
+  <b>2026-09-09 定案的規格（本頁畫的就是它）· 執行仍暫停</b>
+  <p><b>方向不預測，等它走出來再跟。</b>交會事件成立後等 10 分鐘，若價格已經
+  走超過 0.5 個 ATR，就順著<b>它實際走的方向</b>進場；沒走出來就不做。
+  這取代了原本「用事件前 5 分鐘動能猜方向」的規則——那個規則的命中率只有
+  <b>47.6%</b>，換三種代理（價格動能／主動量／掃單幾何）全都一樣，
+  反做更差。</p>
+  <p>樣本外（後半 1.25 年）比較：命中率 <b>48.6% → 51.0%</b>、
+  每筆毛利 <b>+0.216 → +0.305 ATR</b>、逐幣 <b>7/9 → 9/9</b>、
+  1000 USDT 兩倍槓桿三槽的最大回落 <b>47.0% → 26.5%</b>。
+  代價是只有 46% 的事件會走出那個幅度，交易數少一半。</p>
+  <p><b>同時修掉的兩個錯</b>：先前的停損 1 ATR 砍掉左尾、持有 60 分砍掉右尾
+  —— 那才是把這條線壓在水面下的主因，不是成本也不是訊號。
+  現在是停損 3 ATR、持有 480 分；毛利隨持有單調上升，樣本外單調性 +0.907。</p>
+  <p><b>為什麼還是暫停</b>：樣本外單筆淨值的信賴區間下緣仍然含零（n 不夠），
+  而且「等 10 分／0.5 ATR」這組門檻是在全樣本上掃出來的。
+  <code>conj_watch</code> 的下單意圖層維持停止。
+  判決全文 TODO §1.03b~f ／ <code>research/poc/conj_wf.py</code>。</p>
 </div>
 
 <div class="kpis" id="kpis"></div>
@@ -416,8 +445,8 @@ tbody tr.sel{background:#1c2530}
 <div class="bar">
   <span><span class="sw" style="border-color:var(--buy)"></span>買側價位被掃（向上穿越）</span>
   <span><span class="sw" style="border-color:var(--sell)"></span>賣側價位被掃（向下穿越）</span>
-  <span><span class="dot" style="background:var(--up)"></span>進場（錨點 +2 分開盤）</span>
-  <span><span class="sq" style="background:var(--dn)"></span>出場（停損價或 +60 分收盤，「!」= 停損）</span>
+  <span><span class="dot" style="background:var(--up)"></span>進場（成立後等 10 分、走出 0.5 ATR）</span>
+  <span><span class="sq" style="background:var(--dn)"></span>出場（停損價或 +480 分收盤，「!」= 停損）</span>
   <span style="width:100%"></span>
   <span style="color:var(--amb)">⚠ 這是<b>延續</b>交易：順著突破方向進場，<b>不等回踩</b>——所以圓點
   不會落在虛線（價位）上，而是在它外側。這跟舊的掃單失敗（回踩到價位才進）相反。</span>
@@ -552,7 +581,7 @@ function focus(t){
     `<b>#${t.id+1} ${t.side}</b>${t.forward?' <span class="fwd">（前瞻）</span>':''}`+
     ` · ${t.sweep} 穿過${t.level_side==='buyside'?'買側':'賣側'}價位 ${t.level===null?'—':fmtP(t.level)}`+
     `（樞紐 ${t.origin}）+ ${t.sig.replace('sweep','S').replace('delta_ext','D').replace('vol_burst','V')}`+
-    ` → 錨點 ${t.anchor} → ${t.entry_t} 開盤進場 ${fmtP(t.entry)}`+
+    ` → 成立 ${t.anchor} → 等 ${D.params.C_WAIT} 分走出 ${D.params.C_MOVE} ATR → ${t.entry_t} 開盤進場 ${fmtP(t.entry)}`+
     ` → 停損掛 ${fmtP(t.stop)}（${D.params.STOP} × ATR ${fmtP(t.atr)}）`+
     ` → ${t.exit_t} ${t.stopped?'觸及停損':'持有 60 分到期'} 出在 ${fmtP(t.exit_px)}，`+
     `毛 <b class="${t.R>0?'pos':'neg'}">${t.R.toFixed(4)} ATR</b>、`+
@@ -638,6 +667,7 @@ def render(d):
             .replace("__SYM__", d["sym"])
             .replace("__SPAN__", f'{d["span"][0]} → {d["span"][1]} UTC')
             .replace("__DELAY__", str(p["DELAY"])).replace("__STOP__", str(p["STOP"]))
+            .replace("__CW__", str(p["C_WAIT"])).replace("__CM__", str(p["C_MOVE"]))
             .replace("__HOLD__", str(p["HOLD"])).replace("__CM__", str(p["CANDLE_MIN"]))
             .replace("__FREEZE__", d["freeze_day"]).replace("__NFWD__", str(d["n_forward"]))
             .replace("__CLOCK__", clock_txt))

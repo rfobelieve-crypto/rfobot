@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 """交會事件回測檢視器的守衛 —— 圖上畫的必須就是被計分的那一筆
 
-P1  已知答案對照：九幣池化毛利必須重現 `flow_direction.py` P 臂的數字
-    （`data/results/flow_direction.json`，同一條規則的另一份實作）。
-    容差 0.005 ATR：兩份跑在同一份資料上時差是 0；資料日更後母體會多幾筆，
-    容差吃的是那個，不是實作差異。
-P2  逐筆反解：R == 方向 × (出場 − 進場) / ATR，逐位元組（停損筆的出場價
-    就是停損價，所以同一條式子對兩種出場都成立）。
-P3  停損筆的出場必須在進場之後、60 分之內，且那一根確實碰到了停損價；
-    時間出場筆的持有必須恰好 60 分。
+P1  **獨立重寫對照**：測試裡自己跑一支逐筆 for 迴圈，用 conj_backtest 的
+    常數重算 A 臂與 C 臂，與主引擎逐位比對（差 < 1e-9）。
+    不對寫死的數字 —— 那種守衛會因為正當的參數改動而變紅，然後被調鬆。
+P1b C 臂必須真的是「等它走出來」：筆數少於 A，且進場一律在成立後 C_WAIT+1 分。
+P2  逐筆反解：R == 方向 × (出場 − 進場) / ATR（停損筆的出場價就是停損價，
+    所以同一條式子對兩種出場都成立）。
+P3  停損筆的出場在進場之後、HOLD 分之內；時間出場筆的持有恰好 HOLD 分。
 J1/J2  產出的頁面：篩選狀態宣告早於 kpis() 呼叫；用瀏覽器替身把 script
     跑一次，createChart 必須被呼叫到（沿用 sweep_failure 那支守衛的替身；
     mistake.md 2026-09-08：curl 對「圖一片空白」免疫）。
@@ -25,6 +24,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 HERE = Path(__file__).resolve().parent
@@ -32,15 +32,65 @@ POC = HERE.parent
 sys.path.insert(0, str(POC))
 import conj_backtest as cb  # noqa: E402
 
-# 2026-09-09：參考值換成 `conj_redef.py` 的**誠實**定義（進場錨在事件
-# 成立時刻）。原本對的是 `flow_direction.py` 的 +0.2275，而那是舊錨點
-# （群內最早那一分鐘）——TODO §1.03b 判定它是前視：22.3% 的交易在進場
-# 當下事件還不存在，一半的 edge 由此而來。**換參考值不是放寬容差**，
-# 是比對的對象本來就該是誠實那個。
-REF = POC / "data" / "results" / "conj_redef.json"
-LOOKAHEAD_REF = 0.2286        # 舊錨點的值，必須**明顯偏離**它
+# 2026-09-09（二次）：P1 不再對一個寫死的數字，改成**測試裡自己跑一支獨立
+# 的逐筆 for 迴圈**，用 conj_backtest 自己的常數重算 A 臂並逐位比對。
+# 理由：先前 P1 對 `conj_redef` 的 delay=2 毛利，但那個值是用 STOP=1.0 算的；
+# 出場參數一改（3 ATR／480 分）它就必然對不上 —— 一個會因為正當改動而變紅
+# 的守衛，下一個人只會把它調鬆。獨立實作對照沒有這個問題，而且它測的正是
+# 「兩份實作同不同意」，比對一個數字更接近本意。
 OUT = POC.parents[0] / "results" / "conj_backtest_BTC.html"
-TOL = 0.005
+
+
+def _naive(sym, arm):
+    """獨立重寫：逐分鐘 for 迴圈，不用向量化，語意照規則書。"""
+    import event_census as ec
+    import conj_redef as cr
+    liq = cb._empty_liq()
+    cand, ts, cl, at, _ = cb.ck.frozen_cand(sym, liq)
+    b = pd.read_parquet(cb.BARS / f"{sym}.parquet",
+                        columns=["open", "high", "low"])
+    op = b["open"].to_numpy(float)
+    hi = b["high"].to_numpy(float)
+    lo = b["low"].to_numpy(float)
+    n = len(ts)
+    pairs = [(int(m), "sweep")
+             for m in ec.cooldown_filter(np.sort(cand["sweep"]))]
+    for nm in cb.FLOW:
+        v = cand.get(nm)
+        if v is not None and len(v):
+            for m in ec.cooldown_filter(np.sort(v)):
+                pairs.append((int(m), nm))
+    out = []
+    for a, mem in cr.groups_with_members(pairs):
+        sg = {x for _, x in mem}
+        if "sweep" not in sg or not (sg & set(cb.FLOW)):
+            continue
+        rd = max(min(m for m, x in mem if x == "sweep"),
+                 min(m for m, x in mem if x in cb.FLOW))
+        if rd < cb.W or rd + max(cb.DELAY, cb.C_WAIT + 1) + cb.HOLD >= n:
+            continue
+        A = at[rd]
+        if not (A > 0) or not np.isfinite(A):
+            continue
+        if arm == "C":
+            mv = (cl[rd + cb.C_WAIT] - cl[rd]) / A
+            if abs(mv) < cb.C_MOVE:
+                continue
+            d = 1.0 if mv > 0 else -1.0
+            j0 = rd + cb.C_WAIT + 1
+        else:
+            d = 1.0 if cl[rd] > cl[rd - cb.W] else (-1.0 if cl[rd] < cl[rd - cb.W] else 1.0)
+            j0 = rd + cb.DELAY
+        ent = op[j0]
+        sp = ent - d * cb.STOP * A
+        hit = None
+        for k in range(j0 + 1, j0 + cb.HOLD + 1):
+            if (lo[k] <= sp) if d > 0 else (hi[k] >= sp):
+                hit = k
+                break
+        out.append(-cb.STOP if hit is not None
+                   else float(d * (cl[j0 + cb.HOLD] - ent) / A))
+    return out
 
 
 @pytest.fixture(scope="module")
@@ -50,30 +100,27 @@ def ledgers():
     return {s: cb.ledger(s)[0] for s in cb.CORE9}
 
 
-def test_p1_pooled_mean_matches_honest_redef(ledgers):
-    """P1 池化毛利 == conj_redef 誠實定義的同一格（delay=DELAY）。"""
-    if not REF.exists():
-        pytest.skip("conj_redef.json 不在，先跑 conj_redef.py")
-    j = json.loads(REF.read_text(encoding="utf-8"))
-    ref = j["delays"][str(cb.DELAY)]["gross"]
-    rs = [t["R"] for s in cb.CORE9 for t in ledgers[s]]
-    m = float(np.mean(rs))
-    assert abs(m - ref) < TOL, (
-        f"池化毛利 {m:+.4f} vs conj_redef delay={cb.DELAY} {ref:+.4f}"
-        f"（n {len(rs)} vs {j['n']}）—— 兩份實作不同意，不得上網站")
+def test_p1_independent_reimplementation(ledgers):
+    """P1 主引擎 vs 測試裡的獨立逐筆實作，逐位比對（兩臂都比）。"""
+    for arm in ("A", "C"):
+        for s in ("BTC", "ETH"):
+            main = [t["R"] for t in cb.ledger(s, arm=arm)[0]]
+            nv = _naive(s, arm)
+            assert len(main) == len(nv), (arm, s, len(main), len(nv))
+            d = max(abs(a - b) for a, b in zip(main, nv)) if main else 0.0
+            assert d < 1e-9, f"{arm}/{s} 兩份實作不同意，最大差 {d:.2e}"
 
 
-def test_p1b_not_the_lookahead_anchor(ledgers):
-    """P1b 反向：進場若改回群內最早那一分鐘（前視），這一關必須紅。
-
-    TODO §1.03b：舊錨點的池化毛利是 +0.2286，誠實的是 +0.1157 —— 差
-    0.1129，遠大於容差。任何把錨點改回 `a` 的改動都會落回前視值。
-    """
-    rs = [t["R"] for s in cb.CORE9 for t in ledgers[s]]
-    m = float(np.mean(rs))
-    assert abs(m - LOOKAHEAD_REF) > 10 * TOL, (
-        f"池化毛利 {m:+.4f} 落在前視值 {LOOKAHEAD_REF:+.4f} 上 —— "
-        f"進場錨點被改回群內最早那一分鐘了（22.3% 的單會下在事件成立之前）")
+def test_p1b_arm_c_is_a_real_subset(ledgers):
+    """P1b C 臂必須是「等它走出來」而不是別的東西：
+    筆數要明顯少於 A（只有走出門檻的才進），且進場一律晚於 A。"""
+    for s in ("BTC", "ETH", "SOL"):
+        a = cb.ledger(s, arm="A")[0]
+        c = cb.ledger(s, arm="C")[0]
+        assert 0 < len(c) < len(a), (s, len(a), len(c))
+        for t in c:
+            gap = (t["entry_ts"] - t["anchor_ts"]) // 60_000
+            assert gap == cb.C_WAIT + 1, (s, gap)
 
 
 def test_p2_r_solves_back_from_prices(ledgers):
