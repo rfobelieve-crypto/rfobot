@@ -45,6 +45,7 @@ import json
 import os
 import sys
 import time
+import traceback
 import urllib.request
 import warnings
 from datetime import datetime, timezone
@@ -620,16 +621,17 @@ def intent_gate(conn, intents):
         # 而 status 本來就沒有任何路徑會變（agent 唯讀、產品端不直連 DB），
         # 所以「有沒有成交」只能從產品端回報的 agent_conj_fills 推。
         cur.execute(
-            "SELECT i.canonical_symbol, COUNT(*) FROM conj_intents i "
+            "SELECT i.canonical_symbol AS sym, COUNT(*) AS n FROM conj_intents i "
             "LEFT JOIN agent_conj_fills f "
             "  ON f.intent_id = CONCAT(i.canonical_symbol, ':', i.anchor_ts) "
             "WHERE (f.intent_id IS NULL AND i.status='NEW' AND i.expires_ts > %s) "
             "   OR (f.intent_id IS NOT NULL AND f.fill_ts + i.hold_ms > %s) "
             "GROUP BY i.canonical_symbol", (now, now))
-        open_by = dict(cur.fetchall() or [])
-        cur.execute("SELECT COUNT(*) FROM conj_intents WHERE intent_ts >= %s",
-                    (day0,))
-        n_today = int((cur.fetchone() or [0])[0])
+        # DictCursor：fetchall() 回 list[dict]，`dict(...)` 會炸。見 `_one`。
+        open_by = {r["sym"]: int(r["n"]) for r in (cur.fetchall() or [])}
+        cur.execute("SELECT COUNT(*) AS n FROM conj_intents "
+                    "WHERE intent_ts >= %s", (day0,))
+        n_today = int(_one(cur.fetchone()) or 0)
     out = []
     live = sum(open_by.values())
     for it in intents:
@@ -647,6 +649,23 @@ def intent_gate(conn, intents):
     return out
 
 
+def _one(row):
+    """取單欄查詢的那個值。
+
+    `shared.db.get_db_conn()` 用的是 **DictCursor**，所以 `fetchone()` 回的是
+    dict 不是 tuple，`row[0]` 會丟 `KeyError: 0`。這個專案的其他地方都寫
+    dict 存取，只有這支腳本寫成位置索引 —— 而它踩到的那條路徑一分鐘只跑
+    「有事件的時候」，所以錯了兩天沒人知道（2026-09-09 查出 conj_events_live
+    從註冊以來 0 列）。用欄位名不可行（`MAX(event_ts)` 的鍵是整串運算式），
+    所以取「唯一的那個值」。
+    """
+    if not row:
+        return None
+    if isinstance(row, dict):
+        return next(iter(row.values()), None)
+    return row[0]
+
+
 def recent_ok(conn, sym, ev_ts):
     """跨輪的 60 分鐘冷卻：`assemble` 的冷卻只在本輪的視窗內成立。"""
     with conn.cursor() as cur:
@@ -654,7 +673,7 @@ def recent_ok(conn, sym, ev_ts):
                     "WHERE canonical_symbol=%s AND event_ts > %s",
                     (sym, ev_ts - COOLDOWN * 60_000))
         r = cur.fetchone()
-    return not (r and r[0])
+    return _one(r) is None
 
 
 def main():
@@ -741,7 +760,11 @@ def main():
         conn.close()
     except Exception as e:
         ok, reason = False, f"{type(e).__name__}: {e}"
+        # traceback 不可省略：`KeyError: 0` 這種訊息完全指不出位置，而這支
+        # 每分鐘跑一次、錯誤只會累積在 log 裡沒人看得懂（mistake.md
+        # 2026-08-01「渲染層的 try/except 永遠不可以是靜默的」的排程版）。
         print(f"[ERROR] {reason}")
+        traceback.print_exc()
 
     took = (time.time() - t_start) * 1000
     lat = [e[3] for e in events] if ok and 'events' in dir() and events else []
