@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""交會事件 · 回測檢視器 —— 把現行實盤規則的每一筆交易畫在 K 線上
+"""SDV · 回測檢視器 —— 把現行實盤規則的每一筆交易畫在 K 線上
 
 使用者 2026-09-08：「那個歷史回測應該要顯示交會的那個策略才對喔」
 
 網站 /charts/backtest 一直畫的是舊線（掃單失敗，2026-09-07 結案）。
-現在要上實盤的是新線 —— 交會事件（TODO §1.03），本檔給它同一種檢視器：
+現在要上實盤的是新線 —— SDV（2026-09-09 使用者命名；TODO §1.03），本檔給它同一種檢視器：
 每一條線、每一個標記，都取自**同一筆被計分的記錄**，不重算、不近似、
 不另寫一份繪圖用的邏輯（mistake.md 2026-08-26：兩份實作會安靜地不同意）。
 
@@ -18,18 +18,19 @@
     組裝    `conj_redef.groups_with_members`（與判決端同一顆）
     訊號時刻 **ready** = 最後一個必要成分到齊那一分鐘。**不是群內最早那一分鐘**
             —— 用最早那個會讓 22.3% 的單下在事件成立之前（前視，§1.03b）
-    方向    **等它走出來再跟**：ready 之後 10 分鐘，若已走超過 0.5 ATR，
-            順著那個方向進場；沒走出來就不交易。
-            （使用者 2026-09-09：「我不用一定要知道方向，只要知道獵取後怎麼走」。
-              樣本外命中率 48.6% -> 51.0%、逐幣 7/9 -> 9/9、
-              資金曲線最大回落 47.0% -> 26.5%）
-    進場    ready + 11 分那根的**開盤**（限價，成交率 97.8%）
+    方向    ready 前 5 分鐘的動能（`close[ready] > close[ready-5]` 就做多）。
+            **這是 A 臂，現行規格。**「等它走出來再跟」（C 臂）在同日稍後
+            被判過擬合並撤回 —— 誠實地只用前半選門檻會選到不同的一組，
+            那組在後半只有 5/9（見 `ledger()` 的 docstring）。
+            C 保留為 `--arm C` 的可選臂，不是規格。
+    進場    ready + 3 分那根的**開盤**（限價，成交率 97.8%）
     停損    3.0 × ATR_h14(ready)，分鐘高低價判定，從進場**下一根**起
     出場    停損，或進場後 480 分那根的收盤，先到者
     單位    ATR。+0.30 = 平均每筆賺 0.3 個小時 ATR（≈ 0.28% 名目）
 
-成本（Bitget 標準 maker/taker，2026-09-09）
-    進場 2 ／ 時間出場 2 ／ 停損出場 6 bps。限價成交率 97.8% 已量過。
+成本（Bitget **返佣 50% 後的實付**，2026-09-09 使用者提供）
+    進場 1 ／ 時間出場 1 ／ 停損出場 3 bps（牌價 maker 2 / taker 6）。
+    停損率 18% 下混合 2.37 bps。限價成交率 97.8% 已量過。
     逐筆換算：cost_ATR = bps/1e4 × entry / ATR
     表上「淨」= 毛 − 這一筆自己那條腿的成本
 
@@ -189,7 +190,7 @@ def ledger(sym, liq=None, arm="A"):
         if "sweep" not in sig or not (sig & set(FLOW)):
             continue
         # **一切錨在 ready，不是 a**（2026-09-09，TODO §1.03b）。
-        # a 是群內最早那一分鐘；ready 是最後一個必要成分到齊、交會事件真正
+        # a 是群內最早那一分鐘；ready 是最後一個必要成分到齊、SDV 真正
         # 成立的那一分鐘。用 a 當進場錨點，22.3% 的單會下在事件存在之前。
         m_sw = min(m for m, t in mem if t == "sweep")
         m_fl = min(m for m, t in mem if t in FLOW)
@@ -368,7 +369,7 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
 
 TPL = r"""<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>__SYM__ 交會事件 · 回測檢視</title>
+<title>__SYM__ SDV · 回測檢視</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 :root{--bg:#0b0e11;--pan:#12161c;--line:#1e242d;--ink:#eaecef;--dim:#848e9c;
@@ -424,9 +425,10 @@ tbody tr.sel{background:#1c2530}
 </style></head><body><div class="wrap">
 
 <header>
-  <h1>__SYM__USDT · 交會事件回測</h1>
+  <h1>__SYM__USDT · SDV 回測</h1>
   <span class="tag">__SPAN__</span>
-  <span class="tag">掃單 ∧ (主動量極端 ∨ 量能爆發) · 進場 <b>成立時刻 +__DELAY__ 分</b> · 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
+  <span class="tag"><b>S</b> 掃單 · <b>D</b> 主動量極端 · <b>V</b> 量能爆發 —— 三者齊發才是 SDV（下方可切分頁看 S+D／S+V）</span>
+  <span class="tag">進場 <b>成立時刻 +__DELAY__ 分</b>（成立 = 最後一個成分到齊那一分鐘）· 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
   <span class="tag">成本 Bitget 返佣後實付 1/1/3 bps（混合 2.37）· 限價成交率 97.8%</span>
   <span class="tag" style="border-color:var(--amb);color:var(--amb)">執行暫停中 · 樣本外 CI 下緣仍含零</span>
   <span class="tag">K 線 __CM__ 分鐘（顯示用）· 規則跑在 1 分鐘</span>
@@ -441,19 +443,37 @@ tbody tr.sel{background:#1c2530}
   <b>樣本外比樣本內還強</b>（+0.907 vs +0.472），整張「持有 × 停損」網格
   在樣本外 <b>15 格全部為正</b> —— 沒有峰值可以過擬合。</p>
   <p><b>樣本外（後半 1.25 年）</b>：每筆淨 +0.15 ~ +0.24 ATR、逐幣 8-9/9。
-  但<b>樣本外／樣本內只有 34%</b>，所以樣本內的數字一律要打三折。
-  1000 USDT、兩倍槓桿、三槽的模擬：年化 +23~36%、最大回落 26~47%、零強平。
+  但<b>樣本外／樣本內只有 34~36%</b>，所以樣本內的數字一律要打三折。
   十倍槓桿在樣本外是負的（單槽 −99.7%），因為停損 3 ATR ≈ 2.5% 價格，
   十倍下就是權益的 25%／筆。</p>
+  <p><b>回落：先前這裡寫的 26~47% 是低估，已更正。</b>舊值取自單一條模擬
+  路徑；改成重抽交易日順序跑 1500 條路徑之後，樣本外在兩倍槓桿三槽下是
+  <b>中位 43.3%、p95 59.7%、回落超過五成的機率 24.1%</b>（超過七成 0.1%）。
+  四次裡有一次會腰斬。同一組重抽的另一面：<b>優勢大於零的機率 85.0%</b>、
+  勝率 47.9%、獲利因子 1.19、年化夏普 +0.93。<b>勝率低於五成</b>——這條線
+  不靠猜對方向賺錢，靠的是贏的時候比輸的時候大。活數字跑
+  <code>research/poc/conj_bet.py</code>。</p>
+  <p><b>流量條件就是那個判別器（2026-09-09 新證據）</b>：同一批掃單、同一套
+  進出場，唯一差別是流量旗標有沒有開火 —— 兩個都開 <b>+0.331、9/9 幣</b>，
+  兩個都沒開只有 <b>+0.056、6/9</b>，<b>差六倍</b>。而反著做 SDV 是
+  <b>0/9 幣</b>全輸，確認它確實是延續交易。</p>
   <p><b>一個被判掉的改良，留檔</b>：「不預測方向，等它走出來再跟」
   （成立後等 10 分、走超過 0.5 ATR 才進）看起來很好，但誠實地只用前半選門檻
   會選到<b>不同</b>的一組，而那組在後半只有 5/9。先前那個「樣本外 9/9」
   是看過後半才挑的。<b>已撤回，不作為現行規格。</b>
   站得住的只有它不加門檻時的穩定性（命中率 48.6%→50.9%、CI 下緣
   −0.189→−0.122），代價是點估計降低。</p>
+  <p><b>2026-09-09 下半天又死了三個改良，一併留檔</b>：從未平倉量推導的
+  <b>清算位密度</b>（指標的建構通過完整驗證，但密度預測不了延續——最高密度
+  那格反而平庸，而波動度的單調性比它強八倍）；<b>「沒帶量的掃單會反轉」</b>
+  （反著做是負的、逐幣 2/9，真樣本外兩個方向都貼零＝什麼都沒發生）；
+  <b>把 delta 換成 CVD</b>（五分鐘 CVD 變化就是現行的 delta 五分鐘和；
+  帶符號當方向來源，四個窗口跟現行動能 96-97% 一致，全落在雜訊裡）。
+  判決全文 TODO §1.03i／§1.03j。</p>
   <p><b>為什麼還是暫停</b>：樣本外單筆淨值的信賴區間下緣仍然含零
-  （−0.19 ~ −0.12），兩年半的資料釘不住它。<code>conj_watch</code> 的
-  下單意圖層維持停止。判決全文 TODO §1.03b~f。</p>
+  （−0.19 ~ −0.12），而且<b>整張出場網格 15 格沒有任何一格的下緣越過零</b>，
+  兩年半的資料釘不住它。前瞻紀錄 3/300。<code>conj_watch</code> 的下單
+  意圖層維持停止。判決全文 TODO §1.03b~f。</p>
 </div>
 
 <div class="kpis" id="kpis"></div>
@@ -477,8 +497,8 @@ tbody tr.sel{background:#1c2530}
   <button id="btnFit">全景（90 天）</button>
   <span style="width:100%"></span>
   <span style="color:var(--dim)">簽名：</span>
-  <button id="btnGA" class="on">不分</button>
-  <button id="btnGand">S+D+V（且）</button>
+  <button id="btnGA">不分（含 S+D、S+V）</button>
+  <button id="btnGand" class="on">S+D+V＝SDV</button>
   <button id="btnGd">只有主動量（S+D）</button>
   <button id="btnGv">只有量能（S+V）</button>
   <span id="dense"></span>
@@ -514,7 +534,9 @@ const fmtP = v => v >= 1000 ? v.toFixed(1) : v >= 1 ? v.toFixed(3) : v.toFixed(5
 // 篩選狀態宣告在 kpis() **被呼叫之前**——let/const 的暫時性死區會把整段
 // script 打斷、圖一片空白而頁面其他部分照常渲染（mistake.md 2026-09-08）。
 let filt = 'all';       // 賺賠
-let grp  = 'all';       // 簽名
+let grp  = 'and';       // 簽名。**預設就是 SDV（三者齊發）**——
+// 頁面叫 SDV,預設卻顯示整個母體的話,標題與內容不同意。
+// S+V 單獨為負、S+D 樣本薄,只有 and 那格撐得住樣本外。
 // `$` 也宣告在這裡：focus() 在定義處之後才會被呼叫，但把取用工具留在
 // 檔案下半部正是上一次 TDZ 的形狀，不重複同一個佈局。
 const $ = id => document.getElementById(id);
