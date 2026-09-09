@@ -19,6 +19,8 @@ from indicator.okx.types import (
     AlgoOrderResult,
     Balance,
     CancelResult,
+    OrderDetails,
+    OrderEvent,
     OrderResult,
     ReconciliationResult,
     ReconciliationVerdict,
@@ -92,6 +94,63 @@ def _mk_executor(cfg=None):
     exe = V7OkxExecutor(client=client, store=store, reconciler=recon,
                         cfg=cfg)
     return exe, client, store, recon
+
+
+# ── entry fill read-back (2026-09-09) ────────────────────────────────
+#
+# entry_fees_usd was 0 on all 21 live rows ever written.  The only writer
+# was the WS orders-channel callback, and it can never win the race: the
+# fill event fires milliseconds after the market order, while the DB
+# insert happens two REST round-trips later.  These three tests pin the
+# fix, the failure it replaces, and the fallback.
+
+
+class TestEntryFillReadback:
+    def test_readback_persists_real_fee_and_real_fill_price(self):
+        exe, client, store, _ = _mk_executor()
+        client.get_order.return_value = OrderDetails(
+            ord_id="okx-ord-1", state="filled", avg_px=75123.45,
+            fee_usd=-0.1234, acc_fill_sz=0.33)
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            result = exe._open_position(klines=_mk_klines(),
+                                        signal_direction="UP",
+                                        signal_strength="Strong",
+                                        model_version="v1")
+        assert result.action == "open"
+        store.set_entry_fees.assert_called_once()
+        kw = store.set_entry_fees.call_args.kwargs
+        assert kw["position_id"] == 42
+        assert kw["entry_fees_usd"] == pytest.approx(0.1234)
+        assert kw["entry_price"] == pytest.approx(75123.45)
+        # the reported entry is the real fill, not the bar-close estimate
+        assert result.detail["entry_price"] == pytest.approx(75123.45)
+
+    def test_ws_callback_alone_cannot_land_the_fee(self):
+        """Reverse-prove the bug this replaces.
+
+        At the instant the entry fill event arrives there is no OPEN row
+        yet, so the WS callback returns early — silently, because "flat"
+        is also a legitimate state.  That is why 21/21 rows read 0.
+        """
+        exe, client, store, _ = _mk_executor()
+        store.get_open_position.return_value = None   # insert hasn't run yet
+        exe._wire_ws_callbacks()
+        on_order = client.subscribe_orders.call_args.args[0]
+        on_order(OrderEvent(cl_ord_id="v7-x", ord_id="okx-ord-1",
+                            state="filled", fill_price=75000.0,
+                            fill_size=0.33, fee_usd=-0.1234))
+        store.set_entry_fees.assert_not_called()
+
+    def test_readback_unavailable_keeps_the_estimate(self):
+        exe, client, store, _ = _mk_executor()
+        client.get_order.return_value = None          # REST already retried
+        with patch("indicator.okx.executor.send_critical", return_value=True):
+            result = exe._open_position(klines=_mk_klines(),
+                                        signal_direction="UP",
+                                        signal_strength="Strong",
+                                        model_version="v1")
+        assert result.action == "open"
+        store.set_entry_fees.assert_not_called()
 
 
 # ── _open_position ───────────────────────────────────────────────────

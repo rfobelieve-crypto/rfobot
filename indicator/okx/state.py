@@ -225,23 +225,35 @@ class OkxStateStore:
                 conn.close()
 
     def set_entry_fees(self, *, position_id: int,
-                       entry_fees_usd: float) -> None:
-        """Persist the entry order's real fee (from the WS fill event).
+                       entry_fees_usd: float,
+                       entry_price: Optional[float] = None) -> None:
+        """Persist the entry order's real fee (and optionally its real fill).
 
         OKX's orders-channel `fee` field is CUMULATIVE for the order, so
         this overwrites (never adds) — partial-fill events converge on the
         final value.  No status filter: a late fee event landing after the
         row closed is still correct data.
+
+        `entry_price` is written only when the caller read it back from the
+        order (REST `avgPx`).  The WS callback leaves it None because the
+        row it wants may not exist yet — see the executor's post-insert
+        read-back, which is the path that actually lands (2026-09-09).
         """
+        sets = ["entry_fees_usd=%s"]
+        params: list = [float(entry_fees_usd)]
+        if entry_price is not None and float(entry_price) > 0:
+            sets.append("entry_price=%s")
+            params.append(float(entry_price))
+        params.append(int(position_id))
         sql = (
             f"UPDATE `{self._prefix}_positions` "
-            "SET entry_fees_usd=%s WHERE id=%s"
+            f"SET {', '.join(sets)} WHERE id=%s"
         )
         with self._lock:
             conn = get_db_conn()
             try:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (float(entry_fees_usd), int(position_id)))
+                    cur.execute(sql, tuple(params))
                 conn.commit()
             finally:
                 conn.close()

@@ -1565,6 +1565,58 @@ class V7OkxExecutor:
         except Exception:
             logger.exception("set_position_okx_ids_failed")
 
+        # 3b. Read back the entry fill (real avg price + real fee).
+        #
+        # 2026-09-09: entry_fees_usd was 0 on every live row ever written
+        # (21/21).  The only writer was the WS orders-channel callback, and
+        # it CANNOT win: the entry fill event fires on the WS thread within
+        # milliseconds of the market order, while the DB insert above only
+        # happens after two more REST round-trips (algo stop + latency
+        # check).  `get_open_position()` therefore returns None on that
+        # thread and the callback returns early — silently, because "no
+        # open position" is also a legitimate state.  The WS path stays as
+        # a late-arriving refinement; THIS is the path that lands.
+        #
+        # Same read-back the close path already does (step 3 of _close_*).
+        # Doing only the exit side left P&L as real_exit / estimated_entry
+        # — the exact "wrong ruler" that comment warns about.  Failure here
+        # never blocks: the row keeps the bar-close estimate it already has.
+        entry_ord = getattr(entry_result, "ord_id", None)
+        if entry_ord:
+            for attempt in range(3):
+                try:
+                    details = self._client.get_order(
+                        inst_id=self._cfg.inst_id, ord_id=str(entry_ord))
+                except Exception:
+                    logger.exception("entry_fill_readback_failed pos=%s", new_id)
+                    break
+                if details is None:
+                    break   # REST layer already retried — keep the estimate
+                if details.state == "filled":
+                    real_px = (float(details.avg_px)
+                               if details.avg_px and details.avg_px > 0
+                               else None)
+                    real_fee = (abs(float(details.fee_usd))
+                                if details.fee_usd is not None else None)
+                    if real_fee is not None:
+                        try:
+                            self._store.set_entry_fees(
+                                position_id=int(new_id),
+                                entry_fees_usd=real_fee,
+                                entry_price=real_px,
+                            )
+                            if real_px:
+                                last_close = real_px
+                            logger.info(
+                                "entry_fill_readback pos=%d fee=%.4f px=%s",
+                                new_id, real_fee, real_px)
+                        except Exception:
+                            logger.exception("set_entry_fees_failed pos=%s",
+                                             new_id)
+                    break
+                if attempt < 2:
+                    time.sleep(0.5)   # market order on BTC swap fills ~instantly
+
         # Mark approval EXECUTED if we went through the gate
         if approval_id is not None and self._approval is not None:
             self._approval.mark_executed(approval_id=approval_id,
