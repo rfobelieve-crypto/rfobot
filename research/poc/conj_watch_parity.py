@@ -73,6 +73,7 @@ import event_triage as et  # noqa: E402
 import conj_clock as ck  # noqa: E402
 import conj_causal as cc  # noqa: E402
 import conj_watch as cw  # noqa: E402
+import conj_redef as cr  # noqa: E402
 
 BARS = HERE / "data" / "bars"
 DAYS = 30
@@ -81,7 +82,15 @@ FLOWM = set(cw.FLOW)
 
 
 def offline_moments(cand, lo_i):
-    """離線的交會時刻（同 conj_clock 的定義，去掉 oi —— live 不吃 OI）。"""
+    """離線的交會時刻（去掉 oi —— live 不吃 OI）。
+
+    2026-09-09：錨點改成 **ready = max(第一根掃單, 第一根流量)**，與
+    `conj_watch.assemble` 同步。兩邊必須用同一個錨點定義，否則這支對照
+    量到的是「錨點定義差 0-5 分鐘」而不是「兩份實作同不同意」——容差只有
+    2 分鐘，中位偏移就是 2 分鐘，命中率會憑空掉一截，而那個掉法看起來
+    完全像「發射路徑壞了」。**改了 live 就要同步改對照，否則對照失去
+    分辨力**（mistake.md 2026-09-07：對照測試自己被修了三次）。
+    """
     pairs = []
     for nm in et.NAMES:
         if nm == "oi_crash" or nm == "liq_burst":
@@ -91,8 +100,16 @@ def offline_moments(cand, lo_i):
             continue
         for m in ec.cooldown_filter(np.sort(v)):
             pairs.append((int(m), nm))
-    return sorted({a for a, s in et.cluster(pairs)
-                   if "sweep" in s and (s & FLOWM) and a >= lo_i})
+    out = set()
+    for _a, mem in cr.groups_with_members(pairs):
+        s = {x for _, x in mem}
+        if "sweep" not in s or not (s & FLOWM):
+            continue
+        ready = max(min(m for m, x in mem if x == "sweep"),
+                    min(m for m, x in mem if x in FLOWM))
+        if ready >= lo_i:
+            out.add(ready)
+    return sorted(out)
 
 
 def compare(off, live, tol=TOL_MIN):
@@ -139,7 +156,7 @@ def main():
         for k in cw.FLOW:
             v = caus.get(k)
             fa[k] = np.asarray(v if v is not None else [], np.int64)
-        liveA = [a for a, s in cw.assemble(fa) if a >= lo_i]
+        liveA = [a for a, s, _ in cw.assemble(fa) if a >= lo_i]
 
         # ---- B 臂：live **每天重算一次**門檻（真實行為的逐日模擬）----
         # 不可以拿一個固定的「最近 30 天」門檻去比 30 天前的事件——那是這支
@@ -165,7 +182,7 @@ def main():
         fb = {k: (np.concatenate(v) if v else np.array([], np.int64))
               for k, v in acc.items()}
         fb["sweep"] = cand["sweep"]
-        liveB = [a for a, s in cw.assemble(fb) if a >= lo_i]
+        liveB = [a for a, s, _ in cw.assemble(fb) if a >= lo_i]
 
         # ---- C 臂：掃單也用 live 自己的來源（活價位 + 穿越測試）----
         pt = cw.pivot_table(sym)
@@ -196,7 +213,7 @@ def main():
                         sw.append(m0 + k)
         fc = dict(fb)
         fc["sweep"] = np.array(sw, np.int64)
-        liveC = [a for a, s in cw.assemble(fc) if a >= lo_i]
+        liveC = [a for a, s, _ in cw.assemble(fc) if a >= lo_i]
         # V5：原始筆數,不穿過冷卻/交會（那兩層會把洪水吸收掉）
         RAW[0] += int((np.asarray(sw, np.int64) >= lo_i).sum())
         RAW[1] += int((np.asarray(cand["sweep"], np.int64) >= lo_i).sum())

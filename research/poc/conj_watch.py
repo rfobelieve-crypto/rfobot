@@ -60,6 +60,7 @@ sys.path.insert(0, str(HERE.parents[0] / "sweep_failure"))
 import sweep_core as sc  # noqa: E402
 import event_census as ec  # noqa: E402
 import event_triage as et  # noqa: E402
+import conj_redef as cr  # noqa: E402
 
 ROOT = HERE.parents[1]
 LIVE = HERE / "data" / "live"
@@ -86,13 +87,23 @@ EMIT_RECENT = 15
 # ── 執行參數（2026-09-08 第 7 次 override，CLAUDE.md 有完整記錄）──
 # 本層**只算訂單意圖、不送單**。送單在 jarvis（沿用既有 src/exchange/bg），
 # 在這裡再寫一份 Python 下單層是被禁止的——那是第二份實作，而且是下單層。
-NOTIONAL_USD = 150.0        # 每筆名目。$300-500 本金、最多 2 筆同時 -> <1x
-MAX_CONCURRENT = 2          # 全域同時持倉上限
+NOTIONAL_USD = 150.0        # 每筆名目。$300-500 本金、最多 3 筆同時 -> ~1x
+MAX_CONCURRENT = 3          # 全域同時持倉上限（模擬用的那一格：2x/3 槽）
 MAX_PER_SYMBOL = 1          # 同一幣不重複進場
 MAX_DAILY = 8               # 每日意圖上限（事件率 2-3/天，8 是異常煞車）
-STOP_ATR = 1.0              # 停損距離（出場體檢選的那一格，見 TODO §1.03）
-HOLD_MIN = 60               # 時間出場
-INTENT_TTL_S = 180          # 意圖過期：超過就別送陳舊的單（死線是 2 分鐘）
+# ── 出場參數（2026-09-09 重新校準；舊值 1.0 ATR / 60 分是錯的那一組）──
+# 1 ATR 停損切掉左尾、60 分持有切掉右尾，兩邊各砍一半。誠實錨點下重跑
+# hold x stop 網格，3 ATR / 480 分是唯一讓毛利站得住的那一格，而且持有
+# 單調性樣本外 +0.907。**這兩個數字不是可調參數**，改它們要重跑 conj_hold。
+STOP_ATR = 3.0              # 停損距離（ATR 倍數）
+HOLD_MIN = 480              # 時間出場（分鐘）
+# 進場延遲：成立分鐘 + DELAY 根的**開盤**。delay=0 是前視（open(ready) 早於
+# 形成這個事件的那根收盤），所以最小可交易延遲是 1，驗證用的是 3。
+ENTRY_DELAY_MIN = 3
+# 只對 S+D+V 產生意圖。S+V 單獨為負、S+D 樣本薄；驗證過的母體是三者齊發
+# 那一格（conj_backtest 的 sigk=="and"）。shadow 表照記全部簽章。
+INTENT_SIGNATURE = "S+D+V"
+INTENT_TTL_S = 180          # 意圖過期：超過就別送陳舊的單
 # ───────────────────── 2026-09-09：意圖層停止產生 ─────────────────────
 # `conj_redef.py` 查出這條線的進場定義是前視的：`et.cluster` 的錨點是群內
 # **最早**那一分鐘，而交會事件要到最後一個成分到齊（ready）才成立。
@@ -102,11 +113,20 @@ INTENT_TTL_S = 180          # 意圖過期：超過就別送陳舊的單（死�
 # 改成誠實錨點（ready）後逐格重跑，**沒有任何可交易延遲的淨值 CI 下緣 > 0**
 # （delay 1/2/3/5/10 淨 -0.043/-0.027/-0.019/-0.048/-0.060，逐幣 2-3/9）。
 #
-# 所以現在產生的意圖，其 ref_price（= close[錨點]）是一個在送單當下已經
-# 過去的價格，而且整套規則扣成本後期望為負。**在定義修好、重新過閘之前
-# 不得產生任何意圖**——事件偵測（conj_events_live）照跑，那是 shadow 記錄。
-# 要恢復必須：(a) 錨點改 ready、(b) 重跑 conj_redef 有一格過閘、
-# (c) 回頭改 CLAUDE.md 的 override #7。設 CONJ_INTENTS=1 可強制開啟（僅測試用）。
+# 恢復條件是三條，2026-09-09 的進度：
+#   (a) 錨點改 ready                     **已做**（見 assemble）
+#   (b) 重跑 conj_redef 有一格過閘        **未達成**——誠實錨點下 OOS 的
+#       CI 下緣仍是 −0.151，沒有任何延遲格的 CI 下緣 > 0。後來重新校準
+#       出場（3 ATR / 480 分）＋ Bitget 返佣 50% 之後，樣本外 S+D+V 是
+#       +0.1833、CI [−0.135, +0.549]、9/9 幣、P(edge>0)=84.9%
+#       —— **CI 仍然跨零**，所以這一條依原始措辭沒有過。
+#   (c) 回頭改 CLAUDE.md 的 override #7   **未做**
+#
+# 換句話說：真的要開，那是一次**知情的推翻**（我自己寫下的恢復條件沒有
+# 達成），必須照 override 儀式寫進 CLAUDE.md，不能靠改這一行悄悄放行。
+# CLAUDE.md 核心原則 #10 說明了為什麼「CI 不跨零」是研究的門檻而不是
+# 下注的門檻——但那是使用者的決定，不是這個檔案的。
+# 設 CONJ_INTENTS=1 可強制開啟（僅測試用）。
 INTENTS_ENABLED = os.environ.get("CONJ_INTENTS", "") == "1"
 UA = {"User-Agent": "conj-watch/1.0"}
 
@@ -299,7 +319,21 @@ def load_state(rebuild=False):
 
 # ───────────────────────── 組裝（與離線共用同一顆） ─────────────────────────
 def assemble(cand_like):
-    """把 {類型: 分鐘索引} 組成交會時刻 —— **直接呼叫 event_triage.cluster**。
+    """把 {類型: 分鐘索引} 組成交會時刻 —— **共用 conj_redef 的那顆分群**。
+
+    2026-09-09：錨點從「群內最早那一分鐘」改成 **ready = max(第一根掃單,
+    第一根流量)**，也就是**事件真正成立**的那一分鐘。
+
+    `et.cluster` 的最早錨點是事件研究的慣例（事件窗從事件開始算），拿它
+    當交易訊號時刻是前視：流量在 t、掃單在 t+3 時，錨點是 t，而 t 那一刻
+    交會事件還不存在。離線量到事件成立晚於錨點 60.7%、進場落在成立之前
+    22.3%，那 22% 的毛利 +0.5064 誠實後只剩 +0.1094 —— **一半的 edge 是
+    這個錨點造出來的**。
+
+    live 這條線同樣受害，而且更直接：它會在事件成立之前就寫一列
+    `conj_events_live`，並用一個當時還不存在的價格算意圖。
+    `cr.groups_with_members` 逐行照抄 `et.cluster`，只是連群成員一起回傳
+    —— 那正是算 ready 需要的東西（同一份偵測，不是第二份實作）。
 
     2026-09-07 的對照測試（`conj_watch_parity.py`）在門檻對齊之後仍然只有
     55.6% 重疊，因為**組裝規則是第二份實作**：
@@ -323,8 +357,18 @@ def assemble(cand_like):
         for m in ec.cooldown_filter(np.sort(np.asarray(v, np.int64))):
             pairs.append((int(m), nm))
     flowm = set(FLOW)
-    return [(a, s) for a, s in et.cluster(pairs)
-            if "sweep" in s and (s & flowm)]
+    out = []
+    for _a, mem in cr.groups_with_members(pairs):
+        s = {x for _, x in mem}
+        if "sweep" not in s or not (s & flowm):
+            continue
+        sw0 = min(m for m, x in mem if x == "sweep")
+        ready = max(sw0, min(m for m, x in mem if x in flowm))
+        # sw0 一起回傳：被掃的價位掛在**掃單那一分鐘**上，而 ready 可能是
+        # 流量那一分鐘。不帶著它，`lvl_at.get(ready)` 會拿到 0.0 —— 一個
+        # 靜默的空價位（欄位有預設值的那種病）。
+        out.append((ready, s, sw0))
+    return out
 
 
 def flow_flags(ts, vol, delta, t):
@@ -498,15 +542,16 @@ def detect_window(sym, ts, high, low, close, vol, delta, t, g, det,
     flags["sweep"] = np.array(sw, np.int64)
 
     out = []
-    for a, s in assemble(flags):
+    for a, s, sw0 in assemble(flags):
         if a < W or a < n - EMIT_RECENT:
             continue                    # 只發最近幾根，舊的上一輪發過
         sig = "S+" + "+".join(
             [x for x, k in (("D", "delta_ext"), ("V", "vol_burst")) if k in s])
+        # 方向與 conj_backtest 的 A 臂同一條式子，只是錨在 ready 不是 earliest。
         imp = 1 if close[a] > close[a - W] else -1
         out.append((sym + "-USD", int(ts[a]), det,
                     det - (int(ts[a]) + 60_000), sig, imp,
-                    lvl_at.get(a, 0.0), float(close[a]),
+                    lvl_at.get(sw0, 0.0), float(close[a]),
                     float(atr_override) if atr_override else float(t.atr)))
     return out
 
@@ -520,8 +565,15 @@ def make_intent(e, det):
 
     e = (sym, event_ts, det_ts, latency, sig, direction, level, px, atr)
     direction: +1 = LONG, -1 = SHORT（impulse 方向，本線是順著走）
+
+    `event_ts` 現在是**成立**那一分鐘（ready），不是群內最早那一分鐘。
+    回傳 None 代表這一筆不在驗證過的母體裡（見 INTENT_SIGNATURE）。
     """
     sym, ev_ts, _d, _lat, sig, d, _lvl, px, atr = e
+    if sig != INTENT_SIGNATURE:
+        # S+V 單獨為負、S+D 樣本薄。驗證過的是三者齊發那一格；其餘照樣
+        # 記進 conj_events_live（shadow 要全格），但不產生訂單意圖。
+        return None
     px = float(px)
     atr = float(atr)
     side = "LONG" if d > 0 else "SHORT"
@@ -534,11 +586,14 @@ def make_intent(e, det):
     #   exit 同理：研究是「進場後 60 分」，不是「錨點後 60 分」——
     #   產品端平倉時刻 = fill_ts + hold_ms。exit_ts 只是參考。
     #   intent_id 是去重鍵：端點在 TTL 內會重複吐同一筆，產品端必須以它去重。
+    # 過期時刻錨在**進場時刻**（ready + ENTRY_DELAY_MIN），不是 ready：
+    # 回測的進場是 open(ready+3)，所以 ready+1 產生的意圖本來就該活到那時。
+    entry_ts = int(ev_ts) + ENTRY_DELAY_MIN * 60_000
     return dict(canonical_symbol=sym, anchor_ts=int(ev_ts), intent_ts=det,
-                expires_ts=int(ev_ts) + INTENT_TTL_S * 1000,
+                expires_ts=entry_ts + INTENT_TTL_S * 1000,
                 side=side, ref_price=px, stop_price=float(stop),
                 stop_dist=float(stop_dist),
-                exit_ts=int(ev_ts) + HOLD_MIN * 60_000,
+                exit_ts=entry_ts + HOLD_MIN * 60_000,
                 hold_ms=HOLD_MIN * 60_000, atr=atr,
                 notional_usd=NOTIONAL_USD,
                 size_base=NOTIONAL_USD / px if px > 0 else 0.0,
@@ -650,7 +705,9 @@ def main():
                     continue
                 events.append(e)
                 if INTENTS_ENABLED:
-                    intents.append(make_intent(e, det))
+                    it = make_intent(e, det)
+                    if it is not None:
+                        intents.append(it)
 
         if not INTENTS_ENABLED and events:
             print(f"[HALT] 意圖層已停止（2026-09-09 前視判決，見檔頭 "
