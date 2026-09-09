@@ -511,11 +511,16 @@ tbody tr.sel{background:#1c2530}
 <div class="bar">
   <span><span class="sw" style="border-color:var(--buy)"></span>買側價位被掃（向上穿越）</span>
   <span><span class="sw" style="border-color:var(--sell)"></span>賣側價位被掃（向下穿越）</span>
-  <span><span class="dot" style="background:var(--up)"></span>進場（成立時刻 +3 分開盤）</span>
+  <span><span class="dot" style="background:var(--up)"></span><span class="dot" style="background:var(--dn)"></span>進場（成立時刻 +3 分開盤）<b>圓點顏色＝這筆賺賠，不是方向</b>（綠賺／紅賠；做多在 K 棒下方、做空在上方）</span>
   <span><span class="sq" style="background:var(--dn)"></span>出場（停損價或 +480 分收盤，「!」= 停損）</span>
   <span style="width:100%"></span>
-  <span style="color:var(--amb)">⚠ 這是<b>延續</b>交易：順著突破方向進場，<b>不等回踩</b>——所以圓點
-  不會落在虛線（價位）上，而是在它外側。這跟舊的掃單失敗（回踩到價位才進）相反。</span>
+  <span style="color:var(--amb)">⚠ 這是<b>延續</b>交易：方向順著突破，<b>不等回踩</b>。方向這件事
+  量過——<b>99.5% 的交易與突破同向</b>（1,229 筆裡只有 6 筆逆向）。
+  但**進場價不一定在價位外側**：進場是成立時刻 +3 分的開盤，這三分鐘裡價格
+  可能已經退回價位內，<b>樣本外有 40.1% 是這樣</b>。所以圓點有時會落在虛線
+  （價位）的內側 —— 那不是變成抓反轉，是<b>順著突破的方向、但買在回檔裡</b>。
+  兩者差很多：樣本外「進場在突破側」每筆 +0.3295、逐幣 9/9，「退回價位內」
+  每筆 −0.0430、逐幣 4/9（差值 +0.2147，CI 下緣 −0.0794，尚未過閘）。</span>
   <button id="btnAll" class="on">全部交易</button>
   <button id="btnWin">只看賺</button>
   <button id="btnLose">只看賠</button>
@@ -649,12 +654,29 @@ eqc.addLineSeries({color:'#0ecb81',lineWidth:2,title:'累積 ATR（毛）',
   priceLineVisible:false,crosshairMarkerVisible:false}).setData(D.equity);
 chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r)eqc.timeScale().setVisibleLogicalRange(r);});
 
-let lines = [];
-function clearLines(){for(const l of lines)cs.removePriceLine(l);lines=[];}
+let lines = [], segs = [];
+function clearLines(){
+  for(const l of lines) cs.removePriceLine(l); lines=[];
+  for(const s of segs) chart.removeSeries(s); segs=[];
+}
+// 這四條線**只畫在這一筆活著的那段時間上**，不橫跨整張圖。
+// 無邊界的水平線（createPriceLine）會製造一個具體的誤讀：這一筆是時間
+// 出場、停損從來沒被打到，但那條停損線一路延伸到右邊——而右邊後來價格
+// 真的跌破它，看起來就像被停損掃掉了。線有沒有邊界，決定讀者以為
+// 「這條線在講哪一段時間」。
+const SNAP = () => (D.params.CANDLE_MIN || 5) * 60;
 function focus(t){
   clearLines();
-  const mk = (p,c,txt,st) => lines.push(cs.createPriceLine({price:p,color:c,
-    lineWidth:1,lineStyle:st===undefined?2:st,axisLabelVisible:true,title:txt}));
+  const g = SNAP();
+  const t0 = Math.floor(t.t_anchor / g) * g;
+  const t1 = Math.max(t0 + g, Math.ceil(t.t_exit / g) * g);
+  const mk = (p,c,txt,st) => {
+    const s = chart.addLineSeries({color:c, lineWidth:1,
+      lineStyle:(st===undefined?2:st), lastValueVisible:true, title:txt,
+      priceLineVisible:false, crosshairMarkerVisible:false});
+    s.setData([{time:t0,value:p},{time:t1,value:p}]);
+    segs.push(s);
+  };
   if(t.level!==null && t.level!==undefined) mk(t.level,'#848e9c','價位',0);
   mk(t.entry, t.R>0?'#0ecb81':'#f6465d','進場');
   mk(t.stop, '#f6465d','停損 '+D.params.STOP+'ATR',3);
@@ -672,7 +694,7 @@ function focus(t){
     `（樞紐 ${t.origin}）+ ${t.sig.replace('sweep','S').replace('delta_ext','D').replace('vol_burst','V')}`+
     ` → 成立 ${t.anchor} → ${t.entry_t} 開盤進場 ${fmtP(t.entry)}`+
     ` → 停損掛 ${fmtP(t.stop)}（${D.params.STOP} × ATR ${fmtP(t.atr)}）`+
-    ` → ${t.exit_t} ${t.stopped?'觸及停損':'持有 60 分到期'} 出在 ${fmtP(t.exit_px)}，`+
+    ` → ${t.exit_t} ${t.stopped?'觸及停損':'持有 '+D.params.HOLD+' 分到期'} 出在 ${fmtP(t.exit_px)}，`+
     `毛 <b class="${t.R>0?'pos':'neg'}">${t.R.toFixed(4)} ATR</b>、`+
     `淨 <b class="${t.R_net>0?'pos':'neg'}">${t.R_net.toFixed(4)}</b>（成本 ${t.cost_bps} bps）`;
   for(const tr of document.querySelectorAll('#tb tr')) tr.classList.remove('sel');

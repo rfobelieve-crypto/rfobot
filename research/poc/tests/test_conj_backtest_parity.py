@@ -161,6 +161,7 @@ globalThis.LightweightCharts={createChart:()=>{__made=true;return{
   addCandlestickSeries:()=>({setData(){},setMarkers(){},createPriceLine(){},
     removePriceLine(){},applyOptions(){}}),
   addLineSeries:()=>({setData(){},applyOptions(){}}),
+  removeSeries(){},
   timeScale:()=>({fitContent(){},setVisibleRange(){__focused=true;},applyOptions(){},
     subscribeVisibleLogicalRangeChange(){},setVisibleLogicalRange(){}}),
   applyOptions(){},subscribeCrosshairMove(){},resize(){}};}};
