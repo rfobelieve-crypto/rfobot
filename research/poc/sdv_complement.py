@@ -158,7 +158,10 @@ def build(sym):
         r_against = trade(op, hi, lo, cl, at, n, rd, -mom)
         if r_with is None or r_against is None:
             continue
-        rec = dict(sym=sym, ts=int(ts[rd]), pop=pop,
+        # 欄名用 grp 不用 pop —— `d.pop` 會取到 DataFrame 自己的
+        # `.pop()` 方法,`d.pop == "x"` 靜默變成「方法 == 字串」= False,
+        # 然後 `d[False]` 丟 KeyError（本 session 第二次,上次是 `.eq`）。
+        rec = dict(sym=sym, ts=int(ts[rd]), grp=pop,
                    day=pd.Timestamp(int(ts[rd]), unit="ms", tz="UTC")
                         .strftime("%Y-%m-%d"),
                    r_with=r_with, r_against=r_against, mom=mom)
@@ -192,11 +195,11 @@ def main():
     res = {}
 
     print(f"\n母體切分（掃單經冷卻後全部 {len(d):,} 筆）")
-    for p, g in d.groupby("pop"):
+    for p, g in d.groupby("grp"):
         print(f"  {p:<16s} {len(g):6d}  ({len(g)/len(d)*100:4.1f}%)")
 
-    comp = d[d.pop == "互補（零流量）"]
-    sdv = d[d.pop == "SDV"]
+    comp = d[d["grp"] == "互補（零流量）"]
+    sdv = d[d["grp"] == "SDV"]
 
     print("\n=== Q1 三種結局全格報告：互補母體（掃單但零流量）===")
     print("  「沒有延續訊號 = 會反轉」這個推論，要成立必須逆勢那行明顯為正、")
@@ -217,7 +220,7 @@ def main():
 
     print("\n=== Q4 真樣本外（前半／後半分開，判決看後半）===")
     for half, g0 in (("前半", d[d.ts <= mid]), ("後半", d[d.ts > mid])):
-        c = g0[g0.pop == "互補（零流量）"]
+        c = g0[g0["grp"] == "互補（零流量）"]
         print(f"  [{half}]")
         if len(c) >= 40:
             res[f"comp_against_{half}"] = report("  互補·逆勢", c, "r_against")
