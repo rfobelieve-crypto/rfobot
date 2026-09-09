@@ -477,6 +477,7 @@ tbody tr.sel{background:#1c2530}
 </div>
 
 <div class="kpis" id="kpis"></div>
+<div id="smallwarn" style="margin:8px 0 0;color:var(--amb);font-size:12px"></div>
 
 <div class="bar">
   <span><span class="sw" style="border-color:var(--buy)"></span>買側價位被掃（向上穿越）</span>
@@ -551,15 +552,27 @@ function kpis(){
     `<span>${k}</span><small>${s}</small></div>`;
   const g = x => x >= 0 ? 'pos' : 'neg';
   const B = b || a;
+  // 2026-09-09 對調：**大字是全期，小字才是顯示窗**。
+  // 原本反過來——顯示窗（90 天、單一幣、16~34 筆）當大字，全期（235~399 筆）
+  // 當灰色小字。使用者看到手機上 24.2% 的勝率問「才 24% 這麼低喔」，
+  // 而那是 BTC 一個幣、一季、33 筆的數字；同一張卡下面的全期是 45.6%。
+  // **把最不可靠的數字放最大**是這張卡自己造成的誤讀，不是讀的人的錯。
+  const win = `顯示窗 ${a.n} 筆`;
   document.getElementById('kpis').innerHTML = [
-    cell(a.n, '交易筆數', `全期 ${B.n}`),
-    cell(a.exp.toFixed(4), '每筆毛利（ATR）', `全期 ${B.exp.toFixed(4)}`, g(a.exp)),
-    cell(a.net_exp.toFixed(4), '每筆淨利（ATR）', `全期 ${B.net_exp.toFixed(4)}`, g(a.net_exp)),
-    cell(a.wr.toFixed(1)+'%', '勝率', `全期 ${B.wr.toFixed(1)}%`),
-    cell(a.stop_rate.toFixed(1)+'%', '停損率', `全期 ${B.stop_rate.toFixed(1)}%`),
-    cell(isFinite(a.pf)?a.pf.toFixed(2):'∞', '獲利因子（毛）', `全期 ${isFinite(B.pf)?B.pf.toFixed(2):'∞'}`),
-    cell(a.t.toFixed(2), 't 值（未聚類）', `全期 ${B.t.toFixed(2)}`),
+    cell(B.n, '交易筆數（全期）', win),
+    cell(B.exp.toFixed(4), '每筆毛利（ATR）', `${win} ${a.exp.toFixed(4)}`, g(B.exp)),
+    cell(B.net_exp.toFixed(4), '每筆淨利（ATR）', `${win} ${a.net_exp.toFixed(4)}`, g(B.net_exp)),
+    cell(B.wr.toFixed(1)+'%', '勝率（全期）', `${win} ${a.wr.toFixed(1)}%`),
+    cell(B.stop_rate.toFixed(1)+'%', '停損率', `${win} ${a.stop_rate.toFixed(1)}%`),
+    cell(isFinite(B.pf)?B.pf.toFixed(2):'∞', '獲利因子（毛）', `${win} ${isFinite(a.pf)?a.pf.toFixed(2):'∞'}`),
+    cell(B.t.toFixed(2), 't 值（未聚類）', `${win} ${a.t.toFixed(2)}`),
   ].join('');
+  const w = document.getElementById('smallwarn');
+  if(w) w.innerHTML = a.n < 50
+    ? `⚠ 下面圖上這 <b>${a.n}</b> 筆是 90 天顯示窗，<b>樣本太小、不能拿來判斷這條線</b>`
+      + `——它只是讓你看得到每一筆長什麼樣。大字是全期，判決看的是那個，`
+      + `而且真正的判決在九幣合計的樣本外，不在單一幣。`
+    : '';
 }
 kpis();
 
