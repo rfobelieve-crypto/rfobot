@@ -135,12 +135,22 @@ def to_day(ts_ms):
     return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
 
 
-def ledger(sym, liq=None, arm="C"):
+def ledger(sym, liq=None, arm="A"):
     """一個幣的完整交易帳（全歷史）。回傳 (trades, bars_df)。
 
-    arm="A"  事件成立 +3 分進場，方向 = 事件前 5 分鐘動能（原規格）
-    arm="C"  事件成立後等 10 分鐘，走超過 0.5 ATR 才進，**順著它實際走的方向**
-             （2026-09-09 使用者提出：不預測方向，等它走出來再跟）
+    arm="A"  事件成立 +3 分進場，方向 = 事件前 5 分鐘動能（**預設，現行**）
+    arm="C"  成立後等 10 分、走超過 0.5 ATR 才順著它實際的方向進場
+             （2026-09-09 使用者提出「不預測方向，等它走出來再跟」）
+
+    **C 的門檻在同日稍後被判過擬合，所以預設回到 A**：
+    誠實地只用前半資料選門檻，選到的是「等 5 分／走 1.0 ATR」而不是
+    (10, 0.5)；那組在後半是 5/9、n=98、CI 下緣 −0.598。各折選到的門檻
+    還在跳（10分/1.0、5分/1.0）。先前 (10,0.5) 的「樣本外 9/9」之所以
+    好看，正因為它是看過後半才挑的。**C 保留為可選臂供對照，不當現行規格。**
+
+    C 唯一站得住的部分是**不加門檻**時的穩定性：樣本外命中率 48.6% -> 50.9%、
+    CI 下緣 −0.189 -> −0.122、逐幣 7/9 -> 8/9，但點估計反而降低
+    （+0.151 -> +0.082）。等它走出來換到的是穩定，不是報酬。
 
     兩臂唯一的差異是「方向怎麼決定、什麼時候進場」；停損、持有、成本全同。
     `tests/test_conj_backtest_parity.py` 對 A 臂釘住 `conj_redef` 的誠實值。
@@ -261,8 +271,8 @@ def _snap(ms):
     return int(ms // (CANDLE_MIN * 60_000) * (CANDLE_MIN * 60))
 
 
-def build(sym, t_from_ms, t_to_ms, liq=None):
-    trades, b = ledger(sym, liq)
+def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
+    trades, b = ledger(sym, liq, arm=arm)
     last_ts = int(b["ts"].iloc[-1])
     lo = t_from_ms or int(b["ts"].iloc[0])
     hi = t_to_ms or last_ts
@@ -413,7 +423,7 @@ tbody tr.sel{background:#1c2530}
 <header>
   <h1>__SYM__USDT · 交會事件回測</h1>
   <span class="tag">__SPAN__</span>
-  <span class="tag">掃單 ∧ (主動量極端 ∨ 量能爆發) · <b>成立後等 __CW__ 分、走超過 __CM__ ATR 才進</b> · 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
+  <span class="tag">掃單 ∧ (主動量極端 ∨ 量能爆發) · 進場 <b>成立時刻 +__DELAY__ 分</b> · 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
   <span class="tag">成本 Bitget maker 2/2/6 bps · 限價成交率 97.8%</span>
   <span class="tag" style="border-color:var(--amb);color:var(--amb)">執行暫停中 · 樣本外 CI 下緣仍含零</span>
   <span class="tag">K 線 __CM__ 分鐘（顯示用）· 規則跑在 1 分鐘</span>
@@ -421,23 +431,26 @@ tbody tr.sel{background:#1c2530}
 </header>
 
 <div class="stat">
-  <b>2026-09-09 定案的規格（本頁畫的就是它）· 執行仍暫停</b>
-  <p><b>方向不預測，等它走出來再跟。</b>交會事件成立後等 10 分鐘，若價格已經
-  走超過 0.5 個 ATR，就順著<b>它實際走的方向</b>進場；沒走出來就不做。
-  這取代了原本「用事件前 5 分鐘動能猜方向」的規則——那個規則的命中率只有
-  <b>47.6%</b>，換三種代理（價格動能／主動量／掃單幾何）全都一樣，
-  反做更差。</p>
-  <p>樣本外（後半 1.25 年）比較：命中率 <b>48.6% → 51.0%</b>、
-  每筆毛利 <b>+0.216 → +0.305 ATR</b>、逐幣 <b>7/9 → 9/9</b>、
-  1000 USDT 兩倍槓桿三槽的最大回落 <b>47.0% → 26.5%</b>。
-  代價是只有 46% 的事件會走出那個幅度，交易數少一半。</p>
-  <p><b>同時修掉的兩個錯</b>：先前的停損 1 ATR 砍掉左尾、持有 60 分砍掉右尾
-  —— 那才是把這條線壓在水面下的主因，不是成本也不是訊號。
-  現在是停損 3 ATR、持有 480 分；毛利隨持有單調上升，樣本外單調性 +0.907。</p>
-  <p><b>為什麼還是暫停</b>：樣本外單筆淨值的信賴區間下緣仍然含零（n 不夠），
-  而且「等 10 分／0.5 ATR」這組門檻是在全樣本上掃出來的。
-  <code>conj_watch</code> 的下單意圖層維持停止。
-  判決全文 TODO §1.03b~f ／ <code>research/poc/conj_wf.py</code>。</p>
+  <b>2026-09-09 定案：出場參數修正（本頁畫的就是它）· 執行仍暫停</b>
+  <p><b>今天改對的是出場，不是訊號也不是成本。</b>先前的停損 1 ATR 砍掉左尾、
+  持有 60 分砍掉右尾 —— 那才是把這條線壓在水面下的主因。現在是
+  <b>停損 3 ATR、持有 480 分</b>：毛利隨持有單調上升，而且那個單調性在
+  <b>樣本外比樣本內還強</b>（+0.907 vs +0.472），整張「持有 × 停損」網格
+  在樣本外 <b>15 格全部為正</b> —— 沒有峰值可以過擬合。</p>
+  <p><b>樣本外（後半 1.25 年）</b>：每筆淨 +0.15 ~ +0.24 ATR、逐幣 8-9/9。
+  但<b>樣本外／樣本內只有 34%</b>，所以樣本內的數字一律要打三折。
+  1000 USDT、兩倍槓桿、三槽的模擬：年化 +23~36%、最大回落 26~47%、零強平。
+  十倍槓桿在樣本外是負的（單槽 −99.7%），因為停損 3 ATR ≈ 2.5% 價格，
+  十倍下就是權益的 25%／筆。</p>
+  <p><b>一個被判掉的改良，留檔</b>：「不預測方向，等它走出來再跟」
+  （成立後等 10 分、走超過 0.5 ATR 才進）看起來很好，但誠實地只用前半選門檻
+  會選到<b>不同</b>的一組，而那組在後半只有 5/9。先前那個「樣本外 9/9」
+  是看過後半才挑的。<b>已撤回，不作為現行規格。</b>
+  站得住的只有它不加門檻時的穩定性（命中率 48.6%→50.9%、CI 下緣
+  −0.189→−0.122），代價是點估計降低。</p>
+  <p><b>為什麼還是暫停</b>：樣本外單筆淨值的信賴區間下緣仍然含零
+  （−0.19 ~ −0.12），兩年半的資料釘不住它。<code>conj_watch</code> 的
+  下單意圖層維持停止。判決全文 TODO §1.03b~f。</p>
 </div>
 
 <div class="kpis" id="kpis"></div>
@@ -445,7 +458,7 @@ tbody tr.sel{background:#1c2530}
 <div class="bar">
   <span><span class="sw" style="border-color:var(--buy)"></span>買側價位被掃（向上穿越）</span>
   <span><span class="sw" style="border-color:var(--sell)"></span>賣側價位被掃（向下穿越）</span>
-  <span><span class="dot" style="background:var(--up)"></span>進場（成立後等 10 分、走出 0.5 ATR）</span>
+  <span><span class="dot" style="background:var(--up)"></span>進場（成立時刻 +3 分開盤）</span>
   <span><span class="sq" style="background:var(--dn)"></span>出場（停損價或 +480 分收盤，「!」= 停損）</span>
   <span style="width:100%"></span>
   <span style="color:var(--amb)">⚠ 這是<b>延續</b>交易：順著突破方向進場，<b>不等回踩</b>——所以圓點
@@ -581,7 +594,7 @@ function focus(t){
     `<b>#${t.id+1} ${t.side}</b>${t.forward?' <span class="fwd">（前瞻）</span>':''}`+
     ` · ${t.sweep} 穿過${t.level_side==='buyside'?'買側':'賣側'}價位 ${t.level===null?'—':fmtP(t.level)}`+
     `（樞紐 ${t.origin}）+ ${t.sig.replace('sweep','S').replace('delta_ext','D').replace('vol_burst','V')}`+
-    ` → 成立 ${t.anchor} → 等 ${D.params.C_WAIT} 分走出 ${D.params.C_MOVE} ATR → ${t.entry_t} 開盤進場 ${fmtP(t.entry)}`+
+    ` → 成立 ${t.anchor} → ${t.entry_t} 開盤進場 ${fmtP(t.entry)}`+
     ` → 停損掛 ${fmtP(t.stop)}（${D.params.STOP} × ATR ${fmtP(t.atr)}）`+
     ` → ${t.exit_t} ${t.stopped?'觸及停損':'持有 60 分到期'} 出在 ${fmtP(t.exit_px)}，`+
     `毛 <b class="${t.R>0?'pos':'neg'}">${t.R.toFixed(4)} ATR</b>、`+
@@ -704,6 +717,8 @@ def main():
     ap.add_argument("--from", dest="d_from")
     ap.add_argument("--to", dest="d_to")
     ap.add_argument("--last-days", type=int, default=90)
+    ap.add_argument("--arm", default="A", choices=("A", "C"),
+                    help="A=現行（預設）；C=等它走出來（門檻已判過擬合，僅供對照）")
     ap.add_argument("--publish", action="store_true", help="寫進 conj_backtest_pages")
     a = ap.parse_args()
 
@@ -715,7 +730,7 @@ def main():
         if t_from is None:
             last = int(pd.read_parquet(BARS / f"{s}.parquet", columns=["ts"])["ts"].iloc[-1])
             t_from = last - a.last_days * 86_400_000
-        d = build(s, t_from, t_to)
+        d = build(s, t_from, t_to, arm=a.arm)
         html = render(d)
         f = OUT / f"conj_backtest_{s}.html"
         f.write_text(html, encoding="utf-8")
