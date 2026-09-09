@@ -109,9 +109,12 @@ C_MOVE = 0.5         # 這段期間至少要走幾個 ATR 才進場
 FLOW = ("delta_ext", "vol_burst")
 MERGE_GAP = et.MERGE_GAP
 # 分腿成本（bps）：sweep_forward.SCEN 情境 A
-# Bitget 標準 maker/taker(2026-09-09 起):進場與時間出場掛限價、
-# 停損吃單。限價成交率已量過 97.8%(conj_rescue C3)。
-COST_ENTRY, COST_TIME, COST_STOP = 2.0, 2.0, 6.0
+# Bitget **返佣 50% 後的實付**（2026-09-09，使用者提供）：
+# 標準 maker 2 / taker 6 bps，返佣後 maker 1 / taker 3。
+# 進場與時間出場掛限價（成交率 97.8%，conj_rescue C3），停損吃單。
+# 停損率 18% 下混合成本 = 1 + 0.82x1 + 0.18x3 = **2.37 bps**。
+# 用實付而不是牌價：牌價會讓公開頁面低估這條線的淨值。
+COST_ENTRY, COST_TIME, COST_STOP = 1.0, 1.0, 3.0
 CANDLE_MIN = 5
 TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS conj_backtest_pages (
@@ -424,7 +427,7 @@ tbody tr.sel{background:#1c2530}
   <h1>__SYM__USDT · 交會事件回測</h1>
   <span class="tag">__SPAN__</span>
   <span class="tag">掃單 ∧ (主動量極端 ∨ 量能爆發) · 進場 <b>成立時刻 +__DELAY__ 分</b> · 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
-  <span class="tag">成本 Bitget maker 2/2/6 bps · 限價成交率 97.8%</span>
+  <span class="tag">成本 Bitget 返佣後實付 1/1/3 bps（混合 2.37）· 限價成交率 97.8%</span>
   <span class="tag" style="border-color:var(--amb);color:var(--amb)">執行暫停中 · 樣本外 CI 下緣仍含零</span>
   <span class="tag">K 線 __CM__ 分鐘（顯示用）· 規則跑在 1 分鐘</span>
   <span class="tag">凍結規則 · 純回測 · 非訊號</span>
