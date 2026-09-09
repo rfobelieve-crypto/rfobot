@@ -309,7 +309,7 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
         raise SystemExit(f"{sym}: 顯示窗只有 {len(candles)} 根 K，範圍給錯了？")
     tr = [t for t in trades if lo <= t["entry_ts"] <= hi]
 
-    levels, markers, rows, eq = [], [], [], []
+    markers, rows, eq = [], [], []
     cum = 0.0
     for t in tr:
         cum += t["R"]
@@ -317,22 +317,18 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
     for i, t in enumerate(tr):
         win = t["R"] > 0
         col = "#0ecb81" if win else "#f6465d"
-        lc = "#f0b90b" if t["level_side"] == "buyside" else "#7b61ff"
-        if t["level"] is not None:
-            o = t["origin_ts"] if t["origin_ts"] is not None else t["sweep_ts"] - 3_600_000
-            levels.append(dict(id=i, c=lc,
-                               pts=[dict(time=_snap(o), value=t["level"]),
-                                    dict(time=_snap(t["sweep_ts"]), value=t["level"])]))
+        # 2026-09-10 使用者：「畫面很亂我就只要顯示進場出場就好了其他不用」。
+        # 圖上只留這兩個標記 —— 價位虛線與掃單箭頭已移除（價位數字仍在下表
+        # 與單筆說明裡，資料沒有消失，只是不畫在 K 線上）。
+        #
+        # 每個標記自帶 `id`。原本是「三個一組、JS 用 Math.floor(i/3) 反推
+        # 是第幾筆」—— 用位置推導身分，少一個標記整個對應就錯位而且不會報錯
+        # （mistake.md 同族：已經有的東西不要重新推導）。現在直接帶 id。
         markers += [
-            dict(time=_snap(t["sweep_ts"]),
-                 position="aboveBar" if t["level_side"] == "buyside" else "belowBar",
-                 color=lc,
-                 shape="arrowDown" if t["level_side"] == "buyside" else "arrowUp",
-                 text=""),
-            dict(time=_snap(t["entry_ts"]),
+            dict(id=i, time=_snap(t["entry_ts"]),
                  position="belowBar" if t["side"] == "LONG" else "aboveBar",
                  color=col, shape="circle", text=f"{i + 1}"),
-            dict(time=_snap(t["exit_ts"]),
+            dict(id=i, time=_snap(t["exit_ts"]),
                  position="aboveBar" if t["side"] == "LONG" else "belowBar",
                  color=col, shape="square",
                  text=f"{t['R']:+.2f}" + ("!" if t["stopped"] else "")),
@@ -379,7 +375,7 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
                 print(f"[WARN] {stem}.json unreadable: {e}")
 
     n_fwd = sum(1 for t in trades if t["forward"])
-    return dict(sym=sym, candles=candles, levels=levels, markers=markers,
+    return dict(sym=sym, candles=candles, markers=markers,
                 trades=rows, equity=eq, groups=groups,
                 span=[to_day(lo), to_day(hi)],
                 span_all=[to_day(int(b["ts"].iloc[0])), to_day(last_ts)],
@@ -463,21 +459,35 @@ tbody tr:hover{background:#171d25}
 tbody tr.sel{background:#1c2530}
 .pos{color:var(--up)}.neg{color:var(--dn)}.fwd{color:var(--amb)}
 .note{font-size:11.5px;color:var(--dim);max-width:96ch}
+/* 摺疊區：長篇判決與規格預設收起來（2026-09-10「畫面很亂」）。
+   收起不是刪除——公開頁的狀態標示與判決紀錄一個字都沒少，點開就在。 */
+.fold{font-size:11.5px;color:var(--dim);border:1px solid var(--line);
+      border-radius:4px;padding:7px 11px;background:var(--pan)}
+.fold p{margin:6px 0 0;max-width:96ch}
+details.stat{padding:9px 13px}
+details>summary{cursor:pointer;list-style:none;color:var(--dim)}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"▸ ";color:var(--dim)}
+details[open]>summary::before{content:"▾ "}
+details.stat>summary{color:var(--dn)}
 </style></head><body><div class="wrap">
 
 <header>
   <h1>__SYM__USDT · SDV 回測</h1>
   <span class="tag">__SPAN__</span>
-  <span class="tag"><b>S</b> 掃單 · <b>D</b> 主動量極端 · <b>V</b> 量能爆發 —— 三者齊發才是 SDV（下方可切分頁看 S+D／S+V）</span>
-  <span class="tag">進場 <b>成立時刻 +__DELAY__ 分</b>（成立 = 最後一個成分到齊那一分鐘）· 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
-  <span class="tag">成本 Bitget 返佣後實付 1/1/3 bps（混合 2.37）· 限價成交率 97.8%</span>
+  <span class="tag">進場 <b>成立 +__DELAY__ 分</b> · 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
   <span class="tag" style="border-color:var(--amb);color:var(--amb)">執行暫停中 · 樣本外 CI 下緣仍含零</span>
-  <span class="tag">K 線 __CM__ 分鐘（顯示用）· 規則跑在 1 分鐘</span>
-  <span class="tag">凍結規則 · 純回測 · 非訊號</span>
 </header>
 
-<div class="stat">
-  <b>2026-09-09 定案：出場參數修正（本頁畫的就是它）· 執行仍暫停</b>
+<details class="fold"><summary>規格與成本（展開）</summary>
+  <p><b>S</b> 掃單 · <b>D</b> 主動量極端 · <b>V</b> 量能爆發 —— 三者齊發才是 SDV
+  （下方可切分頁看 S+D／S+V）。成立 = 最後一個成分到齊那一分鐘。</p>
+  <p>成本 Bitget 返佣後實付 1/1/3 bps（混合 2.37）· 限價成交率 97.8%。
+  K 線 __CM__ 分鐘（顯示用）· 規則跑在 1 分鐘。凍結規則 · 純回測 · 非訊號。</p>
+</details>
+
+<details class="stat"><summary><b>2026-09-09 定案：出場參數修正（本頁畫的就是它）· 執行仍暫停</b>
+  —— 點開看完整判決</summary>
   <p><b>今天改對的是出場，不是訊號也不是成本。</b>先前的停損 1 ATR 砍掉左尾、
   持有 60 分砍掉右尾 —— 那才是把這條線壓在水面下的主因。現在是
   <b>停損 3 ATR、持有 480 分</b>：毛利隨持有單調上升，而且那個單調性在
@@ -515,25 +525,27 @@ tbody tr.sel{background:#1c2530}
   （−0.19 ~ −0.12），而且<b>整張出場網格 15 格沒有任何一格的下緣越過零</b>，
   兩年半的資料釘不住它。前瞻紀錄 3/300。<code>conj_watch</code> 的下單
   意圖層維持停止。判決全文 TODO §1.03b~f。</p>
-</div>
+</details>
 
 <div class="kpis" id="kpis"></div>
 <div id="smallwarn" style="margin:8px 0 0;color:var(--amb);font-size:12px"></div>
 
 <div class="bar">
-  <span><span class="sw" style="border-color:var(--buy)"></span>買側價位被掃（向上穿越）</span>
-  <span><span class="sw" style="border-color:var(--sell)"></span>賣側價位被掃（向下穿越）</span>
-  <span><span class="dot" style="background:var(--up)"></span><span class="dot" style="background:var(--dn)"></span>進場（成立時刻 +3 分開盤）<b>圓點顏色＝這筆賺賠，不是方向</b>（綠賺／紅賠；做多在 K 棒下方、做空在上方）</span>
-  <span><span class="sq" style="background:var(--dn)"></span>出場（停損價或 +480 分收盤，「!」= 停損）</span>
+  <span><span class="dot" style="background:var(--up)"></span><span class="dot" style="background:var(--dn)"></span>
+    <b>●</b> 進場 —— <b>顏色＝這筆賺賠，不是方向</b>（綠賺／紅賠；做多畫在 K 棒下方、做空在上方）</span>
+  <span><span class="sq" style="background:var(--dn)"></span><b>■</b> 出場（數字＝毛 ATR，「!」= 觸及停損）</span>
   <span style="width:100%"></span>
-  <span style="color:var(--amb)">⚠ 這是<b>延續</b>交易：方向順著突破，<b>不等回踩</b>。方向這件事
-  量過——<b>99.5% 的交易與突破同向</b>（1,229 筆裡只有 6 筆逆向）。
-  但**進場價不一定在價位外側**：進場是成立時刻 +3 分的開盤，這三分鐘裡價格
-  可能已經退回價位內，<b>樣本外有 34.4% 是這樣</b>。所以圓點有時會落在虛線
-  （價位）的內側 —— 那不是變成抓反轉，是<b>順著突破的方向、但買在回檔裡</b>。
-  樣本外「進場在突破側」每筆 <b>+0.3232、逐幣 9/9</b>，「退回價位內」
-  <b>−0.0830、逐幣 5/9</b>；差值 +0.2405、CI 下緣 −0.0305（<b>尚未過閘</b>，
-  如實標）。全期差值 +0.1906、CI 下緣 +0.0027、逐幣 9/9 vs 7/9。</span>
+  <details class="fold" style="width:100%"><summary>為什麼有時候「明明跌了一大段卻算虧錢」</summary>
+  <p>這是<b>延續</b>交易：價格穿過價位就<b>順著穿越方向</b>跟，不等回踩。實測
+  <b>97.5% 的交易與突破同向</b>（上方價位被掃 → 1,396 筆做多 vs 36 筆做空）。
+  所以一根長上影針刺穿上方價位後暴跌，系統做的是<b>多單</b>，那一大段跌幅
+  是虧的不是賺的。圖上的數字已逐筆用「方向 ×(出場−進場)/ATR」獨立反解驗過，
+  3,005 筆<b>零筆對不上</b>。</p>
+  <p>進場價也<b>不一定在價位外側</b>：進場是成立 +3 分的開盤，這三分鐘價格可能
+  已退回價位內，<b>樣本外 34.4%</b> 是這樣 —— 那不是改抓反轉，是順著突破方向
+  但買在回檔裡。樣本外「進場在突破側」每筆 <b>+0.3232、9/9</b>，「退回價位內」
+  <b>−0.0830、5/9</b>；差值 +0.2405、CI 下緣 −0.0305（<b>尚未過閘</b>，如實標）。</p>
+  </details>
   <button id="btnAll" class="on">全部交易</button>
   <button id="btnWin">只看賺</button>
   <button id="btnLose">只看賠</button>
@@ -562,7 +574,7 @@ tbody tr.sel{background:#1c2530}
   <div id="c"></div>
 </div>
 <div id="eq"></div>
-<div class="note" id="sel">點下方任一列 —— 圖表跳到那一筆，並畫出它的價位、進場、停損、出場四條線。</div>
+<div class="note" id="sel">點下方任一列 —— 圖表跳到那一筆，並畫出它的進場與出場兩條線。</div>
 
 <div class="tw"><table>
 <thead><tr>
@@ -641,10 +653,6 @@ const chart = LightweightCharts.createChart(document.getElementById('c'), dark);
 const cs = chart.addCandlestickSeries({upColor:'#0ecb81',downColor:'#f6465d',
   borderVisible:false,wickUpColor:'#0ecb81',wickDownColor:'#f6465d'});
 cs.setData(D.candles);
-for(const L of D.levels){
-  chart.addLineSeries({color:L.c,lineWidth:1,lineStyle:2,lastValueVisible:false,
-    priceLineVisible:false,crosshairMarkerVisible:false}).setData(L.pts);
-}
 
 const keepWL = t => filt==='all' || (filt==='win' ? t.R>0 : t.R<=0);
 const keepG  = t => grp==='all' || t.sigk===grp;
@@ -653,7 +661,7 @@ function drawMarkers(){
   const vis = D.trades.filter(keep);
   const ids = new Set(vis.map(t=>t.id));
   const dense = vis.length > 45;
-  cs.setMarkers(D.markers.filter((m,i)=>ids.has(Math.floor(i/3)))
+  cs.setMarkers(D.markers.filter(m=>ids.has(m.id))
     .map(m => dense ? Object.assign({}, m, {text:''}) : m));
   document.getElementById('dense').textContent =
     dense ? `顯示 ${vis.length} 筆 —— 標記文字已關閉（>45 筆會疊住）。點下表任一列看單筆。`
@@ -690,9 +698,9 @@ function focus(t){
     s.setData([{time:t0,value:p},{time:t1,value:p}]);
     segs.push(s);
   };
-  if(t.level!==null && t.level!==undefined) mk(t.level,'#848e9c','價位',0);
+  // 2026-09-10 使用者：只要進場出場。價位線與停損線已移除（兩者的價格
+  // 仍在下方單筆說明與表格裡，資料沒少，只是不畫在圖上）。
   mk(t.entry, t.R>0?'#0ecb81':'#f6465d','進場');
-  mk(t.stop, '#f6465d','停損 '+D.params.STOP+'ATR',3);
   mk(t.exit_px,'#f0b90b','出場 '+t.R.toFixed(3)+'ATR');
   // ±90 分鐘：一筆交易 62 分鐘，這個視野讓 5 分鐘 K 有 ~40 根、每根約 35
   // 像素，掃單／進場／出場才分得開（±3 小時時每根只剩 15 像素，還是擠）。
