@@ -63,7 +63,7 @@ import argparse
 import json
 import sys
 import warnings
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -149,8 +149,14 @@ def _empty_liq():
                          "u": pd.Series(dtype=float), "sym": pd.Series(dtype=str)})
 
 
+# 顯示時區（2026-09-10 使用者：「時間統一用 UTC+8」）。**只影響顯示**：
+# 事件時刻、樞紐、進出場、PDH/PDL 的日界全部仍以 UTC 計算。
+DISPLAY_TZ = timezone(timedelta(hours=8))
+TZ_LABEL = "UTC+8"
+
+
 def to_day(ts_ms):
-    return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
+    return datetime.fromtimestamp(ts_ms / 1000, tz=DISPLAY_TZ).strftime("%Y-%m-%d %H:%M")
 
 
 def ledger(sym, liq=None, arm="A", scale="1h"):
@@ -391,7 +397,7 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
             # 一條價位一個 series（那會把瀏覽器凍住）。
             levels.append(dict(id=i, side=t["level_side"], c=lc,
                                a=a, z=max(z, a + CANDLE_MIN * 60),
-                               v=t["level"]))
+                               v=t["level"], swept=True, traded=True))
         sweeps.append(dict(id=i, time=_snap(t["sweep_ts"]),
                            position="aboveBar" if t["level_side"] == "buyside" else "belowBar",
                            color=lc,
@@ -427,37 +433,53 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
             t_exit=t["exit_ts"] // 1000,
             t_origin=(t["origin_ts"] or t["sweep_ts"] - 3_600_000) // 1000))
 
-    # 顯示窗內**所有**掃單的價位線（不只形成交易的那些）。
-    # 亮色 = 形成 SDV 交易，灰色 = 只是掃單、沒有流量配合。
+    # 顯示窗內的**每一個**價位，不只形成交易的那些，也不只被掃過的那些。
+    #   已被獵取 -> 實線，從樞紐開盤畫到被掃那一刻
+    #   還沒被獵取 -> 虛線，從樞紐開盤畫到圖的右緣（它還掛在那裡）
+    # 掃單箭頭只留形成交易的那些（使用者：不要灰色箭頭）。
     try:
-        _ev = pd.read_parquet(EVENTS / f"{sym}.parquet",
-                              columns=["level_id", "side", "t_sweep", "sweep_lvl"])
         _lv = pd.read_parquet(LEVELS / f"{sym}.parquet",
-                              columns=["level_id", "hour_ts"]).set_index("level_id")
-        _ev = _ev[(_ev["t_sweep"] >= lo) & (_ev["t_sweep"] <= hi)]
+                              columns=["level_id", "side", "price", "hour_ts",
+                                       "confirmed_at", "invalidated_at"])
+        right = int(candles[-1]["time"])
+        # 每一列的「下一個同側樞紐開盤時刻」——未被掃的線畫到那裡為止，
+        # 同一側因此只有最新一條延伸到右緣（照 LuxAlgo 的 set_level）。
+        _lv = _lv.sort_values("hour_ts")
+        _next = {}
+        for _side, _g in _lv.groupby("side"):
+            _hs = _g["hour_ts"].tolist()
+            _ids = _g["level_id"].tolist()
+            for _k in range(len(_ids)):
+                _next[_ids[_k]] = int(_hs[_k + 1]) if _k + 1 < len(_hs) else None
         used = {(t["sweep_ts"], round(float(t["level"]), 8))
                 for t in tr if t["level"] is not None}
         nid = 10_000
-        for r in _ev.itertuples():
-            t_sw = int(r.t_sweep) - 60_000        # t_sweep 是該分鐘收盤
-            px = float(r.sweep_lvl)
-            if (t_sw, round(px, 8)) in used:
-                continue                          # 已經以亮色畫過
-            o = int(_lv.loc[r.level_id, "hour_ts"]) if r.level_id in _lv.index \
-                else t_sw - 3_600_000
-            a, z = max(_snap(o), _snap(lo)), _snap(t_sw)
+        for r in _lv.itertuples():
+            inval = None if pd.isna(r.invalidated_at) else int(r.invalidated_at)
+            # 這條線在顯示窗裡有沒有一段可見？
+            if inval is not None and inval < lo:
+                continue                      # 窗開始前就被掃掉了
+            if int(r.confirmed_at) > hi:
+                continue                      # 窗結束後才確認
+            a = max(_snap(int(r.hour_ts)), _snap(lo))
+            if inval is not None:
+                z = _snap(inval - 60_000)      # 被獵取 -> 終止在那一刻
+            else:
+                nx = _next.get(r.level_id)     # 還掛著 -> 到下一個同側樞紐
+                z = _snap(nx) if nx else right
+            z = min(z, right)
             if z <= a:
                 continue
-            levels.append(dict(id=nid, side=str(r.side), c="#4a5462",
-                               a=a, z=z, v=px, plain=True))
-            sweeps.append(dict(id=nid, time=_snap(t_sw),
-                               position="aboveBar" if r.side == "buyside" else "belowBar",
-                               color="#4a5462",
-                               shape="arrowDown" if r.side == "buyside" else "arrowUp",
-                               text=""))
+            swept = inval is not None
+            if swept and (int(inval) - 60_000, round(float(r.price), 8)) in used:
+                continue                      # 已由上面的交易線畫過
+            levels.append(dict(id=nid, side=str(r.side),
+                               c="#f0b90b" if r.side == "buyside" else "#7b61ff",
+                               a=a, z=z, v=float(r.price),
+                               swept=bool(swept), traded=False, plain=True))
             nid += 1
     except Exception as e:                        # 顯示層不可靜默
-        print(f"[WARN] {sym}: 全部掃單線畫不出來: {e}")
+        print(f"[WARN] {sym}: 價位線畫不出來: {e}")
 
     # 價位線：**一條價位一個 series**。時間上重疊的價位（不同價格、同時期）
     # 沒辦法塞進單一 series —— 試過用 whitespace 斷點合併，結果 33 條只畫得出
@@ -615,7 +637,7 @@ details.stat>summary{color:var(--dn)}
 
 <header>
   <h1>__SYM__USDT · SDV 回測</h1>
-  <span class="tag">__SPAN__</span>
+  <span class="tag">__SPAN__ · 時間 __TZ__</span>
   <span class="tag">進場 <b>成立 +__DELAY__ 分</b> · 停損 __STOP__ ATR · 持有 __HOLD__ 分</span>
   <span class="tag" style="border-color:var(--amb);color:var(--amb)">執行暫停中 · 樣本外 CI 下緣仍含零</span>
 </header>
@@ -691,6 +713,10 @@ details.stat>summary{color:var(--dn)}
   <span><span class="dot" style="background:var(--up)"></span><span class="dot" style="background:var(--dn)"></span>
     <b>●</b> 進場 —— <b>顏色＝這筆賺賠，不是方向</b>（綠賺／紅賠；做多畫在 K 棒下方、做空在上方）</span>
   <span><span class="sq" style="background:var(--dn)"></span><b>■</b> 出場（數字＝毛 ATR，「!」= 觸及停損）</span>
+  <span><span class="sw" style="border-color:var(--buy)"></span>買側價位　<span class="sw" style="border-color:var(--sell)"></span>賣側價位
+    ——<b>實線</b>＝已被獵取（終止在被掃那一刻），<b>虛線</b>＝還掛著。
+    <b>加粗</b>＝這個掃單形成了 SDV 交易。虛線畫到下一個同側樞紐出現為止，
+    所以每一側只有最新一條會延伸到最右邊（與 LuxAlgo 的畫法一致）。</span>
   <span><span class="sw" style="border-color:#26a69a"></span>PDH　<span class="sw" style="border-color:#ef5350"></span>PDL（前一 UTC 日的高／低，僅顯示）</span>
   <span style="width:100%"></span>
   <details class="fold" style="width:100%"><summary>為什麼有時候「明明跌了一大段卻算虧錢」</summary>
@@ -758,6 +784,23 @@ details.stat>summary{color:var(--dn)}
 </div>
 <script>
 const D = __DATA__;
+// UTC+8 的顯示格式化。**只在印出來的時候位移**，圖表內部仍是 UTC 秒。
+// 宣告在所有使用者之前（本檔 2026-09-10 已因暫時性死區整段中斷過一次）。
+const TZ_OFF = 8 * 3600;
+function fmtTs(t, withTime){
+  const d = new Date((t + TZ_OFF) * 1000);
+  const p = n => String(n).padStart(2,'0');
+  const ymd = d.getUTCFullYear() + '-' + p(d.getUTCMonth()+1) + '-' + p(d.getUTCDate());
+  return withTime ? ymd + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) : ymd;
+}
+function fmtTick(t, type){
+  const d = new Date((t + TZ_OFF) * 1000);
+  const p = n => String(n).padStart(2,'0');
+  // 0=年 1=月 2=日 3=時分  （type 由 lightweight-charts 決定粒度）
+  if(type <= 1) return d.getUTCFullYear() + '-' + p(d.getUTCMonth()+1);
+  if(type === 2) return (d.getUTCMonth()+1) + '/' + d.getUTCDate();
+  return p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+}
 const fmtP = v => v >= 1000 ? v.toFixed(1) : v >= 1 ? v.toFixed(3) : v.toFixed(5);
 
 // 位置文字有兩個出口（一般工具列 + 全螢幕浮層），統一走這一顆，
@@ -822,7 +865,12 @@ const dark = {layout:{background:{color:'#0b0e11'},textColor:'#848e9c',fontSize:
   // lightweight-charts 預設 CrosshairMode.Magnet 會把十字線吸附到最近的
   // 收盤價，量兩點之間的距離時會被它拉走。Normal = 跟著游標自由移動。
   crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
-  timeScale:{timeVisible:true,secondsVisible:false,rightOffset:6,borderColor:'#1e242d'}};
+  // 時間軸與十字線都顯示 UTC+8。lightweight-charts 內部一律以 UTC 秒運算，
+  // 這裡只在「印出來」的時候加 8 小時 —— 資料本身一秒都沒有被移動。
+  localization:{timeFormatter: t => fmtTs(t, true)},
+  timeScale:{timeVisible:true,secondsVisible:false,rightOffset:6,
+    borderColor:'#1e242d',
+    tickMarkFormatter:(t,type)=>fmtTick(t,type)}};
 
 const chart = LightweightCharts.createChart(document.getElementById('c'), dark);
 const cs = chart.addCandlestickSeries({upColor:'#0ecb81',downColor:'#f6465d',
@@ -842,7 +890,10 @@ function drawLevels(){
   for(const L of D.levels){
     // plain = 只是掃單、沒形成交易 —— 不受「只看賺/只看賠」等篩選影響
     if(!L.plain && !ids.has(L.id)) continue;
-    const sx = chart.addLineSeries({color:L.c, lineWidth:1, lineStyle:2,
+    // 0 = 實線（已被獵取）、2 = 虛線（還掛著）；形成交易的加粗
+    const sx = chart.addLineSeries({color:L.c,
+      lineWidth: L.traded ? 2 : 1,
+      lineStyle: L.swept ? 0 : 2,
       lastValueVisible:false, priceLineVisible:false,
       crosshairMarkerVisible:false, autoscaleInfoProvider:()=>null});
     const a = bucket(L.a), z = Math.max(bucket(L.z), a + TF*60);
@@ -860,9 +911,9 @@ function drawMarkers(){
   const dense = vis.length > 45;
   let ms = D.markers.filter(m=>ids.has(m.id))
                      .map(m=>Object.assign({}, m, {time:bucket(m.time)}));
-  if(showSweep) ms = ms.concat(
-        D.sweeps.filter(m=>m.id>=10000 || ids.has(m.id))
-                .map(m=>Object.assign({}, m, {time:bucket(m.time)})));
+  // 箭頭只畫形成交易的那些（使用者 2026-09-10：不要灰色箭頭）
+  if(showSweep) ms = ms.concat(D.sweeps.filter(m=>ids.has(m.id))
+                     .map(m=>Object.assign({}, m, {time:bucket(m.time)})));
   // lightweight-charts 要求 markers 依時間遞增，否則整組安靜地不畫
   ms.sort((a,b)=>a.time-b.time);
   cs.setMarkers(ms.map(m => dense ? Object.assign({}, m, {text:''}) : m));
@@ -1137,7 +1188,8 @@ def render(d):
     clock_txt = "現在 " + "、".join(parts) if parts else "進度見研究看板"
     return (TPL.replace("__DATA__", json.dumps(d, ensure_ascii=False, default=float))
             .replace("__SYM__", d["sym"])
-            .replace("__SPAN__", f'{d["span"][0]} → {d["span"][1]} UTC')
+            .replace("__TZ__", TZ_LABEL)
+            .replace("__SPAN__", f'{d["span"][0]} → {d["span"][1]}')
             .replace("__DELAY__", str(p["DELAY"])).replace("__STOP__", str(p["STOP"]))
             .replace("__CW__", str(p["C_WAIT"])).replace("__CM__", str(p["C_MOVE"]))
             .replace("__HOLD__", str(p["HOLD"])).replace("__CM__", str(p["CANDLE_MIN"]))
