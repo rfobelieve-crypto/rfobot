@@ -157,6 +157,13 @@ REGISTRY = [
     # 旗標寫 HTTP 200，而三個 bot 的最後一筆 live 成交都在 08-30/31 ——
     # 管子通，裡面沒東西。門檻刻意寬（72h），因為磨坊有月磨損閘、單一策略
     # 閒置是正常的；紅的條件是**全部來源同時沉默**。
+    # 2026-09-11：Hyperliquid 鏈上錄製。錄的四樣東西**都沒有歷史端點**
+    # （market 的 OI、L2 簿口、清算價直方圖、觸發單），所以停一小時就永久
+    # 少一小時。門檻 2.5h：每小時跑、一輪約 5 分鐘。
+    ("hl onchain recorder", "json_flag",
+     "research/results/hl_fuel_last.json:ok", 2.5,
+     "hl_fuel_recorder.py 每小時自報；紅 = 覆蓋率掉到 1% 以下、清算價少於 100 筆、"
+     "或幾何違反不為 0（多單清算價必在現價之下）"),
     ("product live fills", "json_flag",
      "research/results/product_fills_last.json:ok", 26.0,
      "check_product_fills.py 每日自報；量的是**宣告與實際的落差**："

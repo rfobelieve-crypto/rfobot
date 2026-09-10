@@ -58,6 +58,15 @@ REGISTRY = [
      "fetch_oi.py，5 分鐘級"),
     ("poc/data 清算", "research/poc/data/liq/*.parquet", "append",
      "小時級，2026-03-11 起"),
+    ("hl 清算價直方圖", "research/hl/data/snapshots/*.json", "append",
+     "hl_fuel_recorder.py 每小時。**沒有歷史端點**，停了就永久缺那一小時"),
+    ("hl 市場狀態(OI/funding)", "research/hl/data/market/*.json", "append",
+     "同上。OI 在 Hyperliquid 沒有歷史查詢，這是唯一來源"),
+    ("hl L2 簿口", "research/hl/data/book/*.json", "append", "同上"),
+    ("hl 掛單與觸發單", "research/hl/data/orders/*.json", "append",
+     "同上。觸發單 = 真實止損，§1.05 只能用指標代理的那個量"),
+    ("hl 地址宇宙", "research/hl/data/addresses.json", "append",
+     "只增不減；覆蓋率隨它成長（實測 242 -> 633 個地址時覆蓋 7% -> 17%）"),
     ("poc/data 掃單快照", "research/poc/data/sweep_snapshot.parquet", "derived",
      "sweep_snapshot.py 整份重生；筆數變動是正常的，只記錄"),
 ]
@@ -99,6 +108,25 @@ def _pq_span(p: Path):
     return n, int(s.min()), int(s.max())
 
 
+def _json_span(p: Path):
+    """JSON 產物（鏈上錄製的每小時檔）：列數取 rows/resting/addresses 的長度，
+    時點取頂層 ts。**不載入巨大檔案的全部欄位**——這些檔 <1MB，直接 load。"""
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return 0, None, None
+    n = 0
+    for k in ("rows", "resting", "triggers", "addresses"):
+        v = d.get(k)
+        if isinstance(v, list):
+            n += len(v)
+    ts = d.get("ts")
+    if isinstance(ts, (int, float)):
+        ms = int(ts) * 1000 if ts < 1e12 else int(ts)
+        return n, ms, ms
+    return n, None, None
+
+
 def scan():
     out = {}
     for name, pat, kind, note in REGISTRY:
@@ -110,7 +138,12 @@ def scan():
                    rows=0, first_ts=None, last_ts=None, bytes=0, sha=None)
         h = hashlib.sha256()
         for p in files:
-            n, a, z = (_csv_span(p) if p.suffix == ".csv" else _pq_span(p))
+            if p.suffix == ".csv":
+                n, a, z = _csv_span(p)
+            elif p.suffix == ".json":
+                n, a, z = _json_span(p)
+            else:
+                n, a, z = _pq_span(p)
             agg["rows"] += n
             agg["bytes"] += p.stat().st_size
             if a is not None:
