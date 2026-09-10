@@ -1,0 +1,83 @@
+{
+  "_readme": "驗證方法論頁的真相源。複製到 ../product-site/content/method.json。公開面規則同 research_nogo：只出百分比、方向、時間；不出美元、張數、模型內部（切點、權重、特徵定義）。每一條規矩都必須配一個真實發生過的案例，沒有案例的規矩不要放上去——那會變成口號。",
+  "updated": "2026-09-10",
+  "principles": [
+    {
+      "id": "prereg",
+      "zh": {
+        "title": "判準寫在會被執行的程式碼裡，而且在跑之前提交",
+        "body": "不是寫在文件裡。散文不會被代入數字，程式碼會。提交的時間戳就是簽名——任何人都可以回頭確認：那個門檻是在看到結果之前寫的，還是之後。",
+        "case": "有一次判準寫成「這一格的區間下緣要低於全體」，看起來比只比點估計更嚴格。把當時的數字代進去才發現：任何寬區間都自動滿足它。那不是門檻，是一句恆真句。從此規矩多一條——寫下判準的當下，立刻把現有數字代進去算一次；如果它現在就過、或它不可能不過，那它不是門檻。"
+      },
+      "en": {
+        "title": "Criteria live in code that runs, and are committed before the run",
+        "body": "Not in a document. Prose never gets numbers substituted into it; code does. The commit timestamp is the signature — anyone can check whether a threshold was written before the result was seen, or after.",
+        "case": "One criterion once read \"the lower bound of this cell must sit below the overall figure\", which looked stricter than comparing point estimates. Substituting the actual numbers showed that any wide interval satisfies it automatically. That is not a threshold, it is a tautology. Hence the extra rule: the moment a criterion is written, put today's numbers into it. If it already passes, or cannot fail, it is not a threshold."
+      }
+    },
+    {
+      "id": "instrument",
+      "zh": {
+        "title": "自己剛寫的儀器，先在一個答案已知的地方跑一次",
+        "body": "自己寫的工具比別人的舊工具危險，因為少了「這是別人寫的、可能有坑」那層警覺。而最危險的時刻，是它剛好證實了你（或使用者）的懷疑。",
+        "case": "一支新寫的診斷程式宣告某條策略的結果是假的，而那個結論正好符合當下的懷疑，所以差點就直接採信。實際上是診斷本身有 bug：它在一個二十四小時不停的市場上報出六成的「跳空」——而那個市場依定義幾乎不可能跳空。判斷法從此固定下來：新儀器要先在一個答案物理上已知的樣本上跑一次。"
+      },
+      "en": {
+        "title": "A freshly written instrument is first run where the answer is already known",
+        "body": "Your own tool is more dangerous than someone else's old one, because the reflex \"this was written by someone else, it may have traps\" is missing. The most dangerous moment is when it happens to confirm what you already suspected.",
+        "case": "A newly written diagnostic declared a strategy's results fake, and because that matched the suspicion of the moment it was nearly taken at face value. The diagnostic itself was wrong: it reported gaps in 60% of cases in a market that trades 24/7 and by definition almost never gaps. The rule since: run a new instrument first on a sample whose answer is physically known."
+      }
+    },
+    {
+      "id": "guard",
+      "zh": {
+        "title": "每一道守衛都要親眼看它綠一次，也紅一次",
+        "body": "一條永遠紅的守衛，在它真正該報警的那天不會改變任何顏色——而紅燈本身會訓練人忽略那個頻道。一條永遠綠的守衛更糟。兩種都不是誤報，是沒有測量能力。",
+        "case": "一條監測管線的燈從註冊那天起就是紅的，而被監測的東西一直是好的：它讀取的欄位型別跟表上其他每一列都不同，於是必然拋例外、必然判定紅。同一天還發現另一道守衛把基準釘在一份會滾動的資料上——每次資料刷新它都會無故變紅，理由跟它要保護的東西完全無關。修法是把基準搬到一份凍結的樣本，然後故意改壞一個參數，確認它真的會紅。"
+      },
+      "en": {
+        "title": "Every guard must be seen green once and red once",
+        "body": "A guard that is always red will not change colour on the day it should fire — and the red light itself trains people to ignore that channel. A guard that is always green is worse. Neither is a false alarm; both are an absence of measurement.",
+        "case": "One monitor was red from the day it was registered while the thing it watched was healthy the whole time: the field it read had a different type from every other row in the registry, so it always threw and always resolved to red. The same day, another guard turned out to be pinned to a data set that rolls forward — every refresh turned it red for reasons unrelated to what it protected. The fix was to pin the baseline to a frozen sample, then deliberately break a parameter to confirm it really does go red."
+      }
+    },
+    {
+      "id": "posthoc",
+      "zh": {
+        "title": "事後找到的東西，唯一算數的檢驗是「只用前半的程序會不會把它選出來」",
+        "body": "逐標的、逐季、細分格、混淆對照、甚至隨機置換——這些全部只能證明「這個答案不是單點雜訊」，不能證明「這個答案不是我挑出來的」。要證明後者，只有把挑選程序本身放進樣本外。",
+        "case": "一個維度連過五項一致性檢查，包括兩千次隨機置換。最後一步是只用前半段資料重跑整個搜尋——程序選到的是完全另一個東西，而那個東西在後半段是負的。整條撤回。從此報告的格式改了：要報「前半選到什麼」，不能只報「我選的那個在後半如何」。兩者不同的那一刻，就是過擬合現形的那一刻。"
+      },
+      "en": {
+        "title": "For anything found after the fact, the only test that counts is whether a first-half-only procedure would have picked it",
+        "body": "Per-symbol, per-quarter, finer buckets, confounder controls, even random permutation — all of these can only show that an answer is not single-point noise. None of them shows that the answer was not cherry-picked. Only putting the selection procedure itself out of sample can do that.",
+        "case": "One dimension passed five consistency checks in a row, including two thousand random permutations. The last step was to re-run the entire search using the first half of the data only — the procedure picked something else entirely, and that something was negative in the second half. The whole thing was withdrawn. Reporting changed as a result: report what the first half picked, not only how your pick did in the second half. The moment those differ is the moment overfitting becomes visible."
+      }
+    },
+    {
+      "id": "nofudge",
+      "zh": {
+        "title": "差 0.0 就是差 0.0",
+        "body": "判準凍結之後不因為「只差一點」而放寬，也不因為結果好看就換一個統計量。而在凍結之前，還要多問一句：這個設計在註冊的樣本量下，分辨得出過與不過嗎？",
+        "case": "一個扳機寫著兩組比例的差要達到八個百分點。跑到接近尾聲時是五點八，看起來像差一點沒過。把標準誤算出來是十一點六個百分點——雜訊比門檻還大，這個設計不管資料怎麼走都做不出決定。結案為「無效判決」，不是「失敗」：那件事從來沒有被真正測過，記成失敗等於謊報。從此凍結任何判準的當下，都要一併算出它在註冊樣本下的標準誤；標準誤大於門檻，就是設計要重做，而不是資料要再等。"
+      },
+      "en": {
+        "title": "Missing by 0.0 is still missing",
+        "body": "Once frozen, a criterion is not loosened because it \"almost\" passed, and the statistic is not swapped for one that looks better. Before freezing, one more question is required: at the registered sample size, can this design tell pass from fail at all?",
+        "case": "One trigger required a gap of eight percentage points between two rates. Near the end it stood at five point eight — apparently a near miss. Computing the standard error gave eleven point six points: the noise was larger than the threshold, so the design could never have reached a decision whichever way the data fell. It was closed as inconclusive by design, not as a failure — the thing was never actually tested, and filing it as a failure would be a false report. Since then, freezing a criterion also means computing its standard error at the registered sample size; if the error exceeds the threshold, the design is redone rather than the data awaited."
+      }
+    }
+  ],
+  "closing": {
+    "zh": {
+      "title": "這保證的是什麼，不保證什麼",
+      "body": "不保證賺錢。這一整套紀律買到的東西只有一個：一個看起來很好的結果，在被拿去下注之前，會先被它自己的作者攻擊過一輪。附帶效果是上牆的每個數字都經得起「這是怎麼來的」這個問題，而被否決的想法不會在半年後換個名字回來——一個沒被記下來的否決，會以新點子的樣子回來。",
+      "note": "本頁描述的是研究流程，不是投資建議，也不構成任何績效承諾。"
+    },
+    "en": {
+      "title": "What this buys, and what it does not",
+      "body": "It does not buy profit. The whole discipline buys exactly one thing: a result that looks good gets attacked by its own author before any money is placed on it. The side effects are that every number on this site survives the question \"where did this come from\", and that a rejected idea does not come back six months later under a new name — an unrecorded rejection always returns dressed as a fresh idea.",
+      "note": "This page describes a research process. It is not investment advice and is not a performance claim."
+    }
+  }
+}
