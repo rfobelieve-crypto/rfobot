@@ -64,6 +64,7 @@ from research.harness import boot_corr, boot_days, day8, write_report  # noqa: E
 FIX = ROOT / "research" / "tests" / "fixtures"
 SNAP = ROOT / "research" / "poc" / "data" / "sweep_snapshot.parquet"
 OUT = ROOT / "research" / "results" / "portfolio_layer.json"
+OUT_ROLES = ROOT / "research" / "results" / "portfolio_roles.json"
 CORE9 = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "LINK", "AVAX"]
 
 
@@ -90,10 +91,68 @@ def _snapshot_arms():
     return {"SWEEP_all": d, "NOFLOW": d[d.sig == "sweep"]}
 
 
-def lines():
+# ── 角色代理（2026-09-10 加）──────────────────────────────────────────
+# **為什麼需要這個**：相關矩陣只能量**已經存在**的線。一條還沒建的策略，
+# 算不出它跟現有池子的相關 —— 所以「先量再談缺口」對候選線做不到。
+#
+# 除非做一個粗糙的代理。而天氣站那些群眾原型本來就是各種角色的天真實作：
+#
+#     TREND     SMA50/200      趨勢跟隨（**長凸性**的天然代理：崩盤時翻空）
+#     MR        RSI 超買超賣    均值回歸（賣凸性）
+#     BREAKOUT  Donchian20     突破（動能）
+#     GRID      庫存 = -(價-錨)/間距  網格（賣凸性，最純）
+#     PSAR      快速趨勢        趨勢家族的另一個參數帶
+#
+# **這些不是策略，是角色的形狀。** 群眾預設參數、未調、**不含成本**、
+# 逐 bar 持倉，所以它們回答的是「這個**角色**跟現有池子獨立嗎」，
+# 不是「這條策略好不好」。前者才是「缺口是真的還是重複計算」的問題。
+#
+# 損益口徑：bar 收盤持倉賺**下一根**的對數報酬（無前視，同 crowd_battery
+# 的 paid_states）。九幣加總。
+ROLE_TFS = None          # 用凍結的 1h 切片，與 §1.05 同一份母體
+
+
+def _role_series():
+    import csv
+    from research.crowd_battery import pos_breakout, pos_mr, pos_trend
+    from research.crowd_battery3 import pos_grid, pos_psar
+
+    frozen = ROOT / "research" / "crowd_stops" / "frozen"
+    if not (frozen / "BTCUSDT_1h.csv").exists():
+        return {}
+    archs = {"TREND": pos_trend, "MR": pos_mr, "BREAKOUT": pos_breakout,
+             "GRID": pos_grid, "PSAR": pos_psar}
+    acc = {k: [] for k in archs}
+    for sym in CORE9:
+        rows = []
+        with open(frozen / f"{sym}USDT_1h.csv", newline="",
+                  encoding="utf-8-sig") as f:
+            r = csv.reader(f)
+            next(r)
+            for x in r:
+                if len(x) >= 6:
+                    rows.append((int(float(x[0])) * 1000, float(x[1]),
+                                 float(x[2]), float(x[3]), float(x[4]),
+                                 float(x[5])))
+        c = np.array([b[4] for b in rows], float)
+        ts = np.array([b[0] for b in rows], np.int64)
+        ret = np.zeros(len(c))
+        ret[1:] = np.diff(np.log(c))
+        for k, fn in archs.items():
+            pos = np.asarray(fn(rows), float)
+            # 收盤持倉賺下一根 -> pos[:-1] 對上 ret[1:]
+            pnl = np.zeros(len(c))
+            pnl[1:] = pos[:-1] * ret[1:]
+            acc[k].append(pd.DataFrame(dict(sym=sym, entry_ms=ts, r=pnl)))
+    return {k: pd.concat(v, ignore_index=True) for k, v in acc.items()}
+
+
+def lines(roles=False):
     out = {"V7": _fixture("v7"), "OLD": _fixture("old")}
     out.update(_sdv_arms())
     out.update(_snapshot_arms())
+    if roles:
+        out.update(_role_series())
     return {k: v[["sym", "entry_ms", "r"]].reset_index(drop=True)
             for k, v in out.items()}
 
@@ -106,7 +165,11 @@ def daily(df, days):
 
 
 def main():
-    L = lines()
+    roles = "--roles" in sys.argv
+    L = lines(roles=roles)
+    if roles:
+        print("**含角色代理**（群眾預設參數、未調、**不含成本**）——"
+              "它們回答的是「這個角色跟現有池子獨立嗎」，不是「這條策略好不好」")
     lo = max(int(day8([v.entry_ms.min()])[0]) for v in L.values())
     hi = min(int(day8([v.entry_ms.max()])[0]) for v in L.values())
     days = np.arange(lo, hi + 1)
@@ -199,7 +262,7 @@ def main():
                         "單位與成本不一致（V7 毛、SDV 淨、OLD 訊號層），"
                         "組合均值不是可交易的宣稱",
                         "成本不會被分散化解決：每條線各付自己那一份"])
-    p = write_report(OUT, res)
+    p = write_report(OUT_ROLES if roles else OUT, res)
     print("\nwritten -> " + str(p))
 
 
