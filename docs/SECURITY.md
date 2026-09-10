@@ -40,6 +40,7 @@
 |---|---|
 | MySQL 連線字串 | Railway（內部主機名）／本機 `.env` |
 | `COINGLASS_API_KEY` | Railway／`.env` |
+| `NANSEN_API_KEY` | 本機 `.env`（**只在研究端唯讀查詢，不進 Railway、不進產品端**） |
 | 四支 Telegram bot token（`TELEGRAM_BOT_TOKEN`、`CANCEL_TG_BOT_TOKEN`、`INDICATOR_BOT_TOKEN`、`AGENT_BOT_TOKEN`） | Railway。**2026-09-05 起一律視為已外洩** |
 
 **版控狀態**：`.env` 與 `config.json` **從未進過 git**（`git log --all -- .env` 為空），
@@ -94,3 +95,19 @@
 - [ ] webhook 改用 `secret_token`（現在 token 兼認證與路徑）
 - [ ] 查證 OKX 金鑰確實無提幣權限、是否可加 IP 白名單
 - [ ] `/admin/flow-bars-export` 加速率限制（目前無限制的資料匯出）
+
+### 2026-09-10 `NANSEN_API_KEY`（新增，且**應視為已外洩**）
+
+使用者在對話中以明文提供。Claude Code 的對話逐字稿是本機的 `.jsonl`
+檔案，路徑可預測，**任何讀得到那個目錄的東西都讀得到這把金鑰**。
+所以它跟四支 Telegram bot token 同級：**一律視為已外洩，請輪替**。
+
+輪替之後把新值放進 `.env`（本檔已列入清冊），不要再貼進對話。
+需要它的程式一律走 `os.environ` 讀，不寫進任何原始碼或 commit。
+
+能做什麼：Nansen 平台的唯讀資料查詢（鏈上聰明錢標籤與資金流）。
+**沒有**下單、提幣、改設定的能力，所以外洩的後果是額度被盜用與帳戶
+資料被查詢，不是資金損失。即便如此仍應輪替——額度是有價的。
+
+限制：只在研究端使用；**不進 Railway、不進產品端 jarvis**（那兩處沒有
+任何需要它的路徑，多一個地方就多一個外洩面）。
