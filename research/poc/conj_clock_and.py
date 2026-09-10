@@ -116,7 +116,12 @@ import triage_matched as tm  # noqa: E402
 import conj_clock as ck  # noqa: E402
 
 OUT = HERE / "data" / "results"
-FREEZE_DAY = "2026-09-08"
+# 原凍結日 2026-09-08。2026-09-10 判定日界改為 UTC+8
+# （event_census.DAY_OFFSET_MS，使用者決定），事件集合因此改變
+# （重疊 94.3%、各約 87 筆不同），舊樣本與新定義**不是同一個母體**，
+# 混著數就是把兩種定義放進同一個計分器 —— 故重新凍結、樣本歸零。
+# 歸零時的進度：conj_clock 3/300、conj_clock_and 1/200。
+FREEZE_DAY = "2026-09-10"
 FREEZE_MS = int(datetime.strptime(FREEZE_DAY, "%Y-%m-%d")
                 .replace(tzinfo=timezone.utc).timestamp() * 1000)
 N_TARGET = 200

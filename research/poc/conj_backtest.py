@@ -611,7 +611,7 @@ tbody tr.sel{background:#1c2530}
 .note{font-size:11.5px;color:var(--dim);max-width:96ch}
 /* 嵌入模式（2026-09-10）：網站是把整頁塞進固定高度的 iframe，而表頭
    （標題＋標籤＋摺疊區＋KPI）在 390x520 的手機框裡就把圖表整個推出框外
-   —— 使用者看到的是「根本什麼都沒有」。所以偵測到自己在 iframe 裡時，
+      （症狀是圖表整個在框外，看起來像空白）。偵測到自己在 iframe 裡時，
    把圖表以外的東西全部收起來，讓圖直接坐在最上面。
    直接開這個檔案時一切照舊，什麼都沒少。 */
 body.embed header, body.embed .fold, body.embed .stat, body.embed .kpis,
@@ -789,7 +789,7 @@ details.stat>summary{color:var(--dn)}
 <script>
 const D = __DATA__;
 // UTC+8 的顯示格式化。**只在印出來的時候位移**，圖表內部仍是 UTC 秒。
-// 宣告在所有使用者之前（本檔 2026-09-10 已因暫時性死區整段中斷過一次）。
+// 宣告在所有呼叫端之前（本檔 2026-09-10 已因暫時性死區整段中斷過一次）。
 const TZ_OFF = 8 * 3600;
 function fmtTs(t, withTime){
   const d = new Date((t + TZ_OFF) * 1000);
@@ -865,10 +865,12 @@ kpis();
 const dark = {layout:{background:{color:'#0b0e11'},textColor:'#848e9c',fontSize:11},
   grid:{vertLines:{color:'#151a21'},horzLines:{color:'#151a21'}},
   rightPriceScale:{borderColor:'#1e242d'},
-  // 2026-09-10 使用者：「圖標虛線不要有磁鐵讓我可以自由活動」。
+  // 2026-09-10：十字線不吸附，可自由移動量距離。
   // lightweight-charts 預設 CrosshairMode.Magnet 會把十字線吸附到最近的
   // 收盤價，量兩點之間的距離時會被它拉走。Normal = 跟著游標自由移動。
-  crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+  crosshair:{mode:0},   // 0 = Normal（跟著游標）、1 = Magnet（吸附收盤價）
+                        // 用數值不用 LightweightCharts.CrosshairMode.Normal：
+                        // 少了那個列舉整段 script 會中斷，頁面全空。
   // 時間軸與十字線都顯示 UTC+8。lightweight-charts 內部一律以 UTC 秒運算，
   // 這裡只在「印出來」的時候加 8 小時 —— 資料本身一秒都沒有被移動。
   localization:{timeFormatter: t => fmtTs(t, true)},
@@ -915,7 +917,7 @@ function drawMarkers(){
   const dense = vis.length > 45;
   let ms = D.markers.filter(m=>ids.has(m.id))
                      .map(m=>Object.assign({}, m, {time:bucket(m.time)}));
-  // 箭頭只畫形成交易的那些（使用者 2026-09-10：不要灰色箭頭）
+  // 箭頭只畫形成交易的那些
   if(showSweep) ms = ms.concat(D.sweeps.filter(m=>ids.has(m.id))
                      .map(m=>Object.assign({}, m, {time:bucket(m.time)})));
   // lightweight-charts 要求 markers 依時間遞增，否則整組安靜地不畫
@@ -1055,7 +1057,7 @@ function focus(t){
     s.setData([{time:t0,value:p},{time:t1,value:p}]);
     segs.push(s);
   };
-  // 2026-09-10 使用者：只要進場出場。價位線與停損線已移除（兩者的價格
+  // 2026-09-10：預設只留進場與出場。價位線與停損線已移除（兩者的價格
   // 仍在下方單筆說明與表格裡，資料沒少，只是不畫在圖上）。
   mk(t.entry, t.R>0?'#0ecb81':'#f6465d','進場');
   mk(t.exit_px,'#f0b90b','出場 '+t.R.toFixed(3)+'ATR');

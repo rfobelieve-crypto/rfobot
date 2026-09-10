@@ -293,7 +293,10 @@ def build_thresholds():
             np.nan_to_num(b["delta"].to_numpy(float), nan=0.0),
             # 切在**今天零點**，與 causal_flags 的「嚴格早於本日」一致，
             # 也與對照測試 B 臂模擬的行為一致 —— 被測的就是被部署的。
-            hi=int(ts[-1] // 86_400_000) * 86_400_000, sym=sym,
+            # 日界自 2026-09-10 起是 UTC+8（ec.DAY_OFFSET_MS），這裡必須
+            # 用同一個位移，否則 live 與離線會用不同的日切，安靜地不同意。
+            hi=(int((ts[-1] + ec.DAY_OFFSET_MS) // 86_400_000) * 86_400_000
+                - ec.DAY_OFFSET_MS), sym=sym,
             atr=float(b["atr_h14"].to_numpy(float)[-1]))
         if r is None:
             continue
@@ -611,7 +614,8 @@ def intent_gate(conn, intents):
     if not intents:
         return []
     now = int(time.time() * 1000)
-    day0 = now - (now % 86_400_000)
+    # 每日上限也跟著 UTC+8 換日（2026-09-10 統一日界）
+    day0 = now - ((now + ec.DAY_OFFSET_MS) % 86_400_000)
     with conn.cursor() as cur:
         # 「持倉中」的定義（2026-09-08 實盤體檢修正）：
         #   (a) NEW 且**尚未過期**——還可能被送出去

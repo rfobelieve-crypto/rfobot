@@ -44,10 +44,18 @@ warnings.filterwarnings("ignore")
 HERE = Path(__file__).resolve().parent
 BARS = HERE / "data" / "bars"
 EVENTS = HERE / "data" / "events"
-# 判定用的日界位移（毫秒）。0 = UTC 日，凍結值。
-# 2026-09-10：使用者要求顯示統一 UTC+8；**顯示已改，這裡刻意沒動** ——
-# 改它會改變門檻與事件集合本身（量測結果見 TODO §1.03l）。
-DAY_OFFSET_MS = 0
+# 判定用的日界位移（毫秒）。**2026-09-10 起 = UTC+8**（使用者決定）。
+#
+# 這決定滾動 30 日 p99 門檻怎麼分組，也就決定 delta_ext / vol_burst 何時
+# 開火、SDV 事件集合長什麼樣 —— **是判定不是顯示**。改動當時量過的後果：
+#     母體 3,008 -> 3,011、SDV 1,587 -> 1,584、SDV 淨 +0.3295 -> +0.3318
+#     事件重疊 94.3%，各有約 87 筆不同
+# 績效在雜訊裡，但事件集合不同，所以 conj_clock / conj_clock_and 的凍結
+# 預註冊在同日重新開始（見兩檔的 FREEZE_DAY 與 TODO §1.03l）。
+#
+# 要跟它保持一致的還有 conj_watch 的 thresholds_asof 切點 —— 兩套日界
+# 並存比統一成任何一套都糟。
+DAY_OFFSET_MS = 8 * 3600 * 1000
 OI = HERE / "data" / "oi"
 OUT = HERE / "data" / "results"
 MIN_MS = 60_000
