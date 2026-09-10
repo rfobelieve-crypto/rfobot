@@ -299,7 +299,7 @@ def ledger(sym, liq=None, arm="A", scale="1h"):
 
 
 def pdh_pdl(b, lo_ms, hi_ms):
-    """前一個 UTC 日的高 / 低，畫在「它生效的那一天」的時間範圍上。
+    """前一日（日界＝顯示時區，現為 UTC+8）的高 / 低。
 
     **display-only，不參與 SDV 判定**（2026-09-10 使用者：「PDH/PDL 不要
     被蓋掉了這個也要顯示出來」—— 但它不是被蓋掉，是 SDV 的價位表從來
@@ -313,14 +313,18 @@ def pdh_pdl(b, lo_ms, hi_ms):
     加上價位線直接把渲染器凍住，實測 CDP 截圖 timeout）。改成**各一條
     階梯線**（lineType WithSteps），日界自然跳變，series 數 180 -> 2。
     """
+    # 日界跟著顯示時區走（2026-09-10 使用者：「改全部統一」）。
+    # 這會切出**不同的**前一日高低 —— 是定義變更，不是顯示變更。
+    # 安全的原因只有一個：PDH/PDL 不參與 SDV 判定。
     v = b[["ts", "high", "low"]].copy()
-    v["d"] = v["ts"] // 86_400_000
+    off = int(DISPLAY_TZ.utcoffset(None).total_seconds() * 1000)
+    v["d"] = (v["ts"] + off) // 86_400_000
     g = v.groupby("d").agg(hi=("high", "max"), lo=("low", "min"))
     g["ph"] = g["hi"].shift(1)          # 前一日高 = 今日的 PDH
     g["pl"] = g["lo"].shift(1)
     out = {"PDH": [], "PDL": []}
     for d, r in g.iterrows():
-        t0 = int(d) * 86_400_000
+        t0 = int(d) * 86_400_000 - off     # 換回 UTC 毫秒
         if t0 + 86_400_000 < lo_ms or t0 > hi_ms:
             continue
         t = _snap(max(t0, lo_ms))
@@ -717,7 +721,7 @@ details.stat>summary{color:var(--dn)}
     ——<b>實線</b>＝已被獵取（終止在被掃那一刻），<b>虛線</b>＝還掛著。
     <b>加粗</b>＝這個掃單形成了 SDV 交易。虛線畫到下一個同側樞紐出現為止，
     所以每一側只有最新一條會延伸到最右邊（與 LuxAlgo 的畫法一致）。</span>
-  <span><span class="sw" style="border-color:#26a69a"></span>PDH　<span class="sw" style="border-color:#ef5350"></span>PDL（前一 UTC 日的高／低，僅顯示）</span>
+  <span><span class="sw" style="border-color:#26a69a"></span>PDH　<span class="sw" style="border-color:#ef5350"></span>PDL（前一日高／低，日界 UTC+8，僅顯示）</span>
   <span style="width:100%"></span>
   <details class="fold" style="width:100%"><summary>為什麼有時候「明明跌了一大段卻算虧錢」</summary>
   <p>這是<b>延續</b>交易：價格穿過價位就<b>順著穿越方向</b>跟，不等回踩。實測

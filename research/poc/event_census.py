@@ -44,6 +44,10 @@ warnings.filterwarnings("ignore")
 HERE = Path(__file__).resolve().parent
 BARS = HERE / "data" / "bars"
 EVENTS = HERE / "data" / "events"
+# 判定用的日界位移（毫秒）。0 = UTC 日，凍結值。
+# 2026-09-10：使用者要求顯示統一 UTC+8；**顯示已改，這裡刻意沒動** ——
+# 改它會改變門檻與事件集合本身（量測結果見 TODO §1.03l）。
+DAY_OFFSET_MS = 0
 OI = HERE / "data" / "oi"
 OUT = HERE / "data" / "results"
 MIN_MS = 60_000
@@ -114,7 +118,10 @@ def detect_all(sym, liq, events_dir=None):
     dl = np.nan_to_num(b["delta"].to_numpy(float), nan=0.0)
     at = b["atr_h14"].to_numpy(float)
     n = len(ts)
-    day = (ts // 86_400_000)
+    # 日界。**這是判定的一部分**，不是顯示：它決定滾動 30 日 p99 的分組，
+    # 也就決定了 delta_ext / vol_burst 何時開火、SDV 事件集合長什麼樣。
+    # 預設 0 = UTC 日（凍結定義）。改它等於改策略，所有既有數字要重跑。
+    day = ((ts + DAY_OFFSET_MS) // 86_400_000)
 
     def back_sum(x):
         c = np.concatenate([[0.0], np.cumsum(x)])
