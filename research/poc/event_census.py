@@ -95,8 +95,12 @@ def day_stats(days, r):
                 mean=float(r.mean()), se=se, mde=float(1.96 * se))
 
 
-def detect_all(sym, liq):
+def detect_all(sym, liq, events_dir=None):
     """五種事件的分鐘索引（未去重）與該幣的分鐘序列。
+
+    `events_dir`（2026-09-10）：掃單事件表的目錄。None = `data/events`
+    （1h 樞紐，預設，行為與先前逐位元相同）；傳 `data/events_5m` 就是
+    5 分鐘樞紐。**只換來源，偵測算法一個字沒動。**
 
     2026-09-07 抽出來共用：重疊矩陣（`event_overlap.py`）必須用**同一份**
     偵測，否則兩份實作會安靜地不同意（mistake.md 2026-08-26）。函式內容
@@ -158,7 +162,8 @@ def detect_all(sym, liq):
         thr = np.percentile(pos, 99) if len(pos) else np.inf
         cand["liq_burst"] = np.flatnonzero(np.nan_to_num(lsum, nan=-1) >= thr)
 
-    ev = pd.read_parquet(EVENTS / f"{sym}.parquet", columns=["t_sweep"])
+    ev = pd.read_parquet((EVENTS if events_dir is None else events_dir)
+                         / f"{sym}.parquet", columns=["t_sweep"])
     cand["sweep"] = np.searchsorted(ts, ev["t_sweep"].to_numpy(np.int64) - MIN_MS)
 
     # 2026-09-07 附加：把**原始量值**一併回傳。因果版門檻（滾動 30 日分位）

@@ -108,25 +108,10 @@ def cluster_ci(df, col="R", n=2000, seed=7):
     return float(np.percentile(out, 2.5)), float(np.percentile(out, 97.5))
 
 
-def groups_gap(pairs, gap_min):
-    """把 (分鐘, 類型) 併成群 —— 相鄰間隔 <= gap_min 就同群。
-
-    這是 `event_triage.cluster` 的參數化版本：MERGE_GAP 由呼叫端給。
-    gap_min = et.MERGE_GAP 時必須與 conj_redef.groups_with_members 一致，
-    那是本檔的已知答案對照（見 main 的 S1）。
-    """
-    if not pairs:
-        return []
-    ps = sorted(pairs)
-    out, cur = [], [ps[0]]
-    for m, t in ps[1:]:
-        if m - cur[-1][0] <= gap_min:
-            cur.append((m, t))
-        else:
-            out.append(cur)
-            cur = [(m, t)]
-    out.append(cur)
-    return [(g[0][0], g) for g in out]
+# 組裝**只有一份**，在 conj_redef。本檔第一版自己抄了一份迴圈，當場被 S1
+# 抓到不一致（1,616 vs 1,587，差在群之間的冷卻）—— 已刪除，改成把 merge_gap
+# 傳給正版（mistake.md 2026-08-26：第二份實作會安靜地不同意）。
+import conj_redef as cr  # noqa: E402
 
 
 def ledger_gap(sym, gap_min, shuffle_flow=False, rng=None, scale="1h"):
@@ -165,7 +150,7 @@ def ledger_gap(sym, gap_min, shuffle_flow=False, rng=None, scale="1h"):
         pairs += [(m, nm) for m in ms]
 
     rows = []
-    for _a, mem in groups_gap(pairs, gap_min):
+    for _a, mem in cr.groups_with_members(pairs, merge_gap=gap_min):
         sig = {t for _, t in mem}
         if not ({"delta_ext", "vol_burst"} <= sig) or "sweep" not in sig:
             continue                                   # 只看 SDV（三者齊發）

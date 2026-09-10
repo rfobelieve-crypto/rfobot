@@ -117,7 +117,7 @@ def day_ci(x, days, b=2000):
     return float(x.mean()), float(np.percentile(r, 2.5)), float(np.percentile(r, 97.5))
 
 
-def groups_with_members(pairs, cooldown=None):
+def groups_with_members(pairs, cooldown=None, merge_gap=None):
     """與 et.cluster 同一套 gap+cooldown，但**連群成員一起回傳**。
 
     et.cluster 只回 (anchor, signature)，拿不到「哪一分鐘是 sweep、哪一分鐘
@@ -129,16 +129,24 @@ def groups_with_members(pairs, cooldown=None):
     的第二波假設）：冷卻是為了事件研究避免重複計數而設的，它會讓「開火之後
     再次開火」在資料上依定義為零。關掉冷卻的結果**不得**回頭餵給任何凍結
     的計分器。
+
+    `merge_gap`（2026-09-10）預設 = `et.MERGE_GAP`（5 分），凍結定義。
+    參數化的理由：`conj_scale_merge.py` 要掃併窗網格，而它第一版自己抄了
+    一份組裝迴圈 —— 立刻與這裡不一致（1,616 vs 1,587 筆，差在**群之間的
+    冷卻**那一段），被它自己的 S1 對照關抓到。**修法是讓這一顆接受參數，
+    不是讓外面再養一份**（mistake.md 2026-08-26：第二份實作會安靜地不同意）。
+    非預設值的結果同樣**不得**回頭餵給凍結的計分器。
     """
     if not pairs:
         return []
     cd = et.COOLDOWN if cooldown is None else cooldown
+    mg = et.MERGE_GAP if merge_gap is None else merge_gap
     prs = sorted(pairs)
     out = []
     cs = cl = prs[0][0]
     mem = [prs[0]]
     for m, t in prs[1:]:
-        if m - cl <= et.MERGE_GAP:
+        if m - cl <= mg:
             cl = m
             mem.append((m, t))
         else:

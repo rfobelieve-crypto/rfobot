@@ -151,7 +151,7 @@ def to_day(ts_ms):
     return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
 
 
-def ledger(sym, liq=None, arm="A"):
+def ledger(sym, liq=None, arm="A", scale="1h"):
     """一個幣的完整交易帳（全歷史）。回傳 (trades, bars_df)。
 
     arm="A"  事件成立 +3 分進場，方向 = 事件前 5 分鐘動能（**預設，現行**）
@@ -172,7 +172,11 @@ def ledger(sym, liq=None, arm="A"):
     `tests/test_conj_backtest_parity.py` 對 A 臂釘住 `conj_redef` 的誠實值。
     """
     liq = _empty_liq() if liq is None else liq
-    cand, ts, cl, at, _day = ck.frozen_cand(sym, liq)
+    # 2026-09-10：樞紐尺度。"1h" = 現行（data/events、data/levels），
+    # "5m" = 5 分鐘樞紐（data/events_5m、data/levels_5m）。規則不變，只換來源。
+    ev_dir = EVENTS if scale == "1h" else HERE / "data" / f"events_{scale}"
+    lv_dir = LEVELS if scale == "1h" else HERE / "data" / f"levels_{scale}"
+    cand, ts, cl, at, _day = ck.frozen_cand(sym, liq, None if scale == "1h" else ev_dir)
     b = pd.read_parquet(BARS / f"{sym}.parquet",
                         columns=["ts", "open", "high", "low", "close"])
     op = b["open"].to_numpy(float)
@@ -189,11 +193,11 @@ def ledger(sym, liq=None, arm="A"):
             for m in ec.cooldown_filter(np.sort(v)):
                 pairs.append((int(m), nm))
 
-    ev = pd.read_parquet(EVENTS / f"{sym}.parquet",
+    ev = pd.read_parquet(ev_dir / f"{sym}.parquet",
                          columns=["level_id", "side", "t_sweep", "sweep_lvl"])
     ev = ev.sort_values("t_sweep")
     ev_ts = ev["t_sweep"].to_numpy(np.int64)
-    lv = pd.read_parquet(LEVELS / f"{sym}.parquet",
+    lv = pd.read_parquet(lv_dir / f"{sym}.parquet",
                          columns=["level_id", "formed_at"]).set_index("level_id")
 
     trades = []

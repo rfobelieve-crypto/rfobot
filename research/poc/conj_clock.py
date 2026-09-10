@@ -114,9 +114,12 @@ STALE_H = 48
 OUT = HERE / "data" / "results"
 
 
-def frozen_cand(sym, liq):
-    """凍結的事件偵測：sweep 原樣 + 三個流事件用因果門檻。"""
-    cand, ts, cl, at, day, q = ec.detect_all(sym, liq)
+def frozen_cand(sym, liq, events_dir=None):
+    """凍結的事件偵測：sweep 原樣 + 三個流事件用因果門檻。
+
+    `events_dir`（2026-09-10）：見 `event_census.detect_all`。None = 1h 樞紐。
+    """
+    cand, ts, cl, at, day, q = ec.detect_all(sym, liq, events_dir)
     caus = cc.causal_flags(q, day)
     out = {"sweep": cand["sweep"]}
     for k in FLOW:
