@@ -64,11 +64,19 @@ COOLDOWNS = [60, 300, 900]
 COOLDOWN_MAIN = 300
 CORE9 = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "LINK", "AVAX"]
 
+# 2026-09-10：樞紐尺度可選（levels.SCALES）。掃單的判定規則一個字不動
+# （k=2 ticks、t_sweep = 該分鐘收盤、dedup 300s），改的只是「讀哪一張價位表」。
+# 1h 是預設且產出必須逐位元不變。回歸關（對照凍結引擎）只有 1h 有對照組。
+SCALE_DIRS = {"1h": ("levels", "events"),
+              "15m": ("levels_15m", "events_15m"),
+              "5m": ("levels_5m", "events_5m")}
 
-def build(sym):
+
+def build(sym, levels_dir=None):
+    levels_dir = LEVELS if levels_dir is None else levels_dir
     b = pd.read_parquet(BARS / f"{sym}.parquet",
                         columns=["ts", "high", "low", "close", "atr_h14", "tick_size"])
-    lv = pd.read_parquet(LEVELS / f"{sym}.parquet")
+    lv = pd.read_parquet(levels_dir / f"{sym}.parquet")
     tick = float(b["tick_size"].iloc[0])
     ts = b["ts"].to_numpy(np.int64)
     hi = np.nan_to_num(b["high"].to_numpy(float), nan=-np.inf)
@@ -175,31 +183,47 @@ def regression_vs_frozen(sym, ev, tick):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--syms", default=",".join(CORE9))
+    ap.add_argument("--scale", default="1h", choices=sorted(SCALE_DIRS),
+                    help="讀哪個尺度的價位表（規則不變，見 SCALE_DIRS）")
     a = ap.parse_args()
-    OUT.mkdir(parents=True, exist_ok=True)
+    lv_name, ev_name = SCALE_DIRS[a.scale]
+    LEVELS_D = HERE / "data" / lv_name
+    OUT_D = HERE / "data" / ev_name
+    print(f"scale={a.scale}  {lv_name}/ -> {ev_name}/")
+    OUT_D.mkdir(parents=True, exist_ok=True)
     QUALITY.mkdir(parents=True, exist_ok=True)
     summary, allok = {}, True
     for s in [x.strip().upper() for x in a.syms.split(",") if x.strip()]:
-        if not (LEVELS / f"{s}.parquet").exists():
+        if not (LEVELS_D / f"{s}.parquet").exists():
             print(f"{s:5s} no levels, skipped")
             continue
-        raw, tick = build(s)
+        raw, tick = build(s, LEVELS_D)
         sens = {}
         for cd in COOLDOWNS:
             _, dr = dedup(raw, tick, cd)
             sens[cd] = int(dr)
         ev, dropped = dedup(raw, tick, COOLDOWN_MAIN)
         b = pd.read_parquet(BARS / f"{s}.parquet", columns=["ts", "high", "low"])
-        lv = pd.read_parquet(LEVELS / f"{s}.parquet")
+        lv = pd.read_parquet(LEVELS_D / f"{s}.parquet")
         fails = run_asserts(ev, lv, b, tick)
-        reg = regression_vs_frozen(s, ev, tick)
-        ev.to_parquet(OUT / f"{s}.parquet", index=False)
+        # 回歸關比的是凍結引擎的 1h 事件表 —— 只有 1h 尺度有這個對照組。
+        # 其他尺度**沒有**外部對照，如實留白，不拿一個不適用的關來假裝驗過。
+        if a.scale == "1h":
+            reg = regression_vs_frozen(s, ev, tick)
+            regr_txt = ("ours->ref={:.2f}% ref->ours={:.2f}%"
+                        .format(reg["ours_in_ref"] * 100, reg["ref_in_ours"] * 100))
+        else:
+            reg = dict(ours_in_ref=None, ref_in_ours=None,
+                       note="no frozen reference at this scale")
+            regr_txt = "n/a (no ref at this scale)"
+        ev.to_parquet(OUT_D / f"{s}.parquet", index=False)
 
         # the duplication the registered dedup does NOT catch: different
         # prices, same hourly bar
         per_hour = ev.groupby(["side", "hour_ts"]).size()
         dup_rate = 1 - len(per_hour) / len(ev)
-        ok = (not fails) and reg["ours_in_ref"] > 0.85 and reg["ref_in_ours"] > 0.85
+        ok = ((not fails) and reg["ours_in_ref"] > 0.85 and reg["ref_in_ours"] > 0.85
+              if a.scale == "1h" else (not fails))
         allok &= ok
         summary[s] = dict(raw=int(len(raw)), kept=int(len(ev)),
                           dropped_by_cooldown=sens, regression=reg,
@@ -208,11 +232,12 @@ def main():
                           asserts=fails)
         print(f"{s:5s} raw={len(raw):5,} kept={len(ev):5,} "
               f"dedup(60/300/900)={sens[60]}/{sens[300]}/{sens[900]}  "
-              f"regr ours->ref={reg['ours_in_ref']*100:.2f}% ref->ours={reg['ref_in_ours']*100:.2f}%  "
+              f"regr {regr_txt}  "
               f"same-hour dup={dup_rate*100:.1f}% (max {per_hour.max()})  "
               f"{'PASS' if ok else 'FAIL ' + str(fails)}")
-    (QUALITY / "stage3_summary.json").write_text(json.dumps(summary, indent=2),
-                                                 encoding="utf-8")
+    tag = "" if a.scale == "1h" else f"_{a.scale}"
+    (QUALITY / f"stage3_summary{tag}.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8")
     print("\nStage 3 gate (>85% both ways):", "ALL PASS" if allok else "FAILED")
     sys.exit(0 if allok else 1)
 

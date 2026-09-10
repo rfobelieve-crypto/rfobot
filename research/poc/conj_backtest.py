@@ -647,6 +647,10 @@ kpis();
 const dark = {layout:{background:{color:'#0b0e11'},textColor:'#848e9c',fontSize:11},
   grid:{vertLines:{color:'#151a21'},horzLines:{color:'#151a21'}},
   rightPriceScale:{borderColor:'#1e242d'},
+  // 2026-09-10 使用者：「圖標虛線不要有磁鐵讓我可以自由活動」。
+  // lightweight-charts 預設 CrosshairMode.Magnet 會把十字線吸附到最近的
+  // 收盤價，量兩點之間的距離時會被它拉走。Normal = 跟著游標自由移動。
+  crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
   timeScale:{timeVisible:true,secondsVisible:false,rightOffset:6,borderColor:'#1e242d'}};
 
 const chart = LightweightCharts.createChart(document.getElementById('c'), dark);

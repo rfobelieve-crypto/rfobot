@@ -61,29 +61,60 @@ HOUR_MS = 3_600_000
 MIN_MS = 60_000
 CORE9 = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "LINK", "AVAX"]
 
+# ------------------------------------------------------------------- scales
+# 2026-09-10 使用者：「我們用 5 分鐘級別就用 5 分鐘級別的圖來做 sweep」。
+#
+# 上面 docstring 說「Why the pivots stay on 1h」的那段理由，**已經過期**：
+# 它列的 Gate F、variant B、ICT 判決全部屬於掃單失敗那條舊線，而舊線
+# 2026-09-07 結案（TODO §1.02）。SDV 是新線，沒有理由繼續背這個相容包袱。
+# 而且尺度不一致的正是它：流量旗標是 5 分鐘窗、進場 +3 分、圖 5 分鐘，
+# 只有價位是小時級 —— 實測掃單因此只有 1.10/幣/天，是三個成分裡最稀有的
+# 那個（delta_ext 2.41、vol_burst 1.91），整條線的頻率被它卡住。
+#
+# **PIVOT 一個字不動（維持 10），唯一改變的是 K 線尺度。** 這不是參數搜尋：
+# §0.73 已經在 1h 上掃過 PIVOT ∈ {4,5,8,10,14} 並判定「粗糙度本身就是濾網」
+# （細化到 4 買到 1.76x 樣本，變體 B 的 meanR 掉 25%，超過它自己 20% 的門檻）。
+# 那個先驗對本改動是**負面**的，如實記在這裡；採不採用 5m 由那同一套判準決定，
+# 不由「哪個數字好看」決定。
+#
+# 1h 是預設且行為必須逐位元不變（改動當天以 md5 對照過九個檔案）。
+SCALES = {
+    "1h": dict(rule="1h", step_ms=3_600_000, out="levels"),
+    "15m": dict(rule="15min", step_ms=900_000, out="levels_15m"),
+    "5m": dict(rule="5min", step_ms=300_000, out="levels_5m"),
+}
+
 
 # ------------------------------------------------------------------ 1h bars
-def to_hourly(df):
-    """Resample the 1-minute table to UTC-aligned 1h bars.
+def to_frame(df, rule="1h", step_ms=HOUR_MS):
+    """Resample the 1-minute table to UTC-aligned bars of the given scale.
 
-    Built from the same source as everything else so there is one truth; the
-    result is cross-checked against the frozen engine's own 1h cache below.
+    Built from the same source as everything else so there is one truth; for
+    the 1h scale the result is cross-checked against the frozen engine's own
+    1h cache below.  `hour_ts` keeps its name at every scale (it is the bar's
+    open time in ms) so downstream readers need no change -- renaming it
+    would be a layout change with seven consumers (mistake.md 2026-08-29).
     """
     idx = pd.to_datetime(df["ts"], unit="ms", utc=True)
-    g = df.set_index(idx).resample("1h")
+    g = df.set_index(idx).resample(rule)
     h = g.agg(open=("open", "first"), high=("high", "max"),
               low=("low", "min"), close=("close", "last"),
               volume=("volume", "sum"), n=("close", "count"))
     h = h[h["n"] > 0].copy()
     h["hour_ts"] = (h.index.view("int64") // 1_000_000).astype(np.int64)
-    # Drop a trailing hour that has not finished.  A partial bar must never
+    # Drop a trailing bar that has not finished.  A partial bar must never
     # define a pivot: its high/low are provisional, and the frozen 1h cache
     # (refreshed on its own schedule) holds a different partial for the same
     # hour.  Verified 2026-09-06: this was the ONLY disagreeing bar out of
     # 22,420 for BTC -- everything else matched exactly.
     last_min = int(df["ts"].iloc[-1])
-    h = h[h["hour_ts"] + HOUR_MS <= last_min + MIN_MS]
+    h = h[h["hour_ts"] + step_ms <= last_min + MIN_MS]
     return h.reset_index(drop=True)
+
+
+def to_hourly(df):
+    """Back-compat alias -- 1h is still the default scale."""
+    return to_frame(df, "1h", HOUR_MS)
 
 
 def crosscheck_hourly(sym, h):
@@ -157,11 +188,15 @@ def first_breach_minute(m_ts, m_high, m_low, after_ms, price, side):
     return int(m_ts[k] + MIN_MS)
 
 
-def build(sym):
+def build(sym, scale="1h"):
+    sc = SCALES[scale]
+    step = sc["step_ms"]
+    out_dir = HERE / "data" / sc["out"]
     df = pd.read_parquet(BARS / f"{sym}.parquet",
                          columns=["ts", "open", "high", "low", "close", "volume"])
-    h = to_hourly(df)
-    xc = crosscheck_hourly(sym, h)
+    h = to_frame(df, sc["rule"], step)
+    # 只有 1h 有外部凍結快取可以對照；其他尺度沒有對照組，如實回 None
+    xc = crosscheck_hourly(sym, h) if scale == "1h" else None
 
     hh = h["high"].to_numpy(float)
     hl = h["low"].to_numpy(float)
@@ -175,8 +210,8 @@ def build(sym):
     rows = []
     for side, idxs, px in (("buyside", ph, hh), ("sellside", pl, hl)):
         for i in idxs:
-            formed = int(hts[i] + HOUR_MS)              # close of the pivot bar
-            conf = int(hts[i + PIVOT] + HOUR_MS)        # close of bar i+PIVOT
+            formed = int(hts[i] + step)                 # close of the pivot bar
+            conf = int(hts[i + PIVOT] + step)           # close of bar i+PIVOT
             price = float(px[i])
             inval = first_breach_minute(m_ts, m_high, m_low, conf, price, side)
             rows.append((side, price, formed, conf, inval, int(i), int(hts[i])))
@@ -185,27 +220,27 @@ def build(sym):
     lv = lv.sort_values(["confirmed_at", "side", "price"]).reset_index(drop=True)
     lv.insert(0, "level_id", [f"{sym}-{i:06d}" for i in range(len(lv))])
     lv["invalidated_at"] = lv["invalidated_at"].astype("Int64")
-    OUT.mkdir(parents=True, exist_ok=True)
-    lv.to_parquet(OUT / f"{sym}.parquet", index=False)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    lv.to_parquet(out_dir / f"{sym}.parquet", index=False)
     return lv, h, xc
 
 
 # -------------------------------------------------------------------- gates
-def run_asserts(lv):
+def run_asserts(lv, step_ms=HOUR_MS):
     f = []
     if not (lv["confirmed_at"] >= lv["formed_at"]).all():
         f.append("confirmed_at < formed_at")
     alive = lv["invalidated_at"].notna()
     if not (lv.loc[alive, "invalidated_at"] > lv.loc[alive, "confirmed_at"]).all():
         f.append("invalidated_at <= confirmed_at")
-    if (lv["confirmed_at"] - lv["formed_at"] != PIVOT * HOUR_MS).any():
-        f.append("confirmation lag is not exactly PIVOT hours")
+    if (lv["confirmed_at"] - lv["formed_at"] != PIVOT * step_ms).any():
+        f.append("confirmation lag is not exactly PIVOT bars")
     if lv["level_id"].duplicated().any():
         f.append("duplicate level_id")
     return f
 
 
-def replay_gate(lv, h, n_trials=50, seed=20260906):
+def replay_gate(lv, h, n_trials=50, seed=20260906, step_ms=HOUR_MS):
     """The gate.  For random cut-offs t, re-derive the live level set with the
     INDEPENDENT scalar implementation over bars[:t] only, and demand equality.
 
@@ -224,12 +259,12 @@ def replay_gate(lv, h, n_trials=50, seed=20260906):
     picks = rng.choice(np.arange(lo, hi), size=n_trials, replace=False)
     bad = []
     for m in sorted(picks):
-        t = int(hts[m] + HOUR_MS)                       # cut-off = close of bar m
+        t = int(hts[m] + step_ms)                       # cut-off = close of bar m
         rh, rl = pivots_reference(hh[:m + 1], hl[:m + 1])
         expect = set()
         for side, idxs, px in (("buyside", rh, hh), ("sellside", rl, hl)):
             for i in idxs:
-                if int(hts[i + PIVOT] + HOUR_MS) > t:   # not confirmed yet
+                if int(hts[i + PIVOT] + step_ms) > t:   # not confirmed yet
                     continue
                 expect.add((side, round(float(px[i]), 10), int(i)))
         sub = lv[(lv["confirmed_at"] <= t)
@@ -254,10 +289,10 @@ def replay_gate(lv, h, n_trials=50, seed=20260906):
     return picks, bad
 
 
-def report(sym, lv, h, xc, fails, n_trials, bad):
+def report(sym, lv, h, xc, fails, n_trials, bad, step_ms=HOUR_MS):
     ts = pd.to_datetime(lv["confirmed_at"], unit="ms", utc=True)
     per_month = lv.assign(m=ts.dt.to_period("M")).groupby("m").size()
-    life = (lv["invalidated_at"] - lv["confirmed_at"]).dropna() / HOUR_MS
+    life = (lv["invalidated_at"] - lv["confirmed_at"]).dropna() / step_ms
     alive = int(lv["invalidated_at"].isna().sum())
     L = [f"# Stage 2 levels — {sym}", ""]
     L.append(f"- levels: **{len(lv):,}**  (buyside {int((lv.side=='buyside').sum()):,} / "
@@ -298,17 +333,22 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--syms", default=",".join(CORE9))
     ap.add_argument("--trials", type=int, default=50)
+    ap.add_argument("--scale", default="1h", choices=sorted(SCALES),
+                    help="樞紐跑在哪個 K 線尺度上（PIVOT 不變，見 SCALES）")
     a = ap.parse_args()
+    step = SCALES[a.scale]["step_ms"]
     allok = True
     summary = {}
+    print(f"scale={a.scale}  rule={SCALES[a.scale]['rule']}  "
+          f"PIVOT={PIVOT}  -> data/{SCALES[a.scale]['out']}/")
     for s in [x.strip().upper() for x in a.syms.split(",") if x.strip()]:
         if not (BARS / f"{s}.parquet").exists():
             print(f"{s:5s} no bars, skipped")
             continue
-        lv, h, xc = build(s)
-        fails = run_asserts(lv)
-        picks, bad = replay_gate(lv, h, n_trials=a.trials)
-        report(s, lv, h, xc, fails, a.trials, bad)
+        lv, h, xc = build(s, a.scale)
+        fails = run_asserts(lv, step)
+        picks, bad = replay_gate(lv, h, n_trials=a.trials, step_ms=step)
+        report(s, lv, h, xc, fails, a.trials, bad, step)
         xok = (xc is None) or (max(xc["high"], xc["low"], xc["close"]) < 1e-9)
         if not xok:
             fails = fails + [f"resampled 1h disagrees with the frozen cache "
@@ -322,8 +362,9 @@ def main():
         summary[s] = dict(levels=int(len(lv)), replay_ok=int(a.trials - len(bad)),
                           trials=int(a.trials), asserts=fails,
                           hourly_xcheck=xc)
-    (QUALITY / "stage2_summary.json").write_text(json.dumps(summary, indent=2),
-                                                 encoding="utf-8")
+    tag = "" if a.scale == "1h" else f"_{a.scale}"
+    (QUALITY / f"stage2_summary{tag}.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8")
     print("\nStage 2 gate:", "ALL PASS" if allok else "FAILED")
     sys.exit(0 if allok else 1)
 
