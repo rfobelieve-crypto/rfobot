@@ -60,6 +60,9 @@ REGISTRY = [
      "小時級，2026-03-11 起"),
     ("hl 清算價直方圖", "research/hl/data/snapshots/*.json", "append",
      "hl_fuel_recorder.py 每小時。**沒有歷史端點**，停了就永久缺那一小時"),
+    ("hl 逐部位明細", "research/hl/data/positions/*.parquet", "append",
+     "**真相源**。清算事件在公開端點沒有旗標，唯一判定是「部位在下一個快照"
+     "消失且期間價格穿過它的清算價」—— 那需要逐部位明細。直方圖由它推導"),
     ("hl 市場狀態(OI/funding)", "research/hl/data/market/*.json", "append",
      "同上。OI 在 Hyperliquid 沒有歷史查詢，這是唯一來源"),
     ("hl L2 簿口", "research/hl/data/book/*.json", "append", "同上"),

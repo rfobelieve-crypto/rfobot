@@ -74,8 +74,17 @@ Hyperliquid 公開。`clearinghouseState` 逐地址給出
     地址宇宙  持續累積、只增不減（有部位的人遲早會成交而被看到）
               存成 addresses.json，**進 data manifest 的 append 類**
 
-**不做的**：不存逐地址明細（隱私與體積），只存聚合直方圖。
-若之後需要逐地址，要另外決定並說明理由。
+**2026-09-11 撤回原本「只存聚合」的決定（累積 1 小時後、歷史還很短時）**：
+原本寫「不存逐地址明細（隱私與體積）」。但那個決定讓**結果變數無法重建** ——
+清算事件在公開端點裡沒有旗標（實測：WS 成交帶只有 coin/side/px/sz/users，
+25 個地址 60 天 32,905 筆成交裡 `dir` 零筆清算），唯一可得的判定是
+**「部位在下一個快照消失，而期間價格穿過它的清算價」**，而那需要逐地址明細。
+
+所以改成**逐部位存 parquet**（addr/coin/szi/entry/liq_px/value/lev），
+直方圖改成從它推導 —— 一個真相源。體積約 0.3MB/小時壓縮後 = 7MB/天。
+
+這個改動現在做，因為歷史只有 1 小時；有了幾週歷史再改 schema 就是
+滾動窗那個病（mistake.md 2026-09-10）。
 
 ===========================================================================
 跑法
@@ -99,7 +108,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 DATA = HERE / "data"
 ADDR_FILE = DATA / "addresses.json"
-SNAP_DIR = DATA / "snapshots"          # fuel
+SNAP_DIR = DATA / "snapshots"          # fuel 直方圖（監看用，可從 POS_DIR 推導）
+POS_DIR = DATA / "positions"           # **逐部位明細，真相源**
 MKT_DIR = DATA / "market"              # 每幣 OI/funding/premium
 BOOK_DIR = DATA / "book"               # L2 兩側 20 檔
 ORD_DIR = DATA / "orders"              # 掛單 + 觸發單
@@ -185,9 +195,10 @@ def bin_of(pct):
 
 
 def snapshot(mk, addrs, max_addr):
-    """查地址的部位，聚合成燃料直方圖。"""
+    """查地址的部位。**逐部位明細是真相源**，直方圖同時算出來供監看。"""
     agg = {}          # coin -> (side, lev_type) -> bin -> [notional, count]
     sampled = {}      # coin -> notional
+    detail = []       # 逐部位：清算事件只能從它與下一個快照的差推出來
     geom_bad = 0
     n_pos = n_liq = n_ok = 0
     for a in list(addrs)[:max_addr]:
@@ -221,6 +232,10 @@ def snapshot(mk, addrs, max_addr):
                 continue
             n_liq += 1
             mark = mk[coin]["mark"]
+            try:
+                ent = float(p.get("entryPx") or 0)
+            except Exception:
+                ent = 0.0
             side = "long" if szi > 0 else "short"
             lv = p.get("leverage") or {}
             lev_type = str(lv.get("type") or "?")
@@ -238,8 +253,10 @@ def snapshot(mk, addrs, max_addr):
             cell[0] += val
             cell[1] += 1
             cell[2] += val * lev_val          # 名目加權槓桿，事後可還原平均
+            detail.append((a, coin, szi, ent, lq, val, lev_type, lev_val,
+                           mark))
     return agg, sampled, dict(addrs_ok=n_ok, positions=n_pos, with_liq=n_liq,
-                              geom_violations=geom_bad)
+                              geom_violations=geom_bad), detail
 
 
 def rec_market(mk, ts):
@@ -396,7 +413,17 @@ def main():
             indent=2), encoding="utf-8")
         return 0
 
-    agg, sampled, stat = snapshot(mk, known, args.max_addr)
+    agg, sampled, stat, detail = snapshot(mk, known, args.max_addr)
+    if detail:
+        import pandas as pd
+        POS_DIR.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(detail, columns=["addr", "coin", "szi", "entry_px",
+                                      "liq_px", "value_usd", "lev_type",
+                                      "lev_val", "mark"]).assign(ts=ts)             .to_parquet(POS_DIR / (time.strftime("%Y%m%d_%H",
+                                                 time.gmtime(ts)) + ".parquet"),
+                        index=False)
+        print("positions -> %d 個部位明細（真相源，清算事件由相鄰快照差推出）"
+              % len(detail))
     cov = sum(sampled.values()) / tot_oi if tot_oi else 0.0
     print("查 %d 個地址 -> %d 部位、%d 個有清算價、幾何違反 %d"
           % (stat["addrs_ok"], stat["positions"], stat["with_liq"],
