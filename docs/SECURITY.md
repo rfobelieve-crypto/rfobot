@@ -40,7 +40,7 @@
 |---|---|
 | MySQL 連線字串 | Railway（內部主機名）／本機 `.env` |
 | `COINGLASS_API_KEY` | Railway／`.env` |
-| `NANSEN_API_KEY` | 本機 `.env`（**只在研究端唯讀查詢，不進 Railway、不進產品端**） |
+| ~~`NANSEN_API_KEY`~~ | **2026-09-10 同日移除**（使用者決定不走這條線）：已從 `.env` 與 MCP 設定刪除。**但逐字稿裡的明文仍在，所以仍應輪替** |
 | 四支 Telegram bot token（`TELEGRAM_BOT_TOKEN`、`CANCEL_TG_BOT_TOKEN`、`INDICATOR_BOT_TOKEN`、`AGENT_BOT_TOKEN`） | Railway。**2026-09-05 起一律視為已外洩** |
 
 **版控狀態**：`.env` 與 `config.json` **從未進過 git**（`git log --all -- .env` 為空），
@@ -102,7 +102,11 @@
 檔案，路徑可預測，**任何讀得到那個目錄的東西都讀得到這把金鑰**。
 所以它跟四支 Telegram bot token 同級：**一律視為已外洩，請輪替**。
 
-輪替之後把新值放進 `.env`（本檔已列入清冊），不要再貼進對話。
+**2026-09-10 當日結案**：使用者決定不走這條線，金鑰已從 `.env` 與 MCP
+設定移除。**但移除不等於失效**——逐字稿裡的明文還在，所以輪替（或直接
+在 Nansen 後台撤銷）仍然要做。撤銷比輪替更乾淨，因為沒有要繼續用。
+
+輪替之後若還要用，放進 `.env`，不要再貼進對話。
 需要它的程式一律走 `os.environ` 讀，不寫進任何原始碼或 commit。
 
 能做什麼：Nansen 平台的唯讀資料查詢（鏈上聰明錢標籤與資金流）。
