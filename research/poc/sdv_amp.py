@@ -237,8 +237,13 @@ def main():
     ok1 = len(e) == 9262 and int(e.is_sdv.sum()) == 1584
     print("S1 母體 %d（應 9,262）  SDV %d（應 1,584）  %s"
           % (len(e), int(e.is_sdv.sum()), "PASS" if ok1 else "**FAIL**"))
-    print("S2 as-of 散戶多空比 vs 快照：中位絕對誤差 %.3g  %s"
-          % (np.median(s2), "PASS" if np.median(s2) < 1e-9 else "**FAIL**"))
+    # nanmedian 不是 median：來源有一列本身是 NaN（AVAX），用 median 會讓
+    # 整個自曝檢查回傳 nan —— 一個看起來像壞掉、其實是好的結果。
+    s2m = float(np.nanmedian(s2))
+    print("S2 as-of 散戶多空比 vs 快照：中位絕對誤差 %.3g（有限 %d/%d、p99 %.3g）"
+          "  %s" % (s2m, int(np.isfinite(s2).sum()), len(s2),
+                    float(np.nanpercentile(s2, 99)),
+                    "PASS" if s2m < 1e-9 else "**FAIL**"))
     for nm in ("retail", "toppos"):
         z = e["z_" + nm]
         print("S4 z_%-7s 中位 %+.3f  IQR %.3f  有效 %.0f%%"
