@@ -57,5 +57,8 @@ echo [%date% %time%] step7 research data manifest >> %LOG%
 python research/ops/data_manifest.py >> %LOG% 2>&1
 if errorlevel 1 set FAILED=1
 
+echo [%date% %time%] step8 product live fills >> %LOG%
+python research/ops/check_product_fills.py >> %LOG% 2>&1
+
 echo [%date% %time%] ===== done FAILED=%FAILED% ===== >> %LOG%
 exit /b %FAILED%

@@ -153,6 +153,13 @@ REGISTRY = [
     # ——.cache 是滾動 930 天窗（沒有任何檔案寫著）、輪替 CSV 讓下游從零重數、
     # 同一份資料兩份拷貝只有一份有人更新。登記簿裡每份資料要宣告 kind：
     # rolling 允許頭部前移、append 頭部前移就是紅、frozen 任何變動都是紅。
+    # 2026-09-10：產品端還有沒有在成交。既有的 v7 export pipe 那一列綠著、
+    # 旗標寫 HTTP 200，而三個 bot 的最後一筆 live 成交都在 08-30/31 ——
+    # 管子通，裡面沒東西。門檻刻意寬（72h），因為磨坊有月磨損閘、單一策略
+    # 閒置是正常的；紅的條件是**全部來源同時沉默**。
+    ("product live fills", "json_flag",
+     "research/results/product_fills_last.json:ok", 26.0,
+     "check_product_fills.py 每日自報；紅 = 三個 bot 全部超過 72h 沒有成交"),
     ("research data manifest", "json_flag",
      "research/results/data_manifest.json:ok", 26.0,
      "data_manifest.py 每日自報；紅 = 凍結資料被動過、或 append 資料的頭部被吃掉"),
