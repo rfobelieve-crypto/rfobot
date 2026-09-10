@@ -1119,6 +1119,97 @@ BTC 實測：觸及 +3.09、穿越 +3.20——方向如預期但只差 0.1 bps�
    的，串接序列的回撤沒有意義（所以會出現 −211% 這種數字）。判決只用年化均值，
    它是逐桶平均、不受串接影響。
 
+### 0.87 研究工程基礎：四步做完（2026-09-10）
+
+使用者：「把我的基礎工程回測工程建好以後有新想法思路就可以更快驗證」。
+
+**動機是當天的證據**：同一天寫了三條研究線（§1.04/§1.05/§1.06），每支
+250~330 行，其中約七成是同一件事的第三次實作。而那七成正是出錯的地方
+——當天錯四次（時間戳單位、median vs nanmedian、補丁半套、heredoc 引號），
+**沒有一次是研究錯的**。
+
+    Step 1  已知答案釘住      8653af3
+    Step 2  抽出 harness      d95c888
+    Step 3  CI / 每日守衛     48386fb
+    Step 4  資料血統 + 排班進版控（本節）
+
+**Step 1 — 先有已知答案，再有共用程式碼**（`research/tests/`）
+
+共用函式庫是「第二份實作」風險的**放大器**：一個 bug 同時污染所有結論，
+而且每條線都得到看起來合理的數字。所以先把三份判決的值釘成回歸測試，
+再動手抽。V7 那本帳在 MySQL、OLD 那本來自滾動窗，兩者不可重現 -> 凍結到
+`tests/fixtures`（212KB，`make_fixtures.py` 可重建）。
+
+反向證明過（三處各注入一個小改動，數字都離開容差）：
+日界 UTC+8->UTC 讓 SDV~OLD 從 −0.369254 變 −0.434789；REACH 1.5->1.4 讓
+前方均值從 0.506262 變 0.485964；擁擠窗 30d->20d 讓 share 從 0.553648
+變 0.548180。
+
+**Step 2 — `research/harness.py`**
+
+`to_ms / day8 / asof / boot_days / boot_corr / tail_test / tail_mask /
+permute_within / permute_best / spec_hash / write_report`。
+**每一行算術都是從既有腳本搬的，不是重新推導的。** 驗收：7 個測試數字
+一個沒動；`sdv_diagnose` 另用它自己已發表的值驗過（SE 0.1392/0.1904、
+MDE 0.546/0.746、清算窗 n=361），完全相同。
+
+三個 API 上的決定寫進了函式簽名：`boot_days` **四個值一起回傳**
+（均值/SE/CI下緣/P(>0)，只報一個會誤述）；`asof` **不做 fallback**
+（「兩個時點拿到一樣的東西」是切點失效的徵兆）；`permute_best` 把
+**多重比較內建**（每輪隨機也享有同樣的挑選機會）。
+
+**Step 3 — 守衛真的有人跑**
+
+這個 repo 至今沒有任何機制強制測試在改動後跑；同日就發現一個釘死的
+parity 測試早已變紅。分工不是為了方便：
+
+    本機  research/run_guards.py 每日跑三組研究回歸測試（19 passed / 63s）
+    雲端  .github/workflows/guards.yml 跑三個純 python 的結構性守衛
+          （facade-skip、agent 邊界、SELECT 了沒 emit ——三個都擋過出貨 bug）
+
+研究回歸測試**不能**上雲：它吃本機資料，雲端跑會全部 skip，而「全部 skip」
+跟「全部通過」在輸出上長得一樣。**兩邊都因此加了「passed 必須 > 0」。**
+
+**Step 4a — 排班進版控**（`research/ops/check_schedules.py`）
+
+擋的是發生過三次的一整類事故：07-05 排程指向改名前的路徑 96 天、
+09-04 搬線時 grep 抓不到排程的 action、09-10 `daily_collect.bat` 被
+gitignore 所以排班內容沒有版控。共同形狀是**關鍵狀態在版控與 grep 的
+範圍之外，失效時不報錯**。
+
+守衛第一次跑就是紅的，指名 `FlowBot_DailyCollect -> UNTRACKED
+daily_collect.bat`。查證後修因：那兩支被標成「含祕密」而排除，**但前提是
+錯的** —— 它們沒有祕密，只是從 `.env` 讀 key。順帶發現
+`setup_schedule.ps1` 的路徑還停在改名前的 `資金機器人\`，**跑它就會註冊
+一個指向不存在資料夾的排程**——2026-07-05 那顆雷，躺在一個沒人看得到的
+檔案裡。兩支都已修並納入版控，守衛轉綠（13 refs ok）。
+
+**Step 4b — 資料血統**（`research/ops/data_manifest.py`）
+
+每份資料宣告 `kind`：`rolling`（起點錨在 now，頭部必然前移，**任何 sha /
+絕對筆數的基準都不可以指向它**）、`append`（頭部前移 = 紅）、`frozen`
+（任何變動 = 紅）、`derived`（只記錄）。首次登記：
+
+    .cache 1h bars        rolling   654,349 列（29 幣，含 added20）
+    crowd_stops/frozen    frozen    201,591
+    tests/fixtures        frozen      9,478
+    poc/data 分鐘 bar      append 12,153,816
+    poc/data 未平倉量       append  2,427,505
+    poc/data 清算         append     38,880
+    掃單快照               derived     9,262
+
+反向證明過：把上一輪基準改成「凍結資料被動過 + append 頭部被吃掉」，
+兩條都正確地紅並指名。
+
+**接線**：三支都進 `daily_collect.bat`（step5/6/7，以 bytes 寫入、正斜線
+路徑、驗過 CRLF 61 / 裸 LF 0 / 行內控制字元 0），並**整支實際執行一次**、
+以產物判定（刪掉三個旗標 -> 跑 bat -> 三個都重新出現且 asof 是新的）。
+freshness board 三列全綠，**0 red / 44 tracked**。
+
+**沒做的（明寫）**：`C:\flowbot\run_indicator.bat` 在 repo 之外（該排程
+Disabled），只被列出不判紅；Railway 的環境變數與啟動指令仍不在版控裡；
+重現性沒有解決（判決仍依賴本機 MySQL 與本機快取）。
+
 ### 1.06 【判決】擁擠程度 -> 幅度：**R1 與 R4 都沒過**，但形狀指向震盪不是位移（2026-09-10）
 
 使用者 2026-09-10：「不要糾結方向這個問題」、「如果是波動就要用網格的方式了」。

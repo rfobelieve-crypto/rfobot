@@ -145,6 +145,20 @@ REGISTRY = [
     # ——「守衛壞掉沒人發現」的第四次。run_guards.py 每日自報 {ok,...}，
     # 判準是產物不是退出碼。它也把「全部 skip」判成紅：一個都沒跑起來跟全過
     # 在輸出上長得一樣（mistake.md 2026-08-26）。
+    # 2026-09-10：排班的每一個持有者。這條擋的是發生過三次的一整類事故
+    # （07-05 排程指向改名前的路徑 96 天、09-04 搬線時 grep 抓不到排程的
+    # action、09-10 daily_collect.bat 被 gitignore 所以排班內容沒有版控）。
+    # 共同形狀是「關鍵狀態在版控與 grep 的範圍之外，失效時不報錯」。
+    # 2026-09-10：研究資料的血統。擋的是「資料的形狀變了而消費者不知道」
+    # ——.cache 是滾動 930 天窗（沒有任何檔案寫著）、輪替 CSV 讓下游從零重數、
+    # 同一份資料兩份拷貝只有一份有人更新。登記簿裡每份資料要宣告 kind：
+    # rolling 允許頭部前移、append 頭部前移就是紅、frozen 任何變動都是紅。
+    ("research data manifest", "json_flag",
+     "research/results/data_manifest.json:ok", 26.0,
+     "data_manifest.py 每日自報；紅 = 凍結資料被動過、或 append 資料的頭部被吃掉"),
+    ("scheduled task refs", "json_flag",
+     "research/results/schedules_last.json:ok", 26.0,
+     "check_schedules.py 每日自報；紅 = 排程引用的檔案不見了，或在 repo 內卻沒被追蹤"),
     ("research guards (回歸測試)", "json_flag",
      "research/results/guards_last.json:ok", 26.0,
      "research/run_guards.py 每日自報；紅 = 回歸測試有失敗、或一個都沒跑起來"),

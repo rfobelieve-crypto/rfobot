@@ -52,9 +52,11 @@ research/cache/
 .cache/
 .claude/worktrees/
 
-# Local scripts with secrets
-market_data/backfill/daily_collect.bat
-market_data/backfill/setup_schedule.ps1
+# 2026-09-10：這兩支曾經被標成「含祕密」而排除，**但那個前提是錯的**——
+# 它們沒有任何祕密，只是從 .env 讀 COINGLASS_API_KEY（.env 本身仍被排除）。
+# 代價是排班的內容沒有版本控制：改了只存在於一台機器上、換機器就消失、
+# 而且沒有任何東西會提醒。研究線的 ops 腳本全部都是追蹤的，只有這兩支不是。
+# 現已納入版控；research/ops/check_schedules.py 會盯著它不再掉出去。
 
 # Data cache and backups
 indicator/model_artifacts/.data_cache/
