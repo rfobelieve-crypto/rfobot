@@ -112,8 +112,12 @@ def backtest_symbol(bars, detail=False):
     entry/stop/exit prices, bar indices). Rules, order and arithmetic are
     untouched — the tuple list is projected from the very same records, so a
     viewer built on `detail` cannot drift from what the backtest scores.
-    Pinned by tests/test_backtest_detail_parity.py against the pre-refactor
-    output of all nine coins (7,083 trades, sha256 86ad51a7...).
+    Pinned by tests/test_backtest_detail_parity.py against a FROZEN slice in
+    tests/fixtures (590 trades, sha256 e225522d...). It used to be pinned on
+    all nine coins in .cache (7,083 trades) — but .cache is a ROLLING 930-day
+    window (fetch_klines.py starts at now - days*86400), so that baseline went
+    red on the next refresh for reasons unrelated to this engine. See
+    mistake.md 2026-09-10.
     """
     n = len(bars)
     h = [b[H] for b in bars]
