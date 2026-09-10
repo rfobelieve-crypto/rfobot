@@ -10,6 +10,17 @@
 而該問的是「最近有沒有新的成交」。這跟 mistake.md 2026-09-01 同一個形狀：
 freshness 監測的是心跳，而這裡沒有心臟。
 
+**2026-09-10 修（使用者：「產品端沒有跑而已」）**：產品端可以被刻意停用，
+而那時這條守衛會**永遠紅** —— 今天已經修過三次同一個病。所以它讀一份
+操作者宣告的 `research/product_expected.json`：
+
+    trading_expected = true   沉默超過門檻 -> 紅（該跑卻沒跑）
+    trading_expected = false  沉默是預期的 -> 綠，但**沉默時數照印**
+                              而且**有成交反而要提醒**（宣告與實際不符）
+
+**守衛量的不是「有沒有成交」，是「宣告與實際的落差」。** 宣告進版控，
+所以「什麼時候被關掉、誰關的、為什麼」是可稽核的，不是某台機器上的口耳相傳。
+
 判準（刻意寬，因為單一策略閒置是正常的）：
 
     磨坊有月磨損預算閘（燒到上限就停到下月 1 號 UTC），所以它單獨沉默
@@ -39,6 +50,7 @@ sys.path.insert(0, str(ROOT / "research"))
 
 SILENT_H = 72.0          # 全部來源都超過這個小時數沒成交 -> 紅
 OUT = ROOT / "research" / "results" / "product_fills_last.json"
+EXPECT = ROOT / "research" / "product_expected.json"   # 操作者宣告，進版控
 SRCS = ("grid", "raid", "v7")
 
 
@@ -68,8 +80,18 @@ def main():
                         reliable=sum(1 for f in g if f.get("cid_known")))
 
     live = [v["silent_h"] for v in per.values() if v["silent_h"] is not None]
-    ok = bool(live) and min(live) <= SILENT_H
+    quiet = (not live) or min(live) > SILENT_H
     worst = max(live) if live else None
+
+    exp = {}
+    if EXPECT.exists():
+        exp = json.loads(EXPECT.read_text(encoding="utf-8"))
+    expected = bool(exp.get("trading_expected", True))
+    if expected:
+        ok = not quiet
+    else:
+        # 宣告停用：沉默是預期的；**有成交反而是落差**
+        ok = quiet
 
     import datetime as dt
     print("%-6s %7s %9s %10s %s" % ("來源", "live 筆", "歸屬可靠", "沉默(時)",
@@ -83,12 +105,18 @@ def main():
                  dt.datetime.utcfromtimestamp(v["last_ms"] / 1000)
                  .strftime("%Y-%m-%d %H:%M")))
 
-    reason = ("全部來源沉默超過 %.0fh（最久 %.1fh）" % (SILENT_H, worst)
-              if not ok else
-              "最近一筆 %.1fh 前" % min(live))
+    if expected:
+        reason = ("全部來源沉默超過 %.0fh（最久 %.1fh）" % (SILENT_H, worst)
+                  if quiet else "最近一筆 %.1fh 前" % min(live))
+    else:
+        tag = "宣告停用中（since %s）" % exp.get("since", "?")
+        reason = (tag + "，沉默 %.1fh，符合宣告" % (worst or 0) if quiet
+                  else tag + "，但 %.1fh 前有成交 —— **宣告與實際不符**"
+                       % min(live))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(dict(
         ok=ok, reason=reason, silent_threshold_h=SILENT_H, per_src=per,
+        trading_expected=expected, expected_since=exp.get("since"),
         asof=time.strftime("%Y-%m-%d %H:%M:%S")), indent=2,
         ensure_ascii=False), encoding="utf-8")
     print()

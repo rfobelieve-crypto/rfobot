@@ -1,0 +1,7 @@
+{
+  "_readme": "產品端**應該**在交易嗎——由操作者宣告，進版控所以可稽核。research/ops/check_product_fills.py 讀它。這一格存在的理由：沒有它，那條守衛在產品端刻意停用時會永遠紅，而永遠紅的燈跟壞掉的燈一樣沒用（mistake.md 2026-09-03）。守衛量的不是『有沒有成交』，是『宣告與實際的落差』。",
+  "trading_expected": false,
+  "since": "2026-08-31",
+  "declared_at": "2026-09-10",
+  "reason": "使用者 2026-09-10：「產品端沒有跑而已」——刻意停用，不是故障。恢復交易時把 trading_expected 改回 true 並更新 since。"
+}

@@ -159,7 +159,9 @@ REGISTRY = [
     # 閒置是正常的；紅的條件是**全部來源同時沉默**。
     ("product live fills", "json_flag",
      "research/results/product_fills_last.json:ok", 26.0,
-     "check_product_fills.py 每日自報；紅 = 三個 bot 全部超過 72h 沒有成交"),
+     "check_product_fills.py 每日自報；量的是**宣告與實際的落差**："
+     "宣告在跑卻沉默 >72h -> 紅；宣告停用卻有成交 -> 紅。"
+     "宣告在 research/product_expected.json（進版控，可稽核）"),
     ("research data manifest", "json_flag",
      "research/results/data_manifest.json:ok", 26.0,
      "data_manifest.py 每日自報；紅 = 凍結資料被動過、或 append 資料的頭部被吃掉"),
