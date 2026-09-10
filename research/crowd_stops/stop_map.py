@@ -88,6 +88,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
 
 from research.crowd_battery import pos_breakout  # noqa: E402
+from research.harness import asof  # noqa: E402
 from research.crowd_battery2 import pos_supertrend  # noqa: E402
 from research.crowd_battery3 import pos_psar  # noqa: E402
 
@@ -176,9 +177,7 @@ def build_events():
         behind = np.zeros(len(g), int)
         near = np.full(len(g), np.nan)
         for (tf, an), (cms, pos, stp) in ss.items():
-            j = np.searchsorted(cms, ts, side="left") - 1     # 嚴格早於
-            ok = (j >= 0)
-            jj = np.clip(j, 0, len(cms) - 1)
+            jj, ok = asof(ts, cms)          # 嚴格早於，見 harness.asof
             p_, s_ = pos[jj], stp[jj]
             live = ok & (p_ != 0) & np.isfinite(s_)
             # 只收未被穿的止損：多單止損要在現價之下、空單在之上

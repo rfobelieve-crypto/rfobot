@@ -31,26 +31,12 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1]))
 import conj_backtest as cb  # noqa: E402
 import conj_clock as ck  # noqa: E402
+from research.harness import boot_days as boot  # noqa: E402
 
 SEED = 20260910
 NBOOT = 4000
 OUT = HERE / "data" / "results" / "sdv_diagnose.json"
 LIQ_T0 = pd.Timestamp("2026-03-11", tz="UTC")
-
-
-def boot(days, vals, n=NBOOT):
-    """日聚類 bootstrap：回傳 (均值, SE, CI 下緣, P(均值>0))。"""
-    rng = np.random.default_rng(SEED)
-    by = {}
-    for d, v in zip(days, vals):
-        by.setdefault(int(d), []).append(v)
-    ks = list(by)
-    arr = [np.array(by[k]) for k in ks]
-    idx = rng.integers(0, len(ks), size=(n, len(ks)))
-    o = np.array([np.concatenate([arr[j] for j in idx[i]]).mean()
-                  for i in range(n)])
-    return (float(np.mean(vals)), float(o.std(ddof=1)),
-            float(np.percentile(o, 2.5)), float((o > 0).mean()))
 
 
 def main():

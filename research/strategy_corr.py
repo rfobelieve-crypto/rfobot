@@ -65,6 +65,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "research" / "poc"))
 sys.path.insert(0, str(ROOT / "research" / "sweep_failure"))
 
+from research.harness import boot_corr, day8  # noqa: E402
+
 TZ_MS = 8 * 3600 * 1000
 SEED = 20260910
 NBOOT = 2000
@@ -72,10 +74,6 @@ CORE9 = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "LINK", "AVAX"]
 DECODE_TOP5 = pd.Timestamp("2026-04-03")     # Strong 定義換成 top-5% 的那天
 OUT = ROOT / "research" / "results" / "strategy_corr.json"
 NAMES = ("V7", "SDV", "OLD")                 # OLD = 流動性獵取舊線
-
-
-def day8(ms):
-    return (np.asarray(ms, np.int64) + TZ_MS) // 86_400_000
 
 
 def load_v7():
@@ -131,26 +129,6 @@ def load_old():
 def daily(df, days_index, on="entry_ms", val="r"):
     g = df.assign(_d=day8(df[on])).groupby("_d")[val].sum()
     return g.reindex(days_index, fill_value=0.0)
-
-
-def boot_corr(x, y, n=NBOOT, method="pearson"):
-    rng = np.random.default_rng(SEED)
-    xs, ys = np.asarray(x, float), np.asarray(y, float)
-    m = len(xs)
-    if m < 10:
-        return float("nan"), float("nan")
-    idx = rng.integers(0, m, size=(n, m))
-    out = np.empty(n)
-    for i in range(n):
-        a, b = xs[idx[i]], ys[idx[i]]
-        if method == "spearman":
-            a = pd.Series(a).rank().to_numpy()
-            b = pd.Series(b).rank().to_numpy()
-        if a.std() == 0 or b.std() == 0:
-            out[i] = 0.0
-        else:
-            out[i] = np.corrcoef(a, b)[0, 1]
-    return float(np.percentile(out, 2.5)), float(np.percentile(out, 97.5))
 
 
 def block(books, days, anchor, label, res):

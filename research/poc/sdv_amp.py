@@ -108,7 +108,6 @@ from __future__ import annotations
 
 import json
 import sys
-from math import comb
 from pathlib import Path
 
 import numpy as np
@@ -117,6 +116,10 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1]))
+
+# 共用鷹架（2026-09-10 抽出）。算術逐行相同，由
+# research/tests/test_research_regression.py 釘住。
+from research.harness import asof, tail_test  # noqa: E402,F401
 
 SNAP = HERE / "data" / "sweep_snapshot.parquet"
 OI = HERE / "data" / "oi"
@@ -158,10 +161,7 @@ def build():
         oiv = q["sum_open_interest_value"].astype(float)
         qoi = oiv.shift(1).rolling(WIN, min_periods=WIN // 4).rank(pct=True)
         qoi = qoi.to_numpy()
-        oms = q["_ms"].to_numpy(np.int64)
-        j = np.searchsorted(oms, g.ts.to_numpy(np.int64), side="left") - 1
-        ok = j >= 0
-        jj = np.clip(j, 0, len(oms) - 1)
+        jj, ok = asof(g.ts.to_numpy(np.int64), q["_ms"].to_numpy(np.int64))
         s2.append(np.abs(q["count_long_short_ratio"].to_numpy(float)[jj]
                          - g.pre_ls_retail.to_numpy(float))[ok])
         frames.append(pd.DataFrame(dict(
@@ -179,56 +179,7 @@ def build():
     return pd.concat(frames, ignore_index=True), np.concatenate(s2)
 
 
-def hi_half(sub, var):
-    """幣內按中位切高半邊。"""
-    v = sub[var].to_numpy(float)
-    ok = np.isfinite(v)
-    hi = np.zeros(len(sub), bool)
-    syms = sub.sym.to_numpy()
-    for s in np.unique(syms):
-        m = (syms == s) & ok
-        if m.sum() >= 20:
-            hi |= m & (v > np.nanmedian(v[m]))
-    return hi, ok
-
-
-def binom_p(k, n, p0):
-    if n == 0:
-        return 1.0
-    return float(sum(comb(n, i) * p0 ** i * (1 - p0) ** (n - i)
-                     for i in range(k, n + 1)))
-
-
 TARGETS = (("amp", "淨位移"), ("rng", "總擺幅"), ("chop", "震盪"))
-
-
-def tail_test(sub, var, tail, strata=None, ycol="amp"):
-    """尾部是否集中在高擁擠半邊。strata 給定時，在每層內各自切中位。"""
-    v = sub[var].to_numpy(float)
-    ok = np.isfinite(v)
-    hi = np.zeros(len(sub), bool)
-    syms = sub.sym.to_numpy()
-    keys = (syms if strata is None
-            else np.char.add(syms.astype(str), strata.astype(str)))
-    for kk in np.unique(keys):
-        m = (keys == kk) & ok
-        if m.sum() >= 20:
-            hi |= m & (v > np.nanmedian(v[m]))
-    t = tail & ok
-    n, k = int(t.sum()), int((t & hi).sum())
-    if n < 20:
-        return None
-    p0 = float((hi & ok).sum() / max(ok.sum(), 1))
-    per = {}
-    for s in np.unique(syms):
-        m = (syms == s) & t
-        if m.sum() >= 3:
-            per[s] = float((m & hi).sum() / m.sum() - p0)
-    return dict(n_tail=n, k_hi=k, share=k / n, p0=p0, p=binom_p(k, n, p0),
-                n_pos=sum(1 for x in per.values() if x > 0), n_sym=len(per),
-                per_sym=per,
-                amp_hi=float(np.nanmean(sub[ycol].to_numpy()[hi & ok])),
-                amp_lo=float(np.nanmean(sub[ycol].to_numpy()[(~hi) & ok])))
 
 
 def main():
