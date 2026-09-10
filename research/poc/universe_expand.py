@@ -18,8 +18,14 @@ volume/delta）。Binance 的未平倉量歷史只留 30 天，幸好用不到�
 ===========================================================================
 選幣規則（事前凍結，看到任何績效之前就定死）
 ===========================================================================
-    1. Binance USDT **永續**合約（與現有九幣同一個市場）
-    2. 上市日期 < 2024-02-15（回測期起點）—— 必須覆蓋整段歷史
+    1. Binance USDT **現貨**（與現有九幣同一個市場 —— 見下方修正）
+    2. 2024-03 當時**已經有日線資料** = 當時已上市，必須覆蓋整段歷史
+
+    **2026-09-10 修正**：第一版用的是**永續**清單（fapi），但
+    `fetch_bars.py` 抓的是**現貨**（api/v3），而現有九幣的資料全是現貨。
+    兩者標的不同（永續的 1000PEPE / 1000SHIB / 1000FLOKI / 1000BONK 在
+    現貨叫 PEPE / SHIB / FLOKI / BONK），抓取直接 400。混市場比選錯幣
+    更糟 —— 那會讓新舊幣的資料來自兩個不同的簿口。已改用現貨清單重凍。
     3. 排名依據 = **2024 年 3 月的日線成交額**（回測期起點當時就知道的
        資訊），不是現在的排名 —— 用現在的排名選就是拿未來資訊挑標的
     4. 取前 N 名，N 事前定為 **30**（含現有九幣）
@@ -63,21 +69,18 @@ def get(url, tries=5):
 
 
 def main():
-    print("抓 Binance USDT 永續清單…")
-    info = get("https://fapi.binance.com/fapi/v1/exchangeInfo")
+    print("抓 Binance USDT 現貨清單…")
+    info = get("https://api.binance.com/api/v3/exchangeInfo")
     cands = []
     for s in info["symbols"]:
-        if s.get("quoteAsset") != "USDT" or s.get("contractType") != "PERPETUAL":
-            continue
-        if s.get("status") != "TRADING":
+        if s.get("quoteAsset") != "USDT" or s.get("status") != "TRADING":
             continue
         base = s.get("baseAsset", "")
         if any(h in base for h in EXCLUDE_HINT):
             continue
-        if int(s.get("onboardDate", 0)) >= CUTOFF_MS:
-            continue                      # 上市太晚，覆蓋不了整段歷史
         cands.append(base)
-    print(f"  符合『USDT 永續 + 上市早於 2024-02-15』的有 {len(cands)} 個")
+    print(f"  USDT 現貨交易對 {len(cands)} 個"
+          f"（上市時間由『2024-03 有沒有日線』判斷，比 onboardDate 直接）")
 
     print(f"抓 {RANK_FROM} ~ {RANK_TO} 的日線成交額當排名依據（當時就知道的資訊）…")
     import datetime as dt
@@ -88,9 +91,10 @@ def main():
     vols = {}
     for i, b in enumerate(cands):
         try:
-            k = get(f"https://fapi.binance.com/fapi/v1/klines?symbol={b}USDT"
+            k = get(f"https://api.binance.com/api/v3/klines?symbol={b}USDT"
                     f"&interval=1d&startTime={t0}&endTime={t1}&limit=40")
-            if not k:
+            # 當時沒有日線 = 當時還沒上市（比 onboardDate 直接，且對現貨可用）
+            if not k or len(k) < 25:
                 continue
             vols[b] = sum(float(x[7]) for x in k)     # quote volume
         except Exception:
@@ -114,8 +118,8 @@ def main():
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(dict(
         frozen_at="2026-09-10",
-        rule=dict(market="Binance USDT PERPETUAL",
-                  onboard_before="2024-02-15",
+        rule=dict(market="Binance USDT SPOT",
+                  listed_by="has daily klines in 2024-03",
                   rank_by=f"quote volume {RANK_FROM}~{RANK_TO}",
                   top_n=TOP_N,
                   excluded_hints=list(EXCLUDE_HINT),
