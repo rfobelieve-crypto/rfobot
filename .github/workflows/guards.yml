@@ -1,0 +1,47 @@
+# Structural guards on every push. Added 2026-09-10.
+#
+# WHY ONLY THESE TESTS: the research regression suite reads local data
+# (minute bars, open interest, a frozen 1h slice, the sweep snapshot). None of
+# that is in git and none of it should be. Running it here would skip
+# everything, and "all skipped" looks exactly like "all passed" in the output
+# -- the shape mistake.md 2026-08-26 exists to forbid. So the split is:
+#
+#   here          pure-python structural guards (AST scans, payload shape)
+#   locally       research/run_guards.py, daily, self-reports to the
+#                 freshness board (a json_flag row, red if stale or failing)
+#
+# The guards below are the ones that have actually caught shipped bugs:
+#   test_okx_client          facade-skip (3 occurrences, one of them live)
+#   test_agent_boundary      read-only boundary of the MCP agent
+#   test_public_payload_shape  SELECTed but never emitted (shipped once)
+
+name: guards
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  structural:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: install
+        run: python -m pip install --quiet pytest
+      - name: structural guards
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          python -m pytest -q --no-header \
+            tests/test_agent_boundary.py \
+            tests/test_okx_client.py \
+            tests/test_public_payload_shape.py \
+            | tee out.txt
+          grep -Eq '[1-9][0-9]* passed' out.txt \
+            || (echo "no test actually ran"; exit 1)

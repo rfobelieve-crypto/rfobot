@@ -140,6 +140,14 @@ REGISTRY = [
     ("conj watch flag (交會 shadow)", "json_flag",
      "research/poc/data/results/conj_watch_last.json:ok", 0.5,
      "conj_watch.py 每分鐘自報;紅 = 排程沒跑、Binance 抓取失敗、或 DB 寫入失敗"),
+    # 2026-09-10：研究端的回歸測試。這個 repo 至今沒有任何機制強制測試在改動
+    # 後跑，而同日就發現一個釘死的 parity 測試早已變紅（基準釘在滾動資料窗上）
+    # ——「守衛壞掉沒人發現」的第四次。run_guards.py 每日自報 {ok,...}，
+    # 判準是產物不是退出碼。它也把「全部 skip」判成紅：一個都沒跑起來跟全過
+    # 在輸出上長得一樣（mistake.md 2026-08-26）。
+    ("research guards (回歸測試)", "json_flag",
+     "research/results/guards_last.json:ok", 26.0,
+     "research/run_guards.py 每日自報；紅 = 回歸測試有失敗、或一個都沒跑起來"),
     ("liq recorder flag (路徑C)", "json_flag",
      "research/results/liq_last.json:ok", 1.0,
      "OKX+Bybit 強平推送錄製器自報；紅 = WS 斷或 DB 寫入失敗"),
