@@ -93,7 +93,8 @@ def load_v7():
     d["entry_ms"] = ms + 3_600_000
     d["exit_ms"] = d["entry_ms"] + 4 * 3_600_000
     d["r"] = np.where(d["direction"] == "UP", 1.0, -1.0) * d["actual_return_4h"]
-    return d[["entry_ms", "exit_ms", "r"]].copy()
+    d["sym"] = "BTC"
+    return d[["sym", "entry_ms", "exit_ms", "r"]].copy()
 
 
 def load_sdv():
@@ -101,8 +102,8 @@ def load_sdv():
     rows = []
     for s in CORE9:
         trs, _ = cb.ledger(s)
-        rows += [dict(entry_ms=t["entry_ts"], exit_ms=t["exit_ts"], r=t["R_net"])
-                 for t in trs if t["sigk"] == "and"]
+        rows += [dict(sym=s, entry_ms=t["entry_ts"], exit_ms=t["exit_ts"],
+                      r=t["R_net"]) for t in trs if t["sigk"] == "and"]
     return pd.DataFrame(rows)
 
 
@@ -116,8 +117,15 @@ def load_old():
             print("  ** missing " + p.name)
             continue
         for t in SC.backtest_symbol(SC.load_csv(str(p))):
-            rows.append(dict(entry_ms=int(t[0]), exit_ms=int(t[1]), r=float(t[2])))
-    return pd.DataFrame(rows)
+            rows.append(dict(sym=s, entry_ms=int(t[0]), exit_ms=int(t[1]),
+                             r=float(t[2])))
+    d = pd.DataFrame(rows)
+    # 這條線的 bar 時間戳是**秒**，另外兩條是毫秒。自動偵測不寫死
+    # （mistake.md 2026-04-12：同一個 provider 的不同端點單位就會不同）。
+    if len(d) and d["entry_ms"].max() < 1e12:
+        d["entry_ms"] = d["entry_ms"] * 1000
+        d["exit_ms"] = d["exit_ms"] * 1000
+    return d
 
 
 def daily(df, days_index, on="entry_ms", val="r"):
@@ -184,14 +192,20 @@ def block(books, days, anchor, label, res):
               "同開火 %3d 天 r=%+.3f CI[%+.3f,%+.3f]"
               % (a, b, pa, ci[0], ci[1], sp, nb, pb, cib[0], cib[1]))
 
+    # 三條線的單位不同（V7 是報酬比例、SDV 是 ATR、舊線是災難停損單位），
+    # 所以先各自除以自己的日波動化成「單位波動」序列，再等權相加。
+    # 這跟 w 正比 1/sigma 的等風險配置在數學上是同一件事（DR 一模一樣），
+    # 但印出來的權重是 0.33/0.33/0.33 而不是 0.99/0.00/0.01 —— 後者會讓人
+    # 以為組合幾乎全押 V7，實際上三條的風險貢獻是相等的。
     sig = S.std()
-    w = (1.0 / sig) / (1.0 / sig).sum()
-    port = (S * w).sum(axis=1)
-    dr = float((w * sig).sum() / port.std())
-    print("\n等風險權重 " + ", ".join("%s %.2f" % (k, w[k]) for k in w.index))
+    Z = S / sig
+    w = pd.Series(1.0 / len(S.columns), index=S.columns)
+    port = (Z * w).sum(axis=1)
+    dr = float(1.0 / port.std())
+    print("\n等風險（各自除以自己的日波動後等權，每條 %.2f）" % w.iloc[0])
     print("  分散比 DR = %.3f   （1.000 = 完全同一個賭注；1.732 = 三條完全獨立）"
           % dr)
-    cov = S.cov()
+    cov = Z.cov()
     mrc = {k: float(w[k] * float((cov.loc[k] * w).sum()) / port.var()) for k in S}
     print("  風險貢獻：" + ", ".join("%s %.0f%%" % (k, 100 * v)
                                  for k, v in mrc.items()))
@@ -204,6 +218,49 @@ def block(books, days, anchor, label, res):
     return S, ACT
 
 
+def extra_checks(books, days, res):
+    """SDV ~ OLD 那個負相關是機制還是儀器？兩道檢查。
+
+    C1 逐幣一致性 —— 兩條線吃同一批幣。若負相關來自機制
+       （SDV 做延續、舊線做反轉，同一批掃單事件的相反方向），
+       它應該**每個幣都負**；只有少數幣負就是某個幣的偶然。
+    C2 打亂日序的對照 —— 把其中一條的日序列隨機重排，相關必須回到 0。
+       回不到 0 代表我的對齊或 bootstrap 有問題（自己剛寫的儀器要先在
+       答案已知的情況下跑一次，mistake.md 2026-07-29）。
+    """
+    print("\n" + "=" * 76)
+    print("C1 SDV ~ OLD 逐幣（兩條線吃同一批幣，機制上應該每個幣都負）")
+    per = {}
+    for s in CORE9:
+        a = daily(books["SDV"][books["SDV"].sym == s], days)
+        b = daily(books["OLD"][books["OLD"].sym == s], days)
+        r = float(a.corr(b)) if a.std() > 0 and b.std() > 0 else float("nan")
+        per[s] = r
+        print("  %-5s r=%+.3f   (SDV %d 筆 / OLD %d 筆)"
+              % (s, r, int((a != 0).sum()), int((b != 0).sum())))
+    neg = sum(1 for v in per.values() if v < 0)
+    print("  -> %d/%d 個幣為負" % (neg, len(per)))
+
+    rng = np.random.default_rng(SEED)
+    S = pd.DataFrame({k: daily(v, days) for k, v in books.items()})
+    sh = [float(pd.Series(rng.permutation(S["SDV"].to_numpy())).corr(
+          pd.Series(S["OLD"].to_numpy()))) for _ in range(500)]
+    print("\nC2 打亂日序 500 次：r 中位 %+.4f，2.5~97.5%% 區間 [%+.3f, %+.3f]"
+          % (float(np.median(sh)), float(np.percentile(sh, 2.5)),
+             float(np.percentile(sh, 97.5))))
+    real = float(S["SDV"].corr(S["OLD"]))
+    ok = abs(np.median(sh)) < 0.05 and real < np.percentile(sh, 2.5)
+    print("  真實 r=%+.3f   %s"
+          % (real, "PASS（對照回到 0 且真實落在區間外）" if ok
+             else "**注意：對照沒回到 0 或真實沒離開區間**"))
+    res["C1_per_sym_sdv_old"] = per
+    res["C1_n_negative"] = int(neg)
+    res["C2_shuffle_median"] = float(np.median(sh))
+    res["C2_shuffle_ci"] = [float(np.percentile(sh, 2.5)),
+                            float(np.percentile(sh, 97.5))]
+    res["C2_pass"] = bool(ok)
+
+
 def main():
     print("載入三本帳…")
     books = {"V7": load_v7(), "SDV": load_sdv(), "OLD": load_old()}
@@ -214,11 +271,19 @@ def main():
                  pd.to_datetime(v.entry_ms.max(), unit="ms").date()))
 
     n_sdv, n_old = len(books["SDV"]), len(books["OLD"])
-    ok1, ok2 = n_sdv == 1584, n_old == 7083
+    ok1 = n_sdv == 1584
+    # S2 修訂（2026-09-10，跑第一次之後）：原本寫「必須等於 7,083」。
+    # 實測 7,064，查明原因**不在這支腳本**：`fetch_klines.py` 的起點是
+    # `now - days*86400`，所以 .cache 是一個**滾動 930 天窗**，每次刷新
+    # 都會從頭部丟掉舊 bar。任何釘在絕對筆數（或 sha）上的檢查在下一次
+    # 刷新就必紅 —— `tests/test_backtest_detail_parity.py` 同一個病，
+    # 它現在也是紅的。改成容忍 5% 的區間，並把診斷印出來。
+    ok2 = abs(n_old - 7083) <= 0.05 * 7083
     print()
     print("S1 SDV 全歷史 %s（應為 1,584）  %s"
           % (format(n_sdv, ","), "PASS" if ok1 else "**FAIL**"))
-    print("S2 舊線九幣 %s（應為 7,083）  %s"
+    print("S2 舊線九幣 %s（2026-09-07 存檔時 7,083；.cache 是滾動 930 天窗，"
+          "頭部會被丟掉，故用 ±5%% 判）  %s"
           % (format(n_old, ","), "PASS" if ok2 else "**FAIL**"))
 
     lo = max(int(day8([v.entry_ms.min()])[0]) for v in books.values())
@@ -235,12 +300,13 @@ def main():
 
     block(books, days, "entry_ms", "進場日", res)
     block(books, days, "exit_ms", "出場日", res)
+    extra_checks(books, days, res)
 
     cut = int(day8([int(DECODE_TOP5.value // 10 ** 6)])[0])
     sub = days[days >= cut]
     if len(sub) > 30:
         print("\n" + "=" * 76)
-        print("敏感度：只用 2026-04-03 之後（V7 Strong 同一種 top-5% 定義），%d 天"
+        print("敏感度：只用 2026-04-03 之後（V7 Strong 同一種 top-5%% 定義），%d 天"
               % len(sub))
         S = pd.DataFrame({k: daily(v, sub, "entry_ms") for k, v in books.items()})
         sens = {}
@@ -249,9 +315,8 @@ def main():
             ci = boot_corr(S[a], S[b])
             sens[a + "|" + b] = dict(pearson=r, ci=list(ci))
             print("  %-4s~%-4s r=%+.3f CI[%+.3f,%+.3f]" % (a, b, r, ci[0], ci[1]))
-        sig = S.std()
-        w = (1.0 / sig) / (1.0 / sig).sum()
-        dr2 = float((w * sig).sum() / (S * w).sum(axis=1).std())
+        Z = S / S.std()
+        dr2 = float(1.0 / (Z.sum(axis=1) / len(Z.columns)).std())
         print("  分散比 DR = %.3f" % dr2)
         res["post_top5"] = dict(days=int(len(sub)), dr=dr2, corr=sens)
 
