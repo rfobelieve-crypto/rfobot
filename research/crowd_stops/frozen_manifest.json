@@ -1,0 +1,71 @@
+{
+  "frozen_at": "2026-09-10",
+  "why": "sweep_failure/.cache 是 fetch_klines.py 抓的滾動 930 天窗（起點 = now - days*86400），每次刷新從頭部丟掉舊 bar。這條研究線的母體必須固定，否則跑兩次得到兩個母體 —— 同一個病今天才讓 parity 測試紅掉（mistake.md 2026-09-10）。",
+  "source": "research/sweep_failure/.cache/*USDT_1h.csv",
+  "note": "CSV 本身不進 git（4.5MB）；這份 manifest 的 sha256 就是它的身分證。",
+  "files": {
+    "BTC": {
+      "n": 22399,
+      "first_ts": 1708394400,
+      "last_ts": 1789027200,
+      "sha256": "7de7a1e9de0036c98b491a533b46ca2f",
+      "bytes": 1301507
+    },
+    "ETH": {
+      "n": 22399,
+      "first_ts": 1708394400,
+      "last_ts": 1789027200,
+      "sha256": "8f9791e264f8aaf49c1abb1702f2629f",
+      "bytes": 1203314
+    },
+    "SOL": {
+      "n": 22399,
+      "first_ts": 1708394400,
+      "last_ts": 1789027200,
+      "sha256": "6b9614a228b6f3e9c1eec732c424f6c3",
+      "bytes": 1097997
+    },
+    "BNB": {
+      "n": 22399,
+      "first_ts": 1708394400,
+      "last_ts": 1789027200,
+      "sha256": "8855db7e38bda3deb1c6ed72716bdae7",
+      "bytes": 1071005
+    },
+    "XRP": {
+      "n": 22399,
+      "first_ts": 1708394400,
+      "last_ts": 1789027200,
+      "sha256": "8798c072ede2299ad3c12fb864755738",
+      "bytes": 1114480
+    },
+    "DOGE": {
+      "n": 22399,
+      "first_ts": 1708394400,
+      "last_ts": 1789027200,
+      "sha256": "a83d93166040d6d4665212ccaca2ef98",
+      "bytes": 1221272
+    },
+    "ADA": {
+      "n": 22399,
+      "first_ts": 1708394400,
+      "last_ts": 1789027200,
+      "sha256": "20fb5f0ada9b3e7a284ae903df7812a2",
+      "bytes": 1112825
+    },
+    "LINK": {
+      "n": 22399,
+      "first_ts": 1708394400,
+      "last_ts": 1789027200,
+      "sha256": "29d99e7c47d6c0faabb5cbe4b08f4c2f",
+      "bytes": 1014463
+    },
+    "AVAX": {
+      "n": 22399,
+      "first_ts": 1708394400,
+      "last_ts": 1789027200,
+      "sha256": "944267015d82e053bfba30a9c869ac62",
+      "bytes": 995206
+    }
+  }
+}

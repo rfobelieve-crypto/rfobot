@@ -91,3 +91,4 @@ research/results/poc_profile/events*.csv
 
 # TODO 1.00 POC 分階段管線:資料層,可由 fetch_bars.py 重生
 research/poc/data/
+research/crowd_stops/frozen/

@@ -99,7 +99,10 @@ def pos_bb_mr(bars):
     return pos
 
 
-def pos_supertrend(bars, atr_n=10, mult=3.0):
+def pos_supertrend(bars, atr_n=10, mult=3.0, detail=False):
+    """2026-09-10 additive：`detail=True` 多回傳止損價 —— SuperTrend 的
+    止損**就是那條線本身**（多頭時是下軌 dn，空頭時是上軌 up）。零額外
+    參數。算術未動，見 pos_breakout 的同款說明。"""
     h = [b[SC.H] for b in bars]
     l = [b[SC.L] for b in bars]
     c = [b[SC.C] for b in bars]
@@ -110,6 +113,7 @@ def pos_supertrend(bars, atr_n=10, mult=3.0):
         tr = max(h[i] - l[i], abs(h[i] - c[i - 1]), abs(l[i] - c[i - 1]))
         atr[i] = tr if i <= atr_n else (atr[i - 1] * (atr_n - 1) + tr) / atr_n
     pos = [0] * n
+    det = [None] * n
     up = dn = 0.0
     trend = 0
     for i in range(atr_n + 1, n):
@@ -123,6 +127,13 @@ def pos_supertrend(bars, atr_n=10, mult=3.0):
         elif trend >= 0 and c[i] < dn:
             trend = -1
         pos[i] = trend
+        if detail:
+            det[i] = dict(pos=trend, up=up, dn=dn,
+                          stop=(dn if trend == 1 else
+                                up if trend == -1 else None))
+    if detail:
+        return [d if d is not None else dict(pos=0, up=None, dn=None,
+                                             stop=None) for d in det]
     return pos
 
 

@@ -95,12 +95,20 @@ def pos_mr(bars) -> list[int]:
     return pos
 
 
-def pos_breakout(bars) -> list[int]:
+def pos_breakout(bars, detail=False):
+    """2026-09-10 additive：`detail=True` 多回傳**這個群眾的止損在哪**。
+
+    突破派的止損就是對側通道帶：做多（突破 hi20）的止損在 lo20，做空的
+    在 hi20。規則、順序、算術一個字都沒動 —— detail 是從同一批中間值投影
+    出來的，所以止損地圖不可能跟這個部位序列各說各話（同 sweep_core
+    的 detail 先例）。`tests/test_stop_detail_parity.py` 釘住。
+    """
     h = [b[SC.H] for b in bars]
     l = [b[SC.L] for b in bars]
     c = [b[SC.C] for b in bars]
     n = len(c)
     pos = [0] * n
+    det = [None] * n
     state = 0
     for i in range(20, n):
         hi20 = max(h[i - 20:i])
@@ -110,6 +118,13 @@ def pos_breakout(bars) -> list[int]:
         elif c[i] < lo20:
             state = -1
         pos[i] = state
+        if detail:
+            det[i] = dict(pos=state, hi20=hi20, lo20=lo20,
+                          stop=(lo20 if state == 1 else
+                                hi20 if state == -1 else None))
+    if detail:
+        return [d if d is not None else dict(pos=0, hi20=None, lo20=None,
+                                             stop=None) for d in det]
     return pos
 
 

@@ -74,13 +74,16 @@ def pos_pivot(bars):
     return pos
 
 
-def pos_psar(bars, step=0.02, cap=0.2):
+def pos_psar(bars, step=0.02, cap=0.2, detail=False):
+    """2026-09-10 additive：`detail=True` 多回傳止損價 —— PSAR 的 **SAR 值
+    本身就是止損**。零額外參數。算術未動，見 pos_breakout 的同款說明。"""
     h = [b[SC.H] for b in bars]
     l = [b[SC.L] for b in bars]
     n = len(bars)
     pos = [0] * n
+    det = [None] * n
     if n < 3:
-        return pos
+        return [dict(pos=0, sar=None, stop=None)] * n if detail else pos
     up = True
     sar, ep, af = l[0], h[0], step
     for i in range(1, n):
@@ -98,6 +101,11 @@ def pos_psar(bars, step=0.02, cap=0.2):
             elif l[i] < ep:
                 ep, af = l[i], min(af + step, cap)
         pos[i] = 1 if up else -1
+        if detail:
+            det[i] = dict(pos=pos[i], sar=sar, stop=sar)
+    if detail:
+        return [d if d is not None else dict(pos=0, sar=None, stop=None)
+                for d in det]
     return pos
 
 
