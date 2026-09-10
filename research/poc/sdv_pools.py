@@ -119,7 +119,10 @@ def sweeps_from_pools(pools, ts, hi, lo, tick):
     return sorted(res)
 
 
-def run_pool(sym, kind):
+def run_pool(sym, kind, pool_fn=None):
+    """2026-09-10 additive：`pool_fn` 給定時用它產生價位表，其餘（穿越判定、
+    冷卻、併窗、進出場、成本）**完全沿用**——新的池子類型不得帶進第二份
+    成交邏輯（本 repo 這個坑咬過五次）。"""
     cand, ts, cl, at, _ = ck.frozen_cand(sym, cb._empty_liq())
     b = pd.read_parquet(cb.BARS / f"{sym}.parquet",
                         columns=["ts", "open", "high", "low", "close", "tick_size"])
@@ -129,7 +132,9 @@ def run_pool(sym, kind):
     tick = float(b["tick_size"].iloc[0])
     n = len(ts)
 
-    if kind == "swing":
+    if pool_fn is not None:
+        sw = sweeps_from_pools(pool_fn(ts, hi, lo, tick), ts, hi, lo, tick)
+    elif kind == "swing":
         sw = [(int(m), np.nan, "") for m in np.sort(cand["sweep"])]
     else:
         sw = sweeps_from_pools(pools_time_based(ts, hi, lo, kind), ts, hi, lo, tick)
