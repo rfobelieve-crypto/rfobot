@@ -421,7 +421,8 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
             dict(id=i, time=_snap(t["exit_ts"]),
                  position="aboveBar" if t["side"] == "LONG" else "belowBar",
                  color=col, shape="square",
-                 text=f"{t['R']:+.2f}" + ("!" if t["stopped"] else "")),
+                 # ✕ 用文字放 —— lightweight-charts 的 shape 沒有 X
+                 text="✕ " + f"{t['R']:+.2f}" + ("!" if t["stopped"] else "")),
         ]
         rows.append(dict(
             id=i, side=t["side"], sig=t["sig"], sigk=t["sigk"],
@@ -716,7 +717,7 @@ details.stat>summary{color:var(--dn)}
 <div class="bar">
   <span><span class="dot" style="background:var(--up)"></span><span class="dot" style="background:var(--dn)"></span>
     <b>●</b> 進場 —— <b>顏色＝這筆賺賠，不是方向</b>（綠賺／紅賠；做多畫在 K 棒下方、做空在上方）</span>
-  <span><span class="sq" style="background:var(--dn)"></span><b>■</b> 出場（數字＝毛 ATR，「!」= 觸及停損）</span>
+  <span><span class="sq" style="background:var(--dn)"></span><b>✕</b> 出場（數字＝毛 ATR，「!」= 觸及停損）</span>
   <span><span class="sw" style="border-color:var(--buy)"></span>買側價位　<span class="sw" style="border-color:var(--sell)"></span>賣側價位
     ——<b>實線</b>＝已被獵取（終止在被掃那一刻），<b>虛線</b>＝還掛著。
     <b>加粗</b>＝這個掃單形成了 SDV 交易。虛線畫到下一個同側樞紐出現為止，
@@ -755,6 +756,7 @@ details.stat>summary{color:var(--dn)}
 <div id="cbox">
   <div class="fsbar">
     <span id="tfbar"></span>
+    <button id="btnAuto" title="自動校準版面：價格軸恢復自動縮放，並對齊到目前這一筆">⤢ 自動</button>
     <button id="btnSweep" title="顯示／隱藏掃單價位與穿越箭頭">🗺 掃單價位</button>
     <button id="btnPdhl" title="顯示／隱藏前一 UTC 日的高低（僅顯示，不參與判定）">📏 PDH/PDL</button>
     <button id="fsPrev" class="fsonly" title="上一筆">‹ 上一筆</button>
@@ -922,7 +924,10 @@ function drawMarkers(){
                      .map(m=>Object.assign({}, m, {time:bucket(m.time)})));
   // lightweight-charts 要求 markers 依時間遞增，否則整組安靜地不畫
   ms.sort((a,b)=>a.time-b.time);
-  cs.setMarkers(ms.map(m => dense ? Object.assign({}, m, {text:''}) : m));
+  // 密集時清掉數字但保留 ✕（否則出場點會變成無標示的色塊）
+  cs.setMarkers(ms.map(m => dense
+    ? Object.assign({}, m, {text: (m.text||'').startsWith('✕') ? '✕' : ''})
+    : m));
   document.getElementById('dense').textContent =
     dense ? `顯示 ${vis.length} 筆 —— 標記文字已關閉（>45 筆會疊住）。點下表任一列看單筆。`
           : `顯示 ${vis.length} 筆`;
@@ -1015,6 +1020,20 @@ function drawPdhl(){
 }
 drawPdhl();
 
+// 「自動」= TradingView 價格軸右下那顆 A。手動拖過價格軸之後 autoScale
+// 會被關掉，圖就不再自己貼齊資料；這顆把它打開，並重新對焦目前這一筆。
+function autoScaleOn(){
+  try{
+    if(chart.priceScale) chart.priceScale('right').applyOptions({autoScale:true});
+  }catch(e){ console.warn('autoScale 不可用:', e); }   // 顯示層不可靜默
+}
+
+document.getElementById('btnAuto').onclick = function(){
+  autoScaleOn();
+  const t = (cur===null||cur===undefined) ? null : D.trades.find(x=>x.id===cur);
+  if(t) focus(t); else chart.timeScale().fitContent();
+};
+
 document.getElementById('btnPdhl').onclick = function(){
   showPdhl = !showPdhl;
   this.classList.toggle('on', showPdhl);
@@ -1047,6 +1066,11 @@ function clearLines(){
 // 「這條線在講哪一段時間」。
 function focus(t){
   clearLines();
+  // 逐筆看的時候價格軸一律回自動 —— 否則看過一筆很極端的之後，
+  // 接下來每一筆都要手動調一次縮放。
+  // **包在 autoScaleOn() 裡**：這是錦上添花，不可以讓它弄壞開頁對焦
+  // （chart.priceScale 在某些版本／替身上不存在，直接呼叫會中斷 focus）。
+  autoScaleOn();
   const g = SNAP();
   const t0 = bucket(t.t_anchor);
   const t1 = Math.max(t0 + g, bucket(t.t_exit) + g);
