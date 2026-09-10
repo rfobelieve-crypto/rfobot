@@ -116,7 +116,9 @@ MERGE_GAP = et.MERGE_GAP
 # 停損率 18% 下混合成本 = 1 + 0.82x1 + 0.18x3 = **2.37 bps**。
 # 用實付而不是牌價：牌價會讓公開頁面低估這條線的淨值。
 COST_ENTRY, COST_TIME, COST_STOP = 1.0, 1.0, 3.0
-CANDLE_MIN = 5
+CANDLE_MIN = 5          # 預設顯示週期
+# 使用者 2026-09-10：圖上要能切 5 分 / 15 分 / 1 小時
+CANDLE_MINS = (5, 15, 60)
 TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS conj_backtest_pages (
     sym        VARCHAR(8)  NOT NULL PRIMARY KEY,
@@ -197,8 +199,11 @@ def ledger(sym, liq=None, arm="A", scale="1h"):
                          columns=["level_id", "side", "t_sweep", "sweep_lvl"])
     ev = ev.sort_values("t_sweep")
     ev_ts = ev["t_sweep"].to_numpy(np.int64)
+    # hour_ts = 樞紐 bar 的**開盤**；formed_at 是它的收盤。畫線起點要用
+    # 前者（線才會坐在那根 K 上），可知時刻仍是後者 —— 用途不同。
     lv = pd.read_parquet(lv_dir / f"{sym}.parquet",
-                         columns=["level_id", "formed_at"]).set_index("level_id")
+                         columns=["level_id", "formed_at",
+                                  "hour_ts"]).set_index("level_id")
 
     trades = []
     for a, mem in cr.groups_with_members(pairs):
@@ -267,7 +272,7 @@ def ledger(sym, liq=None, arm="A", scale="1h"):
             r = ev.iloc[e_i]
             level, lside = float(r["sweep_lvl"]), str(r["side"])
             if r["level_id"] in lv.index:
-                origin = int(lv.loc[r["level_id"], "formed_at"])
+                origin = int(lv.loc[r["level_id"], "hour_ts"])
         leg = COST_ENTRY + (COST_STOP if stopped else COST_TIME)
         cost = leg / 1e4 * ent / A
         trades.append(dict(
@@ -330,11 +335,12 @@ def pdh_pdl(b, lo_ms, hi_ms):
     return res
 
 
-def candles_5m(b, lo_ms, hi_ms):
+def candles_at(b, lo_ms, hi_ms, minutes):
     v = b[(b["ts"] >= lo_ms) & (b["ts"] <= hi_ms)]
     if v.empty:
         return []
-    g = v.assign(bk=(v["ts"] // (CANDLE_MIN * 60_000)) * (CANDLE_MIN * 60_000)) \
+    w = minutes * 60_000
+    g = v.assign(bk=(v["ts"] // w) * w) \
          .groupby("bk").agg(open=("open", "first"), high=("high", "max"),
                             low=("low", "min"), close=("close", "last"))
     return [dict(time=int(t // 1000), open=float(r.open), high=float(r.high),
@@ -343,7 +349,9 @@ def candles_5m(b, lo_ms, hi_ms):
 
 
 def _snap(ms):
-    return int(ms // (CANDLE_MIN * 60_000) * (CANDLE_MIN * 60))
+    """原始秒。**不再在這裡對齊到 K 線桶** —— 顯示週期可切換（5/15/60 分），
+    對齊必須在 JS 端依當前週期做，寫死在這裡就只有一種週期的標記會落對。"""
+    return int(ms // 1000)
 
 
 def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
@@ -351,7 +359,9 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
     last_ts = int(b["ts"].iloc[-1])
     lo = t_from_ms or int(b["ts"].iloc[0])
     hi = t_to_ms or last_ts
-    candles = candles_5m(b, lo, hi)
+    # 只存最細的那一份；15 分／1 小時由 JS 端聚合（都是 5 的倍數，
+    # 聚合精確）。存三份會讓 HTML 2.4MB -> 5.6MB，而 iframe 要載入它。
+    candles = candles_at(b, lo, hi, CANDLE_MIN)
     if len(candles) < 30:
         raise SystemExit(f"{sym}: 顯示窗只有 {len(candles)} 根 K，範圍給錯了？")
     tr = [t for t in trades if lo <= t["entry_ts"] <= hi]
@@ -417,6 +427,38 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
             t_exit=t["exit_ts"] // 1000,
             t_origin=(t["origin_ts"] or t["sweep_ts"] - 3_600_000) // 1000))
 
+    # 顯示窗內**所有**掃單的價位線（不只形成交易的那些）。
+    # 亮色 = 形成 SDV 交易，灰色 = 只是掃單、沒有流量配合。
+    try:
+        _ev = pd.read_parquet(EVENTS / f"{sym}.parquet",
+                              columns=["level_id", "side", "t_sweep", "sweep_lvl"])
+        _lv = pd.read_parquet(LEVELS / f"{sym}.parquet",
+                              columns=["level_id", "hour_ts"]).set_index("level_id")
+        _ev = _ev[(_ev["t_sweep"] >= lo) & (_ev["t_sweep"] <= hi)]
+        used = {(t["sweep_ts"], round(float(t["level"]), 8))
+                for t in tr if t["level"] is not None}
+        nid = 10_000
+        for r in _ev.itertuples():
+            t_sw = int(r.t_sweep) - 60_000        # t_sweep 是該分鐘收盤
+            px = float(r.sweep_lvl)
+            if (t_sw, round(px, 8)) in used:
+                continue                          # 已經以亮色畫過
+            o = int(_lv.loc[r.level_id, "hour_ts"]) if r.level_id in _lv.index \
+                else t_sw - 3_600_000
+            a, z = max(_snap(o), _snap(lo)), _snap(t_sw)
+            if z <= a:
+                continue
+            levels.append(dict(id=nid, side=str(r.side), c="#4a5462",
+                               a=a, z=z, v=px, plain=True))
+            sweeps.append(dict(id=nid, time=_snap(t_sw),
+                               position="aboveBar" if r.side == "buyside" else "belowBar",
+                               color="#4a5462",
+                               shape="arrowDown" if r.side == "buyside" else "arrowUp",
+                               text=""))
+            nid += 1
+    except Exception as e:                        # 顯示層不可靜默
+        print(f"[WARN] {sym}: 全部掃單線畫不出來: {e}")
+
     # 價位線：**一條價位一個 series**。時間上重疊的價位（不同價格、同時期）
     # 沒辦法塞進單一 series —— 試過用 whitespace 斷點合併，結果 33 條只畫得出
     # 13 條，重疊的全被跳過。33 個 series 對 lightweight-charts 沒有問題。
@@ -425,7 +467,7 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
     # 形成於顯示窗之前，實測最早早 28 天），圖表會去擴展時間軸、生出數千個
     # 空白桶。已在上面 clamp。這裡在產出時斷言，不靠瀏覽器發現。
     for L in levels:
-        assert candles[0]["time"] <= L["a"] <= L["z"] <= candles[-1]["time"],             f"{sym} 價位線 {L['id']} 超出 K 線範圍"
+        assert candles[0]["time"] <= L["a"] and L["a"] <= L["z"],             f"{sym} 價位線 {L['id']} 超出 K 線範圍"
 
     def _m(src, pred=lambda t: True):
         rs = [x["R"] for x in src if pred(x)]
@@ -465,7 +507,8 @@ def build(sym, t_from_ms, t_to_ms, liq=None, arm="A"):
                 params=dict(DELAY=DELAY, STOP=STOP, HOLD=HOLD, W=W,
                             C_WAIT=C_WAIT, C_MOVE=C_MOVE,
                             COST=[COST_ENTRY, COST_TIME, COST_STOP],
-                            CANDLE_MIN=CANDLE_MIN))
+                            CANDLE_MIN=CANDLE_MIN,
+                            CANDLE_MINS=list(CANDLE_MINS)))
 
 
 TPL = r"""<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
@@ -540,6 +583,23 @@ tbody tr:hover{background:#171d25}
 tbody tr.sel{background:#1c2530}
 .pos{color:var(--up)}.neg{color:var(--dn)}.fwd{color:var(--amb)}
 .note{font-size:11.5px;color:var(--dim);max-width:96ch}
+/* 嵌入模式（2026-09-10）：網站是把整頁塞進固定高度的 iframe，而表頭
+   （標題＋標籤＋摺疊區＋KPI）在 390x520 的手機框裡就把圖表整個推出框外
+   —— 使用者看到的是「根本什麼都沒有」。所以偵測到自己在 iframe 裡時，
+   把圖表以外的東西全部收起來，讓圖直接坐在最上面。
+   直接開這個檔案時一切照舊，什麼都沒少。 */
+body.embed header, body.embed .fold, body.embed .stat, body.embed .kpis,
+body.embed #smallwarn, body.embed #eq, body.embed .tw,
+body.embed .note, body.embed details{display:none!important}
+/* .bar 裡只留按鈕與計數，說明文字與圖例在這個尺寸下沒有空間 */
+body.embed .bar > span:not(#dense):not(#navpos){display:none!important}
+body.embed .bar{gap:4px 6px;font-size:10.5px}
+body.embed .bar button{padding:2px 7px;font-size:10.5px}
+body.embed .wrap{padding:5px;gap:5px}
+body.embed #c{height:calc(100vh - 84px);min-height:240px}
+/* 浮層按鈕在窄框裡要更小，否則兩行蓋住圖 */
+body.embed .fsbar{gap:3px;font-size:10px}
+body.embed .fsbar button{padding:2px 5px;font-size:10px}
 /* 摺疊區：長篇判決與規格預設收起來（2026-09-10「畫面很亂」）。
    收起不是刪除——公開頁的狀態標示與判決紀錄一個字都沒少，點開就在。 */
 .fold{font-size:11.5px;color:var(--dim);border:1px solid var(--line);
@@ -560,8 +620,9 @@ details.stat>summary{color:var(--dn)}
   <span class="tag" style="border-color:var(--amb);color:var(--amb)">執行暫停中 · 樣本外 CI 下緣仍含零</span>
 </header>
 
-<div class="fold" style="border-color:#f0b90b">
-  <b style="color:#f0b90b">要跟 TradingView 對照的話先看這行</b>
+<details class="fold" style="border-color:#f0b90b">
+  <summary style="color:#f0b90b"><b>要跟 TradingView 對照的話先看這行</b>
+    —— BINANCE:BTCUSDT 現貨 · 1小時 · PIVOT=10 · UTC（點開看完整說明）</summary>
   <p>本頁所有 K 線與價位來自 <b>BINANCE:BTCUSDT（現貨）</b>、UTC。
   在 TradingView 上要比對 sweep 位置，商品必須設成同一個 —— 用
   <code>OKX:BTCUSDT.P</code> 之類的永續合約，K 線的最高最低本來就不同，
@@ -573,7 +634,7 @@ details.stat>summary{color:var(--dn)}
   <b>22.5% 超過一週</b>、3.9% 超過三個月。<b>(2)</b> 穿越判定我們用
   <b>盤中觸價 +2 ticks</b>，收盤穿越的版本實測只差 0.1%（1,429 vs 1,428），
   差別在時機不在有無。</p>
-</div>
+</details>
 
 <details class="fold"><summary>規格與成本（展開）</summary>
   <p><b>S</b> 掃單 · <b>D</b> 主動量極端 · <b>V</b> 量能爆發 —— 三者齊發才是 SDV
@@ -643,11 +704,6 @@ details.stat>summary{color:var(--dn)}
   但買在回檔裡。樣本外「進場在突破側」每筆 <b>+0.3232、9/9</b>，「退回價位內」
   <b>−0.0830、5/9</b>；差值 +0.2405、CI 下緣 −0.0305（<b>尚未過閘</b>，如實標）。</p>
   </details>
-  <button id="btnSweep">🗺 顯示掃單價位</button>
-  <button id="btnPdhl">📏 顯示 PDH／PDL</button>
-  <span style="color:var(--dim)">PDH／PDL <b style="color:var(--amb)">僅顯示</b>，
-    目前<b>不參與</b> SDV 判定（價位表只有 swing pivot 一種）</span>
-  <span style="width:100%"></span>
   <button id="btnAll" class="on">全部交易</button>
   <button id="btnWin">只看賺</button>
   <button id="btnLose">只看賠</button>
@@ -668,6 +724,9 @@ details.stat>summary{color:var(--dn)}
 
 <div id="cbox">
   <div class="fsbar">
+    <span id="tfbar"></span>
+    <button id="btnSweep" title="顯示／隱藏掃單價位與穿越箭頭">🗺 掃單價位</button>
+    <button id="btnPdhl" title="顯示／隱藏前一 UTC 日的高低（僅顯示，不參與判定）">📏 PDH/PDL</button>
     <button id="fsPrev" class="fsonly" title="上一筆">‹ 上一筆</button>
     <span id="fsPos" class="fsonly"></span>
     <button id="fsNext" class="fsonly" title="下一筆">下一筆 ›</button>
@@ -708,6 +767,16 @@ function setPos(txt){ const a=document.getElementById('navpos'),
   if(a) a.textContent=txt; if(b) b.textContent=txt; }
 // 篩選狀態宣告在 kpis() **被呼叫之前**——let/const 的暫時性死區會把整段
 // script 打斷、圖一片空白而頁面其他部分照常渲染（mistake.md 2026-09-08）。
+// 目前的顯示週期（分鐘）。標記與線在 Python 端輸出的是**原始秒**，
+// 對齊到 K 線桶必須在這裡做 —— 週期一換，桶就換。
+let TF = D.params.CANDLE_MIN || 5;
+const bucket = t => Math.floor(t / (TF * 60)) * (TF * 60);
+const SNAP = () => TF * 60;
+// ^^ 這三個必須宣告在 drawMarkers()/drawLevels()/focus() **之前**：
+// const 的暫時性死區一旦被踩到，整段 script 當場中斷，而頁面其他部分
+// 照常渲染 —— 症狀是「圖空白但版面正常」（mistake.md 2026-09-08，
+// 本檔 2026-09-10 又踩一次）。
+
 let filt = 'all';       // 賺賠
 let grp  = 'and';       // 簽名。**預設就是 SDV（三者齊發）**——
 // 頁面叫 SDV,預設卻顯示整個母體的話,標題與內容不同意。
@@ -771,11 +840,13 @@ function drawLevels(){
   if(!showSweep) return;
   const ids = new Set(D.trades.filter(keep).map(t=>t.id));
   for(const L of D.levels){
-    if(!ids.has(L.id)) continue;
+    // plain = 只是掃單、沒形成交易 —— 不受「只看賺/只看賠」等篩選影響
+    if(!L.plain && !ids.has(L.id)) continue;
     const sx = chart.addLineSeries({color:L.c, lineWidth:1, lineStyle:2,
       lastValueVisible:false, priceLineVisible:false,
       crosshairMarkerVisible:false, autoscaleInfoProvider:()=>null});
-    sx.setData([{time:L.a, value:L.v}, {time:L.z, value:L.v}]);
+    const a = bucket(L.a), z = Math.max(bucket(L.z), a + TF*60);
+    sx.setData([{time:a, value:L.v}, {time:z, value:L.v}]);
     lvlSeries.push(sx);
   }
 }
@@ -787,8 +858,11 @@ function drawMarkers(){
   const vis = D.trades.filter(keep);
   const ids = new Set(vis.map(t=>t.id));
   const dense = vis.length > 45;
-  let ms = D.markers.filter(m=>ids.has(m.id));
-  if(showSweep) ms = ms.concat(D.sweeps.filter(m=>ids.has(m.id)));
+  let ms = D.markers.filter(m=>ids.has(m.id))
+                     .map(m=>Object.assign({}, m, {time:bucket(m.time)}));
+  if(showSweep) ms = ms.concat(
+        D.sweeps.filter(m=>m.id>=10000 || ids.has(m.id))
+                .map(m=>Object.assign({}, m, {time:bucket(m.time)})));
   // lightweight-charts 要求 markers 依時間遞增，否則整組安靜地不畫
   ms.sort((a,b)=>a.time-b.time);
   cs.setMarkers(ms.map(m => dense ? Object.assign({}, m, {text:''}) : m));
@@ -796,8 +870,66 @@ function drawMarkers(){
     dense ? `顯示 ${vis.length} 筆 —— 標記文字已關閉（>45 筆會疊住）。點下表任一列看單筆。`
           : `顯示 ${vis.length} 筆`;
 }
+// 週期切換：換掉 K 線資料，然後把所有標記／線依新的桶重畫一次。
+const TFS = D.params.CANDLE_MINS || [5,15,60];
+const tfLabel = m => m>=60 ? (m/60)+' 小時' : m+' 分';
+function buildTfBar(){
+  const bar = document.getElementById('tfbar');
+  bar.innerHTML = '';
+  for(const m of TFS){
+    const b = document.createElement('button');
+    b.textContent = tfLabel(m);
+    b.title = 'K 線改用 ' + tfLabel(m) + '（只影響顯示，規則永遠跑在 1 分鐘上）';
+    if(m===TF) b.classList.add('on');
+    b.onclick = () => setTf(m);
+    bar.appendChild(b);
+  }
+}
+// 從 5 分鐘 K 聚合出更粗的週期。base 一定是 CANDLE_MIN(5)，而 15 與 60
+// 都是它的整數倍，所以 open=首、high=最大、low=最小、close=末 是精確的。
+const BASE = D.params.CANDLE_MIN || 5;
+const aggCache = {};
+function candlesAt(m){
+  if(m === BASE) return D.candles;
+  if(aggCache[m]) return aggCache[m];
+  const w = m * 60, out = [];
+  let cur = null;
+  for(const c of D.candles){
+    const b = Math.floor(c.time / w) * w;
+    if(!cur || cur.time !== b){
+      if(cur) out.push(cur);
+      cur = {time:b, open:c.open, high:c.high, low:c.low, close:c.close};
+    }else{
+      cur.high = Math.max(cur.high, c.high);
+      cur.low  = Math.min(cur.low,  c.low);
+      cur.close = c.close;
+    }
+  }
+  if(cur) out.push(cur);
+  aggCache[m] = out;
+  return out;
+}
+
+function setTf(m){
+  const data = candlesAt(m);
+  if(!data || !data.length) return;
+  const vr = chart.timeScale().getVisibleRange();
+  TF = m;
+  cs.setData(data);
+  buildTfBar();
+  drawMarkers(); drawLevels(); drawPdhl();
+  if(cur!==null && cur!==undefined){ const t=D.trades.find(x=>x.id===cur); if(t) focus(t); }
+  else if(vr) chart.timeScale().setVisibleRange(vr);
+}
+
 drawMarkers();
 drawLevels();
+buildTfBar();
+
+// 嵌在 iframe 裡就自動精簡（見 CSS .embed）。判斷用 window.self!==window.top，
+// 不靠網站傳參數 —— 這樣 product-site 不用改任何一行。
+try{ if(window.self !== window.top) document.body.classList.add('embed'); }
+catch(e){ document.body.classList.add('embed'); }
 
 // PDH/PDL 圖層。同樣 autoscaleInfoProvider:()=>null —— 前日高低常常遠在
 // 顯示窗之外，讓它參與縮放會把 K 線壓成一條。
@@ -814,7 +946,13 @@ function drawPdhl(){
       lastValueVisible:false,
       priceLineVisible:false, crosshairMarkerVisible:false,
       autoscaleInfoProvider:()=>null});
-    sx.setData(L.pts);
+    const seen = new Set(), pts = [];
+    for(const p of L.pts){
+      const t = bucket(p.time);
+      if(seen.has(t)) continue;
+      seen.add(t); pts.push({time:t, value:p.value});
+    }
+    sx.setData(pts);
     pdhlSeries.push(sx);
   }
 }
@@ -823,14 +961,14 @@ drawPdhl();
 document.getElementById('btnPdhl').onclick = function(){
   showPdhl = !showPdhl;
   this.classList.toggle('on', showPdhl);
-  this.textContent = showPdhl ? '📏 隱藏 PDH／PDL' : '📏 顯示 PDH／PDL';
+  this.title = (showPdhl?'隱藏':'顯示') + ' PDH/PDL（僅顯示，不參與判定）';
   drawPdhl();
 };
 
 document.getElementById('btnSweep').onclick = function(){
   showSweep = !showSweep;
   this.classList.toggle('on', showSweep);
-  this.textContent = showSweep ? '🗺 隱藏掃單價位' : '🗺 顯示掃單價位';
+  this.title = (showSweep?'隱藏':'顯示') + '掃單價位與穿越箭頭';
   drawMarkers(); drawLevels();
 };
 
@@ -850,12 +988,11 @@ function clearLines(){
 // 出場、停損從來沒被打到，但那條停損線一路延伸到右邊——而右邊後來價格
 // 真的跌破它，看起來就像被停損掃掉了。線有沒有邊界，決定讀者以為
 // 「這條線在講哪一段時間」。
-const SNAP = () => (D.params.CANDLE_MIN || 5) * 60;
 function focus(t){
   clearLines();
   const g = SNAP();
-  const t0 = Math.floor(t.t_anchor / g) * g;
-  const t1 = Math.max(t0 + g, Math.ceil(t.t_exit / g) * g);
+  const t0 = bucket(t.t_anchor);
+  const t1 = Math.max(t0 + g, bucket(t.t_exit) + g);
   const mk = (p,c,txt,st) => {
     const s = chart.addLineSeries({color:c, lineWidth:1,
       lineStyle:(st===undefined?2:st), lastValueVisible:true, title:txt,
