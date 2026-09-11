@@ -1,0 +1,217 @@
+{
+  "asof": "2026-09-11 15:53:27",
+  "source_mode": "taker_taker",
+  "size_usd": 200.0,
+  "pairs": {
+    "NBIS": {
+      "leg": "IO",
+      "gross_bps": 6.7,
+      "old_cost": 12.075,
+      "old_net": -5.375,
+      "new_buckets": {
+        "1_fees": 4.5,
+        "2_slippage": 0.0,
+        "3_capital": 0.047,
+        "4_carry": 0.068,
+        "5_transfer": 0.0,
+        "6_ops": 0.59,
+        "7_tail": 0.0
+      },
+      "new_cost": 5.205,
+      "new_net": 1.495,
+      "flipped": true,
+      "noise_bps_per_trade": 42.45540439811898,
+      "sharpe_per_trade": 0.035213420321730284
+    },
+    "ANTH": {
+      "leg": "IO",
+      "gross_bps": 7.944,
+      "old_cost": 14.072,
+      "old_net": -6.127,
+      "new_buckets": {
+        "1_fees": 4.5,
+        "2_slippage": 0.515,
+        "3_capital": 0.022,
+        "4_carry": -0.004,
+        "5_transfer": 0.0,
+        "6_ops": 0.586,
+        "7_tail": 0.0
+      },
+      "new_cost": 5.619,
+      "new_net": 2.325,
+      "flipped": true,
+      "noise_bps_per_trade": 18.68614985713921,
+      "sharpe_per_trade": 0.12442370513857959
+    },
+    "BTC": {
+      "leg": "HL",
+      "gross_bps": 3.191,
+      "old_cost": 11.752,
+      "old_net": -8.561,
+      "new_buckets": {
+        "1_fees": 6.0,
+        "2_slippage": 0.0,
+        "3_capital": 0.183,
+        "4_carry": 0.005,
+        "5_transfer": 0.0,
+        "6_ops": 0.614,
+        "7_tail": 0.0
+      },
+      "new_cost": 6.802,
+      "new_net": -3.611,
+      "flipped": false,
+      "noise_bps_per_trade": 36.42130701293737,
+      "sharpe_per_trade": -0.0991452612811869
+    },
+    "HYPE": {
+      "leg": "HL",
+      "gross_bps": 5.291,
+      "old_cost": 11.752,
+      "old_net": -6.461,
+      "new_buckets": {
+        "1_fees": 6.0,
+        "2_slippage": 0.0,
+        "3_capital": 0.183,
+        "4_carry": 0.005,
+        "5_transfer": 0.0,
+        "6_ops": 0.614,
+        "7_tail": 0.0
+      },
+      "new_cost": 6.802,
+      "new_net": -1.511,
+      "flipped": false,
+      "noise_bps_per_trade": 71.5314245118805,
+      "sharpe_per_trade": -0.021123583240664264
+    },
+    "ZEC": {
+      "leg": "HL",
+      "gross_bps": 5.324,
+      "old_cost": 20.646,
+      "old_net": -15.322,
+      "new_buckets": {
+        "1_fees": 6.0,
+        "2_slippage": 0.0,
+        "3_capital": 0.043,
+        "4_carry": 0.001,
+        "5_transfer": 0.0,
+        "6_ops": 0.589,
+        "7_tail": 0.0
+      },
+      "new_cost": 6.633,
+      "new_net": -1.309,
+      "flipped": false,
+      "noise_bps_per_trade": 66.55839602232894,
+      "sharpe_per_trade": -0.019666940284451238
+    },
+    "NEAR": {
+      "leg": "HL",
+      "gross_bps": 5.739,
+      "old_cost": 11.752,
+      "old_net": -6.014,
+      "new_buckets": {
+        "1_fees": 6.0,
+        "2_slippage": 0.0,
+        "3_capital": 0.183,
+        "4_carry": 0.005,
+        "5_transfer": 0.0,
+        "6_ops": 0.614,
+        "7_tail": 0.0
+      },
+      "new_cost": 6.802,
+      "new_net": -1.063,
+      "flipped": false,
+      "noise_bps_per_trade": 138.2837604385663,
+      "sharpe_per_trade": -0.007687092082459288
+    },
+    "GOLD_LL": {
+      "leg": "lighter",
+      "gross_bps": 3.73,
+      "old_cost": 2.747,
+      "old_net": 0.983,
+      "new_buckets": {
+        "1_fees": 0.0,
+        "2_slippage": 0.0,
+        "3_capital": 0.183,
+        "4_carry": 0.0,
+        "5_transfer": 0.0,
+        "6_ops": 0.614,
+        "7_tail": 0.0
+      },
+      "new_cost": 0.797,
+      "new_net": 2.933,
+      "flipped": false,
+      "noise_bps_per_trade": 27.07117233399137,
+      "sharpe_per_trade": 0.10834403341732038
+    },
+    "NVDA_LL": {
+      "leg": "lighter",
+      "gross_bps": 2.527,
+      "old_cost": 2.707,
+      "old_net": -0.18,
+      "new_buckets": {
+        "1_fees": 0.0,
+        "2_slippage": 0.0,
+        "3_capital": 0.183,
+        "4_carry": -0.04,
+        "5_transfer": 0.0,
+        "6_ops": 0.614,
+        "7_tail": 0.0
+      },
+      "new_cost": 0.757,
+      "new_net": 1.77,
+      "flipped": true,
+      "noise_bps_per_trade": 27.429687516116914,
+      "sharpe_per_trade": 0.06452862428563934
+    }
+  },
+  "who_moves": {
+    "NBIS": {
+      "n_events": 179,
+      "share_median": 0.4942649616977828,
+      "share_mean": 0.4916759099095934,
+      "frac_above_0_7": 0.0670391061452514
+    },
+    "ANTH": {
+      "n_events": 29,
+      "share_median": 0.48527949930714664,
+      "share_mean": 0.475263533234547,
+      "frac_above_0_7": 0.10344827586206896
+    },
+    "BTC": {
+      "n_events": 43,
+      "share_median": 0.5429916982097579,
+      "share_mean": 0.5607892344723822,
+      "frac_above_0_7": 0.18604651162790697
+    },
+    "HYPE": {
+      "n_events": 266,
+      "share_median": 0.5205730494645706,
+      "share_mean": 0.4968811674062988,
+      "frac_above_0_7": 0.09774436090225563
+    },
+    "ZEC": {
+      "n_events": 550,
+      "share_median": 0.5158432404961243,
+      "share_mean": 0.5050608653230818,
+      "frac_above_0_7": 0.08727272727272728
+    },
+    "NEAR": {
+      "n_events": 605,
+      "share_median": 0.5080870214510447,
+      "share_mean": 0.5090480473103375,
+      "frac_above_0_7": 0.10082644628099173
+    },
+    "GOLD_LL": {
+      "n_events": 7,
+      "share_median": 0.5068585656521124,
+      "share_mean": 0.5079587890345018,
+      "frac_above_0_7": 0.2857142857142857
+    },
+    "NVDA_LL": {
+      "n_events": 12,
+      "share_median": 0.5340588630908345,
+      "share_mean": 0.5634687006102957,
+      "frac_above_0_7": 0.25
+    }
+  }
+}
