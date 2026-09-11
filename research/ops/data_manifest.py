@@ -82,6 +82,10 @@ REGISTRY = [
      "record_universe.py：126 個 ticker、150 個配對的逐分鐘頂檔。"
      "**不可回填**（WS 串流）。欄位 schema 與 §0.75 的 minutes.csv 逐欄相同，"
      "但 fund_* 三欄是空的（已知缺口，見 TODO §1.25）"),
+    # 2026-09-11：這兩個現在是**指向 D 槽的目錄連結**（見下面的 junction 守衛）。
+    ("market_data 原始資料", "market_data/raw_data/*.parquet", "append",
+     "33.6 GB，2026-09-11 搬到 D:\flowbot_data\raw_data 並在原位留目錄連結；"
+     "路徑對 77 個引用它的檔案完全沒變"),
     ("hl 歷史 K 線", "research/hl/data/candles/*.parquet", "append",
      "hl_candles.py 下載；端點保留上限 5000 根/週期，1h ~208 天。"
      "所以它既是可回填的、也是會從頭部腐蝕的 —— 兩者同時成立"),
@@ -150,7 +154,18 @@ def _json_span(p: Path):
 def scan():
     out = {}
     for name, pat, kind, note in REGISTRY:
-        files = sorted(ROOT.glob(pat))
+        # 2026-09-11：pathlib 的 glob **不吃絕對路徑、也不吃 `..`**
+        # （會拋 NotImplementedError: Non-relative patterns are unsupported）。
+        # 而註冊表現在同時有三種：repo 相對、`../arb/...`、`D:/flowbot_data/...`。
+        # 這一行原本只處理第一種，加進後兩種之後**整支就在 scan() 炸掉**，
+        # 而旗標停在上一次成功的綠 —— 又一個「看板說它活著」。
+        # 改用 glob 模組（它三種都吃）。
+        import glob as _g
+        pat_s = str(pat)
+        if Path(pat_s).is_absolute() or pat_s.startswith(".."):
+            files = sorted(Path(x) for x in _g.glob(pat_s, recursive=True))
+        else:
+            files = sorted(ROOT.glob(pat_s))
         if not files:
             out[name] = dict(kind=kind, note=note, files=0, missing=True)
             continue
@@ -192,6 +207,35 @@ def scan():
     return out
 
 
+# ── junction 守衛（2026-09-11）────────────────────────────────────────────
+# 兩個大資料夾搬到 D 槽、原位留目錄連結。**連結的失效方式是安靜的**：
+# D 槽沒掛載時連結變成一個空目錄，於是每一支讀它的程式都讀到「零列」，
+# 而零列在很多地方是合法狀態（mistake.md 2026-09-03：合法的空狀態與故障
+# 長得一模一樣）。所以要有一條專門問「連結還通嗎」的檢查。
+JUNCTIONS = [
+    ("market_data/raw_data", "D:/flowbot_data/raw_data"),
+    ("research/poc/data", "D:/flowbot_data/poc_data"),
+]
+
+
+def check_junctions(root: Path) -> list:
+    """回傳問題清單；空 = 都通。**空目錄也算問題**，那正是失效的樣子。"""
+    bad = []
+    for rel, target in JUNCTIONS:
+        p = root / rel
+        if not p.exists():
+            bad.append("%s 不存在（連結斷了？D 槽沒掛載？）" % rel)
+            continue
+        t = Path(target)
+        if not t.exists():
+            bad.append("%s 的目標 %s 不存在" % (rel, target))
+            continue
+        n = sum(1 for _ in p.rglob("*") if _.is_file())
+        if n == 0:
+            bad.append("%s 透過連結看到 **0 個檔** —— 連結在但目標是空的" % rel)
+    return bad
+
+
 def main():
     prev = {}
     if OUT.exists():
@@ -229,6 +273,13 @@ def main():
         if a["kind"] == "rolling" and a["first_ts"] and b.get("first_ts") \
                 and a["first_ts"] > b["first_ts"]:
             notes.append("%s -> 頭部前移（滾動窗，預期行為）" % name)
+
+    # junction 守衛：**接在這裡才算存在**。2026-09-11 這一整個 session 的
+    # 主旋律就是「守衛寫了但沒接線」（成交帶沒進 freshness、levels/events
+    # 沒進更新器、看門狗讀不懂旗標）——所以寫完當場接上並反向證明過。
+    jbad = check_junctions(ROOT)
+    if jbad:
+        bad.extend("junction: " + x for x in jbad)
 
     ok = not bad
     OUT.parent.mkdir(parents=True, exist_ok=True)
