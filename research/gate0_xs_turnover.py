@@ -120,7 +120,15 @@ def build(d):
             if r.is_reb:
                 prev = prev_by_min.get(int(r.minute) - 1)
                 if prev is not None:
-                    rec = dict(sym=sym, minute=int(r.minute))
+                    rec = dict(sym=sym, minute=int(r.minute),
+                               # 2026-09-11 加：mid 與 new/old 分開留。
+                               # 原因：(a) 報酬目標要用 mid 不用成交價
+                               # （mistake.md 2026-09-11）；(b) 他的核心機制
+                               # 主張是「新舊兩個失衡符號相反」，只留合成的
+                               # i_new − i_old **驗不了那一句**。
+                               # **`combo%d` 的算式一個字沒動**，所以凍結的
+                               # 換手數字不會移動（mft_xs_alpha.py 的 C1 會驗）。
+                               mid=float(r.mid_price))
                     ok = True
                     for bnd in BANDS:
                         bn, bo = band_split(bids, r.mid_price, prev, "b", bnd)
@@ -128,6 +136,8 @@ def build(d):
                         i_new, i_old = imb(bn, an), imb(bo, ao)
                         if not (np.isfinite(i_new) and np.isfinite(i_old)):
                             ok = False
+                        rec["new%d" % bnd] = i_new
+                        rec["old%d" % bnd] = i_old
                         rec["combo%d" % bnd] = i_new - i_old
                     if ok:
                         rows.append(rec)

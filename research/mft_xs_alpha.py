@@ -1,0 +1,238 @@
+# -*- coding: utf-8 -*-
+"""MFT 第一測：他那個 1 小時橫斷面 alpha 的**毛利**（2026-09-11）
+
+===========================================================================
+為什麼現在做這個
+===========================================================================
+使用者 2026-09-11：「可以量一下 MFT」。
+
+MFT 這條線**成本側已經量完、門檻已知**（`gate0_xs_turnover.py`）：
+
+    每小時換手 52%  ->  吃單 4.55 bps/小時（= 109 bps/天）、掛單 1.52 bps/小時
+
+**缺的是毛利。** 這支補那一半。`Gate 0` 的 (c) 問的就是
+「可實現的邊際 vs 成本，比值多少」——我們有分母了，現在量分子。
+
+===========================================================================
+規格（抄他的，逐項標明哪一項是我們改的）
+===========================================================================
+〈A Real HFT/MFT Alpha〉（docs/external_reading.md 第 7 則）：
+
+    舊檔 = 上一個快照（1 分鐘前）這個價位上有超過 $100；新檔 = 沒有
+    深度聚合到 5 bps 與 10 bps，各自算失衡 (bid−ask)/(bid+ask)
+    **新舊兩個失衡符號相反**，所以合成訊號 = new − old
+    宇宙滾動前 50（市值）、權重＝特徵的橫斷面 z、縮放到總槓桿 1
+    每小時再平衡，標的是 1h 收盤對收盤報酬
+    宣稱：各自 >2 Sharpe、合起來 >3 Sortino（**原始訊號，未扣成本**）
+
+**我們與他不同的四處，全部寫出來**：
+
+| 項目 | 他 | 我們 | 後果 |
+|---|---|---|---|
+| 宇宙 | 滾動前 50 | **11 個**（`orderbook_snapshots_1m` 有的） | 11 個名字的橫斷面 z 很吵，功效差 |
+| 場館 | 未明說 | Binance L20 | |
+| 標的報酬 | 「1h 收盤對收盤」 | **mid 對 mid** | 故意的：成交價在薄簿口上自帶負自相關，會偽裝成反轉（mistake.md 2026-09-11）|
+| $100 門檻 | 他的數 | 照抄，**未經我們驗證** | 與 `hl_mid.OLD_LEVEL_USD` 同一個未驗常數 |
+
+**特徵建構直接 import `gate0_xs_turnover`**，不重寫——那支是這個特徵的
+唯一實作，而 C1 會驗證它的凍結輸出沒有被我今天的改動移動。
+
+===========================================================================
+自曝檢查（跑之前就寫死，答案已知）
+===========================================================================
+C1  **凍結對照**：重算每小時換手，必須重現 `gate0_xs_turnover.json` 的
+    `turnover_mean`（容差 0.005）。我今天為了留 new/old 而改過 `build()`，
+    這一關就是驗那個改動是 additive 的。
+C2  **機制關**：他說「新舊兩個失衡符號相反」。量 `corr(new, old)`
+    與兩者各自的 IC。**這一關不判過不過，它問的是「它在做我以為的事嗎」**
+    （mistake.md 2026-09-09 第三條）。相反才是他的機制；同號代表他的
+    代理在我們這份資料上抓到的不是同一件事。
+C3  **零成本對照**：淨值必須 ≤ 毛利。反了就是成本算式壞了
+    （`factor-research.md` 第 10 條，5 秒鐘擋掉整類錯誤）。
+C4  **功效先算**：用**判決會用的那台機器**（日聚類 bootstrap）算每小時毛利的
+    SE，再跟 4.55 / 1.52 bps 的門檻比。**SE ≥ 門檻 ⇒ 這個設計不能做決定**
+    （mistake.md 2026-09-04 / 09-06），那就報「無效判決」而不是 FAIL。
+
+===========================================================================
+報告紀律
+===========================================================================
+核心原則 9：**樣本外先講**。這支是**單一樣本、沒有樣本外切分**——
+所以它**不得被當成「發現」**，只能回答一個更窄的問題：
+**「毛利有沒有大到值得繼續？」** 那是 Gate 0 的問題，不是 alpha 的判決。
+要升級成判決必須再走 `.claude/rules/factor-research.md` 的十道。
+
+    python research/mft_xs_alpha.py
+    python research/mft_xs_alpha.py --days 30
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from research import gate0_xs_turnover as XS                   # noqa: E402
+
+OUT = ROOT / "research" / "results" / "mft_xs_alpha.json"
+FROZEN = ROOT / "research" / "results" / "gate0_xs_turnover.json"
+TOL_C1 = 0.005
+TAKER, MAKER = XS.HL_TAKER_BPS, XS.HL_MAKER_BPS      # 4.5 / 1.5，gate0.py 實查
+RNG = np.random.default_rng(20260911)
+
+
+def day_boot(x, days, b=4000):
+    """日聚類 bootstrap。回傳 (均值, SE, CI下, CI上, P(>0))。"""
+    x = np.asarray(x, float)
+    ok = np.isfinite(x)
+    x, days = x[ok], np.asarray(days)[ok]
+    if len(x) < 20:
+        return (np.nan,) * 5
+    uq, inv = np.unique(days, return_inverse=True)
+    ix = [np.where(inv == k)[0] for k in range(len(uq))]
+    r = np.empty(b)
+    for i in range(b):
+        p = RNG.integers(0, len(uq), len(uq))
+        r[i] = x[np.concatenate([ix[k] for k in p])].mean()
+    return (float(x.mean()), float(r.std(ddof=1)),
+            float(np.percentile(r, 2.5)), float(np.percentile(r, 97.5)),
+            float((r > 0).mean()))
+
+
+def port_returns(f, col):
+    """權重 x 下一小時 mid 報酬。**不重疊區間**（h=1 所以天然不重疊）。"""
+    feat = f.pivot_table(index="minute", columns="sym", values=col)
+    mid = f.pivot_table(index="minute", columns="sym", values="mid")
+    w = XS.weights_from(feat)                     # 橫斷面 z -> 總槓桿 1
+    fwd = mid.shift(-1) / mid - 1.0               # 這一格到下一格（1 小時）
+    common = w.index.intersection(fwd.index)
+    w, fwd = w.loc[common], fwd.loc[common]
+    both = w.notna() & fwd.notna()
+    r = (w.where(both) * fwd.where(both)).sum(axis=1, min_count=1)
+    ic = [float(pd.Series(feat.loc[t]).corr(pd.Series(fwd.loc[t]), method="spearman"))
+          for t in common]
+    return r.dropna() * 1e4, pd.Series(ic, index=common).dropna(), w
+
+
+def main():
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--days", type=int, default=14)
+    a = ap.parse_args()
+
+    print("抓快照（%d 天）…" % a.days)
+    d = XS.load_pairs(a.days)
+    f = XS.build(d)
+    if f is None or not len(f):
+        print("沒有可用的再平衡點，停。")
+        return 2
+    f["day"] = pd.to_datetime(f.minute * 60000, unit="ms", utc=True).dt.strftime("%Y-%m-%d")
+    res = dict(asof=time.strftime("%Y-%m-%d %H:%M:%S"), days=a.days,
+               rebalances=int(f.minute.nunique()), symbols=int(f.sym.nunique()),
+               rows=int(len(f)), thresholds=dict(taker_bps_h=TAKER, maker_bps_h=MAKER))
+    print("再平衡 %d 次、%d 標的、%d 列\n"
+          % (res["rebalances"], res["symbols"], res["rows"]))
+
+    # ---------- C1 凍結對照 ----------
+    print("=== C1 凍結對照（我今天改過 build()，驗它是 additive）===")
+    c1 = True
+    if FROZEN.exists():
+        fr = json.loads(FROZEN.read_text(encoding="utf-8"))
+        for bnd in XS.BANDS:
+            _, dw = XS.turnover(f, "combo%d" % bnd)
+            got = float(dw.mean())
+            ref = ((fr.get("arms") or {}).get("%dbps" % bnd) or {}).get("turnover_mean")
+            ok = ref is None or abs(got - ref) < TOL_C1
+            c1 &= bool(ok)
+            print("  %2d bps  換手本次 %.4f  凍結 %s  %s"
+                  % (bnd, got, ("%.4f" % ref) if ref is not None else "—",
+                     "OK" if ok else "**不符**"))
+    else:
+        print("  找不到凍結檔，跳過（**這一關因此沒有保護力**）")
+        c1 = False
+    res["C1"] = bool(c1)
+    if not c1:
+        print("\n**C1 未過 —— 我的改動動到了凍結的算術，以下不解讀。**")
+        OUT.write_text(json.dumps(res, ensure_ascii=False, indent=2, default=str),
+                       encoding="utf-8")
+        return 2
+    print("  -> PASS\n")
+
+    # ---------- C2 機制關：新舊符號相反嗎 ----------
+    print("=== C2 機制關：他說「新舊兩個失衡符號相反」===")
+    print("%-8s %12s %12s %12s %12s"
+          % ("帶", "corr(新,舊)", "IC 新", "IC 舊", "IC 合成"))
+    mech = {}
+    for bnd in XS.BANDS:
+        c = float(f["new%d" % bnd].corr(f["old%d" % bnd]))
+        ics = {}
+        for nm in ("new", "old", "combo"):
+            _, ic, _ = port_returns(f, "%s%d" % (nm, bnd))
+            ics[nm] = float(ic.mean()) if len(ic) else np.nan
+        mech["%dbps" % bnd] = dict(corr_new_old=c, **{"ic_" + k: v for k, v in ics.items()})
+        print("%-8s %12.3f %12.4f %12.4f %12.4f"
+              % ("%d bps" % bnd, c, ics["new"], ics["old"], ics["combo"]))
+    res["C2_mechanism"] = mech
+    print("  他的機制要求 corr(新,舊) **為負**、且兩者 IC 反號。")
+    print("  **這一關不判過不過** —— 它回答「它在做我以為的事嗎」。\n")
+
+    # ---------- 毛利 / 淨值 / 功效 ----------
+    print("=== 毛利、淨值、功效（每小時 bps）===")
+    print("%-10s %9s %8s %9s %9s %8s %10s %10s"
+          % ("訊號", "毛利", "SE", "CI下", "CI上", "P(>0)", "淨(吃單)", "淨(掛單)"))
+    arms = {}
+    for bnd in XS.BANDS:
+        col = "combo%d" % bnd
+        r, ic, w = port_returns(f, col)
+        dmap = f.drop_duplicates("minute").set_index("minute")["day"]
+        dys = dmap.reindex(r.index).values
+        m, se, lo, hi, ppos = day_boot(r.values, dys)
+        _, dw = XS.turnover(f, col)
+        tk = float(dw.mean()) * 2 * TAKER       # 單邊換手 x 兩邊 x 費率
+        mk = float(dw.mean()) * 2 * MAKER
+        arms["%dbps" % bnd] = dict(
+            gross_bps_h=m, se_bps_h=se, ci_lo=lo, ci_hi=hi, p_pos=ppos,
+            ic_mean=float(ic.mean()), n_reb=int(len(r)),
+            cost_taker_bps_h=tk, cost_maker_bps_h=mk,
+            net_taker=m - tk, net_maker=m - mk,
+            inconclusive_by_design=bool(se >= MAKER))
+        print("%-10s %+9.3f %8.3f %+9.3f %+9.3f %7.1f%% %+10.3f %+10.3f"
+              % ("combo%d" % bnd, m, se, lo, hi, 100 * ppos, m - tk, m - mk))
+    res["arms"] = arms
+
+    # ---------- C3 零成本對照 ----------
+    c3 = all(v["net_taker"] <= v["gross_bps_h"] + 1e-9
+             and v["net_maker"] <= v["gross_bps_h"] + 1e-9 for v in arms.values())
+    res["C3"] = bool(c3)
+    print("\n=== C3 零成本對照 ===")
+    print("  淨值 <= 毛利：%s" % ("OK" if c3 else "**壞了——成本算式有問題**"))
+
+    # ---------- C4 功效 ----------
+    print("\n=== C4 功效（SE vs 門檻）===")
+    for k, v in arms.items():
+        verdict = ("**無效判決（設計上測不動）**" if v["se_bps_h"] >= MAKER
+                   else "有測量能力")
+        print("  %-8s SE %.3f bps/h  vs 掛單門檻 %.2f / 吃單門檻 %.2f  -> %s"
+              % (k, v["se_bps_h"], MAKER, TAKER, verdict))
+
+    print("\n=== 讀法（核心原則 9）===")
+    print("  **這不是 alpha 的判決，是 Gate 0 的分子。** 單一樣本、沒有樣本外")
+    print("  切分，所以它只能回答「毛利有沒有大到值得繼續」。")
+    print("  要升級成判決必須走 factor-research.md 的十道。")
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(res, ensure_ascii=False, indent=2, default=str),
+                   encoding="utf-8")
+    print("written -> " + str(OUT))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
