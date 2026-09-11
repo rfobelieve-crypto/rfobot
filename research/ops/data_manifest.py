@@ -68,6 +68,13 @@ REGISTRY = [
     ("hl L2 簿口", "research/hl/data/book/*.json", "append", "同上"),
     ("hl 掛單與觸發單", "research/hl/data/orders/*.json", "append",
      "同上。觸發單 = 真實止損，§1.05 只能用指標代理的那個量"),
+    # 2026-09-11：HL 的歷史 K 線。**這是 HL 上唯一可以回填的歷史** ——
+    # 部位/簿口/成交帶四樣都沒有歷史端點。但它也會從頭部掉資料：
+    # candleSnapshot 只保留最近 **5000 根**（實測），所以 1h 只有 208 天、
+    # 1m 只有 3.5 天。保留是以「根數」算的，週期越細歷史越短。
+    ("hl 歷史 K 線", "research/hl/data/candles/*.parquet", "append",
+     "hl_candles.py 下載；端點保留上限 5000 根/週期，1h ~208 天。"
+     "所以它既是可回填的、也是會從頭部腐蝕的 —— 兩者同時成立"),
     ("hl 地址宇宙", "research/hl/data/addresses.json", "append",
      "只增不減；覆蓋率隨它成長（實測 242 -> 633 個地址時覆蓋 7% -> 17%）"),
     ("poc/data 掃單快照", "research/poc/data/sweep_snapshot.parquet", "derived",
@@ -141,12 +148,27 @@ def scan():
                    rows=0, first_ts=None, last_ts=None, bytes=0, sha=None)
         h = hashlib.sha256()
         for p in files:
-            if p.suffix == ".csv":
-                n, a, z = _csv_span(p)
-            elif p.suffix == ".json":
-                n, a, z = _json_span(p)
-            else:
-                n, a, z = _pq_span(p)
+            # **讀不開要分兩種**：剛好在被寫（暫態）vs 真的壞了（要有人看）。
+            # 用 mtime 分辨 —— 2026-09-11 DailyCollect 就是撞到成交帶的
+            # 5 分鐘落盤，整條班車因此回 rc=1，而那個非零從此沒有分辨力。
+            try:
+                if p.suffix == ".csv":
+                    n, a, z = _csv_span(p)
+                elif p.suffix == ".json":
+                    n, a, z = _json_span(p)
+                else:
+                    n, a, z = _pq_span(p)
+            except Exception as e:
+                try:
+                    fresh = (time.time() - p.stat().st_mtime) < 120
+                except Exception:
+                    fresh = False
+                bucket = "writing" if fresh else "corrupt"
+                agg.setdefault(bucket, []).append(p.name)
+                print("[%s] %s 讀不開（%s）: %s"
+                      % ("SKIP" if fresh else "BAD", name, p.name,
+                         str(e).split(chr(10))[0][:90]))
+                continue
             agg["rows"] += n
             agg["bytes"] += p.stat().st_size
             if a is not None:
@@ -175,6 +197,15 @@ def main():
         if a.get("missing"):
             bad.append("%s -> 檔案不見了" % name)
             continue
+        # 讀不開的檔：**corrupt 要變紅，writing 不算錯**。
+        # writing 是常態（成交帶每 5 分鐘落盤，班車會撞上），
+        # 把常態記成錯會訓練人忽略這個頻道。
+        if a.get("corrupt"):
+            bad.append("%s -> **檔案讀不開且不是正在寫**: %s"
+                       % (name, ", ".join(a["corrupt"][:3])))
+        if a.get("writing"):
+            notes.append("%s -> %d 個檔正在被寫入，本輪跳過（預期行為）"
+                         % (name, len(a["writing"])))
         if not b or b.get("missing"):
             notes.append("%s -> 首次登記" % name)
             continue

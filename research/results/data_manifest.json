@@ -1,0 +1,162 @@
+{
+  "ok": true,
+  "reason": "14 份資料，0 則備註",
+  "notes": [],
+  "asof": "2026-09-11 11:11:27",
+  "data": {
+    "sweep_failure/.cache 1h bars": {
+      "kind": "rolling",
+      "note": "fetch_klines.py --days 930，起點 = now - days*86400。**頭部必然前移**；任何 sha / 絕對筆數的基準都不可以指向這裡（2026-09-10 已為此把 parity 測試的基準搬到 crowd_stops/frozen）",
+      "files": 29,
+      "missing": false,
+      "rows": 654813,
+      "first_ts": 1707544800,
+      "last_ts": 1789092000,
+      "bytes": 31546290,
+      "sha": null
+    },
+    "crowd_stops/frozen 1h 切片": {
+      "kind": "frozen",
+      "note": "stop_map 的母體，2026-09-10 從 .cache 複製後凍結。任何變動 = 紅",
+      "files": 9,
+      "missing": false,
+      "rows": 201591,
+      "first_ts": 1708394400,
+      "last_ts": 1789027200,
+      "bytes": 10132069,
+      "sha": "97dfa28d6de0d70acd1410a19f4f5ea2"
+    },
+    "tests/fixtures 三本帳": {
+      "kind": "frozen",
+      "note": "研究回歸測試的輸入（V7 在 MySQL、OLD 來自滾動窗，都不可重現）。任何變動 = 紅，除非同時重跑 make_fixtures.py 並更新判決值",
+      "files": 3,
+      "missing": false,
+      "rows": 9478,
+      "first_ts": 1708502400000,
+      "last_ts": 1789005600000,
+      "bytes": 209424,
+      "sha": "0449c0ea5125cfe896ce10a5dad21462"
+    },
+    "poc/data 分鐘 bar": {
+      "kind": "append",
+      "note": "fetch_bars.py。只在尾端長；頭部前移 = 有人截斷了它",
+      "files": 9,
+      "missing": false,
+      "rows": 12165390,
+      "first_ts": 1707973200000,
+      "last_ts": 1789075740000,
+      "bytes": 491537710,
+      "sha": null
+    },
+    "poc/data 未平倉量": {
+      "kind": "append",
+      "note": "fetch_oi.py，5 分鐘級",
+      "files": 9,
+      "missing": false,
+      "rows": 2430097,
+      "first_ts": 1707955200000,
+      "last_ts": 1788998100000,
+      "bytes": 146051171,
+      "sha": null
+    },
+    "poc/data 清算": {
+      "kind": "append",
+      "note": "小時級，2026-03-11 起",
+      "files": 9,
+      "missing": false,
+      "rows": 38880,
+      "first_ts": 1773194400000,
+      "last_ts": 1788742800000,
+      "bytes": 1154066,
+      "sha": null
+    },
+    "hl 清算價直方圖": {
+      "kind": "append",
+      "note": "hl_fuel_recorder.py 每小時。**沒有歷史端點**，停了就永久缺那一小時",
+      "files": 8,
+      "missing": false,
+      "rows": 6829,
+      "first_ts": 1789070151000,
+      "last_ts": 1789092368000,
+      "bytes": 1810915,
+      "sha": null
+    },
+    "hl 逐部位明細": {
+      "kind": "append",
+      "note": "**真相源**。清算事件在公開端點沒有旗標，唯一判定是「部位在下一個快照消失且期間價格穿過它的清算價」—— 那需要逐部位明細。直方圖由它推導",
+      "files": 4,
+      "missing": false,
+      "rows": 40362,
+      "first_ts": 1789082932,
+      "last_ts": 1789092368,
+      "bytes": 1901010,
+      "sha": null
+    },
+    "hl 市場狀態(OI/funding)": {
+      "kind": "append",
+      "note": "同上。OI 在 Hyperliquid 沒有歷史查詢，這是唯一來源",
+      "files": 9,
+      "missing": false,
+      "rows": 3242,
+      "first_ts": 1789070151000,
+      "last_ts": 1789096021000,
+      "bytes": 776222,
+      "sha": null
+    },
+    "hl L2 簿口": {
+      "kind": "append",
+      "note": "同上",
+      "files": 9,
+      "missing": false,
+      "rows": 3151,
+      "first_ts": 1789070151000,
+      "last_ts": 1789096021000,
+      "bytes": 2338298,
+      "sha": null
+    },
+    "hl 掛單與觸發單": {
+      "kind": "append",
+      "note": "同上。觸發單 = 真實止損，§1.05 只能用指標代理的那個量",
+      "files": 8,
+      "missing": false,
+      "rows": 31969,
+      "first_ts": 1789070151000,
+      "last_ts": 1789092368000,
+      "bytes": 4603824,
+      "sha": null
+    },
+    "hl 歷史 K 線": {
+      "kind": "append",
+      "note": "hl_candles.py 下載；端點保留上限 5000 根/週期，1h ~208 天。所以它既是可回填的、也是會從頭部腐蝕的 —— 兩者同時成立",
+      "files": 305,
+      "missing": false,
+      "rows": 943636,
+      "first_ts": null,
+      "last_ts": null,
+      "bytes": 50744488,
+      "sha": null
+    },
+    "hl 地址宇宙": {
+      "kind": "append",
+      "note": "只增不減；覆蓋率隨它成長（實測 242 -> 633 個地址時覆蓋 7% -> 17%）",
+      "files": 1,
+      "missing": false,
+      "rows": 2645,
+      "first_ts": null,
+      "last_ts": null,
+      "bytes": 124557,
+      "sha": null
+    },
+    "poc/data 掃單快照": {
+      "kind": "derived",
+      "note": "sweep_snapshot.py 整份重生；筆數變動是正常的，只記錄",
+      "files": 1,
+      "missing": false,
+      "rows": 9262,
+      "first_ts": 1708049460000,
+      "last_ts": 1788967380000,
+      "bytes": 4339846,
+      "sha": null
+    }
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "ok": true,
+  "reason": "15 refs ok",
+  "n_refs": 15,
+  "n_bad": 0,
+  "rows": [
+    {
+      "task": "EntropyArbWatchdog",
+      "state": "Ready",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\run_hidden.vbs",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "EntropyArbWatchdog",
+      "state": "Ready",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\arb\\ops\\arb_watchdog.ps1",
+      "exists": true,
+      "inside_repo": false,
+      "tracked": null
+    },
+    {
+      "task": "Flowbot Monthly Revalidation",
+      "state": "Ready",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\scripts\\run_monthly_revalidation.cmd",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "FlowBot_ConjClock",
+      "state": "Ready",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\run_hidden.vbs",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "FlowBot_ConjClock",
+      "state": "Ready",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\conj_update.bat",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "FlowBot_ConjWatch",
+      "state": "Ready",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\run_hidden.vbs",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "FlowBot_ConjWatch",
+      "state": "Ready",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\conj_watch.bat",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "FlowBot_DailyCollect",
+      "state": "Ready",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\market_data\\backfill\\daily_collect.bat",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "FlowBot_ExitPathsWatchdog",
+      "state": "Ready",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\run_hidden.vbs",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "FlowBot_ExitPathsWatchdog",
+      "state": "Ready",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\exit_paths_watchdog.ps1",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "FlowBot_HLRecord",
+      "state": "Running",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\run_hidden.vbs",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "FlowBot_HLRecord",
+      "state": "Running",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\hl_record.bat",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "FlowBot_IndicatorUpdate",
+      "state": "Disabled",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\run_indicator.bat",
+      "exists": true,
+      "inside_repo": false,
+      "tracked": null
+    },
+    {
+      "task": "SweepShadow",
+      "state": "Running",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\run_hidden.vbs",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    },
+    {
+      "task": "SweepShadow",
+      "state": "Running",
+      "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\sweep_failure\\shadow_engine.bat",
+      "exists": true,
+      "inside_repo": true,
+      "tracked": true
+    }
+  ],
+  "asof": "2026-09-11 11:06:54"
+}
