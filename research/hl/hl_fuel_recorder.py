@@ -39,6 +39,16 @@ Hyperliquid 公開。`clearinghouseState` 逐地址給出
 **可以事後補、今晚不錄的**：candleSnapshot（3 年以上）、fundingHistory
 （400 天以上）、userFills（逐地址分頁）。它們有歷史，所以不急。
 
+**2026-09-11 擴編到全部子 dex**（使用者：「數據來源太少了我現在是整個鏈上」）。
+`perpDexs` 回傳 11 個場：主場 + 10 個別人部署的（xyz/flx/vntl/hyna/km/abcd/
+cash/para/mkts/io）。同一個 API，只多一個 `dex` 參數：
+
+    主場 234 + 子 dex 284 = **518 個市場**（宇宙 x 2.2，幾乎零程式碼）
+
+每一列都帶 `dex` 欄位 —— **不同場的市場不可以混在一起算**（同名的幣在不同
+場是不同的合約、不同的簿口、不同的清算引擎）。`io` 那個場正好是套利線
+（§0.75）已經在掃的，所以兩條線會在這裡交會。
+
 ===========================================================================
 實測的可行性（2026-09-11，開工前先量）
 ===========================================================================
@@ -120,7 +130,17 @@ API = "https://api.hyperliquid.xyz/info"
 BINS = (0.5, 1.0, 2.0, 3.0, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 50.0, float("inf"))
 DISCOVER_COINS = 60          # 每輪從 OI 最大的前 N 個幣撈地址
 MAX_ADDR_DEFAULT = 1200      # 每輪查多少個地址（11.5 req/s -> 約 2 分鐘）
-SLEEP = 0.03                 # 約 30 req/s 上限之下的保守間隔
+# 2026-09-11：原本 0.03（約 30 req/s）在短爆發測得過，**持續幾分鐘就被限速**
+# —— 實測 l2Book 只拿到 183/518、metaAndAssetCtxs 整個失敗。而那是**靜默**的：
+# 沒有報錯，只是少了 65%。所以兩件事一起改：放慢到官方限額之內，
+# 並且**把完整率當成旗標的一部分**（完整率不是可以假設的東西）。
+SLEEP = 0.15                 # 約 6.7 req/s = 400/分。0.09（11/s）實測
+                             # 仍被限速（market 完整率掉到 88%），而 l2Book
+                             # 的 weight 比一般請求高，所以按最慢的那個配
+MIN_COMPLETE = 0.95         # 任何任務的完整率低於此 -> 旗標紅
+
+
+_calls = dict(ok=0, fail=0)
 
 
 def info(body, tries=3, timeout=30):
@@ -130,29 +150,52 @@ def info(body, tries=3, timeout=30):
                 API, data=json.dumps(body).encode(),
                 headers={"Content-Type": "application/json"}, method="POST")
             with urllib.request.urlopen(req, timeout=timeout) as r:
-                return json.loads(r.read().decode())
+                out = json.loads(r.read().decode())
+            _calls["ok"] += 1
+            return out
         except Exception:
             if i == tries - 1:
+                _calls["fail"] += 1
                 return None
-            time.sleep(0.5 * (i + 1))
+            time.sleep(1.0 * (i + 1))      # 被限速時要真的退讓
+    _calls["fail"] += 1
     return None
 
 
+def perp_dexs():
+    """回傳 [None, 'xyz', ...]：None 是主場，其餘是別人部署的永續場。"""
+    d = info({"type": "perpDexs"})
+    if not isinstance(d, list):
+        return [None]
+    out = []
+    for x in d:
+        out.append(None if x is None else x.get("name"))
+    return out or [None]
+
+
 def markets():
-    """回傳 {coin: dict(mark, oi_usd, funding, oi)}。"""
-    d = info({"type": "metaAndAssetCtxs"})
-    if not (isinstance(d, list) and len(d) > 1):
-        return {}
+    """回傳 {(dex, coin): dict(...)}。**鍵必須含 dex** —— 同名的幣在不同場
+    是不同的合約、不同的簿口、不同的清算引擎，混在一起算就是兩種單位混進
+    同一個中位數（mistake.md 2026-09-03 的形狀）。"""
     out = {}
-    for m, c in zip(d[0]["universe"], d[1]):
-        try:
-            mark = float(c["markPx"])
-            oi = float(c["openInterest"])
-            out[m["name"]] = dict(mark=mark, oi=oi, oi_usd=oi * mark,
-                                  funding=float(c.get("funding") or 0),
-                                  max_lev=m.get("maxLeverage"))
-        except Exception:
+    for dex in perp_dexs():
+        body = {"type": "metaAndAssetCtxs"}
+        if dex:
+            body["dex"] = dex
+        d = info(body)
+        if not (isinstance(d, list) and len(d) > 1):
             continue
+        for m, c in zip(d[0]["universe"], d[1]):
+            try:
+                mark = float(c["markPx"])
+                oi = float(c["openInterest"])
+                out[(dex, m["name"])] = dict(
+                    dex=dex, coin=m["name"], mark=mark, oi=oi,
+                    oi_usd=oi * mark, funding=float(c.get("funding") or 0),
+                    max_lev=m.get("maxLeverage"), szd=m.get("szDecimals"))
+            except Exception:
+                continue
+        time.sleep(SLEEP)
     return out
 
 
@@ -174,17 +217,26 @@ def save_addrs(s):
 
 
 def discover(mk, known):
-    """從成交最近的幾個幣撈新地址。"""
+    """逐 dex 從成交最近的幾個幣撈地址（每場各取 OI 最大的前 N 個）。"""
     found = set()
-    for coin in sorted(mk, key=lambda k: -mk[k]["oi_usd"])[:DISCOVER_COINS]:
-        d = info({"type": "recentTrades", "coin": coin})
-        if isinstance(d, list):
-            for tr in d:
-                for u in (tr.get("users") or []):
-                    if isinstance(u, str) and u.startswith("0x") and len(u) == 42:
-                        found.add(u.lower())
-        time.sleep(SLEEP)
-    return found - known, found
+    by_dex = {}
+    for dex in sorted({k[0] for k in mk}, key=lambda x: (x is not None, x or "")):
+        ks = [k for k in mk if k[0] == dex]
+        ks.sort(key=lambda k: -mk[k]["oi_usd"])
+        for (_dx, coin) in ks[:DISCOVER_COINS if dex is None else 12]:
+            body = {"type": "recentTrades", "coin": coin}
+            if dex:
+                body["dex"] = dex
+            d = info(body, tries=2)
+            if isinstance(d, list):
+                for tr in d:
+                    for u in (tr.get("users") or []):
+                        if isinstance(u, str) and u.startswith("0x") and len(u) == 42:
+                            u = u.lower()
+                            found.add(u)
+                            by_dex.setdefault(u, set()).add(dex)
+            time.sleep(SLEEP)
+    return found - known, found, by_dex
 
 
 def bin_of(pct):
@@ -260,14 +312,21 @@ def snapshot(mk, addrs, max_addr):
 
 
 def rec_market(mk, ts):
-    """234 個幣的市場狀態。OI 沒有歷史端點，所以這是唯一的來源。"""
-    d = info({"type": "metaAndAssetCtxs"})
+    """全部 518 個市場（11 個場）的狀態。OI 沒有歷史端點，這是唯一的來源。
+    **每列帶 dex** —— 同名的幣在不同場是不同的合約。"""
     rows = []
-    if isinstance(d, list) and len(d) > 1:
+    for dex in sorted({k[0] for k in mk}, key=lambda x: (x is not None, x or "")):
+        body = {"type": "metaAndAssetCtxs"}
+        if dex:
+            body["dex"] = dex
+        d = info(body)
+        time.sleep(SLEEP)
+        if not (isinstance(d, list) and len(d) > 1):
+            continue
         for m, c in zip(d[0]["universe"], d[1]):
             try:
                 rows.append(dict(
-                    ts=ts, coin=m["name"], max_lev=m.get("maxLeverage"),
+                    ts=ts, dex=dex, coin=m["name"], max_lev=m.get("maxLeverage"),
                     mark=float(c["markPx"]), oracle=float(c["oraclePx"]),
                     mid=float(c["midPx"]) if c.get("midPx") else None,
                     oi=float(c["openInterest"]),
@@ -282,26 +341,34 @@ def rec_market(mk, ts):
                 continue
     MKT_DIR.mkdir(parents=True, exist_ok=True)
     (MKT_DIR / (time.strftime("%Y%m%d_%H", time.gmtime(ts)) + ".json")).write_text(
-        json.dumps(dict(ts=ts, rows=rows), ensure_ascii=False), encoding="utf-8")
-    return len(rows)
+        json.dumps(dict(ts=ts, n_expected=len(mk), rows=rows),
+                   ensure_ascii=False), encoding="utf-8")
+    return dict(rows=len(rows), expected=len(mk),
+                complete=len(rows) / max(len(mk), 1))
 
 
 def rec_book(mk, ts, n_coins):
-    """L2 兩側各 20 檔。按 OI 取前 n_coins 個幣（全 234 個也只要 ~20 秒）。"""
+    """L2 兩側各 20 檔，全部 518 個市場（約 45 秒）。每列帶 dex。"""
     rows = []
-    for coin in sorted(mk, key=lambda k: -mk[k]["oi_usd"])[:n_coins]:
-        d = info({"type": "l2Book", "coin": coin}, tries=2)
+    for (dex, coin) in sorted(mk, key=lambda k: -mk[k]["oi_usd"])[:n_coins]:
+        body = {"type": "l2Book", "coin": coin}
+        if dex:
+            body["dex"] = dex
+        d = info(body, tries=2)
         time.sleep(SLEEP)
         if not (isinstance(d, dict) and d.get("levels")):
             continue
         bid, ask = d["levels"][0], d["levels"][1]
-        rows.append(dict(ts=ts, coin=coin,
+        rows.append(dict(ts=ts, dex=dex, coin=coin,
                          bid=[[lv["px"], lv["sz"], lv["n"]] for lv in bid],
                          ask=[[lv["px"], lv["sz"], lv["n"]] for lv in ask]))
+    want = min(n_coins, len(mk))
     BOOK_DIR.mkdir(parents=True, exist_ok=True)
     (BOOK_DIR / (time.strftime("%Y%m%d_%H", time.gmtime(ts)) + ".json")).write_text(
-        json.dumps(dict(ts=ts, rows=rows), ensure_ascii=False), encoding="utf-8")
-    return len(rows)
+        json.dumps(dict(ts=ts, n_expected=want, rows=rows),
+                   ensure_ascii=False), encoding="utf-8")
+    return dict(rows=len(rows), expected=want,
+                complete=len(rows) / max(want, 1))
 
 
 def rec_orders(mk, addrs, ts, max_addr):
@@ -365,7 +432,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--discover", action="store_true", help="只擴充地址宇宙")
     ap.add_argument("--max-addr", type=int, default=MAX_ADDR_DEFAULT)
-    ap.add_argument("--book-coins", type=int, default=234)
+    ap.add_argument("--book-coins", type=int, default=1000)  # 全部 518
     ap.add_argument("--tasks", default="market,book,fuel,orders")
     args = ap.parse_args()
     tasks = set(x.strip() for x in args.tasks.split(","))
@@ -380,10 +447,13 @@ def main():
         print("RED  metaAndAssetCtxs 拿不到")
         return 1
     tot_oi = sum(v["oi_usd"] for v in mk.values())
-    print("市場 %d 個，總未平倉 $%.1fM" % (len(mk), tot_oi / 1e6))
+    ndex = len({k[0] for k in mk})
+    print("市場 %d 個（%d 個場），總未平倉 $%.1fM；主場 $%.1fM"
+          % (len(mk), ndex, tot_oi / 1e6,
+             sum(v["oi_usd"] for k, v in mk.items() if k[0] is None) / 1e6))
 
     known = load_addrs()
-    new, seen = discover(mk, known)
+    new, seen, _by_dex = discover(mk, known)
     known |= new
     save_addrs(known)
     print("地址宇宙 %d（本輪新增 %d，掃了 %d 個幣的最近成交）"
@@ -396,12 +466,17 @@ def main():
     did = {}
     if "market" in tasks:
         did["market"] = rec_market(mk, ts)
-        print("market  -> %d 個幣的 OI/funding/premium" % did["market"])
+        print("market  -> %d/%d 個市場（完整率 %.0f%%）"
+              % (did["market"]["rows"], did["market"]["expected"],
+                 100 * did["market"]["complete"]))
     if "book" in tasks:
         did["book"] = rec_book(mk, ts, args.book_coins)
-        print("book    -> %d 個幣的 L2（兩側各 20 檔）" % did["book"])
+        print("book    -> %d/%d 個 L2（完整率 %.0f%%）"
+              % (did["book"]["rows"], did["book"]["expected"],
+                 100 * did["book"]["complete"]))
     if "orders" in tasks:
-        did["orders"] = rec_orders(mk, known, ts, args.max_addr)
+        did["orders"] = rec_orders({k[1]: v for k, v in mk.items()
+                                    if k[0] is None}, known, ts, args.max_addr)
         print("orders  -> %d 筆掛單、**%d 筆觸發單(止損)**、聚合 %d 列"
               % (did["orders"]["n_orders"], did["orders"]["n_trigger"],
                  did["orders"]["resting_rows"]))
@@ -413,7 +488,11 @@ def main():
             indent=2), encoding="utf-8")
         return 0
 
-    agg, sampled, stat, detail = snapshot(mk, known, args.max_addr)
+    # **部位與掛單本輪仍只掃主場**（明寫，不是漏）：clearinghouseState 吃
+    # dex 參數但各場分開回傳，逐 (地址 x 11 場) 會是 ~10k 次呼叫；而我們的
+    # 地址是從主場成交撈的、子場重疊實測為 0。等子場的地址宇宙長起來再開。
+    mk_main = {k[1]: v for k, v in mk.items() if k[0] is None}
+    agg, sampled, stat, detail = snapshot(mk_main, known, args.max_addr)
     if detail:
         import pandas as pd
         POS_DIR.mkdir(parents=True, exist_ok=True)
@@ -424,7 +503,8 @@ def main():
                         index=False)
         print("positions -> %d 個部位明細（真相源，清算事件由相鄰快照差推出）"
               % len(detail))
-    cov = sum(sampled.values()) / tot_oi if tot_oi else 0.0
+    oi_main = sum(v["oi_usd"] for k, v in mk.items() if k[0] is None)
+    cov = sum(sampled.values()) / oi_main if oi_main else 0.0   # 分母=主場
     print("查 %d 個地址 -> %d 部位、%d 個有清算價、幾何違反 %d"
           % (stat["addrs_ok"], stat["positions"], stat["with_liq"],
              stat["geom_violations"]))
@@ -440,10 +520,10 @@ def main():
                                  bin_hi_pct=(None if BINS[bi] == float("inf")
                                              else BINS[bi]),
                                  notional=ntl, n_pos=cnt,
-                                 mark=mk[coin]["mark"],
-                                 oi_usd=mk[coin]["oi_usd"],
+                                 mark=mk_main[coin]["mark"],
+                                 oi_usd=mk_main[coin]["oi_usd"],
                                  sampled_usd=sampled.get(coin, 0.0),
-                                 funding=mk[coin]["funding"]))
+                                 funding=mk_main[coin]["funding"]))
     SNAP_DIR.mkdir(parents=True, exist_ok=True)
     out = SNAP_DIR / (time.strftime("%Y%m%d_%H", time.gmtime(ts)) + ".json")
     out.write_text(json.dumps(dict(
@@ -453,13 +533,21 @@ def main():
         n_addresses=len(known), rows=rows), ensure_ascii=False), encoding="utf-8")
     print("快照 %d 列 -> %s" % (len(rows), out.name))
 
-    ok = stat["with_liq"] > 100 and stat["geom_violations"] == 0 and cov > 0.01
+    incomplete = [k for k, v in did.items()
+                  if isinstance(v, dict) and "complete" in v
+                  and v["complete"] < MIN_COMPLETE]
+    failrate = _calls["fail"] / max(_calls["ok"] + _calls["fail"], 1)
+    ok = (stat["with_liq"] > 100 and stat["geom_violations"] == 0
+          and cov > 0.01 and not incomplete and failrate < 0.05)
     FLAG.parent.mkdir(parents=True, exist_ok=True)
     FLAG.write_text(json.dumps(dict(
         ok=bool(ok),
-        reason=("覆蓋 %.2f%%、%d 個清算價、幾何違反 %d、地址 %d、%.0f 秒"
+        reason=("覆蓋 %.2f%%、%d 個清算價、幾何違反 %d、地址 %d、"
+                "呼叫失敗率 %.1f%%、不完整的任務 %s、%.0f 秒"
                 % (100 * cov, stat["with_liq"], stat["geom_violations"],
-                   len(known), time.time() - t0)),
+                   len(known), 100 * failrate, incomplete or "無",
+                   time.time() - t0)),
+        call_fail_rate=failrate, incomplete=incomplete,
         coverage_frac=cov, n_addresses=len(known), stat=stat, did=did,
         snapshots=len(list(SNAP_DIR.glob("*.json"))),
         asof=time.strftime("%Y-%m-%d %H:%M:%S")), ensure_ascii=False,
