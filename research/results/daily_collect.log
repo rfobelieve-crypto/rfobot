@@ -2761,3 +2761,559 @@ Manifest saved: D:\flowbot_data\manifest.json
 2026-09-08 04:00:56,895 [INFO] Total copied: 6 files, 954.7 KB
 2026-09-08 04:00:56,895 [INFO] Destination total: 49.1 MB
 [2026/09/08 ¶g¤G  4:00:56.90] ===== done FAILED=0 ===== 
+[2026/09/09 ¶g¤T  4:00:01.72] ===== daily_collect start ===== 
+[2026/09/09 ¶g¤T  4:00:01.75] step1 coinglass_backfill 
+2026-09-09 04:00:02,867 [INFO] === OI History: BTC (BTCUSDT) Binance 1h ===
+2026-09-09 04:00:03,156 [INFO] OI: 4000 rows fetched
+2026-09-09 04:00:03,277 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\oi_BTC_Binance_1h.parquet (4000 rows)
+2026-09-09 04:00:03,277 [INFO] === OI Aggregated: BTC 1h ===
+2026-09-09 04:00:03,530 [INFO] OI Aggregated: 4000 rows
+2026-09-09 04:00:03,548 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\oi_agg_BTC_Binance_1h.parquet (4000 rows)
+2026-09-09 04:00:03,548 [INFO] === Liquidation: BTC (BTCUSDT) Binance 1h ===
+2026-09-09 04:00:03,669 [INFO] Liquidation: 4000 rows
+2026-09-09 04:00:03,681 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\liquidation_BTC_Binance_1h.parquet (4000 rows)
+2026-09-09 04:00:03,681 [INFO] === Long/Short Ratio: BTC (BTCUSDT) Binance 1h ===
+2026-09-09 04:00:03,846 [INFO] Long/Short: 4000 rows
+2026-09-09 04:00:03,853 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\long_short_BTC_Binance_1h.parquet (4000 rows)
+2026-09-09 04:00:03,855 [INFO] === Funding Rate: BTC (BTCUSDT) Binance 1h ===
+2026-09-09 04:00:04,035 [INFO] Funding: 4000 rows
+2026-09-09 04:00:04,050 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\funding_BTC_Binance_1h.parquet (4000 rows)
+2026-09-09 04:00:04,050 [INFO] === Taker Buy/Sell: BTC (BTCUSDT) Binance 1h ===
+2026-09-09 04:00:04,175 [INFO] Taker: 4000 rows
+2026-09-09 04:00:04,190 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\taker_BTC_Binance_1h.parquet (4000 rows)
+2026-09-09 04:00:04,190 [INFO] Done. Files saved to C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass
+[2026/09/09 ¶g¤T  4:00:04.26] step2 research backfill_all_parquet 
+============================================================
+[1/3] Binance klines 1h backfill
+============================================================
+  Existing: 7820 bars, ends at 2026-09-07 19:00:00+00:00
+  Fetched 24 bars up to 2026-09-08 19:00:00+00:00
+  Updated: 7844 bars, 2025-10-17 00:00:00+00:00 -> 2026-09-08 19:00:00+00:00
+
+============================================================
+[2/4 existing] Coinglass endpoints
+============================================================
+  oi: 7838 bars, 2025-10-17 -> 2026-09-08
+  oi_agg: 7838 bars, 2025-10-17 -> 2026-09-08
+  liquidation: 7838 bars, 2025-10-17 -> 2026-09-08
+  long_short: 7838 bars, 2025-10-17 -> 2026-09-08
+  global_ls: 7838 bars, 2025-10-17 -> 2026-09-08
+  funding: 7838 bars, 2025-10-17 -> 2026-09-08
+  taker: 7838 bars, 2025-10-17 -> 2026-09-08
+
+============================================================
+[3/4 new] Coinglass endpoints
+============================================================
+  coinbase_premium: 7713 bars, 2025-10-22 -> 2026-09-08
+  bitfinex_margin: 7713 bars, 2025-10-22 -> 2026-09-08
+  top_ls_position: 7713 bars, 2025-10-22 -> 2026-09-08
+  futures_cvd_agg: 7713 bars, 2025-10-22 -> 2026-09-08
+  spot_cvd_agg: 7713 bars, 2025-10-22 -> 2026-09-08
+  liq_agg: 7713 bars, 2025-10-22 -> 2026-09-08
+  oi_coin_margin: 4713 bars, 2026-02-24 -> 2026-09-08
+
+============================================================
+[4/4] Deribit DVOL 1h backfill
+============================================================
+  Existing: 9536 bars, ends at 2026-09-07 19:00:00+00:00
+  iter 0: +25 rows, earliest=2026-09-07 19:00:00+00:00
+  Updated: 9560 bars, 2025-08-06 12:00:00+00:00 -> 2026-09-08 19:00:00+00:00
+
+============================================================
+DONE - all parquet files updated
+============================================================
+[2026/09/09 ¶g¤T  4:00:20.14] step1.6 refresh_fng (weakness-#2 revival) 
+
+============================================================
+[2/3] CG Fear & Greed index (daily)
+============================================================
+  saved 3120 days, 2018-02-01 â†’ 2026-09-08
+refresh_fng: OK
+[2026/09/09 ¶g¤T  4:00:21.20] step3 export_depth_deltas 
+exported 1391770 rows (2026-07-09 05:23:00 -> 2026-09-08 19:59:00 UTC) -> C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\depth_deltas_1m.parquet
+[2026/09/09 ¶g¤T  4:00:57.54] step4 backup data_collector --light 
+2026-09-09 04:00:57,679 [INFO] Data Collector ¡X mode: light
+2026-09-09 04:00:57,679 [INFO] Source: C:\Users\rfo\Desktop\flowbot\flow_system
+2026-09-09 04:00:57,679 [INFO] Destination: D:\flowbot_data
+2026-09-09 04:00:57,681 [INFO] === Coinglass data ===
+2026-09-09 04:00:57,724 [INFO]   Coinglass: 6 copied, 6 skipped, 957.1 KB
+2026-09-09 04:00:57,724 [INFO] === Binance metrics ===
+2026-09-09 04:00:57,726 [INFO]   Metrics: 0 copied, 1 skipped, 0 B
+2026-09-09 04:00:57,726 [INFO] === Funding rate ===
+2026-09-09 04:00:57,727 [INFO]   Funding: 0 copied, 3 skipped, 0 B
+2026-09-09 04:00:57,727 [INFO] === Klines ===
+2026-09-09 04:00:57,764 [INFO]   Klines: 0 copied, 92 skipped, 0 B
+2026-09-09 04:00:57,764 [INFO] === Processed ML data ===
+2026-09-09 04:00:57,764 [INFO]   Processed: 0 copied, 0 skipped, 0 B
+2026-09-09 04:00:57,777 [INFO] 
+Manifest saved: D:\flowbot_data\manifest.json
+2026-09-09 04:00:57,777 [INFO] Total copied: 6 files, 957.1 KB
+2026-09-09 04:00:57,778 [INFO] Destination total: 49.1 MB
+[2026/09/09 ¶g¤T  4:00:57.78] ===== done FAILED=0 ===== 
+[2026/09/10 ¶g¥| 18:59:25.91] ===== daily_collect start ===== 
+[2026/09/10 ¶g¥| 18:59:25.91] step1 coinglass_backfill 
+2026-09-10 18:59:26,664 [INFO] === OI History: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 18:59:26,957 [INFO] OI: 4000 rows fetched
+2026-09-10 18:59:27,097 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\oi_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 18:59:27,097 [INFO] === OI Aggregated: BTC 1h ===
+2026-09-10 18:59:27,211 [INFO] OI Aggregated: 4000 rows
+2026-09-10 18:59:27,225 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\oi_agg_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 18:59:27,225 [INFO] === Liquidation: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 18:59:27,347 [INFO] Liquidation: 4000 rows
+2026-09-10 18:59:27,356 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\liquidation_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 18:59:27,356 [INFO] === Long/Short Ratio: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 18:59:27,509 [INFO] Long/Short: 4000 rows
+2026-09-10 18:59:27,515 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\long_short_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 18:59:27,515 [INFO] === Funding Rate: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 18:59:27,678 [INFO] Funding: 4000 rows
+2026-09-10 18:59:27,689 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\funding_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 18:59:27,689 [INFO] === Taker Buy/Sell: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 18:59:27,778 [INFO] Taker: 3992 rows
+2026-09-10 18:59:27,787 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\taker_BTC_Binance_1h.parquet (3992 rows)
+2026-09-10 18:59:27,787 [INFO] Done. Files saved to C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass
+[2026/09/10 ¶g¥| 18:59:27.84] step2 research backfill_all_parquet 
+============================================================
+[1/3] Binance klines 1h backfill
+============================================================
+  Existing: 7844 bars, ends at 2026-09-08 19:00:00+00:00
+  Fetched 38 bars up to 2026-09-10 09:00:00+00:00
+  Updated: 7882 bars, 2025-10-17 00:00:00+00:00 -> 2026-09-10 09:00:00+00:00
+
+============================================================
+[2/4 existing] Coinglass endpoints
+============================================================
+  oi: 7876 bars, 2025-10-17 -> 2026-09-10
+  oi_agg: 7876 bars, 2025-10-17 -> 2026-09-10
+  liquidation: 7876 bars, 2025-10-17 -> 2026-09-10
+  long_short: 7876 bars, 2025-10-17 -> 2026-09-10
+  global_ls: 7876 bars, 2025-10-17 -> 2026-09-10
+  funding: 7876 bars, 2025-10-17 -> 2026-09-10
+  taker: 7869 bars, 2025-10-17 -> 2026-09-10
+
+============================================================
+[3/4 new] Coinglass endpoints
+============================================================
+  coinbase_premium: 7751 bars, 2025-10-22 -> 2026-09-10
+  bitfinex_margin: 7751 bars, 2025-10-22 -> 2026-09-10
+  top_ls_position: 7751 bars, 2025-10-22 -> 2026-09-10
+  futures_cvd_agg: 7751 bars, 2025-10-22 -> 2026-09-10
+  spot_cvd_agg: 7751 bars, 2025-10-22 -> 2026-09-10
+  liq_agg: 7751 bars, 2025-10-22 -> 2026-09-10
+  oi_coin_margin: 4751 bars, 2026-02-24 -> 2026-09-10
+
+============================================================
+[4/4] Deribit DVOL 1h backfill
+============================================================
+  Existing: 9560 bars, ends at 2026-09-08 19:00:00+00:00
+  iter 0: +40 rows, earliest=2026-09-08 19:00:00+00:00
+  Updated: 9599 bars, 2025-08-06 12:00:00+00:00 -> 2026-09-10 10:00:00+00:00
+
+============================================================
+DONE - all parquet files updated
+============================================================
+[2026/09/10 ¶g¥| 18:59:43.01] step1.6 refresh_fng (weakness-#2 revival) 
+
+============================================================
+[2/3] CG Fear & Greed index (daily)
+============================================================
+  saved 3122 days, 2018-02-01 â†’ 2026-09-10
+refresh_fng: OK
+[2026/09/10 ¶g¥| 18:59:43.95] step3 export_depth_deltas 
+exported 1438550 rows (2026-07-09 05:23:00 -> 2026-09-10 10:58:00 UTC) -> C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\depth_deltas_1m.parquet
+[2026/09/10 ¶g¥| 19:00:18.75] step4 backup data_collector --light 
+2026-09-10 19:00:18,872 [INFO] Data Collector ¡X mode: light
+2026-09-10 19:00:18,872 [INFO] Source: C:\Users\rfo\Desktop\flowbot\flow_system
+2026-09-10 19:00:18,872 [INFO] Destination: D:\flowbot_data
+2026-09-10 19:00:18,874 [INFO] === Coinglass data ===
+2026-09-10 19:00:18,921 [INFO]   Coinglass: 6 copied, 6 skipped, 951.9 KB
+2026-09-10 19:00:18,921 [INFO] === Binance metrics ===
+2026-09-10 19:00:18,922 [INFO]   Metrics: 0 copied, 1 skipped, 0 B
+2026-09-10 19:00:18,922 [INFO] === Funding rate ===
+2026-09-10 19:00:18,924 [INFO]   Funding: 0 copied, 3 skipped, 0 B
+2026-09-10 19:00:18,924 [INFO] === Klines ===
+2026-09-10 19:00:18,983 [INFO]   Klines: 0 copied, 92 skipped, 0 B
+2026-09-10 19:00:18,983 [INFO] === Processed ML data ===
+2026-09-10 19:00:18,983 [INFO]   Processed: 0 copied, 0 skipped, 0 B
+2026-09-10 19:00:18,998 [INFO] 
+Manifest saved: D:\flowbot_data\manifest.json
+2026-09-10 19:00:18,999 [INFO] Total copied: 6 files, 951.9 KB
+2026-09-10 19:00:18,999 [INFO] Destination total: 49.1 MB
+[2026/09/10 ¶g¥| 19:00:19.00] step5 research guards (regression tests) 
+guards: OK  19 passed in 63.62s (0:01:03)
+written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\guards_last.json
+[2026/09/10 ¶g¥| 19:01:23.47] ===== done FAILED=0 ===== 
+[2026/09/10 ¶g¥| 19:43:47.70] ===== daily_collect start ===== 
+[2026/09/10 ¶g¥| 19:43:47.70] step1 coinglass_backfill 
+2026-09-10 19:43:48,519 [INFO] === OI History: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 19:43:48,734 [INFO] OI: 4000 rows fetched
+2026-09-10 19:43:48,784 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\oi_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 19:43:48,784 [INFO] === OI Aggregated: BTC 1h ===
+2026-09-10 19:43:48,985 [INFO] OI Aggregated: 4000 rows
+2026-09-10 19:43:49,000 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\oi_agg_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 19:43:49,000 [INFO] === Liquidation: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 19:43:49,116 [INFO] Liquidation: 4000 rows
+2026-09-10 19:43:49,125 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\liquidation_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 19:43:49,125 [INFO] === Long/Short Ratio: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 19:43:49,227 [INFO] Long/Short: 4000 rows
+2026-09-10 19:43:49,234 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\long_short_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 19:43:49,234 [INFO] === Funding Rate: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 19:43:49,399 [INFO] Funding: 4000 rows
+2026-09-10 19:43:49,411 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\funding_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 19:43:49,411 [INFO] === Taker Buy/Sell: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 19:43:49,541 [INFO] Taker: 3991 rows
+2026-09-10 19:43:49,550 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\taker_BTC_Binance_1h.parquet (3991 rows)
+2026-09-10 19:43:49,551 [INFO] Done. Files saved to C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass
+[2026/09/10 ¶g¥| 19:43:49.61] step2 research backfill_all_parquet 
+============================================================
+[1/3] Binance klines 1h backfill
+============================================================
+  Existing: 7882 bars, ends at 2026-09-10 09:00:00+00:00
+  Fetched 1 bars up to 2026-09-10 10:00:00+00:00
+  Updated: 7883 bars, 2025-10-17 00:00:00+00:00 -> 2026-09-10 10:00:00+00:00
+
+============================================================
+[2/4 existing] Coinglass endpoints
+============================================================
+  oi: 7877 bars, 2025-10-17 -> 2026-09-10
+  oi_agg: 7877 bars, 2025-10-17 -> 2026-09-10
+  liquidation: 7877 bars, 2025-10-17 -> 2026-09-10
+  long_short: 7877 bars, 2025-10-17 -> 2026-09-10
+  global_ls: 7877 bars, 2025-10-17 -> 2026-09-10
+  funding: 7877 bars, 2025-10-17 -> 2026-09-10
+  taker: 7870 bars, 2025-10-17 -> 2026-09-10
+
+============================================================
+[3/4 new] Coinglass endpoints
+============================================================
+  coinbase_premium: 7752 bars, 2025-10-22 -> 2026-09-10
+  bitfinex_margin: 7752 bars, 2025-10-22 -> 2026-09-10
+  top_ls_position: 7752 bars, 2025-10-22 -> 2026-09-10
+  futures_cvd_agg: 7752 bars, 2025-10-22 -> 2026-09-10
+  spot_cvd_agg: 7752 bars, 2025-10-22 -> 2026-09-10
+  liq_agg: 7752 bars, 2025-10-22 -> 2026-09-10
+  oi_coin_margin: 4752 bars, 2026-02-24 -> 2026-09-10
+
+============================================================
+[4/4] Deribit DVOL 1h backfill
+============================================================
+  Existing: 9599 bars, ends at 2026-09-10 10:00:00+00:00
+  iter 0: +2 rows, earliest=2026-09-10 10:00:00+00:00
+  Updated: 9600 bars, 2025-08-06 12:00:00+00:00 -> 2026-09-10 11:00:00+00:00
+
+============================================================
+DONE - all parquet files updated
+============================================================
+[2026/09/10 ¶g¥| 19:44:05.31] step1.6 refresh_fng (weakness-#2 revival) 
+
+============================================================
+[2/3] CG Fear & Greed index (daily)
+============================================================
+  saved 3122 days, 2018-02-01 â†’ 2026-09-10
+refresh_fng: OK
+[2026/09/10 ¶g¥| 19:44:06.39] step3 export_depth_deltas 
+exported 1439450 rows (2026-07-09 05:23:00 -> 2026-09-10 11:43:00 UTC) -> C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\depth_deltas_1m.parquet
+[2026/09/10 ¶g¥| 19:44:40.83] step4 backup data_collector --light 
+2026-09-10 19:44:40,962 [INFO] Data Collector ¡X mode: light
+2026-09-10 19:44:40,962 [INFO] Source: C:\Users\rfo\Desktop\flowbot\flow_system
+2026-09-10 19:44:40,962 [INFO] Destination: D:\flowbot_data
+2026-09-10 19:44:40,963 [INFO] === Coinglass data ===
+2026-09-10 19:44:41,027 [INFO]   Coinglass: 6 copied, 6 skipped, 953.6 KB
+2026-09-10 19:44:41,027 [INFO] === Binance metrics ===
+2026-09-10 19:44:41,027 [INFO]   Metrics: 0 copied, 1 skipped, 0 B
+2026-09-10 19:44:41,027 [INFO] === Funding rate ===
+2026-09-10 19:44:41,029 [INFO]   Funding: 0 copied, 3 skipped, 0 B
+2026-09-10 19:44:41,029 [INFO] === Klines ===
+2026-09-10 19:44:41,044 [INFO]   Klines: 0 copied, 92 skipped, 0 B
+2026-09-10 19:44:41,044 [INFO] === Processed ML data ===
+2026-09-10 19:44:41,044 [INFO]   Processed: 0 copied, 0 skipped, 0 B
+2026-09-10 19:44:41,056 [INFO] 
+Manifest saved: D:\flowbot_data\manifest.json
+2026-09-10 19:44:41,056 [INFO] Total copied: 6 files, 953.6 KB
+2026-09-10 19:44:41,056 [INFO] Destination total: 49.1 MB
+[2026/09/10 ¶g¥| 19:44:41.06] step5 research guards (regression tests) 
+guards: OK  19 passed in 63.15s (0:01:03)
+written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\guards_last.json
+[2026/09/10 ¶g¥| 19:45:44.98] step6 scheduled task refs 
+±Æµ{                           ¦s¦b        ¦b repo  ³Q°lÂÜ      ¸ô®|
+EntropyArbWatchdog           yes       yes     yes      run_hidden.vbs
+EntropyArbWatchdog           yes       -       -        arb_watchdog.ps1
+Flowbot Monthly Revalidatio  yes       yes     yes      run_monthly_revalidation.cmd
+FlowBot_ConjClock            yes       yes     yes      run_hidden.vbs
+FlowBot_ConjClock            yes       yes     yes      conj_update.bat
+FlowBot_ConjWatch            yes       yes     yes      run_hidden.vbs
+FlowBot_ConjWatch            yes       yes     yes      conj_watch.bat
+FlowBot_DailyCollect         yes       yes     yes      daily_collect.bat
+FlowBot_ExitPathsWatchdog    yes       yes     yes      run_hidden.vbs
+FlowBot_ExitPathsWatchdog    yes       yes     yes      exit_paths_watchdog.ps1
+FlowBot_IndicatorUpdate      yes       -       -        run_indicator.bat
+SweepShadow                  yes       yes     yes      run_hidden.vbs
+SweepShadow                  yes       yes     yes      shadow_engine.bat
+
+schedules: OK  13 refs ok
+written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\schedules_last.json
+[2026/09/10 ¶g¥| 19:45:47.59] ===== done FAILED=0 ===== 
+[2026/09/10 ¶g¥| 19:47:23.93] ===== daily_collect start ===== 
+[2026/09/10 ¶g¥| 19:47:23.93] step1 coinglass_backfill 
+2026-09-10 19:47:24,720 [INFO] === OI History: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 19:47:24,950 [INFO] OI: 4000 rows fetched
+2026-09-10 19:47:25,007 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\oi_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 19:47:25,007 [INFO] === OI Aggregated: BTC 1h ===
+2026-09-10 19:47:25,219 [INFO] OI Aggregated: 4000 rows
+2026-09-10 19:47:25,232 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\oi_agg_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 19:47:25,233 [INFO] === Liquidation: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 19:47:25,315 [INFO] Liquidation: 4000 rows
+2026-09-10 19:47:25,325 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\liquidation_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 19:47:25,325 [INFO] === Long/Short Ratio: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 19:47:25,474 [INFO] Long/Short: 4000 rows
+2026-09-10 19:47:25,482 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\long_short_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 19:47:25,482 [INFO] === Funding Rate: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 19:47:25,609 [INFO] Funding: 4000 rows
+2026-09-10 19:47:25,619 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\funding_BTC_Binance_1h.parquet (4000 rows)
+2026-09-10 19:47:25,619 [INFO] === Taker Buy/Sell: BTC (BTCUSDT) Binance 1h ===
+2026-09-10 19:47:25,777 [INFO] Taker: 3991 rows
+2026-09-10 19:47:25,786 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\taker_BTC_Binance_1h.parquet (3991 rows)
+2026-09-10 19:47:25,787 [INFO] Done. Files saved to C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass
+[2026/09/10 ¶g¥| 19:47:25.84] step2 research backfill_all_parquet 
+============================================================
+[1/3] Binance klines 1h backfill
+============================================================
+  Existing: 7883 bars, ends at 2026-09-10 10:00:00+00:00
+  Fetched 0 bars up to N/A
+  Updated: 7883 bars, 2025-10-17 00:00:00+00:00 -> 2026-09-10 10:00:00+00:00
+
+============================================================
+[2/4 existing] Coinglass endpoints
+============================================================
+  oi: 7877 bars, 2025-10-17 -> 2026-09-10
+  oi_agg: 7877 bars, 2025-10-17 -> 2026-09-10
+  liquidation: 7877 bars, 2025-10-17 -> 2026-09-10
+  long_short: 7877 bars, 2025-10-17 -> 2026-09-10
+  global_ls: 7877 bars, 2025-10-17 -> 2026-09-10
+  funding: 7877 bars, 2025-10-17 -> 2026-09-10
+  taker: 7870 bars, 2025-10-17 -> 2026-09-10
+
+============================================================
+[3/4 new] Coinglass endpoints
+============================================================
+  coinbase_premium: 7752 bars, 2025-10-22 -> 2026-09-10
+  bitfinex_margin: 7752 bars, 2025-10-22 -> 2026-09-10
+  top_ls_position: 7752 bars, 2025-10-22 -> 2026-09-10
+  futures_cvd_agg: 7752 bars, 2025-10-22 -> 2026-09-10
+  spot_cvd_agg: 7752 bars, 2025-10-22 -> 2026-09-10
+  liq_agg: 7752 bars, 2025-10-22 -> 2026-09-10
+  oi_coin_margin: 4752 bars, 2026-02-24 -> 2026-09-10
+
+============================================================
+[4/4] Deribit DVOL 1h backfill
+============================================================
+  Existing: 9600 bars, ends at 2026-09-10 11:00:00+00:00
+  iter 0: +1 rows, earliest=2026-09-10 11:00:00+00:00
+  Updated: 9600 bars, 2025-08-06 12:00:00+00:00 -> 2026-09-10 11:00:00+00:00
+
+============================================================
+DONE - all parquet files updated
+============================================================
+[2026/09/10 ¶g¥| 19:47:41.65] step1.6 refresh_fng (weakness-#2 revival) 
+
+============================================================
+[2/3] CG Fear & Greed index (daily)
+============================================================
+  saved 3122 days, 2018-02-01 â†’ 2026-09-10
+refresh_fng: OK
+[2026/09/10 ¶g¥| 19:47:42.84] step3 export_depth_deltas 
+exported 1439510 rows (2026-07-09 05:23:00 -> 2026-09-10 11:46:00 UTC) -> C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\depth_deltas_1m.parquet
+[2026/09/10 ¶g¥| 19:48:18.50] step4 backup data_collector --light 
+2026-09-10 19:48:18,618 [INFO] Data Collector ¡X mode: light
+2026-09-10 19:48:18,618 [INFO] Source: C:\Users\rfo\Desktop\flowbot\flow_system
+2026-09-10 19:48:18,618 [INFO] Destination: D:\flowbot_data
+2026-09-10 19:48:18,619 [INFO] === Coinglass data ===
+2026-09-10 19:48:18,653 [INFO]   Coinglass: 6 copied, 6 skipped, 953.6 KB
+2026-09-10 19:48:18,655 [INFO] === Binance metrics ===
+2026-09-10 19:48:18,655 [INFO]   Metrics: 0 copied, 1 skipped, 0 B
+2026-09-10 19:48:18,655 [INFO] === Funding rate ===
+2026-09-10 19:48:18,656 [INFO]   Funding: 0 copied, 3 skipped, 0 B
+2026-09-10 19:48:18,656 [INFO] === Klines ===
+2026-09-10 19:48:18,671 [INFO]   Klines: 0 copied, 92 skipped, 0 B
+2026-09-10 19:48:18,671 [INFO] === Processed ML data ===
+2026-09-10 19:48:18,671 [INFO]   Processed: 0 copied, 0 skipped, 0 B
+2026-09-10 19:48:18,680 [INFO] 
+Manifest saved: D:\flowbot_data\manifest.json
+2026-09-10 19:48:18,680 [INFO] Total copied: 6 files, 953.6 KB
+2026-09-10 19:48:18,680 [INFO] Destination total: 49.1 MB
+[2026/09/10 ¶g¥| 19:48:18.68] step5 research guards (regression tests) 
+guards: OK  19 passed in 65.03s (0:01:05)
+written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\guards_last.json
+[2026/09/10 ¶g¥| 19:49:24.53] step6 scheduled task refs 
+±Æµ{                           ¦s¦b        ¦b repo  ³Q°lÂÜ      ¸ô®|
+EntropyArbWatchdog           yes       yes     yes      run_hidden.vbs
+EntropyArbWatchdog           yes       -       -        arb_watchdog.ps1
+Flowbot Monthly Revalidatio  yes       yes     yes      run_monthly_revalidation.cmd
+FlowBot_ConjClock            yes       yes     yes      run_hidden.vbs
+FlowBot_ConjClock            yes       yes     yes      conj_update.bat
+FlowBot_ConjWatch            yes       yes     yes      run_hidden.vbs
+FlowBot_ConjWatch            yes       yes     yes      conj_watch.bat
+FlowBot_DailyCollect         yes       yes     yes      daily_collect.bat
+FlowBot_ExitPathsWatchdog    yes       yes     yes      run_hidden.vbs
+FlowBot_ExitPathsWatchdog    yes       yes     yes      exit_paths_watchdog.ps1
+FlowBot_IndicatorUpdate      yes       -       -        run_indicator.bat
+SweepShadow                  yes       yes     yes      run_hidden.vbs
+SweepShadow                  yes       yes     yes      shadow_engine.bat
+
+schedules: OK  13 refs ok
+written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\schedules_last.json
+[2026/09/10 ¶g¥| 19:49:26.85] step7 research data manifest 
+¸ê®Æ                         kind            ¦C¼Æ          first           last
+sweep_failure/.cache 1h b  rolling    654,349     1707544800     1789034400
+crowd_stops/frozen 1h ¤Á¤ù   frozen     201,591     1708394400     1789027200
+tests/fixtures ¤T¥»±b         frozen       9,478  1708502400000  1789005600000
+poc/data ¤ÀÄÁ bar            append   12,153,816  1707973200000  1788998580000
+poc/data ¥¼¥­­Ü¶q              append   2,427,505  1707955200000  1788911700000
+poc/data ²Mºâ                append      38,880  1773194400000  1788742800000
+poc/data ±½³æ§Ö·Ó              derived      9,262  1708049460000  1788967380000
+  note: sweep_failure/.cache 1h bars -> ­º¦¸µn°O
+  note: crowd_stops/frozen 1h ¤Á¤ù -> ­º¦¸µn°O
+  note: tests/fixtures ¤T¥»±b -> ­º¦¸µn°O
+  note: poc/data ¤ÀÄÁ bar -> ­º¦¸µn°O
+  note: poc/data ¥¼¥­­Ü¶q -> ­º¦¸µn°O
+  note: poc/data ²Mºâ -> ­º¦¸µn°O
+  note: poc/data ±½³æ§Ö·Ó -> ­º¦¸µn°O
+
+manifest: OK  µLÅÜ°Ê
+written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\data_manifest.json
+[2026/09/10 ¶g¥| 19:49:28.37] ===== done FAILED=0 ===== 
+[2026/09/11 ¶g¤­  4:00:02.18] ===== daily_collect start ===== 
+[2026/09/11 ¶g¤­  4:00:02.20] step1 coinglass_backfill 
+2026-09-11 04:00:03,083 [INFO] === OI History: BTC (BTCUSDT) Binance 1h ===
+2026-09-11 04:00:03,314 [INFO] OI: 4000 rows fetched
+2026-09-11 04:00:03,365 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\oi_BTC_Binance_1h.parquet (4000 rows)
+2026-09-11 04:00:03,365 [INFO] === OI Aggregated: BTC 1h ===
+2026-09-11 04:00:03,703 [INFO] OI Aggregated: 4000 rows
+2026-09-11 04:00:03,720 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\oi_agg_BTC_Binance_1h.parquet (4000 rows)
+2026-09-11 04:00:03,720 [INFO] === Liquidation: BTC (BTCUSDT) Binance 1h ===
+2026-09-11 04:00:03,853 [INFO] Liquidation: 4000 rows
+2026-09-11 04:00:03,862 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\liquidation_BTC_Binance_1h.parquet (4000 rows)
+2026-09-11 04:00:03,862 [INFO] === Long/Short Ratio: BTC (BTCUSDT) Binance 1h ===
+2026-09-11 04:00:03,977 [INFO] Long/Short: 4000 rows
+2026-09-11 04:00:03,986 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\long_short_BTC_Binance_1h.parquet (4000 rows)
+2026-09-11 04:00:03,986 [INFO] === Funding Rate: BTC (BTCUSDT) Binance 1h ===
+2026-09-11 04:00:04,083 [INFO] Funding: 4000 rows
+2026-09-11 04:00:04,098 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\funding_BTC_Binance_1h.parquet (4000 rows)
+2026-09-11 04:00:04,098 [INFO] === Taker Buy/Sell: BTC (BTCUSDT) Binance 1h ===
+2026-09-11 04:00:04,195 [INFO] Taker: 3982 rows
+2026-09-11 04:00:04,206 [INFO] Saved: C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass\taker_BTC_Binance_1h.parquet (3982 rows)
+2026-09-11 04:00:04,206 [INFO] Done. Files saved to C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\coinglass
+[2026/09/11 ¶g¤­  4:00:04.27] step2 research backfill_all_parquet 
+============================================================
+[1/3] Binance klines 1h backfill
+============================================================
+  Existing: 7883 bars, ends at 2026-09-10 10:00:00+00:00
+  Fetched 9 bars up to 2026-09-10 19:00:00+00:00
+  Updated: 7892 bars, 2025-10-17 00:00:00+00:00 -> 2026-09-10 19:00:00+00:00
+
+============================================================
+[2/4 existing] Coinglass endpoints
+============================================================
+  oi: 7886 bars, 2025-10-17 -> 2026-09-10
+  oi_agg: 7886 bars, 2025-10-17 -> 2026-09-10
+  liquidation: 7886 bars, 2025-10-17 -> 2026-09-10
+  long_short: 7886 bars, 2025-10-17 -> 2026-09-10
+  global_ls: 7886 bars, 2025-10-17 -> 2026-09-10
+  funding: 7886 bars, 2025-10-17 -> 2026-09-10
+  taker: 7871 bars, 2025-10-17 -> 2026-09-10
+
+============================================================
+[3/4 new] Coinglass endpoints
+============================================================
+  coinbase_premium: 7761 bars, 2025-10-22 -> 2026-09-10
+  bitfinex_margin: 7761 bars, 2025-10-22 -> 2026-09-10
+  top_ls_position: 7761 bars, 2025-10-22 -> 2026-09-10
+  futures_cvd_agg: 7761 bars, 2025-10-22 -> 2026-09-10
+  spot_cvd_agg: 7761 bars, 2025-10-22 -> 2026-09-10
+  liq_agg: 7761 bars, 2025-10-22 -> 2026-09-10
+  oi_coin_margin: 4761 bars, 2026-02-24 -> 2026-09-10
+
+============================================================
+[4/4] Deribit DVOL 1h backfill
+============================================================
+  Existing: 9600 bars, ends at 2026-09-10 11:00:00+00:00
+  iter 0: +10 rows, earliest=2026-09-10 11:00:00+00:00
+  Updated: 9609 bars, 2025-08-06 12:00:00+00:00 -> 2026-09-10 20:00:00+00:00
+
+============================================================
+DONE - all parquet files updated
+============================================================
+[2026/09/11 ¶g¤­  4:00:19.96] step1.6 refresh_fng (weakness-#2 revival) 
+
+============================================================
+[2/3] CG Fear & Greed index (daily)
+============================================================
+  saved 3122 days, 2018-02-01 â†’ 2026-09-10
+refresh_fng: OK
+[2026/09/11 ¶g¤­  4:00:20.98] step3 export_depth_deltas 
+exported 1449370 rows (2026-07-09 05:23:00 -> 2026-09-10 19:59:00 UTC) -> C:\Users\rfo\Desktop\flowbot\flow_system\market_data\raw_data\depth_deltas_1m.parquet
+[2026/09/11 ¶g¤­  4:00:55.29] step4 backup data_collector --light 
+2026-09-11 04:00:55,419 [INFO] Data Collector ¡X mode: light
+2026-09-11 04:00:55,421 [INFO] Source: C:\Users\rfo\Desktop\flowbot\flow_system
+2026-09-11 04:00:55,421 [INFO] Destination: D:\flowbot_data
+2026-09-11 04:00:55,421 [INFO] === Coinglass data ===
+2026-09-11 04:00:55,459 [INFO]   Coinglass: 6 copied, 6 skipped, 954.0 KB
+2026-09-11 04:00:55,459 [INFO] === Binance metrics ===
+2026-09-11 04:00:55,460 [INFO]   Metrics: 0 copied, 1 skipped, 0 B
+2026-09-11 04:00:55,461 [INFO] === Funding rate ===
+2026-09-11 04:00:55,462 [INFO]   Funding: 0 copied, 3 skipped, 0 B
+2026-09-11 04:00:55,462 [INFO] === Klines ===
+2026-09-11 04:00:55,494 [INFO]   Klines: 0 copied, 92 skipped, 0 B
+2026-09-11 04:00:55,494 [INFO] === Processed ML data ===
+2026-09-11 04:00:55,496 [INFO]   Processed: 0 copied, 0 skipped, 0 B
+2026-09-11 04:00:55,505 [INFO] 
+Manifest saved: D:\flowbot_data\manifest.json
+2026-09-11 04:00:55,505 [INFO] Total copied: 6 files, 954.0 KB
+2026-09-11 04:00:55,505 [INFO] Destination total: 49.1 MB
+[2026/09/11 ¶g¤­  4:00:55.51] step5 research guards (regression tests) 
+guards: OK  19 passed in 63.68s (0:01:03)
+written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\guards_last.json
+[2026/09/11 ¶g¤­  4:02:00.15] step6 scheduled task refs 
+±Æµ{                           ¦s¦b        ¦b repo  ³Q°lÂÜ      ¸ô®|
+EntropyArbWatchdog           yes       yes     yes      run_hidden.vbs
+EntropyArbWatchdog           yes       -       -        arb_watchdog.ps1
+Flowbot Monthly Revalidatio  yes       yes     yes      run_monthly_revalidation.cmd
+FlowBot_ConjClock            yes       yes     yes      run_hidden.vbs
+FlowBot_ConjClock            yes       yes     yes      conj_update.bat
+FlowBot_ConjWatch            yes       yes     yes      run_hidden.vbs
+FlowBot_ConjWatch            yes       yes     yes      conj_watch.bat
+FlowBot_DailyCollect         yes       yes     yes      daily_collect.bat
+FlowBot_ExitPathsWatchdog    yes       yes     yes      run_hidden.vbs
+FlowBot_ExitPathsWatchdog    yes       yes     yes      exit_paths_watchdog.ps1
+FlowBot_HLRecord             yes       yes     yes      run_hidden.vbs
+FlowBot_HLRecord             yes       yes     **NO**   hl_record.bat
+FlowBot_IndicatorUpdate      yes       -       -        run_indicator.bat
+SweepShadow                  yes       yes     yes      run_hidden.vbs
+SweepShadow                  yes       yes     yes      shadow_engine.bat
+
+schedules: RED  FlowBot_HLRecord -> UNTRACKED research/ops/hl_record.bat
+written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\schedules_last.json
+[2026/09/11 ¶g¤­  4:02:02.14] step7 research data manifest 
+Traceback (most recent call last):
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\research\ops\data_manifest.py", line 191, in <module>
+    raise SystemExit(main())
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\research\ops\data_manifest.py", line 143, in main
+    cur = scan()
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\research\ops\data_manifest.py", line 122, in scan
+    n, a, z = (_csv_span(p) if p.suffix == ".csv" else _pq_span(p))
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\research\ops\data_manifest.py", line 99, in _pq_span
+    f = pq.ParquetFile(p)
+  File "C:\Users\rfo\anaconda3\lib\site-packages\pyarrow\parquet\core.py", line 328, in __init__
+    self.reader.open(
+  File "pyarrow\\_parquet.pyx", line 1656, in pyarrow._parquet.ParquetReader.open
+  File "pyarrow\\error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: Parquet magic bytes not found in footer. Either the file is corrupted or this is not a parquet file.
+[2026/09/11 ¶g¤­  4:02:03.71] step8 product live fills 
+æ‹‰åˆ° 462 ç­†æˆäº¤ â†’ mill_fills.jsonl
+ä¾†æº      live ç­†      æ­¸å±¬å¯é       æ²‰é»˜(æ™‚) æœ€å¾Œä¸€ç­† (UTC)
+grid       301         0      260.3 2026-08-30 23:46
+raid        73        55      258.9 2026-08-31 01:06
+v7           0         0          â€” â€”
+
+product fills: OK  å®£å‘Šåœç”¨ä¸­ï¼ˆsince 2026-08-31ï¼‰ï¼Œæ²‰é»˜ 260.3hï¼Œç¬¦åˆå®£å‘Š
+written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\product_fills_last.json
+[2026/09/11 ¶g¤­  4:02:04.13] ===== done FAILED=1 ===== 

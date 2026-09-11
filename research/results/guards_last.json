@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "reason": "19 passed in 63.68s (0:01:03)",
+  "passed": 19,
+  "failed": 0,
+  "skipped": 0,
+  "returncode": 0,
+  "seconds": 64.5,
+  "asof": "2026-09-11 04:02:00",
+  "suites": [
+    "research/tests",
+    "research/sweep_failure/tests",
+    "research/crowd_stops/tests"
+  ]
+}

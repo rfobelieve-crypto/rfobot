@@ -84,8 +84,21 @@ import conj_clock as ck  # noqa: E402
 BARS = HERE / "data" / "bars"
 OUT = HERE / "data" / "results"
 W = 5
+# 2026-09-11 註記（**預設值刻意不動**）：這兩個數在本支凍結之後、同一天的
+# §1.03d/f 被判為「錯的出場設定」—— `conj_backtest.py` 的檔頭白紙黑字寫著
+# 「1 ATR 停損砍掉左尾、60 分持有砍掉右尾，**那才是把這條線壓在水面下的
+# 主因，不是成本也不是訊號**」，定案值是 STOP=3.0 / HOLD=480。
+# 本支的 D1 已知答案對照（REF_OLD）是在 STOP=1.0/HOLD=60 上算的，所以
+# **預設值改了 D1 就失去意義**，因此預設保留原值當歷史紀錄，
+# 定案參數走 `--decided`（那時 D1 換成「對上 conj_backtest 的合池值」）。
 HOLD = 60
 STOP = 1.0
+# --decided 的那一組（來源：conj_backtest.py，同一個真相源，不在這裡重新決定）
+DECIDED = dict(HOLD=480, STOP=3.0, COST=(1.0, 1.0, 3.0))
+# conj_backtest 在 sigk="and" 合池（全期、9 幣）的每筆淨值。
+# --decided 模式的已知答案：兩台儀器在同一個構造上必須對得上。
+REF_DECIDED_AND = 0.331
+TOL_DECIDED = 0.02
 FLOW = ("delta_ext", "vol_burst")
 DELAYS = (0, 1, 2, 3, 5, 10)
 # **delay=0 是前視，只列印不判定**（2026-09-09 跑完第一版當場抓到）：
@@ -162,7 +175,19 @@ def groups_with_members(pairs, cooldown=None, merge_gap=None):
     return kept
 
 
-def main():
+def main(argv=None):
+    global HOLD, STOP, COST_ENTRY, COST_TIME, COST_STOP
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--decided", action="store_true",
+                    help="用 §1.03d/f 的定案出場與返佣後成本重跑（預設是凍結原值）")
+    ap.add_argument("--sig", default="pop", choices=("pop", "and"),
+                    help="pop = S∧(D∨V) 母體（預設，本支原本的口徑）；"
+                         "and = S∧D∧V，**那才是現行規格**")
+    ARGS = ap.parse_args(argv)
+    if ARGS.decided:
+        HOLD, STOP = DECIDED["HOLD"], DECIDED["STOP"]
+        COST_ENTRY, COST_TIME, COST_STOP = DECIDED["COST"]
     rows, apc = [], {}
     for sym in ec.CORE9:
         cand, ts, cl, at, _day = ck.frozen_cand(sym, pd.DataFrame(
@@ -208,7 +233,10 @@ def main():
                 c = (COST_ENTRY + (COST_STOP if stopped else COST_TIME)) / 1e4 * ent / A
                 return R, R - c
 
-            r = dict(sym=sym,
+            sigk = ("and" if set(FLOW) <= types else "one")
+            if ARGS.sig == "and" and sigk != "and":
+                continue
+            r = dict(sym=sym, sigk=sigk,
                      day=pd.Timestamp(int(ts[ready]), unit="ms",
                                       tz="UTC").strftime("%Y-%m-%d"),
                      lag=int(ready - a),
@@ -240,7 +268,25 @@ def main():
     print()
 
     ok = False
-    if "old2" in d:
+    if ARGS.decided:
+        # **換一個已知答案。** 定案參數下 REF_OLD 不適用（它是在 STOP=1.0/
+        # HOLD=60 上算的），所以改成跨儀器對照：同樣的構造、同樣的口徑，
+        # 這支與 conj_backtest 必須對得上。對不上就是有一邊接錯了，
+        # 而「兩台儀器不同意」本身就是不准解讀的理由
+        # （mistake.md 2026-08-26：第二份實作會安靜地不同意）。
+        if ARGS.sig != "and":
+            print("=== D1（--decided）===")
+            print("  跨儀器對照只在 `--sig and` 下有已知答案"
+                  "（conj_backtest 只在簽章上合池）。請加 --sig and。")
+            return 1
+        m, _, _ = day_ci(d["n3"].to_numpy(), days)
+        ok = abs(m - REF_DECIDED_AND) < TOL_DECIDED
+        print("=== D1 跨儀器對照（定案參數、sigk=and、delay=3）===")
+        print(f"  本支 {m:+.4f}   conj_backtest {REF_DECIDED_AND:+.4f}"
+              f"（容差 {TOL_DECIDED}）-> "
+              + ("PASS" if ok else "**FAIL —— 兩台儀器不同意，以下不解讀**"))
+        print()
+    elif "old2" in d:
         m, _, _ = day_ci(d.old2.to_numpy(), days)
         ok = abs(m - REF_OLD) < TOL
         print("=== D1 已知答案對照（舊錨點 delay=2）===")
@@ -255,6 +301,9 @@ def main():
     print(f"{'delay':>6s} {'n':>6s} {'毛':>9s} {'毛CI下':>9s} "
           f"{'淨':>9s} {'淨CI下':>9s} {'淨CI上':>9s} {'幣+':>5s} {'停損率':>7s}")
     res = {"n": int(len(d)), "atr_pct_w": apw, "D1": bool(ok),
+           "mode": ("decided" if ARGS.decided else "frozen"), "sig": ARGS.sig,
+           "exit": dict(HOLD=HOLD, STOP=STOP,
+                        COST=[COST_ENTRY, COST_TIME, COST_STOP]),
            "lag_gt0": float((d.lag > 0).mean()),
            "peek_rate_old": float((d.lag > 2).mean()), "delays": {}}
     best = None
@@ -271,7 +320,12 @@ def main():
               f"{mn:+9.4f} {ln:+9.4f} {hn:+9.4f} {pos:4d}/9 {sr*100:6.1f}%{tag}")
         res["delays"][k] = dict(gross=mg, gross_lo=lg, net=mn, net_lo=ln,
                                 net_hi=hn, coins_pos=pos, stop_rate=sr,
-                                lookahead=k in LOOKAHEAD_DELAYS)
+                                lookahead=k in LOOKAHEAD_DELAYS,
+                                # 2026-09-11 加：逐幣淨值。只存了「幾個為正」
+                                # 的時候，沒辦法回答「某一個幣如何」——而那個
+                                # 問題一定會被問，而且用猜的最危險。
+                                per_coin={str(kk): float(vv)
+                                          for kk, vv in per.items()})
         if ln > 0 and pos >= 6 and k in TRADABLE_DELAYS:
             best = k
     print()
@@ -302,12 +356,12 @@ def main():
         res.setdefault("subpop", {})[lab] = dict(n=int(len(sub)), gross=mg,
                                                  net=mn, net_lo=ln)
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "conj_redef.json").write_text(
+    (OUT / ("conj_redef.json" if not ARGS.decided else "conj_redef_decided.json")).write_text(
         json.dumps(res, indent=2, ensure_ascii=False, default=float),
         encoding="utf-8")
-    d.to_parquet(OUT / "conj_redef.parquet", index=False)
+    d.to_parquet(OUT / ("conj_redef.parquet" if not ARGS.decided else "conj_redef_decided.parquet"), index=False)
     print()
-    print("written ->", OUT / "conj_redef.json")
+    print("written ->", OUT / ("conj_redef.json" if not ARGS.decided else "conj_redef_decided.json"))
     return 0
 
 

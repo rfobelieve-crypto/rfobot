@@ -78,3 +78,111 @@ flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_
 
 flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_last.json   ok=True  reason=ok
 [2026/09/08 �g�G  5:31:25.08] conj_update end rc=0 
+[2026/09/09 �g�T  5:30:02.27] conj_update start 
+[fetch_bars] rc=0
+    ADA   +     495 bars       0s  -> ADA_1m.csv
+    LINK  +     495 bars       0s  -> LINK_1m.csv
+    AVAX  +     495 bars       0s  -> AVAX_1m.csv
+[bars] rc=0
+    AVAX  rows=1,348,830 gap=0.0000% zerovol=0.3943% volxcheck_max=0.0000%  asserts=ok  -> PASS
+    
+    Stage 0 gate: ALL PASS
+[fetch_oi] rc=0
+    ADA   rows= 269,435  +      0  missing_days=0 (404=0)      0s
+    LINK  rows= 269,435  +      0  missing_days=0 (404=0)      0s
+    AVAX  rows= 269,435  +      0  missing_days=0 (404=0)      0s
+[levels] rc=0
+    AVAX  levels= 1,559 alive=   80 replay=50/50 1h-xcheck_max=0.0e+00  asserts=ok  -> PASS
+    
+    Stage 2 gate: ALL PASS
+[events] rc=0
+    AVAX  raw=1,479 kept=1,375 dedup(60/300/900)=104/104/104  regr ours->ref=99.42% ref->ours=99.73%  same-hour dup=19.4% (max 20)  PASS
+    
+    Stage 3 gate (>85% both ways): ALL PASS
+[conj_clock] rc=0
+    樣本 < 30，無法計算日聚類 CI。累積中。
+    
+    written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock.json
+[conj_clock_and] rc=0
+    
+    提醒：本時鐘的 in-sample 分解是**開時鐘的理由，不是證據**（§0.92 的 C/D 陷阱）。現行 conj_clock.py 不作廢，兩條並行。
+    written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_and.json
+[conj_backtest] rc=0
+    AVAX: 2026-06-10 21:29 → 2026-09-08 21:29  顯示窗 25,921 根 / 28 筆  毛 +0.3486 淨 +0.1838 ATR  勝率 42.9%  停損率 35.7%
+       全期 296 筆 毛 +0.1283   前瞻 0 筆   -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\conj_backtest_AVAX.html
+    published 9 page(s) -> conj_backtest_pages
+
+flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_last.json   ok=True  reason=ok
+[2026/09/09 �g�T  5:33:13.05] conj_update end rc=0 
+[2026/09/10 �g�|  8:04:11.54] conj_update start 
+[fetch_bars] rc=0
+    ADA   +    1594 bars       1s  -> ADA_1m.csv
+    LINK  +    1594 bars       0s  -> LINK_1m.csv
+    AVAX  +    1594 bars       0s  -> AVAX_1m.csv
+[bars] rc=0
+    AVAX  rows=1,350,424 gap=0.0000% zerovol=0.3941% volxcheck_max=0.0000%  asserts=ok  -> PASS
+    
+    Stage 0 gate: ALL PASS
+[fetch_oi] rc=0
+          first missing: [('2026-09-09', 404)]
+    AVAX  rows= 269,723  +    288  missing_days=1 (404=1)      1s
+          first missing: [('2026-09-09', 404)]
+[levels] rc=0
+    AVAX  levels= 1,560 alive=   80 replay=50/50 1h-xcheck_max=0.0e+00  asserts=ok  -> PASS
+    
+    Stage 2 gate: ALL PASS
+[events] rc=0
+    AVAX  raw=1,480 kept=1,376 dedup(60/300/900)=104/104/104  regr ours->ref=99.42% ref->ours=99.73%  same-hour dup=19.4% (max 20)  PASS
+    
+    Stage 3 gate (>85% both ways): ALL PASS
+[conj_clock] rc=0
+    樣本 < 30，無法計算日聚類 CI。累積中。
+    
+    written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock.json
+[conj_clock_and] rc=0
+    
+    提醒：本時鐘的 in-sample 分解是**開時鐘的理由，不是證據**（§0.92 的 C/D 陷阱）。現行 conj_clock.py 不作廢，兩條並行。
+    written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_and.json
+[conj_backtest] rc=0
+    AVAX: 2026-06-12 00:03 → 2026-09-10 00:03  顯示窗 25,921 根 / 28 筆  毛 +0.2644 淨 +0.2328 ATR  勝率 42.9%  停損率 17.9%
+       全期 296 筆 毛 +0.2812   前瞻 0 筆   -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\conj_backtest_AVAX.html
+    published 9 page(s) -> conj_backtest_pages
+
+flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_last.json   ok=True  reason=ok
+[2026/09/10 �g�|  8:07:29.54] conj_update end rc=0 
+[2026/09/11 �g��  5:30:02.03] conj_update start 
+[fetch_bars] rc=0
+    ADA   +    1286 bars       0s  -> ADA_1m.csv
+    LINK  +    1286 bars       0s  -> LINK_1m.csv
+    AVAX  +    1286 bars       0s  -> AVAX_1m.csv
+[bars] rc=0
+    AVAX  rows=1,351,710 gap=0.0000% zerovol=0.3938% volxcheck_max=0.0000%  asserts=ok  -> PASS
+    
+    Stage 0 gate: ALL PASS
+[fetch_oi] rc=0
+    ADA   rows= 270,011  +    288  missing_days=0 (404=0)      1s
+    LINK  rows= 270,011  +    288  missing_days=0 (404=0)      1s
+    AVAX  rows= 270,011  +    288  missing_days=0 (404=0)      1s
+[levels] rc=0
+    AVAX  levels= 1,561 alive=   79 replay=50/50 1h-xcheck_max=0.0e+00  asserts=ok  -> PASS
+    
+    Stage 2 gate: ALL PASS
+[events] rc=0
+    AVAX  raw=1,482 kept=1,378 dedup(60/300/900)=104/104/104  regr ours->ref=99.42% ref->ours=99.73%  same-hour dup=19.4% (max 20)  PASS
+    
+    Stage 3 gate (>85% both ways): ALL PASS
+[conj_clock] rc=0
+    樣本 < 30，無法計算日聚類 CI。累積中。
+    
+    written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock.json
+[conj_clock_and] rc=0
+    
+    提醒：本時鐘的 in-sample 分解是**開時鐘的理由，不是證據**（§0.92 的 C/D 陷阱）。現行 conj_clock.py 不作廢，兩條並行。
+    written -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_and.json
+[conj_backtest] rc=0
+    AVAX: 2026-06-13 05:29 → 2026-09-11 05:29  顯示窗 25,921 根 / 28 筆  毛 +0.2644 淨 +0.2328 ATR  勝率 42.9%  停損率 17.9%
+       全期 294 筆 毛 +0.2622   前瞻 0 筆   -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\conj_backtest_AVAX.html
+    published 9 page(s) -> conj_backtest_pages
+
+flag -> C:\Users\rfo\Desktop\flowbot\flow_system\research\poc\data\results\conj_clock_last.json   ok=True  reason=ok
+[2026/09/11 �g��  5:33:15.24] conj_update end rc=0 

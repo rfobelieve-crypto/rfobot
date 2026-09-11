@@ -1,12 +1,12 @@
 {
-  "ok": false,
+  "ok": true,
   "interval": "1d",
-  "coins_ok": 149,
-  "coins_fail": 29,
-  "rows": 166737,
-  "dur_sec": 225,
-  "earliest": "2020-08-19",
+  "coins_ok": 29,
+  "coins_fail": 0,
+  "rows": 24260,
+  "dur_sec": 123,
+  "earliest": "2021-01-26",
   "latest": "2026-09-11",
   "reason": "HL candleSnapshot 單次上限 5000 根，已往回翻頁到底",
-  "asof": "2026-09-11 11:11:51"
+  "asof": "2026-09-11 11:16:07"
 }

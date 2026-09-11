@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "reason": "宣告停用中（since 2026-08-31），沉默 260.3h，符合宣告",
+  "silent_threshold_h": 72.0,
+  "per_src": {
+    "grid": {
+      "n": 301,
+      "last_ms": 1788133563840,
+      "silent_h": 260.3,
+      "reliable": 0
+    },
+    "raid": {
+      "n": 73,
+      "last_ms": 1788138389244,
+      "silent_h": 258.9,
+      "reliable": 55
+    },
+    "v7": {
+      "n": 0,
+      "last_ms": null,
+      "silent_h": null,
+      "reliable": 0
+    }
+  },
+  "trading_expected": false,
+  "expected_since": "2026-08-31",
+  "asof": "2026-09-11 04:02:04"
+}

@@ -1,0 +1,293 @@
+[2026/09/11 �g��  3:55:43.57] ===== hl_record start ===== 
+市場 234 個，總未平倉 $10320.1M
+地址宇宙 633（本輪新增 110，掃了 60 個幣的最近成交）
+market  -> 234 個幣的 OI/funding/premium
+book    -> 234 個幣的 L2（兩側各 20 檔）
+orders  -> 35762 筆掛單、**507 筆觸發單(止損)**、聚合 2185 列
+查 633 個地址 -> 11699 部位、6985 個有清算價、幾何違反 0
+覆蓋率 17.25% 的總未平倉名目
+快照 722 列 -> 20260910_19.json
+hl fuel: OK  （快照累積 1 個）
+[2026/09/11 �g��  4:00:35.47] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g��  4:05:01.75] ===== hl_record start ===== 
+市場 234 個，總未平倉 $10313.4M
+地址宇宙 729（本輪新增 96，掃了 60 個幣的最近成交）
+market  -> 234 個幣的 OI/funding/premium
+book    -> 234 個幣的 L2（兩側各 20 檔）
+orders  -> 31507 筆掛單、**864 筆觸發單(止損)**、聚合 2197 列
+查 723 個地址 -> 13000 部位、7795 個有清算價、幾何違反 0
+覆蓋率 17.38% 的總未平倉名目
+快照 748 列 -> 20260910_20.json
+hl fuel: OK  （快照累積 2 個）
+[2026/09/11 �g��  4:10:35.88] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g��  5:05:01.74] ===== hl_record start ===== 
+市場 234 個，總未平倉 $10331.8M
+地址宇宙 833（本輪新增 104，掃了 60 個幣的最近成交）
+market  -> 234 個幣的 OI/funding/premium
+book    -> 234 個幣的 L2（兩側各 20 檔）
+orders  -> 35952 筆掛單、**898 筆觸發單(止損)**、聚合 2338 列
+查 818 個地址 -> 13744 部位、8273 個有清算價、幾何違反 0
+覆蓋率 17.70% 的總未平倉名目
+快照 775 列 -> 20260910_21.json
+hl fuel: OK  （快照累積 3 個）
+[2026/09/11 �g��  5:11:13.38] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g��  6:05:02.11] ===== hl_record start ===== 
+市場 234 個，總未平倉 $10309.9M
+地址宇宙 941（本輪新增 108，掃了 60 個幣的最近成交）
+market  -> 234 個幣的 OI/funding/premium
+book    -> 234 個幣的 L2（兩側各 20 檔）
+orders  -> 37031 筆掛單、**1042 筆觸發單(止損)**、聚合 2276 列
+查 855 個地址 -> 14278 部位、8614 個有清算價、幾何違反 0
+覆蓋率 18.83% 的總未平倉名目
+快照 846 列 -> 20260910_22.json
+hl fuel: OK  （快照累積 4 個）
+[2026/09/11 �g��  6:11:53.03] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g��  7:05:01.75] ===== hl_record start ===== 
+市場 234 個，總未平倉 $10192.7M
+地址宇宙 1066（本輪新增 125，掃了 60 個幣的最近成交）
+market  -> 234 個幣的 OI/funding/premium
+book    -> 234 個幣的 L2（兩側各 20 檔）
+orders  -> 34053 筆掛單、**1065 筆觸發單(止損)**、聚合 2188 列
+查 881 個地址 -> 13783 部位、8165 個有清算價、幾何違反 0
+覆蓋率 17.41% 的總未平倉名目
+快照 886 列 -> 20260910_23.json
+hl fuel: OK  （快照累積 5 個）
+[2026/09/11 �g��  7:11:56.17] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g��  8:05:02.01] ===== hl_record start ===== 
+市場 518 個（11 個場），總未平倉 $14051.0M；主場 $10105.4M
+地址宇宙 1737（本輪新增 110，掃了 60 個幣的最近成交）
+market  -> 518 個幣的 OI/funding/premium
+book    -> 183 個幣的 L2（兩側各 20 檔）
+orders  -> 24358 筆掛單、**776 筆觸發單(止損)**、聚合 2112 列
+positions -> 5437 個部位明細（真相源，清算事件由相鄰快照差推出）
+查 837 個地址 -> 9226 部位、5437 個有清算價、幾何違反 0
+覆蓋率 16.29% 的總未平倉名目
+Traceback (most recent call last):
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\research\hl\hl_fuel_recorder.py", line 530, in <module>
+    coverage_frac=cov, total_oi_usd=tot_oi, stat=stat,
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\research\hl\hl_fuel_recorder.py", line 500, in main
+    time.gmtime(ts)) + ".parquet"),
+KeyError: 'ETH'
+[2026/09/11 �g��  8:14:32.84] verify units 
+Traceback (most recent call last):
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\research\hl\hl_verify.py", line 214, in <module>
+    raise SystemExit(main())
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\research\hl\hl_verify.py", line 56, in main
+    mc = info({"type": "metaAndAssetCtxs"})
+  File "C:\Users\rfo\Desktop\flowbot\flow_system\research\hl\hl_verify.py", line 41, in info
+    with urllib.request.urlopen(req, timeout=t) as r:
+  File "C:\Users\rfo\anaconda3\lib\urllib\request.py", line 214, in urlopen
+    return opener.open(url, data, timeout)
+  File "C:\Users\rfo\anaconda3\lib\urllib\request.py", line 523, in open
+    response = meth(req, response)
+  File "C:\Users\rfo\anaconda3\lib\urllib\request.py", line 632, in http_response
+    response = self.parent.error(
+  File "C:\Users\rfo\anaconda3\lib\urllib\request.py", line 561, in error
+    return self._call_chain(*args)
+  File "C:\Users\rfo\anaconda3\lib\urllib\request.py", line 494, in _call_chain
+    result = func(*args)
+  File "C:\Users\rfo\anaconda3\lib\urllib\request.py", line 641, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 429: Too Many Requests
+[2026/09/11 �g��  8:14:33.70] ===== hl_record done rc=1 ===== 
+[2026/09/11 �g��  8:28:15.37] ===== hl_record start ===== 
+市場 518 個（11 個場），總未平倉 $14075.1M；主場 $10118.2M
+地址宇宙 2090（本輪新增 123，掃了 60 個幣的最近成交）
+market  -> 518/518 個市場（完整率 100%）
+book    -> 518/518 個 L2（完整率 100%）
+orders  -> 52498 筆掛單、**2379 筆觸發單(止損)**、聚合 2586 列
+positions -> 14794 個部位明細（真相源，清算事件由相鄰快照差推出）
+查 2086 個地址 -> 25233 部位、14794 個有清算價、幾何違反 0
+覆蓋率 22.22% 的總未平倉名目
+快照 1216 列 -> 20260911_00.json
+hl fuel: OK  （快照累積 6 個）
+[2026/09/11 �g��  8:52:48.31] verify units 
+V1     positionValue vs |szi|xmark：中位 24.2 bps、p99 280.3 bps、逐幣最差中位 403.9 bps、>2% 的 368/14794 PASS
+V2     每 1 BTC 的名目 = $76751（應等於現價量級 $76797）                 PASS
+V3     szi 違反 szDecimals 的筆數 0                              PASS
+V4     最密 60 秒窗 1948 筆，觀測/預期名目佔比：BTC 2.85x、ZEC 1.51x、HYPE 0.63x、ETH 0.16x **FAIL**
+V5     tape ts 範圍 1789081216587 ~ 1789083398276（毫秒應在 1.5e12~2.2e12） PASS
+V6     同一檔內重複 tid 0 筆                                       PASS
+V7     tape 含現貨代號（@index）0 筆                                PASS
+V8     成交價偏離現價 >20% 的 0/9552（舊快照會有，比例須小）                    PASS
+V9     總 OI $10.12B / 總 24h 量 $5.86B = 1.73（周轉合理區間 0.2~20）  PASS
+V10    reduce-only 止損方向一致 1577/1581（平多在下、平空在上）              PASS
+
+hl verify: RED  V4: 最密 60 秒窗 1948 筆，觀測/預期名目佔比：BTC 2.85x、ZEC 1.51x、HYPE 0.63x、ETH 0.16x
+[2026/09/11 �g��  8:52:49.27] ===== hl_record done rc=1 ===== 
+[2026/09/11 �g��  9:05:01.78] ===== hl_record start ===== 
+市場 518 個（11 個場），總未平倉 $14150.1M；主場 $10184.3M
+地址宇宙 2480（本輪新增 121，掃了 60 個幣的最近成交）
+market  -> 518/518 個市場（完整率 100%）
+book    -> 518/518 個 L2（完整率 100%）
+orders  -> 61028 筆掛單、**3091 筆觸發單(止損)**、聚合 2599 列
+positions -> 16088 個部位明細（真相源，清算事件由相鄰快照差推出）
+查 2480 個地址 -> 27508 部位、16088 個有清算價、幾何違反 0
+覆蓋率 23.38% 的總未平倉名目
+快照 1291 列 -> 20260911_01.json
+hl fuel: OK  （快照累積 7 個）
+[2026/09/11 �g��  9:33:45.54] verify units 
+V1     positionValue vs |szi|xmark_snap：中位 53.8 bps、p99 258.8 bps、逐幣最差中位 305.4 bps、>2% 的 377/16088 PASS
+V2     每 1 BTC 的名目 = $76796（應等於現價量級 $76706）                 PASS
+V3     szi 違反 szDecimals 的筆數 0                              PASS
+V4     最密 60 秒窗 1948 筆，觀測/預期佔比中位 1.49x（離群 0/6）：BTC 2.87x、ZEC 1.49x、HYPE 0.63x、ETH 0.16x、ARB 10.71x、SOL 0.73x PASS
+V5     tape ts 範圍 1789081216587 ~ 1789083398276（毫秒應在 1.5e12~2.2e12） PASS
+V6     同一檔內重複 tid 0 筆                                       PASS
+V7     tape 含現貨代號（@index）0 筆                                PASS
+V8     成交價偏離現價 >20% 的 0/9552（舊快照會有，比例須小）                    PASS
+V9     總 OI $10.11B / 總 24h 量 $5.85B = 1.73（周轉合理區間 0.2~20）  PASS
+V10    reduce-only 止損方向一致 2051/2051（平多在下、平空在上）              PASS
+
+hl verify: OK  全過
+[2026/09/11 �g��  9:33:46.62] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g�� 10:05:01.83] ===== hl_record start ===== 
+市場 518 個（11 個場），總未平倉 $14113.0M；主場 $10150.1M
+地址宇宙 2562（本輪新增 82，掃了 60 個幣的最近成交）
+market  -> 518/518 個市場（完整率 100%）
+book    -> 518/518 個 L2（完整率 100%）
+orders  -> 56999 筆掛單、**3101 筆觸發單(止損)**、聚合 2653 列
+positions -> 16132 個部位明細（真相源，清算事件由相鄰快照差推出）
+查 2500 個地址 -> 27534 部位、16132 個有清算價、幾何違反 0
+覆蓋率 23.33% 的總未平倉名目
+快照 1286 列 -> 20260911_02.json
+hl fuel: OK  （快照累積 8 個）
+[2026/09/11 �g�� 10:33:38.59] verify units 
+V1     positionValue vs |szi|xmark_snap：中位 41.0 bps、p99 259.2 bps、逐幣最差中位 251.4 bps、>2% 的 434/16132 PASS
+V2     每 1 BTC 的名目 = $76782（應等於現價量級 $76766）                 PASS
+V3     szi 違反 szDecimals 的筆數 0                              PASS
+V4     最密 60 秒窗 2932 筆，觀測/預期佔比中位 3.07x（離群 0/6）：HYPE 3.00x、PONS 13.51x、NEAR 3.07x、BTC 0.05x、ARB 4.39x、ZEC 0.07x PASS
+V5     tape ts 範圍 1789092000019 ~ 1789093935723（毫秒應在 1.5e12~2.2e12） PASS
+V6     同一檔內重複 tid 0 筆                                       PASS
+V7     tape 含現貨代號（@index）0 筆                                PASS
+V8     成交價偏離現價 >20% 的 0/55004（舊快照會有，比例須小）                   PASS
+V9     總 OI $10.08B / 總 24h 量 $5.76B = 1.75（周轉合理區間 0.2~20）  PASS
+V10    reduce-only 止損方向一致 2082/2083（平多在下、平空在上）              PASS
+
+hl verify: OK  全過
+[2026/09/11 �g�� 10:33:39.69] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g�� 11:05:01.78] ===== hl_record start ===== 
+市場 518 個（11 個場），總未平倉 $14051.2M；主場 $10084.2M
+地址宇宙 2645（本輪新增 83，掃了 60 個幣的最近成交）
+market  -> 518/518 個市場（完整率 100%）
+book    -> 427/518 個 L2（完整率 82%）
+orders  -> 59752 筆掛單、**3109 筆觸發單(止損)**、聚合 2603 列
+positions -> 15696 個部位明細（真相源，清算事件由相鄰快照差推出）
+查 2500 個地址 -> 26956 部位、15696 個有清算價、幾何違反 0
+覆蓋率 23.19% 的總未平倉名目
+快照 1264 列 -> 20260911_03.json
+hl fuel: RED  （快照累積 9 個）
+[2026/09/11 �g�� 11:38:49.86] verify units 
+V1     positionValue vs |szi|xmark_snap：中位 16.8 bps、p99 189.5 bps、逐幣最差中位 231.8 bps、>2% 的 118/15696 PASS
+V2     每 1 BTC 的名目 = $76749（應等於現價量級 $76844）                 PASS
+V3     szi 違反 szDecimals 的筆數 0                              PASS
+V4     最密 60 秒窗 3277 筆，觀測/預期佔比中位 2.50x（離群 0/6）：HYPE 4.28x、BTC 0.61x、ETH 0.70x、ZEC 1.33x、PUMP 6.78x、LIT 2.50x PASS
+V5     tape ts 範圍 1789095600118 ~ 1789097836690（毫秒應在 1.5e12~2.2e12） PASS
+V6     同一檔內重複 tid 0 筆                                       PASS
+V7     tape 含現貨代號（@index）0 筆                                PASS
+V8     成交價偏離現價 >20% 的 0/58317（舊快照會有，比例須小）                   PASS
+V9     總 OI $10.10B / 總 24h 量 $5.65B = 1.79（周轉合理區間 0.2~20）  PASS
+V10    reduce-only 止損方向一致 2016/2019（平多在下、平空在上）              PASS
+
+hl verify: OK  全過
+[2026/09/11 �g�� 11:38:51.09] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g�� 12:05:01.81] ===== hl_record start ===== 
+市場 518 個（11 個場），總未平倉 $14098.1M；主場 $10120.2M
+地址宇宙 2780（本輪新增 135，掃了 60 個幣的最近成交）
+market  -> 518/518 個市場（完整率 100%）
+book    -> 518/518 個 L2（完整率 100%）
+orders  -> 59875 筆掛單、**3012 筆觸發單(止損)**、聚合 2632 列
+positions -> 15119 個部位明細（真相源，清算事件由相鄰快照差推出）
+查 2500 個地址 -> 25781 部位、15119 個有清算價、幾何違反 0
+覆蓋率 23.36% 的總未平倉名目
+快照 1231 列 -> 20260911_04.json
+hl fuel: OK  （快照累積 10 個）
+[2026/09/11 �g�� 12:33:53.91] verify units 
+V1     positionValue vs |szi|xmark_snap：中位 61.3 bps、p99 308.8 bps、逐幣最差中位 395.5 bps、>2% 的 633/15119 PASS
+V2     每 1 BTC 的名目 = $77134（應等於現價量級 $77122）                 PASS
+V3     szi 違反 szDecimals 的筆數 0                              PASS
+V4     最密 60 秒窗 4082 筆，觀測/預期佔比中位 0.92x（離群 1/6）：BTC 3.50x、XMR 210.87x、ZEC 0.92x、ETH 0.21x、PUMP 0.92x、HYPE 0.15x PASS
+V5     tape ts 範圍 1789099200030 ~ 1789101138258（毫秒應在 1.5e12~2.2e12） PASS
+V6     同一檔內重複 tid 0 筆                                       PASS
+V7     tape 含現貨代號（@index）0 筆                                PASS
+V8     成交價偏離現價 >20% 的 0/62652（舊快照會有，比例須小）                   PASS
+V9     總 OI $10.18B / 總 24h 量 $5.66B = 1.80（周轉合理區間 0.2~20）  PASS
+V10    reduce-only 止損方向一致 1882/1887（平多在下、平空在上）              PASS
+
+hl verify: OK  全過
+[2026/09/11 �g�� 12:33:55.19] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g�� 13:05:01.83] ===== hl_record start ===== 
+市場 518 個（11 個場），總未平倉 $14100.6M；主場 $10106.1M
+地址宇宙 2869（本輪新增 89，掃了 60 個幣的最近成交）
+market  -> 518/518 個市場（完整率 100%）
+book    -> 518/518 個 L2（完整率 100%）
+orders  -> 54979 筆掛單、**3090 筆觸發單(止損)**、聚合 2561 列
+positions -> 14895 個部位明細（真相源，清算事件由相鄰快照差推出）
+查 2500 個地址 -> 25019 部位、14895 個有清算價、幾何違反 0
+覆蓋率 21.60% 的總未平倉名目
+快照 1203 列 -> 20260911_05.json
+hl fuel: OK  （快照累積 11 個）
+[2026/09/11 �g�� 13:33:48.30] verify units 
+V1     positionValue vs |szi|xmark_snap：中位 13.5 bps、p99 231.3 bps、逐幣最差中位 249.3 bps、>2% 的 258/14895 PASS
+V2     每 1 BTC 的名目 = $77084（應等於現價量級 $77054）                 PASS
+V3     szi 違反 szDecimals 的筆數 0                              PASS
+V4     最密 60 秒窗 2555 筆，觀測/預期佔比中位 0.86x（離群 0/6）：BTC 0.68x、ETH 0.76x、HYPE 0.86x、XRP 6.25x、CHIP 45.19x、ZEC 0.49x PASS
+V5     tape ts 範圍 1789102800018 ~ 1789104741210（毫秒應在 1.5e12~2.2e12） PASS
+V6     同一檔內重複 tid 0 筆                                       PASS
+V7     tape 含現貨代號（@index）0 筆                                PASS
+V8     成交價偏離現價 >20% 的 0/45840（舊快照會有，比例須小）                   PASS
+V9     總 OI $10.10B / 總 24h 量 $5.67B = 1.78（周轉合理區間 0.2~20）  PASS
+V10    reduce-only 止損方向一致 2006/2006（平多在下、平空在上）              PASS
+
+hl verify: OK  全過
+[2026/09/11 �g�� 13:33:49.54] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g�� 14:05:01.84] ===== hl_record start ===== 
+市場 518 個（11 個場），總未平倉 $14159.3M；主場 $10157.4M
+地址宇宙 2969（本輪新增 100，掃了 60 個幣的最近成交）
+market  -> 518/518 個市場（完整率 100%）
+book    -> 518/518 個 L2（完整率 100%）
+orders  -> 54708 筆掛單、**3016 筆觸發單(止損)**、聚合 2563 列
+positions -> 14500 個部位明細（真相源，清算事件由相鄰快照差推出）
+查 2499 個地址 -> 24516 部位、14500 個有清算價、幾何違反 0
+覆蓋率 21.17% 的總未平倉名目
+快照 1174 列 -> 20260911_06.json
+hl fuel: OK  （快照累積 12 個）
+[2026/09/11 �g�� 14:33:27.08] verify units 
+V1     positionValue vs |szi|xmark_snap：中位 23.6 bps、p99 224.9 bps、逐幣最差中位 238.0 bps、>2% 的 216/14500 PASS
+V2     每 1 BTC 的名目 = $77239（應等於現價量級 $77184）                 PASS
+V3     szi 違反 szDecimals 的筆數 0                              PASS
+V4     最密 60 秒窗 3504 筆，觀測/預期佔比中位 3.52x（離群 0/6）：BTC 3.52x、ETH 4.04x、HYPE 3.92x、ZEC 0.87x、XRP 2.16x、PONS 1.09x PASS
+V5     tape ts 範圍 1789106400042 ~ 1789108342699（毫秒應在 1.5e12~2.2e12） PASS
+V6     同一檔內重複 tid 0 筆                                       PASS
+V7     tape 含現貨代號（@index）0 筆                                PASS
+V8     成交價偏離現價 >20% 的 0/55757（舊快照會有，比例須小）                   PASS
+V9     總 OI $10.10B / 總 24h 量 $5.71B = 1.77（周轉合理區間 0.2~20）  PASS
+V10    reduce-only 止損方向一致 1933/1936（平多在下、平空在上）              PASS
+
+hl verify: OK  全過
+[2026/09/11 �g�� 14:33:28.33] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g�� 15:05:02.16] ===== hl_record start ===== 
+市場 518 個（11 個場），總未平倉 $14171.7M；主場 $10149.6M
+地址宇宙 3080（本輪新增 111，掃了 60 個幣的最近成交）
+market  -> 518/518 個市場（完整率 100%）
+book    -> 518/518 個 L2（完整率 100%）
+orders  -> 51185 筆掛單、**2976 筆觸發單(止損)**、聚合 2529 列
+positions -> 14526 個部位明細（真相源，清算事件由相鄰快照差推出）
+查 2496 個地址 -> 24378 部位、14526 個有清算價、幾何違反 0
+覆蓋率 20.35% 的總未平倉名目
+快照 1209 列 -> 20260911_07.json
+hl fuel: OK  （快照累積 13 個）
+[2026/09/11 �g�� 15:34:29.20] verify units 
+V1     positionValue vs |szi|xmark_snap：中位 17.3 bps、p99 197.6 bps、逐幣最差中位 427.1 bps、>2% 的 145/14526 PASS
+V2     每 1 BTC 的名目 = $77307（應等於現價量級 $77289）                 PASS
+V3     szi 違反 szDecimals 的筆數 0                              PASS
+V4     最密 60 秒窗 2844 筆，觀測/預期佔比中位 2.97x（離群 0/6）：HYPE 4.19x、SOL 9.32x、ETH 0.74x、BTC 0.31x、NEAR 2.97x、PUMP 1.58x PASS
+V5     tape ts 範圍 1789110000124 ~ 1789111944151（毫秒應在 1.5e12~2.2e12） PASS
+V6     同一檔內重複 tid 0 筆                                       PASS
+V7     tape 含現貨代號（@index）0 筆                                PASS
+V8     成交價偏離現價 >20% 的 0/56087（舊快照會有，比例須小）                   PASS
+V9     總 OI $10.18B / 總 24h 量 $5.68B = 1.79（周轉合理區間 0.2~20）  PASS
+V10    reduce-only 止損方向一致 1979/1982（平多在下、平空在上）              PASS
+
+hl verify: OK  全過
+[2026/09/11 �g�� 15:34:30.31] ===== hl_record done rc=0 ===== 
+[2026/09/11 �g�� 16:05:01.85] ===== hl_record start ===== 

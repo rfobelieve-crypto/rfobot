@@ -1,0 +1,37 @@
+{
+  "ok": true,
+  "reason": "覆蓋 20.35%、14526 個清算價、幾何違反 0、地址 3080、呼叫失敗率 2.9%、不完整的任務 無、1767 秒",
+  "call_fail_rate": 0.028736639214999124,
+  "incomplete": [],
+  "addrs_polled": 2496,
+  "addrs_known": 3080,
+  "coverage_partial": false,
+  "coverage_frac": 0.20353606476563302,
+  "n_addresses": 3080,
+  "stat": {
+    "addrs_ok": 2496,
+    "positions": 24378,
+    "with_liq": 14526,
+    "geom_violations": 0
+  },
+  "did": {
+    "market": {
+      "rows": 518,
+      "expected": 518,
+      "complete": 1.0
+    },
+    "book": {
+      "rows": 518,
+      "expected": 518,
+      "complete": 1.0
+    },
+    "orders": {
+      "addrs_ok": 2349,
+      "n_orders": 51185,
+      "n_trigger": 2976,
+      "resting_rows": 2529
+    }
+  },
+  "snapshots": 13,
+  "asof": "2026-09-11 15:34:29"
+}

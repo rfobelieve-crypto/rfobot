@@ -1,384 +1,462 @@
-{"t": 1787194499340, "mode": "paper", "marketId": "SPXUSDT", "side": "buy", "price": 0.36086006774902346, "sizeBase": 1106, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787194832428, "mode": "paper", "marketId": "ETHUSDT", "side": "buy", "price": 2246.221919131801, "sizeBase": 0.35000000000000003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787195344639, "mode": "paper", "marketId": "ETHUSDT", "side": "buy", "price": 2237.316921195984, "sizeBase": 0.35000000000000003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787195463648, "mode": "paper", "marketId": "ETHUSDT", "side": "buy", "price": 2228.3266712581844, "sizeBase": 0.35000000000000003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787195487651, "mode": "paper", "marketId": "SPXUSDT", "side": "buy", "price": 0.359406787109375, "sizeBase": 1106, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787195739676, "mode": "paper", "marketId": "SPXUSDT", "side": "sell", "price": 0.360205078125, "sizeBase": 1106, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787195894704, "mode": "paper", "marketId": "ETHUSDT", "side": "sell", "price": 2233.0633839762563, "sizeBase": 0.35000000000000003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787196114733, "mode": "paper", "marketId": "ETHUSDT", "side": "sell", "price": 2242.049667414554, "sizeBase": 0.35000000000000003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787197531043, "mode": "paper", "marketId": "SPXUSDT", "side": "sell", "price": 0.36245, "sizeBase": 1106, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787197549047, "mode": "paper", "marketId": "ETHUSDT", "side": "sell", "price": 2255.557448976024, "sizeBase": 0.35000000000000003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787198473444, "mode": "paper", "marketId": "SPXUSDT", "side": "buy", "price": 0.360690625, "sizeBase": 1106, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816204, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 2265.34, "sizeBase": 1.68, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.04, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.16, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.14, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.08, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.65, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.39, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.06, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.08, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.08, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.07126, "sizeBase": 1425, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.07126, "sizeBase": 3328, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 17, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 195, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 119, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 31, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 150, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 150, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.0054, "sizeBase": 331, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.0054, "sizeBase": 331, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.07013, "sizeBase": 4753, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 65123.2, "sizeBase": 0.0257, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 65504.6, "sizeBase": 0.0223, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 65526, "sizeBase": 0.0034, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 65335.4, "sizeBase": 0.177, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 65994.1, "sizeBase": 0.1116, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 65994.1, "sizeBase": 0.0654, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787249813705, "mode": "live", "marketId": "GOOGLUSDT", "side": "sell", "price": 0.08128, "sizeBase": 274, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787270434562, "mode": "live", "marketId": "XAUUSDT", "side": "buy", "price": 0.08055, "sizeBase": 274, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787271394626, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 654.05, "sizeBase": 0.02, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787271394626, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 654.05, "sizeBase": 0.03, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787278342740, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 660.81, "sizeBase": 0.05, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787285757452, "mode": "live", "marketId": "XAGUSDT", "side": "sell", "price": 89.109, "sizeBase": 0.3, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787285757664, "mode": "live", "marketId": "XRPUSDT", "side": "sell", "price": 2347, "sizeBase": 0.01, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787285757849, "mode": "live", "marketId": "LINKUSDT", "side": "sell", "price": 2347, "sizeBase": 0.01, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787292057377, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 664.25, "sizeBase": 0.05, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787296592567, "mode": "live", "marketId": "QQQUSDT", "side": "buy", "price": 2405.65, "sizeBase": 0.02, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787299257365, "mode": "live", "marketId": "GOOGLUSDT", "side": "buy", "price": 670.51, "sizeBase": 0.05, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787302077516, "mode": "live", "marketId": "AVAXUSDT", "side": "buy", "price": 92.573, "sizeBase": 0.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787303817504, "mode": "live", "marketId": "SPXUSDT", "side": "sell", "price": 91.232, "sizeBase": 0.1, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787303817504, "mode": "live", "marketId": "SPXUSDT", "side": "sell", "price": 91.232, "sizeBase": 0.1, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787303817719, "mode": "live", "marketId": "NVDAUSDT", "side": "sell", "price": 2392.59, "sizeBase": 0.01, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787306409219, "mode": "live", "marketId": "MSFTUSDT", "side": "buy", "price": 2404.73, "sizeBase": 0.01, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787324456175, "mode": "live", "marketId": "METAUSDT", "side": "buy", "price": 91.888, "sizeBase": 0.2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787343416396, "mode": "live", "marketId": "TSLAUSDT", "side": "sell", "price": 7.579, "sizeBase": 2.2, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787364023670, "mode": "live", "marketId": "AAPLUSDT", "side": "buy", "price": 7.857, "sizeBase": 2.2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787443793212, "mode": "live", "marketId": "XAUUSDT", "side": "buy", "price": 93.858, "sizeBase": 0.1, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787447287742, "mode": "live", "marketId": "NDX100USDT", "side": "buy", "price": 11.649, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787447288070, "mode": "live", "marketId": "ADAUSDT", "side": "buy", "price": 7.518, "sizeBase": 1.7, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787462179493, "mode": "live", "marketId": "METAUSDT", "side": "sell", "price": 10.992, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787464841719, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 92.245, "sizeBase": 0.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787468441788, "mode": "live", "marketId": "QQQUSDT", "side": "sell", "price": 7.332, "sizeBase": 1.7, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787468861717, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 687.03, "sizeBase": 0.03, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787490011799, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 694.03, "sizeBase": 0.03, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787504912947, "mode": "live", "marketId": "MSFTUSDT", "side": "sell", "price": 0.09249, "sizeBase": 7, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787504912947, "mode": "live", "marketId": "MSFTUSDT", "side": "sell", "price": 0.09249, "sizeBase": 108, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787515593121, "mode": "live", "marketId": "NVDAUSDT", "side": "sell", "price": 697.79, "sizeBase": 0.04, "fee": null, "src": "raid", "cid_known": false}
-{"t": 1787526032275, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 0.09301, "sizeBase": 115, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787536832272, "mode": "live", "marketId": "GOOGLUSDT", "side": "buy", "price": 694.41, "sizeBase": 0.02, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787536832272, "mode": "live", "marketId": "GOOGLUSDT", "side": "buy", "price": 694.41, "sizeBase": 0.02, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787576768190, "mode": "live", "marketId": "GOOGLUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787580198292, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787580596399, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787581516437, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787582732833, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787582790794, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787583764929, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787583764930, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787583822896, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787584446006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787584446006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787584446006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787585845365, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787585845366, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787585845366, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787585945270, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787585945271, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787585945271, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787586311123, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787586311124, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787586311124, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787586398075, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787586398075, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787586398075, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787586734643, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787586734643, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787586734643, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787592128108, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787592128108, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787592128108, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787625447428, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787625447431, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787625447431, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787626578158, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787626578159, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787626578159, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787627500410, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787627500410, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787627500410, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787627823821, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787627823821, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787627823821, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787628489472, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787628489472, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787628489473, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787631693284, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787631693286, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787631693286, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787632270797, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787632270797, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787632270797, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787632695707, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787632695708, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787632695708, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787672604355, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787672604358, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787672604358, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787691982577, "mode": "live", "marketId": "NVDAUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787699804437, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787699804438, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787699804438, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787699804438, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787705183400, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787705183400, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787705183400, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787705183400, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787705458124, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787705458124, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787705458125, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787705458125, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787707201741, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787707201741, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787707201742, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787707201742, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787708083793, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787708083793, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787708083794, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787708083794, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787709296974, "mode": "live", "marketId": "NVDAUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787709296975, "mode": "live", "marketId": "NVDAUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787709537433, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787709537433, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787709537434, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787709537434, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787709537434, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787709537434, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787713583368, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787713583368, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787713583368, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787713583369, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787713583369, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787713583369, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787725667005, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787725667006, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787725667006, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787725667006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787725667006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787725667006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787726741399, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787726741399, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787726741399, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787726741399, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787726741399, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787726741400, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787727426665, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787727426666, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787727426666, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787727426666, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787727426666, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787727426666, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787738824680, "mode": "live", "marketId": "AAPLUSDT", "side": "buy", "price": 78351.5, "sizeBase": 0.0002, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787738824987, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 11.258, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787738825310, "mode": "live", "marketId": "XAUUSDT", "side": "buy", "price": 7.312, "sizeBase": 1.8, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787739205182, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.312, "sizeBase": 1.8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.258, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 78351.5, "sizeBase": 0.0002, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787739263278, "mode": "live", "marketId": "ETHUSDT", "side": "buy", "price": 78419.9, "sizeBase": 0.0002, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787739263657, "mode": "live", "marketId": "DOGEUSDT", "side": "buy", "price": 11.263, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787739263955, "mode": "live", "marketId": "AVAXUSDT", "side": "buy", "price": 7.314, "sizeBase": 1.8, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787742383618, "mode": "live", "marketId": "XRPUSDT", "side": "sell", "price": 0.08682, "sizeBase": 127, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.08682, "sizeBase": 127, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.314, "sizeBase": 1.8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.263, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 78419.9, "sizeBase": 0.0002, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.312, "sizeBase": 1.8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.258, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 78351.5, "sizeBase": 0.0002, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787742528238, "mode": "live", "marketId": "XAGUSDT", "side": "sell", "price": 0.08676, "sizeBase": 125, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787742528602, "mode": "live", "marketId": "DOGEUSDT", "side": "sell", "price": 11.451, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787756928567, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 77854.7, "sizeBase": 0.0002, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787756928702, "mode": "live", "marketId": "MSFTUSDT", "side": "buy", "price": 77857.6, "sizeBase": 0.0002, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787771328086, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 0.0849, "sizeBase": 35, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787771328086, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 0.0849, "sizeBase": 90, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787771387957, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.08488, "sizeBase": 125, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787771448062, "mode": "live", "marketId": "DOGEUSDT", "side": "buy", "price": 0.08503, "sizeBase": 2, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787782008173, "mode": "live", "marketId": "NDX100USDT", "side": "sell", "price": 11.487, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787785608258, "mode": "live", "marketId": "NDX100USDT", "side": "sell", "price": 7.368, "sizeBase": 1.7, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787785788083, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 78651.9, "sizeBase": 0.0002, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787785789774, "mode": "live", "marketId": "ASMLUSDT", "side": "sell", "price": 78648, "sizeBase": 0.0001, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787785789774, "mode": "live", "marketId": "ASMLUSDT", "side": "sell", "price": 78648, "sizeBase": 0.0001, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787785848031, "mode": "live", "marketId": "QQQUSDT", "side": "sell", "price": 78682.6, "sizeBase": 0.0002, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787785849598, "mode": "live", "marketId": "AAPLUSDT", "side": "sell", "price": 78682.6, "sizeBase": 0.0002, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787810808299, "mode": "live", "marketId": "SOLUSDT", "side": "sell", "price": 11.595, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787839668161, "mode": "live", "marketId": "SOLUSDT", "side": "buy", "price": 11.767, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787879148268, "mode": "live", "marketId": "TSLAUSDT", "side": "sell", "price": 713.4, "sizeBase": 0.03, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787879208364, "mode": "live", "marketId": "NVDAUSDT", "side": "sell", "price": 11.981, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787886646301, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 11.981, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787886646301, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 713.4, "sizeBase": 0.03, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787886646301, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.767, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787886704278, "mode": "live", "marketId": "NDX100USDT", "side": "buy", "price": 11.68, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787887897225, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.68, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787887897227, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 11.981, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787887897227, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 713.4, "sizeBase": 0.03, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787887897227, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.767, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787889995299, "mode": "live", "marketId": "XAUUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787897195399, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787905820561, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787905820561, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787906179416, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787906179417, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787907977604, "mode": "live", "marketId": "ETHUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787907977924, "mode": "live", "marketId": "LINKUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787908157690, "mode": "live", "marketId": "NDX100USDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787911849196, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787911849197, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787911849197, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787911849197, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787911849197, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787913107283, "mode": "live", "marketId": "QQQUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787914067361, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787914907387, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787925958829, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787926507154, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787933000917, "mode": "live", "marketId": "AMZNUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787933870919, "mode": "live", "marketId": "ASMLUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787933870919, "mode": "live", "marketId": "ASMLUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934318111, "mode": "live", "marketId": "BNBUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886460, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886460, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373027, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373029, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373029, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373029, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373029, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373029, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699100, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656195, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656197, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137925, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137927, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432189, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432191, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1787994390135, "mode": "live", "marketId": "MSFTUSDT", "side": "buy", "price": 103.363, "sizeBase": 0.1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787994390454, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 11.298, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1787994450355, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.08431, "sizeBase": 201, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788023190336, "mode": "live", "marketId": "SOLUSDT", "side": "sell", "price": 105.009, "sizeBase": 0.1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788023192006, "mode": "live", "marketId": "XRPUSDT", "side": "sell", "price": 11.426, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788023250051, "mode": "live", "marketId": "ADAUSDT", "side": "sell", "price": 11.422, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788023251774, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.08521, "sizeBase": 201, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788023310193, "mode": "live", "marketId": "LINKUSDT", "side": "sell", "price": 11.419, "sizeBase": 1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788023311769, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.08519, "sizeBase": 53, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788023311769, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.0852, "sizeBase": 89, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788080790273, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 0.08463, "sizeBase": 309, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788084390352, "mode": "live", "marketId": "METAUSDT", "side": "buy", "price": 11.346, "sizeBase": 2, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788100631821, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.346, "sizeBase": 2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788100631821, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.08463, "sizeBase": 309, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788109568692, "mode": "live", "marketId": "AAPLUSDT", "side": "sell", "price": 0.2056, "sizeBase": 82, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788127328914, "mode": "live", "marketId": "BNBUSDT", "side": "buy", "price": 104.644, "sizeBase": 0.1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788127328998, "mode": "live", "marketId": "AVAXUSDT", "side": "buy", "price": 104.615, "sizeBase": 0.1, "fee": null, "src": "raid", "cid_known": true}
-{"t": 1788128549932, "mode": "live", "marketId": "AMZNUSDT", "side": "sell", "price": 0.08332, "sizeBase": 51, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788128549933, "mode": "live", "marketId": "AMZNUSDT", "side": "sell", "price": 0.08332, "sizeBase": 91, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788129024529, "mode": "live", "marketId": "ADAUSDT", "side": "sell", "price": 0.1968, "sizeBase": 55, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788131827380, "mode": "live", "marketId": "SOLUSDT", "side": "sell", "price": 0.08268, "sizeBase": 244, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788131827380, "mode": "live", "marketId": "SOLUSDT", "side": "sell", "price": 0.08269, "sizeBase": 65, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788132501301, "mode": "live", "marketId": "AVAXUSDT", "side": "sell", "price": 11.238, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788132501301, "mode": "live", "marketId": "AVAXUSDT", "side": "sell", "price": 11.238, "sizeBase": 1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788132575277, "mode": "live", "marketId": "QQQUSDT", "side": "sell", "price": 1.3613, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788132575277, "mode": "live", "marketId": "QQQUSDT", "side": "sell", "price": 7.135, "sizeBase": 2.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788132578272, "mode": "live", "marketId": "AAPLUSDT", "side": "sell", "price": 101.195, "sizeBase": 0.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788132578272, "mode": "live", "marketId": "AAPLUSDT", "side": "sell", "price": 101.195, "sizeBase": 0.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788133201232, "mode": "live", "marketId": "BNBUSDT", "side": "sell", "price": 1.3451, "sizeBase": 8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788133207104, "mode": "live", "marketId": "AVAXUSDT", "side": "sell", "price": 11.109, "sizeBase": 2, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788133207807, "mode": "live", "marketId": "METAUSDT", "side": "sell", "price": 101.316, "sizeBase": 0.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788133207807, "mode": "live", "marketId": "METAUSDT", "side": "sell", "price": 101.316, "sizeBase": 0.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788133295243, "mode": "live", "marketId": "BNBUSDT", "side": "sell", "price": 101.16, "sizeBase": 0.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788133295243, "mode": "live", "marketId": "BNBUSDT", "side": "sell", "price": 101.16, "sizeBase": 0.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788133521858, "mode": "live", "marketId": "METAUSDT", "side": "sell", "price": 101.3, "sizeBase": 0.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788133521858, "mode": "live", "marketId": "METAUSDT", "side": "sell", "price": 101.3, "sizeBase": 0.1, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788133563840, "mode": "live", "marketId": "AVAXUSDT", "side": "sell", "price": 7.039, "sizeBase": 1.8, "fee": null, "src": "grid", "cid_known": false}
-{"t": 1788133563840, "mode": "live", "marketId": "AVAXUSDT", "side": "sell", "price": 7.039, "sizeBase": 1.8, "fee": null, "src": "grid", "cid_known": false}
+{"t": 1787231816204, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 2265.34, "sizeBase": 1.68, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.04, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.16, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.14, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.08, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.65, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.39, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.06, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.08, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 2252.22, "sizeBase": 0.08, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.07126, "sizeBase": 1425, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.07126, "sizeBase": 3328, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 17, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 195, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 119, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 31, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 150, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.0229, "sizeBase": 150, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.0054, "sizeBase": 331, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.0054, "sizeBase": 331, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.07013, "sizeBase": 4753, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 65123.2, "sizeBase": 0.0257, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 65504.6, "sizeBase": 0.0223, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 65526, "sizeBase": 0.0034, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 65335.4, "sizeBase": 0.177, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 65994.1, "sizeBase": 0.1116, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787231816205, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 65994.1, "sizeBase": 0.0654, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787249813705, "mode": "live", "marketId": "GOOGLUSDT", "side": "sell", "price": 0.08128, "sizeBase": 274, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787270434562, "mode": "live", "marketId": "XAUUSDT", "side": "buy", "price": 0.08055, "sizeBase": 274, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787271394626, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 654.05, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787271394626, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 654.05, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787278342740, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 660.81, "sizeBase": 0.05, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787285757452, "mode": "live", "marketId": "XAGUSDT", "side": "sell", "price": 89.109, "sizeBase": 0.3, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787285757664, "mode": "live", "marketId": "XRPUSDT", "side": "sell", "price": 2347, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787285757849, "mode": "live", "marketId": "LINKUSDT", "side": "sell", "price": 2347, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787292057377, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 664.25, "sizeBase": 0.05, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787296592567, "mode": "live", "marketId": "QQQUSDT", "side": "buy", "price": 2405.65, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787299257365, "mode": "live", "marketId": "GOOGLUSDT", "side": "buy", "price": 670.51, "sizeBase": 0.05, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787302077516, "mode": "live", "marketId": "AVAXUSDT", "side": "buy", "price": 92.573, "sizeBase": 0.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787303817504, "mode": "live", "marketId": "SPXUSDT", "side": "sell", "price": 91.232, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787303817504, "mode": "live", "marketId": "SPXUSDT", "side": "sell", "price": 91.232, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787303817719, "mode": "live", "marketId": "NVDAUSDT", "side": "sell", "price": 2392.59, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787306409219, "mode": "live", "marketId": "MSFTUSDT", "side": "buy", "price": 2404.73, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787324456175, "mode": "live", "marketId": "METAUSDT", "side": "buy", "price": 91.888, "sizeBase": 0.2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787343416396, "mode": "live", "marketId": "TSLAUSDT", "side": "sell", "price": 7.579, "sizeBase": 2.2, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787364023670, "mode": "live", "marketId": "AAPLUSDT", "side": "buy", "price": 7.857, "sizeBase": 2.2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787443793212, "mode": "live", "marketId": "XAUUSDT", "side": "buy", "price": 93.858, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787447287742, "mode": "live", "marketId": "NDX100USDT", "side": "buy", "price": 11.649, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787447288070, "mode": "live", "marketId": "ADAUSDT", "side": "buy", "price": 7.518, "sizeBase": 1.7, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787462179493, "mode": "live", "marketId": "METAUSDT", "side": "sell", "price": 10.992, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787464841719, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 92.245, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787468441788, "mode": "live", "marketId": "QQQUSDT", "side": "sell", "price": 7.332, "sizeBase": 1.7, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787468861717, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 687.03, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787490011799, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 694.03, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787504912947, "mode": "live", "marketId": "MSFTUSDT", "side": "sell", "price": 0.09249, "sizeBase": 7, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787504912947, "mode": "live", "marketId": "MSFTUSDT", "side": "sell", "price": 0.09249, "sizeBase": 108, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787515593121, "mode": "live", "marketId": "NVDAUSDT", "side": "sell", "price": 697.79, "sizeBase": 0.04, "fee": null, "pnl": null, "src": "raid", "cid_known": false}
+{"t": 1787526032275, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 0.09301, "sizeBase": 115, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787536832272, "mode": "live", "marketId": "GOOGLUSDT", "side": "buy", "price": 694.41, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787536832272, "mode": "live", "marketId": "GOOGLUSDT", "side": "buy", "price": 694.41, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787576768190, "mode": "live", "marketId": "GOOGLUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787580198292, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787580596399, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787581516437, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787582732833, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787582790794, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787583764929, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787583764930, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787583822896, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787584446006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787584446006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787584446006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787585845365, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787585845366, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787585845366, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787585945270, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787585945271, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787585945271, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787586311123, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787586311124, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787586311124, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787586398075, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787586398075, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787586398075, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787586734643, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787586734643, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787586734643, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787592128108, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787592128108, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787592128108, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787625447428, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787625447431, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787625447431, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787626578158, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787626578159, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787626578159, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787627500410, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787627500410, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787627500410, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787627823821, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787627823821, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787627823821, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787628489472, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787628489472, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787628489473, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787631693284, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787631693286, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787631693286, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787632270797, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787632270797, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787632270797, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787632695707, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787632695708, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787632695708, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787672604355, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787672604358, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787672604358, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787691982577, "mode": "live", "marketId": "NVDAUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787699804437, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787699804438, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787699804438, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787699804438, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787705183400, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787705183400, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787705183400, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787705183400, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787705458124, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787705458124, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787705458125, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787705458125, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787707201741, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787707201741, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787707201742, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787707201742, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787708083793, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787708083793, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787708083794, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787708083794, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787709296974, "mode": "live", "marketId": "NVDAUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787709296975, "mode": "live", "marketId": "NVDAUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787709537433, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787709537433, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787709537434, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787709537434, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787709537434, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787709537434, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787713583368, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787713583368, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787713583368, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787713583369, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787713583369, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787713583369, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787725667005, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787725667006, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787725667006, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787725667006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787725667006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787725667006, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787726741399, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787726741399, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787726741399, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787726741399, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787726741399, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787726741400, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787727426665, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787727426666, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787727426666, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787727426666, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787727426666, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787727426666, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787738824680, "mode": "live", "marketId": "AAPLUSDT", "side": "buy", "price": 78351.5, "sizeBase": 0.0002, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787738824987, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 11.258, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787738825310, "mode": "live", "marketId": "XAUUSDT", "side": "buy", "price": 7.312, "sizeBase": 1.8, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787739205182, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.312, "sizeBase": 1.8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.258, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 78351.5, "sizeBase": 0.0002, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787739205184, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787739263278, "mode": "live", "marketId": "ETHUSDT", "side": "buy", "price": 78419.9, "sizeBase": 0.0002, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787739263657, "mode": "live", "marketId": "DOGEUSDT", "side": "buy", "price": 11.263, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787739263955, "mode": "live", "marketId": "AVAXUSDT", "side": "buy", "price": 7.314, "sizeBase": 1.8, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787742383618, "mode": "live", "marketId": "XRPUSDT", "side": "sell", "price": 0.08682, "sizeBase": 127, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.08682, "sizeBase": 127, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.314, "sizeBase": 1.8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.263, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 78419.9, "sizeBase": 0.0002, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.312, "sizeBase": 1.8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.258, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 78351.5, "sizeBase": 0.0002, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4413, "sizeBase": 2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.362, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.4465, "sizeBase": 6, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.5186, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 1.522, "sizeBase": 4, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742470043, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 7.587, "sizeBase": 1.3, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787742528238, "mode": "live", "marketId": "XAGUSDT", "side": "sell", "price": 0.08676, "sizeBase": 125, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787742528602, "mode": "live", "marketId": "DOGEUSDT", "side": "sell", "price": 11.451, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787756928567, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 77854.7, "sizeBase": 0.0002, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787756928702, "mode": "live", "marketId": "MSFTUSDT", "side": "buy", "price": 77857.6, "sizeBase": 0.0002, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787771328086, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 0.0849, "sizeBase": 35, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787771328086, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 0.0849, "sizeBase": 90, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787771387957, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.08488, "sizeBase": 125, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787771448062, "mode": "live", "marketId": "DOGEUSDT", "side": "buy", "price": 0.08503, "sizeBase": 2, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787782008173, "mode": "live", "marketId": "NDX100USDT", "side": "sell", "price": 11.487, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787785608258, "mode": "live", "marketId": "NDX100USDT", "side": "sell", "price": 7.368, "sizeBase": 1.7, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787785788083, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 78651.9, "sizeBase": 0.0002, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787785789774, "mode": "live", "marketId": "ASMLUSDT", "side": "sell", "price": 78648, "sizeBase": 0.0001, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787785789774, "mode": "live", "marketId": "ASMLUSDT", "side": "sell", "price": 78648, "sizeBase": 0.0001, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787785848031, "mode": "live", "marketId": "QQQUSDT", "side": "sell", "price": 78682.6, "sizeBase": 0.0002, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787785849598, "mode": "live", "marketId": "AAPLUSDT", "side": "sell", "price": 78682.6, "sizeBase": 0.0002, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787810808299, "mode": "live", "marketId": "SOLUSDT", "side": "sell", "price": 11.595, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787839668161, "mode": "live", "marketId": "SOLUSDT", "side": "buy", "price": 11.767, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787879148268, "mode": "live", "marketId": "TSLAUSDT", "side": "sell", "price": 713.4, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787879208364, "mode": "live", "marketId": "NVDAUSDT", "side": "sell", "price": 11.981, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787886646301, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 11.981, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787886646301, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 713.4, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787886646301, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.767, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787886704278, "mode": "live", "marketId": "NDX100USDT", "side": "buy", "price": 11.68, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787887897225, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.68, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787887897227, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 11.981, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787887897227, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 713.4, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787887897227, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.767, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787889995299, "mode": "live", "marketId": "XAUUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787897195399, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787905820561, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787905820561, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787906179416, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787906179417, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787907977604, "mode": "live", "marketId": "ETHUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787907977924, "mode": "live", "marketId": "LINKUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787908157690, "mode": "live", "marketId": "NDX100USDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787911849196, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787911849197, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787911849197, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787911849197, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787911849197, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787913107283, "mode": "live", "marketId": "QQQUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787914067361, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787914907387, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787925958829, "mode": "live", "marketId": "XAUUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787926507154, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787926507155, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787933000917, "mode": "live", "marketId": "AMZNUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787933870919, "mode": "live", "marketId": "ASMLUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787933870919, "mode": "live", "marketId": "ASMLUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934318111, "mode": "live", "marketId": "BNBUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886460, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886460, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787934886461, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373027, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373029, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373029, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373029, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373029, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373029, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787936373030, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699100, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787939699101, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656195, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656197, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787980656198, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137925, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137927, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990137928, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432189, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.1994, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432191, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.01, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 690.54, "sizeBase": 0.02, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 77915.9, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 78365.6, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 79562.5, "sizeBase": 0.0003, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.2083, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 704.67, "sizeBase": 0.03, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.661, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 7.392, "sizeBase": 2.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.0871, "sizeBase": 142, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 1.423, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787990432192, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.691, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1787994390135, "mode": "live", "marketId": "MSFTUSDT", "side": "buy", "price": 103.363, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787994390454, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 11.298, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1787994450355, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.08431, "sizeBase": 201, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788023190336, "mode": "live", "marketId": "SOLUSDT", "side": "sell", "price": 105.009, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788023192006, "mode": "live", "marketId": "XRPUSDT", "side": "sell", "price": 11.426, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788023250051, "mode": "live", "marketId": "ADAUSDT", "side": "sell", "price": 11.422, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788023251774, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.08521, "sizeBase": 201, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788023310193, "mode": "live", "marketId": "LINKUSDT", "side": "sell", "price": 11.419, "sizeBase": 1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788023311769, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.08519, "sizeBase": 53, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788023311769, "mode": "live", "marketId": "BTCUSDT", "side": "sell", "price": 0.0852, "sizeBase": 89, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788080790273, "mode": "live", "marketId": "ASMLUSDT", "side": "buy", "price": 0.08463, "sizeBase": 309, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788084390352, "mode": "live", "marketId": "METAUSDT", "side": "buy", "price": 11.346, "sizeBase": 2, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788100631821, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 11.346, "sizeBase": 2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788100631821, "mode": "live", "marketId": "BTCUSDT", "side": "buy", "price": 0.08463, "sizeBase": 309, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788109568692, "mode": "live", "marketId": "AAPLUSDT", "side": "sell", "price": 0.2056, "sizeBase": 82, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788127328914, "mode": "live", "marketId": "BNBUSDT", "side": "buy", "price": 104.644, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788127328998, "mode": "live", "marketId": "AVAXUSDT", "side": "buy", "price": 104.615, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788128549932, "mode": "live", "marketId": "AMZNUSDT", "side": "sell", "price": 0.08332, "sizeBase": 51, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788128549933, "mode": "live", "marketId": "AMZNUSDT", "side": "sell", "price": 0.08332, "sizeBase": 91, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788129024529, "mode": "live", "marketId": "ADAUSDT", "side": "sell", "price": 0.1968, "sizeBase": 55, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788131827380, "mode": "live", "marketId": "SOLUSDT", "side": "sell", "price": 0.08268, "sizeBase": 244, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788131827380, "mode": "live", "marketId": "SOLUSDT", "side": "sell", "price": 0.08269, "sizeBase": 65, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788132501301, "mode": "live", "marketId": "AVAXUSDT", "side": "sell", "price": 11.238, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788132501301, "mode": "live", "marketId": "AVAXUSDT", "side": "sell", "price": 11.238, "sizeBase": 1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788132575277, "mode": "live", "marketId": "QQQUSDT", "side": "sell", "price": 1.3613, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788132575277, "mode": "live", "marketId": "QQQUSDT", "side": "sell", "price": 7.135, "sizeBase": 2.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788132578272, "mode": "live", "marketId": "AAPLUSDT", "side": "sell", "price": 101.195, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788132578272, "mode": "live", "marketId": "AAPLUSDT", "side": "sell", "price": 101.195, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788133201232, "mode": "live", "marketId": "BNBUSDT", "side": "sell", "price": 1.3451, "sizeBase": 8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788133207104, "mode": "live", "marketId": "AVAXUSDT", "side": "sell", "price": 11.109, "sizeBase": 2, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788133207807, "mode": "live", "marketId": "METAUSDT", "side": "sell", "price": 101.316, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788133207807, "mode": "live", "marketId": "METAUSDT", "side": "sell", "price": 101.316, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788133295243, "mode": "live", "marketId": "BNBUSDT", "side": "sell", "price": 101.16, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788133295243, "mode": "live", "marketId": "BNBUSDT", "side": "sell", "price": 101.16, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788133521858, "mode": "live", "marketId": "METAUSDT", "side": "sell", "price": 101.3, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788133521858, "mode": "live", "marketId": "METAUSDT", "side": "sell", "price": 101.3, "sizeBase": 0.1, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788133563840, "mode": "live", "marketId": "AVAXUSDT", "side": "sell", "price": 7.039, "sizeBase": 1.8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788133563840, "mode": "live", "marketId": "AVAXUSDT", "side": "sell", "price": 7.039, "sizeBase": 1.8, "fee": null, "pnl": null, "src": "grid", "cid_known": false}
+{"t": 1788138389244, "mode": "live", "marketId": "XAGUSDT", "side": "buy", "price": 0.1928, "sizeBase": 82, "fee": null, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788520009209, "mode": "paper", "marketId": "SOLUSDT", "side": "buy", "price": 104.00965848776434, "sizeBase": 1.288122, "fee": 0.080386, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788520011211, "mode": "paper", "marketId": "ETHUSDT", "side": "sell", "price": 2520.8319584134824, "sizeBase": 0.065884, "fee": 0.099649, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788520012212, "mode": "paper", "marketId": "ETHUSDT", "side": "sell", "price": 2520.8489688101117, "sizeBase": 0.065904, "fee": 0.09968, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788520014213, "mode": "paper", "marketId": "ETHUSDT", "side": "sell", "price": 2520.871294955688, "sizeBase": 0.06593, "fee": 0.099721, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788523249242, "mode": "paper", "marketId": "ETHUSDT", "side": "buy", "price": 2523.56, "sizeBase": 0.06593, "fee": 0.099827, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788526848916, "mode": "paper", "marketId": "SOLUSDT", "side": "sell", "price": 101.32610049983212, "sizeBase": 1.288122, "fee": 0.078312, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788527024004, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 79507.7, "sizeBase": 0.05031, "fee": 2.400019, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1788541229963, "mode": "paper", "marketId": "ETHUSDT", "side": "buy", "price": 2458.5, "sizeBase": 0.065884, "fee": 0.097185, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788541231465, "mode": "paper", "marketId": "ETHUSDT", "side": "buy", "price": 2458.4875, "sizeBase": 0.065904, "fee": 0.097214, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788545069987, "mode": "paper", "marketId": "BTCUSDT", "side": "sell", "price": 79532, "sizeBase": 0.05031, "fee": 2.400753, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1788595425113, "mode": "paper", "marketId": "BTCUSDT", "side": "sell", "price": 79638.7, "sizeBase": 0.050227, "fee": 2.400008, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1788603105031, "mode": "paper", "marketId": "AVAXUSDT", "side": "sell", "price": 7.499, "sizeBase": 29.500962, "fee": 0.132737, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788606044835, "mode": "paper", "marketId": "AVAXUSDT", "side": "buy", "price": 7.5, "sizeBase": 29.500962, "fee": 0.132754, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788606525386, "mode": "paper", "marketId": "DOGEUSDT", "side": "sell", "price": 0.08604, "sizeBase": 2390.057361, "fee": 0.123384, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788606526386, "mode": "paper", "marketId": "BNBUSDT", "side": "sell", "price": 748.34, "sizeBase": 0.214761, "fee": 0.096429, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788613244878, "mode": "paper", "marketId": "DOGEUSDT", "side": "buy", "price": 0.08739852881979265, "sizeBase": 2390.057361, "fee": 0.125332, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788613246480, "mode": "paper", "marketId": "BNBUSDT", "side": "buy", "price": 762.6094392427801, "sizeBase": 0.214761, "fee": 0.098267, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788617024829, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 79608.5, "sizeBase": 0.050227, "fee": 2.399098, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1788620864969, "mode": "paper", "marketId": "BNBUSDT", "side": "sell", "price": 769.1017406845093, "sizeBase": 0.246581, "fee": 0.113788, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788620924935, "mode": "paper", "marketId": "BNBUSDT", "side": "buy", "price": 769.44, "sizeBase": 0.246581, "fee": 0.113838, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788624585403, "mode": "paper", "marketId": "DOGEUSDT", "side": "sell", "price": 0.087473671875, "sizeBase": 1632.153422, "fee": 0.085662, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788627644998, "mode": "paper", "marketId": "DOGEUSDT", "side": "buy", "price": 0.08792917190215019, "sizeBase": 1632.153422, "fee": 0.086108, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788639105941, "mode": "paper", "marketId": "BNBUSDT", "side": "sell", "price": 772.13, "sizeBase": 0.157364, "fee": 0.072903, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788660045167, "mode": "paper", "marketId": "BNBUSDT", "side": "buy", "price": 764.86, "sizeBase": 0.157364, "fee": 0.072217, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788696406401, "mode": "paper", "marketId": "DOGEUSDT", "side": "buy", "price": 0.08980799774169923, "sizeBase": 1114.993687, "fee": 0.060081, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788696465529, "mode": "paper", "marketId": "DOGEUSDT", "side": "sell", "price": 0.08982170532226562, "sizeBase": 1114.993687, "fee": 0.06009, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788714646417, "mode": "paper", "marketId": "XRPUSDT", "side": "buy", "price": 1.4080722213745116, "sizeBase": 124.718463, "fee": 0.105368, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788714647418, "mode": "paper", "marketId": "XRPUSDT", "side": "buy", "price": 1.4080541660308836, "sizeBase": 121.754567, "fee": 0.102862, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788714649419, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 79557.11559865474, "sizeBase": 0.005402, "fee": 0.257861, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788714650420, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 79558.76169899106, "sizeBase": 0.005389, "fee": 0.257245, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788714652420, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 79560.92220568247, "sizeBase": 0.005372, "fee": 0.256441, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788717645614, "mode": "paper", "marketId": "XRPUSDT", "side": "sell", "price": 1.4089, "sizeBase": 124.718463, "fee": 0.10543, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788717647296, "mode": "paper", "marketId": "BTCUSDT", "side": "sell", "price": 79717.5, "sizeBase": 0.005402, "fee": 0.25838, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788717648893, "mode": "paper", "marketId": "BTCUSDT", "side": "sell", "price": 79717.5, "sizeBase": 0.005389, "fee": 0.257759, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788717650488, "mode": "paper", "marketId": "BTCUSDT", "side": "sell", "price": 79717.5, "sizeBase": 0.005372, "fee": 0.256945, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788717652654, "mode": "paper", "marketId": "AVAXUSDT", "side": "buy", "price": 7.62, "sizeBase": 20.441537, "fee": 0.093459, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788721245623, "mode": "paper", "marketId": "XRPUSDT", "side": "sell", "price": 1.412175, "sizeBase": 124.718463, "fee": 0.105675, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788735645590, "mode": "paper", "marketId": "AVAXUSDT", "side": "sell", "price": 7.812, "sizeBase": 20.441537, "fee": 0.095814, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788739726628, "mode": "paper", "marketId": "LINKUSDT", "side": "sell", "price": 13.26971661823988, "sizeBase": 6.48125, "fee": 0.051603, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788760845669, "mode": "paper", "marketId": "LINKUSDT", "side": "buy", "price": 13.436531765705187, "sizeBase": 6.48125, "fee": 0.052251, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788775905915, "mode": "paper", "marketId": "XRPUSDT", "side": "buy", "price": 1.3980927978515625, "sizeBase": 117.8669, "fee": 0.098873, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788775907916, "mode": "paper", "marketId": "XRPUSDT", "side": "buy", "price": 1.398052198791504, "sizeBase": 107.836248, "fee": 0.090456, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788775908916, "mode": "paper", "marketId": "XRPUSDT", "side": "buy", "price": 1.398039149093628, "sizeBase": 107.87673, "fee": 0.09049, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788775965810, "mode": "paper", "marketId": "XRPUSDT", "side": "sell", "price": 1.3983798847198488, "sizeBase": 117.8669, "fee": 0.098894, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788775967507, "mode": "paper", "marketId": "XRPUSDT", "side": "sell", "price": 1.3983449351549149, "sizeBase": 107.87673, "fee": 0.090509, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788778845941, "mode": "paper", "marketId": "XRPUSDT", "side": "sell", "price": 1.3980711914062498, "sizeBase": 107.836248, "fee": 0.090458, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788800926511, "mode": "paper", "marketId": "LINKUSDT", "side": "buy", "price": 12.931, "sizeBase": 6.293504, "fee": 0.048829, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788800927512, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 79034.8, "sizeBase": 0.004682, "fee": 0.222025, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788807645964, "mode": "paper", "marketId": "LINKUSDT", "side": "sell", "price": 12.74, "sizeBase": 6.293504, "fee": 0.048108, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788822045971, "mode": "paper", "marketId": "BTCUSDT", "side": "sell", "price": 78937.1, "sizeBase": 0.004682, "fee": 0.22175, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788861766603, "mode": "paper", "marketId": "BTCUSDT", "side": "sell", "price": 78705.38936767577, "sizeBase": 0.050823, "fee": 2.400026, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1788862066725, "mode": "paper", "marketId": "BNBUSDT", "side": "sell", "price": 754.7788885498046, "sizeBase": 0.253732, "fee": 0.114907, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788862068725, "mode": "paper", "marketId": "BNBUSDT", "side": "sell", "price": 754.805624809265, "sizeBase": 0.254191, "fee": 0.115119, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788865246426, "mode": "paper", "marketId": "BNBUSDT", "side": "buy", "price": 755.544833984375, "sizeBase": 0.254191, "fee": 0.115232, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788878986280, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 78572.86789458488, "sizeBase": 0.050823, "fee": 2.395985, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1788883246275, "mode": "paper", "marketId": "BNBUSDT", "side": "buy", "price": 755.2234894561768, "sizeBase": 0.253732, "fee": 0.114975, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788915826787, "mode": "paper", "marketId": "BTCUSDT", "side": "sell", "price": 78729.1, "sizeBase": 0.050807, "fee": 2.399994, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1788937787198, "mode": "paper", "marketId": "ETHUSDT", "side": "sell", "price": 2513.1057812500003, "sizeBase": 0.100488, "fee": 0.151522, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788942526702, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 79642.93831507565, "sizeBase": 0.050807, "fee": 2.427851, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1788958846742, "mode": "paper", "marketId": "ETHUSDT", "side": "buy", "price": 2508.153135331965, "sizeBase": 0.100488, "fee": 0.151224, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788977447009, "mode": "paper", "marketId": "XRPUSDT", "side": "buy", "price": 1.4185, "sizeBase": 88.948979, "fee": 0.075704, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788977449011, "mode": "paper", "marketId": "ADAUSDT", "side": "buy", "price": 0.2172, "sizeBase": 357.372597, "fee": 0.046573, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788977450012, "mode": "paper", "marketId": "ADAUSDT", "side": "buy", "price": 0.2172, "sizeBase": 357.372597, "fee": 0.046573, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788977452013, "mode": "paper", "marketId": "BNBUSDT", "side": "buy", "price": 739.8, "sizeBase": 0.237793, "fee": 0.105552, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788977453013, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 78646.6, "sizeBase": 0.002624, "fee": 0.123821, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788977507212, "mode": "paper", "marketId": "BNBUSDT", "side": "sell", "price": 739.72, "sizeBase": 0.237793, "fee": 0.10554, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788984046937, "mode": "paper", "marketId": "XRPUSDT", "side": "sell", "price": 1.4008264337090057, "sizeBase": 88.948979, "fee": 0.074761, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788984048541, "mode": "paper", "marketId": "ADAUSDT", "side": "sell", "price": 0.21461802455740514, "sizeBase": 357.372597, "fee": 0.046019, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788984050144, "mode": "paper", "marketId": "ADAUSDT", "side": "sell", "price": 0.21465388881354042, "sizeBase": 357.372597, "fee": 0.046027, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788991246987, "mode": "paper", "marketId": "BTCUSDT", "side": "sell", "price": 78132.31402529612, "sizeBase": 0.002624, "fee": 0.123012, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788995567522, "mode": "paper", "marketId": "ADAUSDT", "side": "buy", "price": 0.21113056688308715, "sizeBase": 549.223868, "fee": 0.069575, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788995568523, "mode": "paper", "marketId": "LINKUSDT", "side": "buy", "price": 11.748245850801467, "sizeBase": 9.059687, "fee": 0.063861, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788995570522, "mode": "paper", "marketId": "SOLUSDT", "side": "buy", "price": 101.38848953247071, "sizeBase": 2.094882, "fee": 0.127438, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788995627034, "mode": "paper", "marketId": "ADAUSDT", "side": "sell", "price": 0.21097586784362793, "sizeBase": 549.223868, "fee": 0.069524, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1788995628738, "mode": "paper", "marketId": "SOLUSDT", "side": "sell", "price": 101.35068627929687, "sizeBase": 2.094882, "fee": 0.127391, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789002047073, "mode": "paper", "marketId": "LINKUSDT", "side": "sell", "price": 11.707, "sizeBase": 9.059687, "fee": 0.063637, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789002647633, "mode": "paper", "marketId": "DOGEUSDT", "side": "buy", "price": 0.08603, "sizeBase": 1147.057921, "fee": 0.059209, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789002648634, "mode": "paper", "marketId": "XRPUSDT", "side": "buy", "price": 1.391870638179779, "sizeBase": 86.110615, "fee": 0.071913, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789016447199, "mode": "paper", "marketId": "DOGEUSDT", "side": "sell", "price": 0.08575421875, "sizeBase": 1147.057921, "fee": 0.059019, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789020047237, "mode": "paper", "marketId": "XRPUSDT", "side": "sell", "price": 1.3906799774169922, "sizeBase": 86.110615, "fee": 0.071851, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789052867631, "mode": "paper", "marketId": "ADAUSDT", "side": "buy", "price": 0.21098119988886174, "sizeBase": 375.856958, "fee": 0.047579, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789052869632, "mode": "paper", "marketId": "LINKUSDT", "side": "buy", "price": 11.659033586244506, "sizeBase": 8.930685, "fee": 0.062474, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789052870633, "mode": "paper", "marketId": "LINKUSDT", "side": "buy", "price": 11.65927518968338, "sizeBase": 8.92555, "fee": 0.062439, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789052872633, "mode": "paper", "marketId": "ADAUSDT", "side": "buy", "price": 0.21102053864550138, "sizeBase": 375.31757, "fee": 0.04752, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789052927612, "mode": "paper", "marketId": "LINKUSDT", "side": "sell", "price": 11.665, "sizeBase": 8.92555, "fee": 0.06247, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789059647786, "mode": "paper", "marketId": "ADAUSDT", "side": "sell", "price": 0.2078177978515625, "sizeBase": 375.31757, "fee": 0.046799, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789063247542, "mode": "paper", "marketId": "LINKUSDT", "side": "sell", "price": 11.676, "sizeBase": 8.930685, "fee": 0.062565, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789063249235, "mode": "paper", "marketId": "ADAUSDT", "side": "sell", "price": 0.2097, "sizeBase": 375.31757, "fee": 0.047222, "pnl": null, "src": "raid", "cid_known": true}
