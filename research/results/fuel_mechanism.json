@@ -1,0 +1,16 @@
+{
+  "_readme": "§1.10 機制關的預註冊狀態。門檻未凍結時不產生任何判決數字。",
+  "stage": "prereg-frozen-no-thresholds",
+  "inventory": {
+    "snapshots": 3,
+    "market_rounds": 8,
+    "last_snapshot_rows": 16088,
+    "g1_geometry": {
+      "ok": true,
+      "long_bad": 0,
+      "short_bad": 0,
+      "n": 16088
+    },
+    "thresholds_frozen": false
+  }
+}
