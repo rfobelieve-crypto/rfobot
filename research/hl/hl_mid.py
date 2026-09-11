@@ -79,8 +79,15 @@ TOP_N = 40              # 量出來的：約 98.3% 的日成交額
 SAMPLE_SEC = 60         # 牆鐘固定取樣
 FLUSH_SEC = 300         # 每 5 分鐘落盤
 DEPTH_LEVELS = 5        # 合計前幾檔的 sz / n
+BANDS = (1, 2, 5, 10, 25, 50)     # 距 mid 幾 bps 內的累計深度
+OLD_LEVEL_USD = 100.0             # 「上一快照這一檔有超過這個金額」-> 算舊單
+                                  # 這個門檻抄自外部來源（$100），**未經我們驗證**；
+                                  # 它是代理的參數，之後要做敏感度
 
 _books = {}             # coin -> (book_time_ms, bids, asks)
+_prev = {}              # coin -> {("b"|"a", px_str): usd}  上一次取樣的逐檔
+                        # **新舊拆分只能在錄的當下算**：它要比對上一個快照，
+                        # 而落盤之後那個狀態就不存在了
 _rows = []
 _lock = threading.Lock()
 _stat = dict(msgs=0, samples=0, rows=0, reconnects=0, started=time.time(),
@@ -149,6 +156,9 @@ def sample_once():
             if not (bpx > 0 and apx > bpx):
                 continue          # 交叉或空簿口：不寫，寧可少一列
             mid = (bpx + apx) / 2.0
+            pm = _prev.get(coin, {})
+            bd, bn_, bnew5, bold5, bnew10, bold10 = _bands(bids, mid, "b", pm)
+            ad, an_, anew5, aold5, anew10, aold10 = _bands(asks, mid, "a", pm)
             rows.append((
                 ts, coin, btime, bpx, apx, mid,
                 round(1e4 * (apx - bpx) / mid, 4),
@@ -158,7 +168,23 @@ def sample_once():
                 sum(float(x["sz"]) for x in asks[:DEPTH_LEVELS]),
                 sum(int(x.get("n") or 0) for x in bids[:DEPTH_LEVELS]),
                 sum(int(x.get("n") or 0) for x in asks[:DEPTH_LEVELS]),
+                *[bd[k] for k in BANDS], *[ad[k] for k in BANDS],
+                *[bn_[k] for k in BANDS], *[an_[k] for k in BANDS],
+                bnew5, bold5, anew5, aold5, bnew10, bold10, anew10, aold10,
             ))
+            # 這一輪的逐檔金額留給下一輪當「舊」的判準
+            nxt = {}
+            for lv in bids:
+                try:
+                    nxt[("b", lv["px"])] = float(lv["px"]) * float(lv["sz"])
+                except Exception:
+                    pass
+            for lv in asks:
+                try:
+                    nxt[("a", lv["px"])] = float(lv["px"]) * float(lv["sz"])
+                except Exception:
+                    pass
+            _prev[coin] = nxt
             got += 1
         except Exception:
             continue
@@ -169,9 +195,49 @@ def sample_once():
     return got
 
 
-COLS = ["ts", "coin", "book_time", "bid", "ask", "mid", "spread_bps",
-        "bid_sz", "ask_sz", "bid_n", "ask_n",
-        "bid_sz5", "ask_sz5", "bid_n5", "ask_n5"]
+def _bands(levels, mid, side, prev_map):
+    """回傳 (各帶 size, 各帶筆數, 5bps 新/舊, 10bps 新/舊)。
+
+    「新/舊」用上一快照同一個價位有沒有超過 OLD_LEVEL_USD 當代理 ——
+    掛單年齡看不到，這是外部來源提出的替代品（見本檔頭）。
+    """
+    dsz = {b_: 0.0 for b_ in BANDS}
+    dn = {b_: 0 for b_ in BANDS}
+    new5 = old5 = new10 = old10 = 0.0
+    for lv in levels:
+        try:
+            px, sz, n = float(lv["px"]), float(lv["sz"]), int(lv.get("n") or 0)
+        except Exception:
+            continue
+        if px <= 0 or mid <= 0:
+            continue
+        dist = abs(px - mid) / mid * 1e4          # 距 mid 幾 bps
+        for b_ in BANDS:
+            if dist <= b_:
+                dsz[b_] += sz
+                dn[b_] += n
+        usd = px * sz
+        was_old = prev_map.get((side, lv["px"]), 0.0) > OLD_LEVEL_USD
+        if dist <= 5:
+            if was_old:
+                old5 += usd
+            else:
+                new5 += usd
+        if dist <= 10:
+            if was_old:
+                old10 += usd
+            else:
+                new10 += usd
+    return dsz, dn, new5, old5, new10, old10
+
+
+COLS = (["ts", "coin", "book_time", "bid", "ask", "mid", "spread_bps",
+         "bid_sz", "ask_sz", "bid_n", "ask_n",
+         "bid_sz5", "ask_sz5", "bid_n5", "ask_n5"]
+        + ["bid_d%d" % b_ for b_ in BANDS] + ["ask_d%d" % b_ for b_ in BANDS]
+        + ["bid_nb%d" % b_ for b_ in BANDS] + ["ask_nb%d" % b_ for b_ in BANDS]
+        + ["bid_new5", "bid_old5", "ask_new5", "ask_old5",
+           "bid_new10", "bid_old10", "ask_new10", "ask_old10"])
 
 
 def flush():
