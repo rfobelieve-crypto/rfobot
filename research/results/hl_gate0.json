@@ -1,0 +1,77 @@
+{
+  "asof": "2026-09-11 13:43:07",
+  "rest_rtt": {
+    "median_ms": 71,
+    "p25": 59,
+    "p75": 75,
+    "min": 58,
+    "max": 359,
+    "n": 12
+  },
+  "ws_latency": {
+    "median_ms": 160,
+    "p25": 156,
+    "p75": 168,
+    "p95": 553,
+    "n": 37
+  },
+  "fees": {
+    "perp_taker_bps": 4.5,
+    "perp_maker_bps": 1.5,
+    "spot_taker_bps": 7.0,
+    "spot_maker_bps": 4.0,
+    "vip_tiers": [
+      {
+        "ntl": 5000000.0,
+        "taker_bps": 4.0,
+        "maker_bps": 1.2
+      },
+      {
+        "ntl": 25000000.0,
+        "taker_bps": 3.5,
+        "maker_bps": 0.8
+      },
+      {
+        "ntl": 100000000.0,
+        "taker_bps": 3.0,
+        "maker_bps": 0.4
+      },
+      {
+        "ntl": 500000000.0,
+        "taker_bps": 2.8,
+        "maker_bps": 0.0
+      }
+    ],
+    "mm_rebate_tiers": [
+      {
+        "maker_fraction": 0.005,
+        "maker_bps": -0.1
+      },
+      {
+        "maker_fraction": 0.015,
+        "maker_bps": -0.2
+      },
+      {
+        "maker_fraction": 0.03,
+        "maker_bps": -0.3
+      }
+    ],
+    "referral_discount": "0.0"
+  },
+  "book": {
+    "n_files": 1,
+    "rows": 120,
+    "coins": 40,
+    "spread_bps_median": 0.865,
+    "spread_bps_p25": 0.4,
+    "spread_bps_p75": 2.025,
+    "top_queue_orders_median": 1.5,
+    "top5_queue_orders_median": 7.2
+  },
+  "roundtrip_cost_bps": {
+    "taker_taker": 9.0,
+    "maker_taker": 6.0,
+    "maker_maker": 3.0
+  },
+  "pure_market_making_net_bps": -2.135
+}
