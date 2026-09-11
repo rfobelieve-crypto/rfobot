@@ -17,9 +17,19 @@ New-Item -ItemType Directory -Force -Path (Split-Path $Log) | Out-Null
 function Say($m) { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Add-Content -Path $Log }
 
 # name = 顯示名, script = 相對路徑, flag = 新鮮度旗標, log = 輸出檔
+#
+# **加進這張表的錄製器必須在啟動時就寫一次 ok=True 的旗標**（liq_recorder:232
+# 的 flag(True,"starting") 就是這個慣例）。沒照做的話，這支會在它來得及
+# 落盤之前讀到上一輪的舊旗標、判定 stale，然後殺掉一個健康的新行程 ——
+# 無限重啟迴圈。hl_tape 2026-09-11 就這樣被殺過一次（落盤週期 300 秒 vs
+# 本支 5 分鐘），修法寫在 hl_tape.write_flag 的 docstring 裡。
 $Jobs = @(
   @{ name = 'liq';     script = 'research\exit_paths\liq_recorder.py';     flag = 'research\results\liq_last.json';     log = 'research\exit_paths\logs\liq_recorder.log' },
-  @{ name = 'lighter'; script = 'research\exit_paths\lighter_recorder.py'; flag = 'research\results\lighter_last.json'; log = 'research\exit_paths\logs\lighter_recorder.log' }
+  @{ name = 'lighter'; script = 'research\exit_paths\lighter_recorder.py'; flag = 'research\results\lighter_last.json'; log = 'research\exit_paths\logs\lighter_recorder.log' },
+  # 2026-09-11 加入：HL 全市場成交帶。它是常駐 WS，斷線自己會重連，
+  # 但行程整個死掉就沒人管 —— 實際發生過（UTC 23:36 死、兩小時後才發現）。
+  # 接在這裡而不是另寫一支看門狗：同一個判準（旗標的 asof，不是行程在不在）。
+  @{ name = 'hl_tape';  script = 'research\hl\hl_tape.py';  flag = 'research\results\hl_tape_last.json'; log = 'research\hl\logs\hl_tape.log' }
 )
 
 foreach ($j in $Jobs) {

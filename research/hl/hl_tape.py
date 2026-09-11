@@ -115,15 +115,26 @@ def flush():
     write_flag()
 
 
-def write_flag():
+def write_flag(starting=False):
+    """寫新鮮度旗標。
+
+    `starting=True` 是**啟動那一瞬間**用的：此刻 trades 必然是 0，但行程是
+    健康的（WS 已訂閱）。不寫這一份的話，看門狗會在第一次 flush（300 秒）
+    之前讀到上一輪的舊旗標、判定 stale，把一個剛起來的健康行程殺掉 ——
+    2026-09-11 實際發生過一次（見本檔 commit 訊息）。
+    """
     up = time.time() - _stat["started"]
     lag = ((time.time() * 1000 - _stat["last_trade_ms"]) / 1000
            if _stat["last_trade_ms"] else None)
-    ok = bool(_stat["trades"] > 0 and (lag is None or lag < 120))
+    # 啟動中：ok 的語意是「連得上且設定對」，不是「已經有資料」
+    # （mistake.md 2026-09-03：後者在合法的空狀態下與故障無法區分）。
+    ok = (True if starting
+          else bool(_stat["trades"] > 0 and (lag is None or lag < 120)))
     FLAG.parent.mkdir(parents=True, exist_ok=True)
     FLAG.write_text(json.dumps(dict(
         ok=ok,
-        reason=("成交 %d 筆（%.1f/秒）、地址 %d、重連 %d、最後一筆 %s 秒前"
+        reason=("啟動中（已訂閱，還沒有成交）" if starting else
+                "成交 %d 筆（%.1f/秒）、地址 %d、重連 %d、最後一筆 %s 秒前"
                 % (_stat["trades"], _stat["trades"] / max(up, 1), len(_addrs),
                    _stat["reconnects"],
                    "—" if lag is None else "%.0f" % lag)),
@@ -134,12 +145,53 @@ def write_flag():
         indent=2), encoding="utf-8")
 
 
+_LOCK_FH = None          # 故意是模組層的全域：句柄要活到行程結束
+
+
+def acquire_single_instance():
+    """取得獨佔鎖；已經有一個實例在跑就回 False。
+
+    用檔案鎖不用 pid 檔 —— 行程被殺時 OS 自動釋放，不會留孤兒鎖。
+    `_LOCK_FH` 必須是全域，被垃圾回收掉就等於解鎖。
+    """
+    global _LOCK_FH
+    if _LOCK_FH is not None:
+        return True          # 同一行程已經持有；重複上鎖會鎖死自己
+    lk = ROOT / "research" / "results" / ".hl_tape.lock"
+    lk.parent.mkdir(parents=True, exist_ok=True)
+    fh = open(lk, "a+b")
+    try:
+        import msvcrt
+        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+    except OSError:
+        fh.close()
+        return False
+    except ImportError:                      # 非 Windows
+        import fcntl
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            fh.close()
+            return False
+    _LOCK_FH = fh
+    return True
+
+
 def run(seconds=None):
     import websocket
+    # **只准一個實例**：兩個寫入者對同一批 parquet 做 read-modify-write 會
+    # 靜默掉列，而且事後算不出掉了多少（2026-09-11 我自己起第二個實例踩到）。
+    if not acquire_single_instance():
+        print("已經有一個成交帶在跑（檔案鎖 research/results/.hl_tape.lock）。"
+              "不啟動第二個 —— 兩個寫入者會靜默破壞 parquet。")
+        return 2
     cs = coins()
     print("訂閱 %d 個幣的成交帶 -> %s" % (len(cs), TAPE_DIR))
     _addrs.update(load_tape_addrs())
     print("既有地址 %d" % len(_addrs))
+    # **先舉手再連線**：看門狗每 5 分鐘看一次旗標，而第一次 flush 要 300 秒。
+    # 不先寫這一份，剛起來的行程會被讀到舊旗標的看門狗殺掉（2026-09-11 實證）。
+    write_flag(starting=True)
     stop_at = (time.time() + seconds) if seconds else None
 
     def on_open(ws):
@@ -202,10 +254,16 @@ def main():
     ap.add_argument("--seconds", type=int, default=None,
                     help="跑幾秒就停（驗收用；預設常駐）")
     a = ap.parse_args()
+    # **先拿鎖再開 ticker**：被拒絕的實例不該有任何會寫檔的執行緒在跑。
+    if not acquire_single_instance():
+        print("已經有一個成交帶在跑（檔案鎖 research/results/.hl_tape.lock）。"
+              "不啟動第二個 —— 兩個寫入者會靜默破壞 parquet。")
+        return 2
     if not a.seconds:
         threading.Thread(target=ticker, daemon=True).start()
-    run(a.seconds)
-    return 0
+    # 回傳碼要傳出去：退出碼 0 是「跑完了」不是「做了事」
+    # （mistake.md 2026-08-26，那次一個什麼都沒做的指令回了 0）。
+    return run(a.seconds) or 0
 
 
 if __name__ == "__main__":

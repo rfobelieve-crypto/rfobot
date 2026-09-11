@@ -172,6 +172,16 @@ REGISTRY = [
      "research/results/hl_fuel_last.json:ok", 2.5,
      "hl_fuel_recorder.py 每小時自報；紅 = 覆蓋率掉到 1% 以下、清算價少於 100 筆、"
      "或幾何違反不為 0（多單清算價必在現價之下）"),
+    # 2026-09-11：全市場成交帶。**沒有被註冊是怎麼被發現的**——它在
+    # UTC 23:36 死掉，兩小時後我去查覆蓋率才看到，而看板全程 0 red。
+    # hl_tape.py 的檔頭早就寫著「判準看旗標不看行程」，但那條線沒接上來。
+    # 門檻 0.6h：落盤週期 5 分鐘，36 分鐘沒動就不是慢是死。
+    # 它**不可回補**——WS 是串流，斷掉那段沒有任何端點補得回來。
+    ("hl trade tape", "json_flag",
+     "research/results/hl_tape_last.json:ok", 0.6,
+     "hl_tape.py 常駐自報；紅 = 行程死了或卡在 WS 讀取上。"
+     "重啟由 exit_paths_watchdog.ps1 負責（每 5 分鐘），"
+     "所以這一列紅超過一輪代表**重啟也失敗**，不只是剛好死掉"),
     ("product live fills", "json_flag",
      "research/results/product_fills_last.json:ok", 26.0,
      "check_product_fills.py 每日自報；量的是**宣告與實際的落差**："
