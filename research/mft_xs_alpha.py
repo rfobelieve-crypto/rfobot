@@ -142,12 +142,28 @@ def main():
           % (res["rebalances"], res["symbols"], res["rows"]))
 
     # ---------- C1 凍結對照 ----------
-    print("=== C1 凍結對照（我今天改過 build()，驗它是 additive）===")
+    # **這一關要跑在它的基準當初那份資料窗上，不是跑在本次的 --days 上。**
+    # 換手是資料相依的量，拿 120 天的換手去比 14 天算出來的凍結值，必然不符
+    # ——而它印出來的診斷會是「你動到了凍結的算術」，那是錯的歸因，
+    # 會讓人以為程式壞了而不是窗變了（mistake.md 2026-09-10：把 sha 釘樁
+    # 釘在一份滾動的資料窗上，那條守衛在下一次刷新就必紅，而且紅的原因
+    # 跟它要保護的東西完全無關）。
+    #
+    # 正確的形式：守衛比的是「同一份輸入 -> 同樣的輸出」。所以窗不同時
+    # 另外抓一份基準窗的資料來比，主分析照樣用使用者要的窗。
+    print("=== C1 凍結對照（驗算術沒被改動；跑在基準自己的資料窗上）===")
     c1 = True
     if FROZEN.exists():
         fr = json.loads(FROZEN.read_text(encoding="utf-8"))
+        ref_days = int(fr.get("days") or a.days)
+        if ref_days == a.days:
+            fc = f
+        else:
+            print("  本次窗 %d 天 ≠ 基準窗 %d 天 -> 另抓一份基準窗來比"
+                  % (a.days, ref_days))
+            fc = XS.build(XS.load_pairs(ref_days))
         for bnd in XS.BANDS:
-            _, dw = XS.turnover(f, "combo%d" % bnd)
+            _, dw = XS.turnover(fc, "combo%d" % bnd)
             got = float(dw.mean())
             ref = ((fr.get("arms") or {}).get("%dbps" % bnd) or {}).get("turnover_mean")
             ok = ref is None or abs(got - ref) < TOL_C1
