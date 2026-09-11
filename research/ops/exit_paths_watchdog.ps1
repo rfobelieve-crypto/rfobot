@@ -17,7 +17,6 @@ New-Item -ItemType Directory -Force -Path (Split-Path $Log) | Out-Null
 function Say($m) { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Add-Content -Path $Log }
 
 # name = 顯示名, script = 相對路徑, flag = 新鮮度旗標, log = 輸出檔
-#
 # **加進這張表的錄製器必須在啟動時就寫一次 ok=True 的旗標**（liq_recorder:232
 # 的 flag(True,"starting") 就是這個慣例）。沒照做的話，這支會在它來得及
 # 落盤之前讀到上一輪的舊旗標、判定 stale，然後殺掉一個健康的新行程 ——
@@ -32,11 +31,22 @@ $Jobs = @(
   @{ name = 'hl_tape';  script = 'research\hl\hl_tape.py';  flag = 'research\results\hl_tape_last.json'; log = 'research\hl\logs\hl_tape.log' },
   # 2026-09-11 加入：分鐘級中價與佇列。同樣是常駐 WS、同樣不可回填。
   @{ name = 'hl_mid';   script = 'research\hl\hl_mid.py';   flag = 'research\results\hl_mid_last.json'; log = 'research\hl\logs\hl_mid.log' }
+  # **§1.25 的宇宙錄製器刻意不在這張表裡。** 它歸 `../arb/ops/arb_watchdog.ps1`
+  # 管（那支 2026-09-11 就加了 'universe' 這一員）。2026-09-11 我一度把它加
+  # 進來，因為 grep 這個 repo 的看門狗找不到它 —— 那正是 mistake.md 2026-09-04
+  # 的錯：**枚舉的範圍是這台機器，不是這個 repo**。
+  #
+  # 而且兩支併存比缺一支更糟，因為**判準相反**：arb 那支只看行程在不在、
+  # 從不殺；這一支看旗標新鮮度、會殺。同一個行程掛兩個判準不同的看門狗，
+  # 其中一支會殺掉另一支剛拉起來的東西。一個錄製器只能有一個看門狗。
 )
 
 foreach ($j in $Jobs) {
   $script = Join-Path $Root $j.script
-  if (-not (Test-Path $script)) { continue }
+  # 路徑打錯的話，舊版在這裡**靜默** continue —— 而「跳過」跟「健康」在
+  # log 上長得一模一樣（這支只在有事時才寫一行）。留一行痕跡，否則一個
+  # 打錯的路徑會讓某個錄製器永遠沒有看門狗，而且沒有任何地方看得出來。
+  if (-not (Test-Path $script)) { Say "$($j.name): script not found -> $script（跳過）"; continue }
 
   $running = @(Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
                Where-Object { $_.CommandLine -like "*$($j.script.Replace('\','\\'))*" -or $_.CommandLine -like "*$(Split-Path $j.script -Leaf)*" })
