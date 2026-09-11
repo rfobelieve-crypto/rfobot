@@ -29,7 +29,9 @@ $Jobs = @(
   # 2026-09-11 加入：HL 全市場成交帶。它是常駐 WS，斷線自己會重連，
   # 但行程整個死掉就沒人管 —— 實際發生過（UTC 23:36 死、兩小時後才發現）。
   # 接在這裡而不是另寫一支看門狗：同一個判準（旗標的 asof，不是行程在不在）。
-  @{ name = 'hl_tape';  script = 'research\hl\hl_tape.py';  flag = 'research\results\hl_tape_last.json'; log = 'research\hl\logs\hl_tape.log' }
+  @{ name = 'hl_tape';  script = 'research\hl\hl_tape.py';  flag = 'research\results\hl_tape_last.json'; log = 'research\hl\logs\hl_tape.log' },
+  # 2026-09-11 加入：分鐘級中價與佇列。同樣是常駐 WS、同樣不可回填。
+  @{ name = 'hl_mid';   script = 'research\hl\hl_mid.py';   flag = 'research\results\hl_mid_last.json'; log = 'research\hl\logs\hl_mid.log' }
 )
 
 foreach ($j in $Jobs) {

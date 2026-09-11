@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "reason": "啟動中（已訂閱，還沒取樣）",
+  "coins": 0,
+  "samples": 0,
+  "rows": 0,
+  "reconnects": 0,
+  "uptime_sec": 0,
+  "mid_dir": "D:\\flowbot_data\\hl\\mid",
+  "top_n": 40,
+  "sample_sec": 60,
+  "asof": "2026-09-11 13:09:05"
+}
