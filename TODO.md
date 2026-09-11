@@ -199,6 +199,69 @@ CI95 **[−0.132, +0.550]**（跨零）、9/9 幣、**P(優勢>0) 85.0%**；
 
 ---
 
+### 1.21 §0.75 的 premium 從來沒有扣掉穩定幣基差 —— 我們寫了它的名字三次（2026-09-11）
+
+來源：Quant Arb〈Small Trader Alpha #6: Perpetual Arbitrage〉付費全文
+（`docs/external_reading.md` 第 13 則）。他把穩定幣正規化列為**第一步**：
+
+> 「除非我們針對**交易所各自的**穩定幣價格做調整，而不是套用某個全球價格，
+> 否則我們看到的永續之間的基差會是**一個對 USDC 的賭注**。」
+
+**查證結果**：`lighter-rh` 的報價在 **USDG**，而 8 個配對裡
+**6 個的 B 腿是它**（SNDK/ANTH/BTC/HYPE/ZEC/NEAR），
+GOLD_LL/NVDA_LL 的 B 腿也是。而 `premium_close_bps` 是**原始價格比**，
+**沒有扣任何穩定幣基差**。
+
+而我們**寫過它三次**：
+
+```
+arblib/cost_model.py:18        「7 tail … stablecoin depeg (USDG!)」
+arblib/cost_model.py:96        ("stablecoin depeg USDG/USDC", 0.10, 0.03, "ASSUMED; lighter-rh quotes in USDG")
+arblib/premium_verdict.py:66   「convergence (USDC vs USDG basis dressed up as premium)」
+```
+
+**第三行逐字寫著「被打扮成 premium 的 USDC/USDG 基差」——然後沒有任何
+一行程式去扣它。** 這是 mistake.md「我在檔頭寫下這個病的名字，然後把
+同一個病留在那個檔案裡」的第三個實例（前兩次：成交帶未註冊 freshness、
+`conj_update` 漏掉 levels/events）。
+
+**影響方向未知，所以不准說「我們的判決偏樂觀」**——要量。在量到之前：
+**§0.75 的 band 一律標註「未扣穩定幣基差」**，§1.20 的容量數字同樣帶這個註記。
+
+**怎麼量**：lighter / lighter-rh 若有穩定幣自己的市場對就直接用；
+沒有的話用他給的代理——同一標的的 USDC/USDT/USD 合約之間的比值
+（**前提是結算方式與資金費規格相同**，他明講這個前提）。
+**depeg 期間必須關機**，否則系統會去賭 depeg。
+
+---
+
+### 1.22 錄製缺口：`minutes.csv` 沒有成交量，所以 lead-lag 的條件式主張檢定不了（2026-09-11）
+
+同一篇的第 (6)(7) 點：**誰在移動是條件於單量的**，而 lead-lag 的強度要用
+**非預期成交量**（成交量的 z-score ＋ log 轉換）動態建模，
+不是相對成交量的水準。
+
+**我們的 `who_moves` 量的是無條件中位數（0.485–0.543）**，
+而那個數字與「大單 50/50 ＋ 小單 100/0」的混合**相容**——
+所以它既不支持也不反對他的主張。原本寫的「他的核心假設失敗」**已撤回**
+（更正寫在 `research/gate0_arb_unhedged.py` 的 `who_moves` 判讀旁邊）。
+
+**要能檢定，需要錄成交量**。`minutes.csv` 現有 29 欄裡
+只有 `samples`（取樣數）與四個**掛單量**欄位，**沒有成交量**。
+
+**這是一個有時鐘的決定**（CLAUDE.md §鏈上錄製集同一條）：
+判準可以之後再寫，**錄得不夠細是不可回填的**。所以要先決定錄不錄，
+再決定要測什麼。
+
+**順帶，同一篇有兩件用現有資料就能測的**：
+- 第 (8) 點「先收到的訊息價格最準，你傾向在訊息最舊那一腿漏單」
+  -> `minutes.csv` 已有 `sell_max_age_s` / `buy_max_age_s`。
+- 第 (9) 點未完成定價 `True Price = Price − E[成本|未完成]×P(未完成)`
+  -> 現在 `leg_fail_rate` 是全家族一個 6% 的常數；
+     他說未完成率**逐交易所差很多**，而我們有 `venue_toxicity_*.json`。
+
+---
+
 ### 1.20 §0.75 的容量 —— Gate 0 的第三關（2026-09-11）
 
 > 編號用 1.20 不用 1.12：**§1.00–1.13 是套利線的號段，已移出到 `../arb/TODO.md`**。
