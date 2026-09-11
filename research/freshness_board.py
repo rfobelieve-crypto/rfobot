@@ -160,6 +160,14 @@ REGISTRY = [
     # 2026-09-11：Hyperliquid 鏈上錄製。錄的四樣東西**都沒有歷史端點**
     # （market 的 OI、L2 簿口、清算價直方圖、觸發單），所以停一小時就永久
     # 少一小時。門檻 2.5h：每小時跑、一輪約 5 分鐘。
+    # 2026-09-11：鏈上資料的**單位**驗證。使用者在開始累積歷史之前問
+    # 「每筆的名目有沒有一樣」—— 那正是 mistake.md 2026-09-03 的坑
+    # （把最小下單單位當成合約面值，一顆 BTC 的頂檔記成 $14.57）。
+    # 十關每一關都對上一個**獨立發布的數字**，不是自我一致性。
+    ("hl 單位驗證", "json_flag",
+     "research/results/hl_verify_last.json:ok", 26.0,
+     "hl_verify.py 每日自報十關；紅 = 名目與 |數量|x價格 不符、szDecimals 違反、"
+     "成交量對不上交易所公布值、時間戳單位錯、現貨混進永續、或止損方向反了"),
     ("hl onchain recorder", "json_flag",
      "research/results/hl_fuel_last.json:ok", 2.5,
      "hl_fuel_recorder.py 每小時自報；紅 = 覆蓋率掉到 1% 以下、清算價少於 100 筆、"

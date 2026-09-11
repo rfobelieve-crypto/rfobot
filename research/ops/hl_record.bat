@@ -14,5 +14,8 @@ set PYTHONIOENCODING=utf-8
 
 echo [%date% %time%] ===== hl_record start ===== >> %LOG%
 python research/hl/hl_fuel_recorder.py --max-addr 900 >> %LOG% 2>&1
+echo [%date% %time%] verify units >> %LOG%
+python research/hl/hl_verify.py >> %LOG% 2>&1
+
 echo [%date% %time%] ===== hl_record done rc=%errorlevel% ===== >> %LOG%
 exit /b 0
