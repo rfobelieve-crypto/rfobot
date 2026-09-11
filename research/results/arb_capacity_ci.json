@@ -1,0 +1,99 @@
+{
+  "asof": "2026-09-11 22:29:01",
+  "draws": 400,
+  "block_min": 1440,
+  "point_total": 1269.6,
+  "total_p05": 0.0,
+  "total_p50": 1438.8,
+  "total_p95": 4860.6,
+  "pairs": {
+    "NBIS": {
+      "point": 0.0,
+      "size": null,
+      "net_bps": null,
+      "band": 25.98,
+      "tpy": 60.9,
+      "n_blocks": 11,
+      "p05": 0.0,
+      "p50": 0.0,
+      "p95": 8.1
+    },
+    "ANTH": {
+      "point": 1269.6,
+      "size": 2000,
+      "net_bps": 208.54,
+      "band": 457.71,
+      "tpy": 30.4,
+      "n_blocks": 11,
+      "p05": 0.0,
+      "p50": 1438.8,
+      "p95": 4859.8
+    },
+    "BTC": {
+      "point": 0.0,
+      "size": null,
+      "net_bps": null,
+      "band": 5.6,
+      "tpy": 0.0,
+      "n_blocks": 11,
+      "p05": 0.0,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    "HYPE": {
+      "point": 0.0,
+      "size": null,
+      "net_bps": null,
+      "band": 8.9,
+      "tpy": 183.0,
+      "n_blocks": 9,
+      "p05": 0.0,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    "ZEC": {
+      "point": 0.0,
+      "size": null,
+      "net_bps": null,
+      "band": 11.18,
+      "tpy": 121.8,
+      "n_blocks": 11,
+      "p05": 0.0,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    "NEAR": {
+      "point": 0.0,
+      "size": null,
+      "net_bps": null,
+      "band": 10.85,
+      "tpy": 60.9,
+      "n_blocks": 11,
+      "p05": 0.0,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    "GOLD_LL": {
+      "point": 0.0,
+      "size": 25000,
+      "net_bps": 1.01,
+      "band": 7.98,
+      "tpy": 0.0,
+      "n_blocks": 7,
+      "p05": 0.0,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    "NVDA_LL": {
+      "point": 0.0,
+      "size": null,
+      "net_bps": null,
+      "band": 2.91,
+      "tpy": 831.9,
+      "n_blocks": 7,
+      "p05": 0.0,
+      "p50": 0.0,
+      "p95": 3.1
+    }
+  }
+}
