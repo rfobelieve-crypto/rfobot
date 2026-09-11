@@ -365,3 +365,4 @@ V10    reduce-only 止損方向一致 1968/1971（平多在下、平空在上）
 
 hl verify: RED  V1: positionValue vs |szi|xmark_snap：中位 54.2 bps、p99 950.7 bps、逐幣最差中位 1034.6 bps、>2% 的 311/14591
 [2026/09/11 �g�� 18:34:19.36] ===== hl_record done rc=1 ===== 
+[2026/09/11 �g�� 19:05:01.90] ===== hl_record start ===== 

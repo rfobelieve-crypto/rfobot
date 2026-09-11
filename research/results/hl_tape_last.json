@@ -1,11 +1,11 @@
 {
   "ok": true,
-  "reason": "成交 922848 筆（28.2/秒）、地址 22826、重連 3、最後一筆 1 秒前",
-  "trades": 922848,
-  "addresses": 22826,
+  "reason": "成交 970101 筆（28.9/秒）、地址 24071、重連 3、最後一筆 1 秒前",
+  "trades": 970101,
+  "addresses": 24071,
   "reconnects": 3,
-  "rows_written": 922848,
-  "uptime_sec": 32719,
+  "rows_written": 970101,
+  "uptime_sec": 33620,
   "tape_dir": "D:\\flowbot_data\\hl\\trades",
-  "asof": "2026-09-11 18:57:33"
+  "asof": "2026-09-11 19:12:33"
 }

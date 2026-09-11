@@ -95,3 +95,4 @@ research/results/poc_profile/events*.csv
 research/poc/data/
 research/crowd_stops/frozen/
 research/hl/data/
+quant arb/papers/*.pdf
