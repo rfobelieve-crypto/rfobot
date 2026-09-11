@@ -155,6 +155,94 @@ FAIL 再確認一次。但兩節的「峰在 15-30m」這類敘述要標成**未
 
 ---
 
+## 2026-09-11: 看門狗用系統語系讀 UTF-8 的中文旗標 -> 解析失敗 -> 把「我讀不懂」當成「它該死」-> 殺了 hl_mid 70 次、近 6 小時不可回填的資料沒了
+
+**What happened:**
+把 `hl_mid` 的宇宙從 40 加寬到 100 之後重啟，看它的旗標：
+`coins=0, uptime_sec=0`。而旗標的 mtime 只有 8 秒前——**uptime 0 配上
+剛寫的 mtime，代表它剛剛又重啟了一次**。
+
+查看門狗的 log：
+
+```
+18:49:35  hl_mid: flag unreadable: 傳入了無效的字元，預期是 ':' 或 '}'。(58): {
+18:54:02  hl_mid: running but stale -> killing 1 pid(s)
+18:54:04  hl_mid: starting
+```
+
+**不是時間問題**（`$StaleMin = 20` 分鐘，遠大於 300 秒的落盤週期）。
+是**編碼**：
+
+```powershell
+$f = Get-Content $flagPath -Raw | ConvertFrom-Json     # <- 少了 -Encoding UTF8
+```
+
+`Get-Content -Raw` 用**系統語系**（這台是 cp950）讀檔，而旗標的 `reason`
+是 Python 寫的 **UTF-8 中文**（`"啟動中（已訂閱，還沒取樣）"`）。
+讀壞之後引號被弄亂 -> `ConvertFrom-Json` 拋例外 -> 而舊的 `catch` 分支
+**什麼都沒設**，`$stale` 保持初始值 `$true` -> **殺掉一個健康的行程**。
+
+**規模**：`grep -c "running but stale -> killing"` = **75 次**，其中
+**hl_mid 佔 70 次，從 13:09 連續到 18:54，每 5 分鐘一次**。
+也就是說 `hl_mid` 從它註冊的那一刻起**就一直在重啟迴圈**，
+整個下午幾乎沒錄到東西（實際落地 240 列 ≈ 6 分鐘，而它「上線」了 5 小時 45 分）。
+**而它錄的是 WS 串流，不可回填。**
+
+連帶：`hl_tape`、`hl_candles`、`hl_fuel`、`hl_verify`、`product_fills`
+的 `reason` 也都是中文 —— **同一個 bug 對它們全部成立**。
+
+**更刺眼的是同一台機器上已經有人寫過這件事。** `../arb/engine/main.py` 的
+logging 設定裡：
+
+> 「encoding is NOT optional here. Without it FileHandler uses the locale
+> codec (cp950 on this box) ... and every bilingual message in this engine
+> -- which is every CRITICAL one -- raises UnicodeEncodeError inside logging
+> and is DROPPED. **A guard that fires into a log line that cannot be
+> written has not fired.**」
+
+同一個根、同一台機器、只是方向相反（那次是**寫**，這次是**讀**）。
+
+**Root cause（兩層，第二層更嚴重）:**
+
+1. **跨語言的邊界沒有宣告編碼。** Python 寫 UTF-8，PowerShell 讀系統語系。
+   兩邊都「正常」，只有含非 ASCII 的那些旗標會壞——所以它**看起來只壞一部分**，
+   而壞掉的剛好是我今天新加的那兩支（中文 reason 是新寫法）。
+2. **`catch` 的預設值選錯方向。** `$stale = $true` 是初始值，而 `catch` 沒有
+   覆寫它，於是「**我讀不懂我自己的儀器**」被當成「**被監測的東西該死**」。
+   這是 fail-dangerous：看門狗的失敗模式應該是**不動手**，不是**動手殺**。
+   而它殺掉的是一個**正在正常寫資料**的行程。
+
+**為什麼沒有任何守衛抓到**：freshness board 是 Python 寫的，它讀 UTF-8
+**完全正常**，所以那一列一直是綠的。**看板說它活著，而它每 5 分鐘死一次。**
+我今天早上甚至「驗證」過那一列綠一次紅一次——驗的是 Python 那側，
+而殺它的是 PowerShell 那側。**兩個讀者，只驗了一個**
+（[[2026-08-29 一份資料兩個讀者只改了一個]] 的第二次）。
+
+**Correct approach（已修，兩處）:**
+1. `Get-Content $flagPath -Raw **-Encoding UTF8**`。
+2. `catch` 改成**退回檔案 mtime**：mtime 新 = 行程還在寫 = **不要殺**。
+   理由寫在原地：「讀不懂旗標不是『行程該死』的證據，是『看門狗的儀器壞了』」。
+
+**反向證明**：修完連跑多輪看門狗，`hl_mid` 的 **pid 不變**（10020），
+而旗標從 `coins=0` 長到 **`coins=100`、500 列、uptime 301 秒**。
+修之前 pid 每 5 分鐘就換一個。
+
+**Rule:** **任何跨語言讀寫的狀態檔，兩邊都要明寫編碼。** Python 寫
+`encoding="utf-8"` 不夠 —— 讀它的那支（PowerShell / cmd / 別人的工具）
+也要明寫。判斷法很便宜：**旗標的 `reason` 塞一個中文字，然後讓讀取端跑一次**。
+ASCII 的旗標永遠不會暴露這個 bug，而我們的旗標**剛好有些是中文有些不是**。
+
+第二條，比編碼重要：**看門狗的 `catch` 必須 fail-safe 不是 fail-dangerous。**
+「我讀不到狀態」與「它壞了」是兩件事，而把前者當後者的代價是**殺掉健康的
+行程並丟掉不可回填的資料**。凡是會**殺行程、刪資料、改部位**的自動化，
+它的例外分支預設必須是**不動手**。
+
+第三條：**一個狀態檔有幾個讀者，就要驗幾個。** freshness（Python）綠著，
+watchdog（PowerShell）在殺它——我今天早上驗了前者就宣告接線完成。
+加一條守衛時要問「**還有誰會讀這個檔，它們用什麼讀**」。
+
+---
+
 ## 2026-09-11: 判決達標的那一天，schema 從 `interim` 換成 `sides`，而下游 `if not i: continue` 靜默跳過每一個配對——成本模型凍在 09-05 六天，今天三份新報告全跑在它上面
 
 **What happened:**

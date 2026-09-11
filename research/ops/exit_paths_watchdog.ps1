@@ -45,11 +45,26 @@ foreach ($j in $Jobs) {
   $flagPath = Join-Path $Root $j.flag
   if (Test-Path $flagPath) {
     try {
-      $f = Get-Content $flagPath -Raw | ConvertFrom-Json
+      # **-Encoding UTF8 不是可選的。** 2026-09-11 查出來的：沒有它
+      # Get-Content 用系統語系（這台是 cp950）讀檔，而旗標的 `reason` 是
+      # Python 寫的 UTF-8 中文 -> 讀壞 -> ConvertFrom-Json 失敗 ->
+      # 舊的 catch 什麼都不設、$stale 保持 $true -> **殺掉一個健康的行程**。
+      # hl_mid 因此從 13:09 到 18:54 被殺了 70 次（每 5 分鐘一次），
+      # 整個下午幾乎沒錄到東西，而它錄的是不可回填的 WS 資料。
+      # 同一台機器上 arb 引擎的 logging 早就踩過這個（FileHandler 的
+      # encoding 註解），只是方向相反（寫 vs 讀）。
+      $f = Get-Content $flagPath -Raw -Encoding UTF8 | ConvertFrom-Json
       $age = (New-TimeSpan -Start ([datetime]::Parse($f.asof).ToUniversalTime()) -End ([datetime]::UtcNow)).TotalMinutes
       $stale = ($age -gt $StaleMin) -or (-not $f.ok)
       if ($stale) { Say "$($j.name): flag stale/not-ok (age $([math]::Round($age,1))m, ok=$($f.ok))" }
-    } catch { Say "$($j.name): flag unreadable: $_" }
+    } catch {
+      # **讀不懂旗標不是「行程該死」的證據，是「看門狗的儀器壞了」。**
+      # 退回用檔案的 mtime 判斷：mtime 新 = 行程還在寫 = 活著，不要殺。
+      # （mistake.md 2026-09-11：age_json_flag 用的是 mtime 不是 asof 欄位。）
+      $mAge = (New-TimeSpan -Start (Get-Item $flagPath).LastWriteTimeUtc -End ([datetime]::UtcNow)).TotalMinutes
+      $stale = ($mAge -gt $StaleMin)
+      Say "$($j.name): flag unreadable ($_) -> 退回 mtime age $([math]::Round($mAge,1))m, stale=$stale"
+    }
   } else { Say "$($j.name): no flag yet" }
 
   if ($running.Count -gt 0 -and -not $stale) { continue }
