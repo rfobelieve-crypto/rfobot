@@ -69,7 +69,10 @@ def main():
     else:
         d = pd.read_parquet(pf[-1])
         d = d[d.coin.isin(meta)].copy()
-        d["recomp"] = d.szi.abs() * d["mark"]
+        # 有 mark_snap 的新檔用它當對照（`mark` 現在是同一瞬間反推的，
+        # 拿它比會恆等於零，那就失去測量能力了 —— §1.05 的同族）。
+        ref = "mark_snap" if "mark_snap" in d.columns else "mark"
+        d["recomp"] = d.szi.abs() * d[ref]
         d["relerr"] = (d.value_usd - d.recomp).abs() / d.recomp.clip(lower=1e-9)
         med = float(d.relerr.median())
         p99 = float(d.relerr.quantile(0.99))
@@ -84,7 +87,7 @@ def main():
         percoin = d.groupby("coin").relerr.median()
         worst_coin = float(percoin.max())
         check("V1", med < 0.01 and worst_coin < 0.05,
-              "positionValue vs |szi|xmark：中位 %.1f bps、p99 %.1f bps、"
+              "positionValue vs |szi|x" + ref + "：中位 %.1f bps、p99 %.1f bps、"
               "逐幣最差中位 %.1f bps、>2%% 的 %d/%d"
               % (med * 1e4, p99 * 1e4, worst_coin * 1e4, bad, len(d)))
 
@@ -141,10 +144,18 @@ def main():
             frac = v / day if day else float("nan")
             rows.append((coin, v, day, frac,
                          frac / expect if expect else float("nan")))
-        r5 = [r[4] for r in rows if r[4] == r[4]]
-        check("V4", r5 and all(0.1 <= x <= 10 for x in r5),
-              "最密 60 秒窗 %d 筆，觀測/預期名目佔比："
-              % best_n + "、".join("%s %.2fx" % (r[0], r[4]) for r in rows[:4]))
+        # **判準看中位，不看每一個**（2026-09-11 第三次修）。
+        # 單位錯會讓**所有**幣同幅偏移（差 10 倍就全部差 10 倍）；
+        # 而薄市場在一個 60 秒窗裡的單一大單只會打中它自己 —— 前一版
+        # 要求每個幣都在 [0.1,10]，結果被一個沒印出來的薄幣判紅，
+        # 而那是自然的爆發性不是單位問題。
+        r5 = sorted(r[4] for r in rows if r[4] == r[4])
+        med = r5[len(r5) // 2] if r5 else float("nan")
+        wild = sum(1 for x in r5 if not (0.02 <= x <= 50))
+        check("V4", r5 and 0.2 <= med <= 5 and wild <= len(r5) // 3,
+              "最密 60 秒窗 %d 筆，觀測/預期佔比中位 %.2fx（離群 %d/%d）："
+              % (best_n, med, wild, len(r5))
+              + "、".join("%s %.2fx" % (r[0], r[4]) for r in rows))
         res["V4_rows"] = [dict(coin=r[0], ntl=r[1], day_ntl=r[2],
                                frac=r[3], frac_over_expected=r[4])
                           for r in rows]

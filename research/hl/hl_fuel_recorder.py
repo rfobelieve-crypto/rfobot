@@ -283,7 +283,16 @@ def snapshot(mk, addrs, max_addr):
             if lq <= 0:
                 continue
             n_liq += 1
-            mark = mk[coin]["mark"]
+            # **用同一瞬間的價格**（2026-09-11 修）：`positionValue` 與
+            # `liquidationPx` 都是 HL 在這次回應那一刻算的，而 mk 的 mark 來自
+            # 本輪最開始的 metaAndAssetCtxs —— 全掃兩千多個地址要 24 分鐘，
+            # 所以兩者可以差 20 分鐘的行情（實測 V1 的中位誤差從 4.3 bps 升到
+            # 24.2 bps，就是這個）。燃料圖的「距離」必須同瞬間，否則距離被
+            # 行情漂移污染。positionValue / |szi| 就是 HL 自己那一刻的 mark。
+            mark_snap = mk[coin]["mark"]
+            mark = (val / abs(szi)) if szi else mark_snap
+            if not (mark > 0):
+                mark = mark_snap
             try:
                 ent = float(p.get("entryPx") or 0)
             except Exception:
@@ -306,7 +315,7 @@ def snapshot(mk, addrs, max_addr):
             cell[1] += 1
             cell[2] += val * lev_val          # 名目加權槓桿，事後可還原平均
             detail.append((a, coin, szi, ent, lq, val, lev_type, lev_val,
-                           mark))
+                           mark, mark_snap))
     return agg, sampled, dict(addrs_ok=n_ok, positions=n_pos, with_liq=n_liq,
                               geom_violations=geom_bad), detail
 
@@ -498,7 +507,7 @@ def main():
         POS_DIR.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(detail, columns=["addr", "coin", "szi", "entry_px",
                                       "liq_px", "value_usd", "lev_type",
-                                      "lev_val", "mark"]).assign(ts=ts)             .to_parquet(POS_DIR / (time.strftime("%Y%m%d_%H",
+                                      "lev_val", "mark", "mark_snap"]).assign(ts=ts)             .to_parquet(POS_DIR / (time.strftime("%Y%m%d_%H",
                                                  time.gmtime(ts)) + ".parquet"),
                         index=False)
         print("positions -> %d 個部位明細（真相源，清算事件由相鄰快照差推出）"
@@ -548,6 +557,12 @@ def main():
                    len(known), 100 * failrate, incomplete or "無",
                    time.time() - t0)),
         call_fail_rate=failrate, incomplete=incomplete,
+        # **部分掃描的覆蓋率不可拿去發布**：用 --max-addr 限制只掃一部分
+        # 地址時，覆蓋率必然偏低（實測 300 個地址 2.78% vs 2,500 個 22.22%）。
+        # 旗標自己說它完不完整，下游（onchain_publish）才不會把一個被人為
+        # 截短的數字當成真相。
+        addrs_polled=int(stat["addrs_ok"]), addrs_known=len(known),
+        coverage_partial=bool(stat["addrs_ok"] < 0.8 * len(known)),
         coverage_frac=cov, n_addresses=len(known), stat=stat, did=did,
         snapshots=len(list(SNAP_DIR.glob("*.json"))),
         asof=time.strftime("%Y-%m-%d %H:%M:%S")), ensure_ascii=False,

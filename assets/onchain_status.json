@@ -1,0 +1,30 @@
+{
+  "_readme": "鏈上量化的狀態卡。**由 research/hl/onchain_publish.py 產生**，不要手改 —— 數字的真相源是錄製器與驗證器自己寫的旗標。公開面規則：只出百分比、方向、時間與計數，不出美元金額。",
+  "updated": "2026-09-11",
+  "asof_utc": "2026-09-11 09:02:29",
+  "stage": "recording",
+  "venues": 11,
+  "markets": 518,
+  "snapshots": 7,
+  "addresses": 3803,
+  "coverage_pct": null,
+  "coverage_partial": true,
+  "addrs_polled": 300,
+  "checks_passed": 10,
+  "checks_total": 10,
+  "recorder_ok": true,
+  "verify_ok": true,
+  "tape_ok": true,
+  "zh": {
+    "name": "鏈上量化",
+    "desc": "永續 DEX 的逐地址部位、清算價、真實止損單與全市場成交帶。中心化交易所不公開這些，只能用代理推估 —— 而那在這套系統上連續失敗了三次。這條線的前提是：不推估，直接讀。",
+    "stage": "錄製中（判準還沒寫，要先有真實分布才知道門檻該放哪）",
+    "note": "市場數很多，但我們每小時只覆蓋其中一部分的未平倉量；覆蓋率跟著資料一起存，否則事後無法判斷一張「前方沒有燃料」的圖是真的沒有，還是只是沒看到。"
+  },
+  "en": {
+    "name": "On-chain quant",
+    "desc": "Per-address positions, liquidation prices, real stop orders and the full trade tape on perpetual DEXs. Centralised venues publish none of this, so it has to be proxied — and proxying it failed three times in a row on this system. The premise here is to read it instead of estimating it.",
+    "stage": "Recording. No criteria frozen yet: thresholds are only meaningful once the real noise level is known.",
+    "note": "There are many markets, but each hourly pass covers only part of the open interest. Coverage is stored alongside the data — otherwise an empty fuel map cannot be told apart from one we simply did not see."
+  }
+}
