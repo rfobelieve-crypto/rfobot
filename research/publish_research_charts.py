@@ -89,6 +89,11 @@ def chart_mft_halves():
                   "是前半表現最差的那一個。"),
             xlabel="前半（挑參數用的）", ylabel="後半（沒看過的）",
             unit="每小時毛利（基點）",
+            sample=("%d 天、%d 次換倉、%d 個標的，每小時重組一次"
+                    % (d.get("days", 0), d.get("rebalances", 0),
+                       d.get("symbols", 0))),
+            callout=("六條裡五條翻號。\n"
+                     "唯一沒翻的那條，前半是最差的那一條。"),
             note=("前半會挑到 `%s`：前半 %+.2f -> 後半 %+.2f。"
                   "這不是「差一點」，是雜訊的指紋。"
                   % (pick.get("arm", "—"), pick.get("first", 0),
@@ -104,6 +109,11 @@ def chart_mft_halves():
             xlabel="First half (used to choose)",
             ylabel="Second half (never seen)",
             unit="gross basis points per hour",
+            sample=("%d days, %d rebalances, %d symbols, hourly"
+                    % (d.get("days", 0), d.get("rebalances", 0),
+                       d.get("symbols", 0))),
+            callout=("Five of six flip sign.\n"
+                     "The one that does not was the worst in sample."),
             note=("The first half would pick `%s`: %+.2f -> %+.2f. "
                   "That is not 'nearly passing'. That is what noise looks like."
                   % (pick.get("arm", "—"), pick.get("first", 0),
@@ -138,6 +148,12 @@ def chart_percoin_noise():
                   "**線如果大致平行，代表「哪個標的比較好」是可以事先知道的；"
                   "線如果交叉成一團，那個排名就是雜訊。**"),
             xlabel="前半名次", ylabel="後半名次",
+            sample="九個標的，以 %s 為界切成前後兩半" % (d.get("cut") or "—"),
+            callout=("等級相關 %+.3f —— 負的。\n"
+                     "只用前半挑會挑到 %s，而它在後半是第 %d 名。"
+                     % (rho if rho is not None else 0, pick or "—",
+                        next((r["second_rank"] for r in rows
+                              if r["name"] == pick), 0))),
             note=("前後半名次的等級相關是 **%+.3f**（負的）。"
                   "只用前半挑，程序會挑 **%s** —— 而它在後半是最後一名。"
                   % (rho if rho is not None else 0, pick or "—")),
@@ -149,6 +165,12 @@ def chart_percoin_noise():
                   "**Roughly parallel lines would mean the ranking is "
                   "knowable in advance. Crossed lines mean it is noise.**"),
             xlabel="First-half rank", ylabel="Second-half rank",
+            sample="Nine symbols, split at %s" % (d.get("cut") or "—"),
+            callout=("Rank correlation %+.3f — negative.\n"
+                     "A first-half-only pick lands on %s, which finishes %d of 9."
+                     % (rho if rho is not None else 0, pick or "—",
+                        next((r["second_rank"] for r in rows
+                              if r["name"] == pick), 0))),
             note=("Rank correlation between halves is **%+.3f** (negative). "
                   "A first-half-only procedure picks **%s** — which finishes "
                   "last in the second half."
@@ -243,6 +265,12 @@ def chart_patience():
                   "等得越久，機會越可能還在（這個我們量過，而且對照組是平的）。"
                   "**但等待也會讓機會數變少，而機會數正是我們缺的東西。**"),
             xlabel="進場前先等幾分鐘",
+            sample="%d 個配對，兩個場館，不等待那一格 n=%d 個機會" % (
+                len(d.get("pairs") or {}), n0),
+            callout=("等 8 分鐘，價值最高——\n"
+                     "但機會數只剩 %.0f%%，而那個差的標準誤比差本身大。"
+                     % next((r["events_pct"] for r in rows
+                             if r["k"] == best["k"]), 0)),
             note=("看起來最好的那一格把價值拉到 %s 倍，"
                   "但**那個差的標準誤比差本身還大**，"
                   "而且 **87%% 的效果集中在單一個配對**——"
@@ -258,6 +286,13 @@ def chart_patience():
                   "the number of opportunities — and that is the thing we are "
                   "short of.**"),
             xlabel="Minutes waited before entering",
+            sample="%d pairs, two venues; the no-wait bucket has n=%d" % (
+                len(d.get("pairs") or {}), n0),
+            callout=("Waiting 8 minutes maximises value —\n"
+                     "but only %.0f%% of opportunities survive, and the SE of "
+                     "that gain exceeds the gain."
+                     % next((r["events_pct"] for r in rows
+                             if r["k"] == best["k"]), 0)),
             note=("The best-looking bucket multiplies value by %s, but **the "
                   "standard error of that difference is larger than the "
                   "difference**, and **87%% of the effect sits in a single "
@@ -291,6 +326,8 @@ def chart_universe():
                   "自動化。** 規則先凍結（每一個在兩個以上場館都有的標的，"
                   "不排名、不設門檻、不做任何與績效有關的排除），再開始錄。"),
             before_label="原本（手挑）", after_label="現在（規則）",
+            sample="%d 個標的，%d 個場館對" % (u.get("n_tickers", 0), len(by)),
+            callout="三條線缺的都是同一個東西：夠寬的樣本。",
             note=("錄製從 8 個配對變成 **%d** 個，"
                   "而且是**先把規則凍結才產生資料**——"
                   "反過來就沒有樣本外可言。" % u.get("n_pairs", 0)),
@@ -305,6 +342,8 @@ def chart_universe():
                   "no ranking, no threshold, no performance-related "
                   "exclusion), and only then does recording start."),
             before_label="Before (hand-picked)", after_label="Now (by rule)",
+            sample="%d tickers across %d venue pairs" % (u.get("n_tickers", 0), len(by)),
+            callout="All three lines were short of the same thing: a wide enough sample.",
             note=("Recording went from 8 pairs to **%d** — and the rule was "
                   "frozen before the data existed. The other order leaves no "
                   "out-of-sample at all." % u.get("n_pairs", 0)),

@@ -62,6 +62,8 @@
     "xlabel": "前半（挑參數用的）",
     "ylabel": "後半（沒看過的）",
     "unit": "每小時毛利（基點）",
+    "sample": "14 天、320 次換倉、11 個標的，每小時重組一次",
+    "callout": "六條裡五條翻號。\n唯一沒翻的那條，前半是最差的那一條。",
     "note": "前半會挑到 `new5`：前半 +3.57 -> 後半 -2.20。這不是「差一點」，是雜訊的指紋。"
    },
    "en": {
@@ -70,6 +72,8 @@
     "xlabel": "First half (used to choose)",
     "ylabel": "Second half (never seen)",
     "unit": "gross basis points per hour",
+    "sample": "14 days, 320 rebalances, 11 symbols, hourly",
+    "callout": "Five of six flip sign.\nThe one that does not was the worst in sample.",
     "note": "The first half would pick `new5`: +3.57 -> -2.20. That is not 'nearly passing'. That is what noise looks like."
    },
    "series": [
@@ -120,6 +124,8 @@
     "lede": "同一條策略、九個標的，按前半的表現排名，再看它們在後半的排名。**線如果大致平行，代表「哪個標的比較好」是可以事先知道的；線如果交叉成一團，那個排名就是雜訊。**",
     "xlabel": "前半名次",
     "ylabel": "後半名次",
+    "sample": "九個標的，以 2025-06-29 00:01 為界切成前後兩半",
+    "callout": "等級相關 -0.267 —— 負的。\n只用前半挑會挑到 ADA，而它在後半是第 9 名。",
     "note": "前後半名次的等級相關是 **-0.267**（負的）。只用前半挑，程序會挑 **ADA** —— 而它在後半是最後一名。"
    },
    "en": {
@@ -127,6 +133,8 @@
     "lede": "One strategy, nine symbols, ranked by first-half performance, then plotted against their second-half rank. **Roughly parallel lines would mean the ranking is knowable in advance. Crossed lines mean it is noise.**",
     "xlabel": "First-half rank",
     "ylabel": "Second-half rank",
+    "sample": "Nine symbols, split at 2025-06-29 00:01",
+    "callout": "Rank correlation -0.267 — negative.\nA first-half-only pick lands on ADA, which finishes 9 of 9.",
     "note": "Rank correlation between halves is **-0.267** (negative). A first-half-only procedure picks **ADA** — which finishes last in the second half."
    },
    "series": [
@@ -185,12 +193,16 @@
     "title": "耐心的代價，以及為什麼它看起來有用其實測不動",
     "lede": "一個想法：既然在速度上贏不了，就只做「已經存在了一段時間」的機會——用耐心換速度。等得越久，機會越可能還在（這個我們量過，而且對照組是平的）。**但等待也會讓機會數變少，而機會數正是我們缺的東西。**",
     "xlabel": "進場前先等幾分鐘",
+    "sample": "7 個配對，兩個場館，不等待那一格 n=34 個機會",
+    "callout": "等 8 分鐘，價值最高——\n但機會數只剩 62%，而那個差的標準誤比差本身大。",
     "note": "看起來最好的那一格把價值拉到 1.93 倍，但**那個差的標準誤比差本身還大**，而且 **87% 的效果集中在單一個配對**——把它拿掉，方向就反過來。所以這是**無效判決不是通過**。"
    },
    "en": {
     "title": "What patience costs, and why it looks useful but cannot be measured",
     "lede": "An idea: if you cannot win on speed, trade only the opportunities that have already survived a while. The longer one has lasted, the likelier it lasts longer (measured, with a flat control). **But waiting also cuts the number of opportunities — and that is the thing we are short of.**",
     "xlabel": "Minutes waited before entering",
+    "sample": "7 pairs, two venues; the no-wait bucket has n=34",
+    "callout": "Waiting 8 minutes maximises value —\nbut only 62% of opportunities survive, and the SE of that gain exceeds the gain.",
     "note": "The best-looking bucket multiplies value by 1.93x, but **the standard error of that difference is larger than the difference**, and **87% of the effect sits in a single pair** — drop it and the direction reverses. So this is inconclusive by design, not a pass."
    },
    "series": [
@@ -246,6 +258,8 @@
     "lede": "三個彼此獨立的測試在同一天得到同一個診斷——樣本不夠寬，所以測不動。而原因很平凡：**標的是手動挑的，沒有把「全部都錄下來」自動化。** 規則先凍結（每一個在兩個以上場館都有的標的，不排名、不設門檻、不做任何與績效有關的排除），再開始錄。",
     "before_label": "原本（手挑）",
     "after_label": "現在（規則）",
+    "sample": "126 個標的，3 個場館對",
+    "callout": "三條線缺的都是同一個東西：夠寬的樣本。",
     "note": "錄製從 8 個配對變成 **150** 個，而且是**先把規則凍結才產生資料**——反過來就沒有樣本外可言。"
    },
    "en": {
@@ -253,6 +267,8 @@
     "lede": "Three independent tests produced the same diagnosis on the same day — the sample is not wide enough to decide. The cause is mundane: **symbols were hand-picked, and 'record everything' was never automated.** The rule is frozen first (every symbol quotable on two or more venues; no ranking, no threshold, no performance-related exclusion), and only then does recording start.",
     "before_label": "Before (hand-picked)",
     "after_label": "Now (by rule)",
+    "sample": "126 tickers across 3 venue pairs",
+    "callout": "All three lines were short of the same thing: a wide enough sample.",
     "note": "Recording went from 8 pairs to **150** — and the rule was frozen before the data existed. The other order leaves no out-of-sample at all."
    },
    "series": [
