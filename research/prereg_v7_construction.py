@@ -247,19 +247,94 @@ def se_only(d: pd.DataFrame):
     return ses
 
 
-def verdict(*_a, **_kw):
-    """門檻已凍結（見 THRESHOLDS），計分器待接。
+def _boot_diff_hit(d, arm_x, arm_y, n=4000, seed=SEED):
+    """命中率差的日聚類 bootstrap。
 
-    **凍結的順序是重點**：SE 先算、門檻後寫、計分器最後接。
-    這個順序讓「先看結果再寫門檻」在構造上做不到。
+    **兩臂的開火列不相交**（A 是 |z| 最高 5%，C 是最低 20%），
+    所以不能配對重抽。做法是**重抽「天」**，每一輪用被抽到的那些天
+    重算兩臂的命中率再相減 —— 這樣兩臂共用同一組天，
+    日內相關（同一天的多根 bar 高度相關）才會被正確地算進去。
     """
+    rng = np.random.default_rng(seed)
+    px, py = "pos_" + arm_x, "pos_" + arm_y
+    sub = d[(d[px] != 0) | (d[py] != 0)]
+    days = sub["day"].unique()
+    by = {}
+    for day, g in sub.groupby("day"):
+        hx = np.sign(g[px]) == np.sign(g["y"])
+        hy = np.sign(g[py]) == np.sign(g["y"])
+        by[day] = (hx[g[px] != 0].values.astype(float),
+                   hy[g[py] != 0].values.astype(float))
+    idx = rng.integers(0, len(days), size=(n, len(days)))
+    out = np.empty(n)
+    for i in range(n):
+        ax = np.concatenate([by[days[j]][0] for j in idx[i]
+                             if len(by[days[j]][0])])
+        ay = np.concatenate([by[days[j]][1] for j in idx[i]
+                             if len(by[days[j]][1])])
+        out[i] = (ax.mean() if len(ax) else np.nan) - \
+                 (ay.mean() if len(ay) else np.nan)
+    out = out[np.isfinite(out)]
+    obs_x = np.concatenate([v[0] for v in by.values() if len(v[0])])
+    obs_y = np.concatenate([v[1] for v in by.values() if len(v[1])])
+    return dict(hit_x=float(obs_x.mean()), n_x=int(len(obs_x)),
+                hit_y=float(obs_y.mean()), n_y=int(len(obs_y)),
+                diff=float(obs_x.mean() - obs_y.mean()),
+                se=float(out.std(ddof=1)),
+                ci_lo=float(np.percentile(out, 2.5)),
+                ci_hi=float(np.percentile(out, 97.5)),
+                p_pos=float((out > 0).mean()))
+
+
+def verdict(d):
+    """**只實作 THRESHOLDS 裡凍結的那些。** 不新增、不放寬。"""
     if THRESHOLDS is None:
         raise RuntimeError("門檻還沒凍結。先跑 --se-only。")
-    raise NotImplementedError(
-        "門檻已凍結於 2026-09-11（commit 見 git log）。計分器待接。\n"
-        "接的時候只准實作 THRESHOLDS 裡寫的那些，**不准新增或放寬**。\n"
-        "特別注意：淨值那一半已事先宣告 INCONCLUSIVE BY DESIGN，"
-        "它的 null 結果不得被讀成『沒有差別』。")
+    T = THRESHOLDS
+    res = dict(rows=int(len(d)), days=int(d["day"].nunique()))
+
+    # --- 儀器關：含成本必須 <= 零成本，否則成本模型壞了（整批作廢）---
+    inst = {}
+    for a in ("A", "B", "C"):
+        with_c = float(np.mean(arm_pnl(d, "pos_" + a, TURNOVER_BPS)))
+        zero_c = float(np.mean(arm_pnl(d, "pos_" + a, 0.0)))
+        inst[a] = dict(with_cost=with_c, zero_cost=zero_c,
+                       ok=bool(with_c <= zero_c))
+    res["instrument_cost_control"] = inst
+    if T.get("need_cost_control") and not all(v["ok"] for v in inst.values()):
+        res["VERDICT"] = "VOID — 含成本 >= 零成本，成本模型壞了"
+        return res
+
+    # --- H1：命中率 C − A ---
+    h = _boot_diff_hit(d, "C", "A", n=T["h1_boot_n"])
+    res["H1"] = h
+    enough = (h["n_x"] >= T["h1_min_n_each"] and h["n_y"] >= T["h1_min_n_each"])
+    res["H1_n_ok"] = bool(enough)
+    if not enough:
+        res["VERDICT"] = "INCONCLUSIVE — 開火列不足 %d" % T["h1_min_n_each"]
+    elif h["ci_lo"] > T["h1_ci_low_gt"]:
+        res["VERDICT"] = ("H1 PASS — **極端值假設是反的**"
+                          "（C 的命中率顯著高於 A）")
+    else:
+        res["VERDICT"] = ("H1 不過 — 停在「沒有單調關係」，"
+                          "**不得升級成「反向」**")
+
+    # --- 淨值：事先宣告測不動，全格報告但不判 ---
+    pnl = {}
+    for a in ("A", "B", "C"):
+        v = arm_pnl(d, "pos_" + a, TURNOVER_BPS)
+        m, se, lo, pp = boot_days(d["day"].values, v, n=T["h1_boot_n"], seed=SEED)
+        pnl[a] = dict(mean=m, se=se, ci_lo=lo, p_pos=pp)
+    for x, y in (("B", "A"), ("C", "A")):
+        dv = (arm_pnl(d, "pos_" + x, TURNOVER_BPS)
+              - arm_pnl(d, "pos_" + y, TURNOVER_BPS))
+        m, se, lo, pp = boot_days(d["day"].values, dv, n=T["h1_boot_n"], seed=SEED)
+        pnl[x + "-" + y] = dict(mean=m, se=se, ci_lo=lo, p_pos=pp)
+    res["pnl"] = pnl
+    res["pnl_note"] = ("**INCONCLUSIVE BY DESIGN**：MDE 是經濟錨的 %s 倍。"
+                       "此欄的 null 結果**不得**被讀成「兩種構造沒有差別」"
+                       % T["pnl_mde_over_anchor"])
+    return res
 
 
 def main():
@@ -283,10 +358,32 @@ def main():
             ensure_ascii=False, indent=2), encoding="utf-8")
         print("written -> " + str(OUT))
         return 0
-    try:
-        verdict()
-    except RuntimeError as e:
-        print("[預期] 判決被擋下：\n" + str(e))
+    r = verdict(d)
+    print("=== §1.11 判決 ===")
+    print("樣本 %d 列 / %d 天\n" % (r["rows"], r["days"]))
+    print("儀器關（含成本必須 <= 零成本）:")
+    for a, v in r["instrument_cost_control"].items():
+        print("  %s  含成本 %+.3e  零成本 %+.3e  %s"
+              % (a, v["with_cost"], v["zero_cost"], "OK" if v["ok"] else "**壞**"))
+    if "H1" in r:
+        h = r["H1"]
+        print("\nH1 方向命中率（主判準）")
+        print("  C 臂 %.2f%%（n=%d）" % (100 * h["hit_x"], h["n_x"]))
+        print("  A 臂 %.2f%%（n=%d）" % (100 * h["hit_y"], h["n_y"]))
+        print("  差 %+.2f pp   SE %.2f pp   CI95 [%+.2f, %+.2f] pp   P(>0)=%.1f%%"
+              % (100 * h["diff"], 100 * h["se"], 100 * h["ci_lo"],
+                 100 * h["ci_hi"], 100 * h["p_pos"]))
+    print("\n淨值（**事先宣告測不動**，全格報告不判）")
+    for k, v in r["pnl"].items():
+        print("  %-6s 均值 %+.3e  SE %.3e  CI下 %+.3e  P(>0)=%.1f%%"
+              % (k, v["mean"], v["se"], v["ci_lo"], 100 * v["p_pos"]))
+    print("  " + r["pnl_note"])
+    print("\n>>> " + r["VERDICT"])
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(dict(stage="verdict", asof=time.strftime(
+        "%Y-%m-%d %H:%M:%S"), **r), ensure_ascii=False, indent=2,
+        default=str), encoding="utf-8")
+    print("written -> " + str(OUT))
     return 0
 
 
