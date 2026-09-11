@@ -1,6 +1,6 @@
 {
  "_readme": "研究圖表的真相源。複製到 ../product-site/content/research_charts.json。**每一個數字都由 research/publish_research_charts.py 從做決定的那份結果檔生成，不得手改**——手抄的數字會漂而且沒人會發現。公開面規則同 research_nogo：只出百分比、方向、時間、計數；不出美元、張數、模型內部。",
- "updated": "2026-09-11",
+ "updated": "2026-09-12",
  "charts": [
   {
    "id": "gate0",
@@ -57,61 +57,61 @@
    "id": "mft_halves",
    "kind": "slope",
    "zh": {
-    "title": "前半很漂亮，後半翻號",
-    "lede": "一個一小時頻率的橫斷面訊號，六種組法。**符號與組法只用前半決定**，後半完全沒看過。六個裡有五個在後半翻了號——而唯一沒翻的那個，是前半表現最差的那一個。",
+    "title": "訊號活下來了，但付不起自己的手續費",
+    "lede": "一個一小時頻率的橫斷面訊號，六種組法。**符號與組法只用前半決定**，後半完全沒看過。六個裡有 2 個在後半翻號——但真正擋住它的不是翻號：**前半會挑到的那一個在後半是 +0.37，而光是掛單的來回手續費就要 1.50。** 訊號是真的，只是比成本小。",
     "xlabel": "前半（挑參數用的）",
     "ylabel": "後半（沒看過的）",
     "unit": "每小時毛利（基點）",
-    "sample": "14 天、320 次換倉、11 個標的，每小時重組一次",
-    "callout": "六條裡五條翻號。\n唯一沒翻的那條，前半是最差的那一條。",
-    "note": "前半會挑到 `new5`：前半 +3.57 -> 後半 -2.20。這不是「差一點」，是雜訊的指紋。"
+    "sample": "120 天、1444 次換倉、11 個標的，每小時重組一次",
+    "callout": "前半挑到的那條，後半 +0.37 bps/小時。\n而掛單來回手續費是 1.50 —— 訊號比成本小。",
+    "note": "前半會挑到 `new5`：前半 +0.96 -> 後半 +0.37 —— **樣本外仍然為正**。擋住它的是換手：這個訊號每小時重組一次，光是掛單的來回手續費就要 1.50 bps/小時，比它賺的還多。所以唯一的槓桿是**把換手砍下來**，不是換組法。"
    },
    "en": {
-    "title": "Beautiful in the first half, sign-flipped in the second",
-    "lede": "One hourly cross-sectional signal, six constructions. **The sign and the construction are chosen on the first half only**; the second half is never looked at. Five of six flip sign out of sample — and the one that does not is the worst performer in sample.",
+    "title": "The signal survived. It still cannot pay its own fees.",
+    "lede": "One hourly cross-sectional signal, six constructions. **The sign and the construction are chosen on the first half only**; the second half is never looked at. 2 of six flip sign — but that is not what stops it: **the arm the first half picks earns +0.37 out of sample, while the maker round-trip alone costs 1.50.** The signal is real; it is just smaller than the cost.",
     "xlabel": "First half (used to choose)",
     "ylabel": "Second half (never seen)",
     "unit": "gross basis points per hour",
-    "sample": "14 days, 320 rebalances, 11 symbols, hourly",
-    "callout": "Five of six flip sign.\nThe one that does not was the worst in sample.",
-    "note": "The first half would pick `new5`: +3.57 -> -2.20. That is not 'nearly passing'. That is what noise looks like."
+    "sample": "120 days, 1444 rebalances, 11 symbols, hourly",
+    "callout": "The first half's pick earns +0.37 bps/hour out of sample.\nThe maker round trip costs 1.50. Smaller than the cost.",
+    "note": "The first half would pick `new5`: +0.96 -> +0.37 — **still positive out of sample**. What stops it is turnover: rebalancing hourly costs 1.50 bps/hour in maker fees alone, more than it earns. The only lever is cutting turnover, not trying another construction."
    },
    "series": [
     {
      "arm": "new5",
-     "first": 3.569,
-     "second": -2.201,
-     "flipped": true
+     "first": 0.963,
+     "second": 0.367,
+     "flipped": false
     },
     {
-     "arm": "new10",
-     "first": 3.288,
-     "second": -1.496,
+     "arm": "combo10",
+     "first": 0.881,
+     "second": -0.319,
      "flipped": true
     },
     {
      "arm": "combo5",
-     "first": 3.046,
-     "second": -2.214,
-     "flipped": true
-    },
-    {
-     "arm": "combo10",
-     "first": 2.575,
-     "second": -3.004,
-     "flipped": true
-    },
-    {
-     "arm": "old10",
-     "first": 1.13,
-     "second": 3.599,
+     "first": 0.7,
+     "second": 0.925,
      "flipped": false
     },
     {
-     "arm": "old5",
-     "first": 0.306,
-     "second": -3.127,
+     "arm": "new10",
+     "first": 0.605,
+     "second": 0.018,
+     "flipped": false
+    },
+    {
+     "arm": "old10",
+     "first": 0.473,
+     "second": -1.226,
      "flipped": true
+    },
+    {
+     "arm": "old5",
+     "first": 0.349,
+     "second": 0.238,
+     "flipped": false
     }
    ],
    "source": "research/results/mft_xs_alpha.json"

@@ -78,46 +78,66 @@ def chart_mft_halves():
                          flipped=bool(v["first"] * v["second"] < 0)))
     arms.sort(key=lambda x: -x["first"])
     pick = d.get("oos_sign_pick") or {}
+    # **從資料算，不要寫死。** 這句文案原本寫死「六個裡有五個翻號」，那是
+    # 14 天那版的結論；資料換成 120 天之後翻號數變 2，而文字不會自己更新
+    # （mistake.md 2026-08-26：被推翻的結論會以「詞」的形式活下來）。
+    flipped_n = sum(1 for x in arms if x["flipped"])
+    # 掛單來回成本 = 換手 × 2 × 每邊 maker bps。用本次跑出來的換手。
+    thr = d.get("thresholds") or {}
+    MAKER_FLOOR = float(thr.get("maker_bps_h") or 1.5)
     return dict(
         id="mft_halves",
         kind="slope",
         zh=dict(
-            title="前半很漂亮，後半翻號",
+            title="訊號活下來了，但付不起自己的手續費",
             lede=("一個一小時頻率的橫斷面訊號，六種組法。"
                   "**符號與組法只用前半決定**，後半完全沒看過。"
-                  "六個裡有五個在後半翻了號——而唯一沒翻的那個，"
-                  "是前半表現最差的那一個。"),
+                  "六個裡有 %d 個在後半翻號——但真正擋住它的不是翻號："
+                  "**前半會挑到的那一個在後半是 %+.2f，而光是掛單的來回"
+                  "手續費就要 %.2f。** 訊號是真的，只是比成本小。"
+                  % (flipped_n, pick.get("second", 0), MAKER_FLOOR)),
             xlabel="前半（挑參數用的）", ylabel="後半（沒看過的）",
             unit="每小時毛利（基點）",
             sample=("%d 天、%d 次換倉、%d 個標的，每小時重組一次"
                     % (d.get("days", 0), d.get("rebalances", 0),
                        d.get("symbols", 0))),
-            callout=("六條裡五條翻號。\n"
-                     "唯一沒翻的那條，前半是最差的那一條。"),
-            note=("前半會挑到 `%s`：前半 %+.2f -> 後半 %+.2f。"
-                  "這不是「差一點」，是雜訊的指紋。"
+            callout=("前半挑到的那條，後半 %+.2f bps/小時。\n"
+                     "而掛單來回手續費是 %.2f —— 訊號比成本小。"
+                     % (pick.get("second", 0), MAKER_FLOOR)),
+            note=("前半會挑到 `%s`：前半 %+.2f -> 後半 %+.2f —— "
+                  "**樣本外仍然為正**。擋住它的是換手：這個訊號每小時重組"
+                  "一次，光是掛單的來回手續費就要 %.2f bps/小時，"
+                  "比它賺的還多。所以唯一的槓桿是**把換手砍下來**，"
+                  "不是換組法。"
                   % (pick.get("arm", "—"), pick.get("first", 0),
-                     pick.get("second", 0))),
+                     pick.get("second", 0), MAKER_FLOOR)),
         ),
         en=dict(
-            title="Beautiful in the first half, sign-flipped in the second",
+            title="The signal survived. It still cannot pay its own fees.",
             lede=("One hourly cross-sectional signal, six constructions. "
                   "**The sign and the construction are chosen on the first "
                   "half only**; the second half is never looked at. "
-                  "Five of six flip sign out of sample — and the one that "
-                  "does not is the worst performer in sample."),
+                  "%d of six flip sign — but that is not what stops it: "
+                  "**the arm the first half picks earns %+.2f out of sample, "
+                  "while the maker round-trip alone costs %.2f.** "
+                  "The signal is real; it is just smaller than the cost."
+                  % (flipped_n, pick.get("second", 0), MAKER_FLOOR)),
             xlabel="First half (used to choose)",
             ylabel="Second half (never seen)",
             unit="gross basis points per hour",
             sample=("%d days, %d rebalances, %d symbols, hourly"
                     % (d.get("days", 0), d.get("rebalances", 0),
                        d.get("symbols", 0))),
-            callout=("Five of six flip sign.\n"
-                     "The one that does not was the worst in sample."),
-            note=("The first half would pick `%s`: %+.2f -> %+.2f. "
-                  "That is not 'nearly passing'. That is what noise looks like."
+            callout=("The first half's pick earns %+.2f bps/hour out of sample.\n"
+                     "The maker round trip costs %.2f. Smaller than the cost."
+                     % (pick.get("second", 0), MAKER_FLOOR)),
+            note=("The first half would pick `%s`: %+.2f -> %+.2f — "
+                  "**still positive out of sample**. What stops it is "
+                  "turnover: rebalancing hourly costs %.2f bps/hour in maker "
+                  "fees alone, more than it earns. The only lever is cutting "
+                  "turnover, not trying another construction."
                   % (pick.get("arm", "—"), pick.get("first", 0),
-                     pick.get("second", 0))),
+                     pick.get("second", 0), MAKER_FLOOR)),
         ),
         series=arms,
         source="research/results/mft_xs_alpha.json",
