@@ -82,7 +82,11 @@ from research import gate0_xs_turnover as XS                   # noqa: E402
 OUT = ROOT / "research" / "results" / "mft_xs_alpha.json"
 FROZEN = ROOT / "research" / "results" / "gate0_xs_turnover.json"
 TOL_C1 = 0.005
-TAKER, MAKER = XS.HL_TAKER_BPS, XS.HL_MAKER_BPS      # 4.5 / 1.5，gate0.py 實查
+# 費率在 main() 裡按 --venue 決定（見 XS.fees_for 的說明：訊號量在哪、
+# 單會送去哪，是兩件事，而這裡要用的是**後者**）。模組層先給佔位值，
+# 讓它在被指定之前就不可能被誤用成一個看起來合理的預設。
+TAKER = MAKER = float("nan")
+FEE_SRC = "（未指定場館）"
 RNG = np.random.default_rng(20260911)
 
 
@@ -126,7 +130,18 @@ def main():
         pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=14)
+    ap.add_argument("--venue", default="bitget",
+                    choices=sorted(XS.VENUE_FEES),
+                    help="**執行**場館的費率（不是訊號來源的場館）")
+    ap.add_argument("--rebate", type=float, default=None,
+                    help="返佣比例，覆蓋場館預設（0.5 = 打五折）")
     a = ap.parse_args()
+    global TAKER, MAKER, FEE_SRC
+    TAKER, MAKER, FEE_SRC = XS.fees_for(a.venue, a.rebate)
+    print("費率：%s  taker %.2f / maker %.2f bps 每邊" % (a.venue, TAKER, MAKER))
+    print("      %s" % FEE_SRC)
+    print("      **訊號量自 Binance 簿口，這是執行場館的費率 —— 兩者刻意分開**")
+    print()
 
     print("抓快照（%d 天）…" % a.days)
     d = XS.load_pairs(a.days)
@@ -137,7 +152,8 @@ def main():
     f["day"] = pd.to_datetime(f.minute * 60000, unit="ms", utc=True).dt.strftime("%Y-%m-%d")
     res = dict(asof=time.strftime("%Y-%m-%d %H:%M:%S"), days=a.days,
                rebalances=int(f.minute.nunique()), symbols=int(f.sym.nunique()),
-               rows=int(len(f)), thresholds=dict(taker_bps_h=TAKER, maker_bps_h=MAKER))
+               rows=int(len(f)), venue=a.venue, fee_src=FEE_SRC,
+               thresholds=dict(taker_bps_h=TAKER, maker_bps_h=MAKER))
     print("再平衡 %d 次、%d 標的、%d 列\n"
           % (res["rebalances"], res["symbols"], res["rows"]))
 

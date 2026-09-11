@@ -50,6 +50,45 @@ BANDS = (5, 10)              # 他用的兩個帶
 HL_TAKER_BPS = 4.5           # gate0.py 實查
 HL_MAKER_BPS = 1.5
 
+# ── 費率：**要跟「實際會在哪下單」同一個場館** ─────────────────────────
+# 2026-09-12 使用者問「MFT 是在 DEX 還是 CEX 執行、算過返佣沒有」，查出來
+# 是一個**沒人發現的錯配**：
+#
+#   訊號  orderbook_snapshots_1m（exchange='binance'，912,794 列全是 Binance）
+#   報酬  同一張表的 mid
+#   成本  **HL 的 4.5 / 1.5** ← 對不上
+#
+# 整個量測是 Binance 內部的，只有費率是 Hyperliquid 的。那不是設計選擇，
+# 是常數叫 `HL_*` 卻被塞進 Binance 的計算裡。
+#
+# 而真正該用的是**執行場館**的費率（訊號在哪量到，跟單會送去哪，是兩件事）。
+# 這個專案的執行路徑是 jarvis -> Bitget，所以預設就是 Bitget。
+#
+# 每個數字都要有出處，沒有出處的常數會變成判決的地基（[[2026-09-03]]：
+# 「一天可捕獲 $30」就是這樣來的）。
+VENUE_FEES = {
+    # 場館:      (taker_bps, maker_bps, 出處)
+    "hl": (4.5, 1.5, "research/hl/gate0.py 實查 HL API，零成交量級距；"
+                     "掛單返傭要 maker 量佔全所 0.5% 才開始（−0.1 bps），我們拿不到"),
+    "binance": (5.0, 2.0, "Binance U 本位永續 VIP0 公開費率（BNB 折扣另計）"),
+    "bitget": (6.0, 2.0, "Bitget U 本位永續 VIP0 公開費率"),
+}
+# 返佣比例（0.5 = 手續費打五折）。
+# **Bitget 50% 是使用者 2026-09-12 告知的**，與 SDV 成本模型既有的
+# 「返佣後 1/1/3」互相印證（6.0×0.5=3.0 taker、2.0×0.5=1.0 maker）。
+# 仍標為**未由對帳單獨立查證** —— 要變成判決的地基之前該對一次真實帳單。
+VENUE_REBATE = {"hl": 0.0, "binance": 0.0, "bitget": 0.5}
+
+
+def fees_for(venue: str, rebate: float | None = None):
+    """回傳 (taker_bps, maker_bps, 說明)。返佣直接打在費率上。"""
+    v = (venue or "bitget").lower()
+    if v not in VENUE_FEES:
+        raise SystemExit("未知場館 %r，可用：%s" % (venue, "/".join(VENUE_FEES)))
+    tk, mk, src = VENUE_FEES[v]
+    rb = VENUE_REBATE.get(v, 0.0) if rebate is None else float(rebate)
+    return tk * (1 - rb), mk * (1 - rb), "%s；返佣 %.0f%%" % (src, rb * 100)
+
 
 def band_split(raw, mid, prev_map, side, band_bps):
     """回傳 (new_usd, old_usd)：帶內深度按「上一分鐘這一檔有沒有量」拆分。"""

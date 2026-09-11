@@ -58,59 +58,59 @@
    "kind": "slope",
    "zh": {
     "title": "訊號活下來了，但付不起自己的手續費",
-    "lede": "一個一小時頻率的橫斷面訊號，六種組法。**符號與組法只用前半決定**，後半完全沒看過。六個裡有 2 個在後半翻號——但真正擋住它的不是翻號：**前半會挑到的那一個在後半是 +0.37，而光是掛單的來回手續費就要 1.50。** 訊號是真的，只是比成本小。",
+    "lede": "一個一小時頻率的橫斷面訊號，六種組法。**符號與組法只用前半決定**，後半完全沒看過。六個裡有 3 個在後半翻號——但真正擋住它的不是翻號：**前半會挑到的那一個在後半是 +0.29，而光是掛單的來回手續費就要 1.00。** 訊號是真的，只是比成本小。",
     "xlabel": "前半（挑參數用的）",
     "ylabel": "後半（沒看過的）",
     "unit": "每小時毛利（基點）",
-    "sample": "120 天、1444 次換倉、11 個標的，每小時重組一次",
-    "callout": "前半挑到的那條，後半 +0.37 bps/小時。\n而掛單來回手續費是 1.50 —— 訊號比成本小。",
-    "note": "前半會挑到 `new5`：前半 +0.96 -> 後半 +0.37 —— **樣本外仍然為正**。擋住它的是換手：這個訊號每小時重組一次，光是掛單的來回手續費就要 1.50 bps/小時，比它賺的還多。所以唯一的槓桿是**把換手砍下來**，不是換組法。"
+    "sample": "120 天、1447 次換倉、11 個標的，每小時重組一次",
+    "callout": "前半挑到的那條，後半 +0.29 bps/小時。\n而掛單來回手續費是 1.00 —— 訊號比成本小。",
+    "note": "前半會挑到 `new5`：前半 +0.95 -> 後半 +0.29 —— **樣本外仍然為正**。擋住它的是換手：這個訊號每小時重組一次，光是掛單的來回手續費就要 1.00 bps/小時，比它賺的還多。所以唯一的槓桿是**把換手砍下來**，不是換組法。"
    },
    "en": {
     "title": "The signal survived. It still cannot pay its own fees.",
-    "lede": "One hourly cross-sectional signal, six constructions. **The sign and the construction are chosen on the first half only**; the second half is never looked at. 2 of six flip sign — but that is not what stops it: **the arm the first half picks earns +0.37 out of sample, while the maker round-trip alone costs 1.50.** The signal is real; it is just smaller than the cost.",
+    "lede": "One hourly cross-sectional signal, six constructions. **The sign and the construction are chosen on the first half only**; the second half is never looked at. 3 of six flip sign — but that is not what stops it: **the arm the first half picks earns +0.29 out of sample, while the maker round-trip alone costs 1.00.** The signal is real; it is just smaller than the cost.",
     "xlabel": "First half (used to choose)",
     "ylabel": "Second half (never seen)",
     "unit": "gross basis points per hour",
-    "sample": "120 days, 1444 rebalances, 11 symbols, hourly",
-    "callout": "The first half's pick earns +0.37 bps/hour out of sample.\nThe maker round trip costs 1.50. Smaller than the cost.",
-    "note": "The first half would pick `new5`: +0.96 -> +0.37 — **still positive out of sample**. What stops it is turnover: rebalancing hourly costs 1.50 bps/hour in maker fees alone, more than it earns. The only lever is cutting turnover, not trying another construction."
+    "sample": "120 days, 1447 rebalances, 11 symbols, hourly",
+    "callout": "The first half's pick earns +0.29 bps/hour out of sample.\nThe maker round trip costs 1.00. Smaller than the cost.",
+    "note": "The first half would pick `new5`: +0.95 -> +0.29 — **still positive out of sample**. What stops it is turnover: rebalancing hourly costs 1.00 bps/hour in maker fees alone, more than it earns. The only lever is cutting turnover, not trying another construction."
    },
    "series": [
     {
      "arm": "new5",
-     "first": 0.963,
-     "second": 0.367,
+     "first": 0.949,
+     "second": 0.294,
      "flipped": false
     },
     {
      "arm": "combo10",
-     "first": 0.881,
-     "second": -0.319,
+     "first": 0.874,
+     "second": -0.336,
      "flipped": true
     },
     {
      "arm": "combo5",
-     "first": 0.7,
-     "second": 0.925,
+     "first": 0.677,
+     "second": 0.89,
      "flipped": false
     },
     {
      "arm": "new10",
-     "first": 0.605,
-     "second": 0.018,
-     "flipped": false
+     "first": 0.593,
+     "second": -0.035,
+     "flipped": true
     },
     {
      "arm": "old10",
-     "first": 0.473,
-     "second": -1.226,
+     "first": 0.479,
+     "second": -1.195,
      "flipped": true
     },
     {
      "arm": "old5",
-     "first": 0.349,
-     "second": 0.238,
+     "first": 0.377,
+     "second": 0.246,
      "flipped": false
     }
    ],
