@@ -1,7 +1,7 @@
 {
  "registered": "2026-09-02",
  "deadline": "2026-09-30",
- "days": 9.38,
+ "days": 9.42,
  "gate_days": 28.0,
  "gate_met": false,
  "criteria": {
@@ -40,7 +40,7 @@
   "ETHUSDT": {
    "n": 29,
    "median_ann_pct": 8.43,
-   "p10": 3.72,
+   "p10": 3.94,
    "p90": 10.95,
    "neg_frac": 0.034
   }

@@ -78,6 +78,10 @@ REGISTRY = [
     # 不可回填。`bid_n/ask_n` 是每檔掛單筆數，CEX 公開簿口沒有這一欄。
     ("hl 中價與佇列", "D:/flowbot_data/hl/mid/*/*.parquet", "append",
      "hl_mid.py 每 60 秒取樣主場量能前 40 名；不可回填"),
+    ("§1.25 宇宙級分鐘簿口", "../arb/engine/logs/universe/*/minutes.csv", "append",
+     "record_universe.py：126 個 ticker、150 個配對的逐分鐘頂檔。"
+     "**不可回填**（WS 串流）。欄位 schema 與 §0.75 的 minutes.csv 逐欄相同，"
+     "但 fund_* 三欄是空的（已知缺口，見 TODO §1.25）"),
     ("hl 歷史 K 線", "research/hl/data/candles/*.parquet", "append",
      "hl_candles.py 下載；端點保留上限 5000 根/週期，1h ~208 天。"
      "所以它既是可回填的、也是會從頭部腐蝕的 —— 兩者同時成立"),

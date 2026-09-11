@@ -1,17 +1,17 @@
 {
   "ok": true,
-  "reason": "覆蓋 16.33%、13945 個清算價、幾何違反 0、地址 3200、呼叫失敗率 2.6%、不完整的任務 無、1728 秒",
-  "call_fail_rate": 0.026283511477133346,
+  "reason": "覆蓋 17.93%、14334 個清算價、幾何違反 0、地址 3329、呼叫失敗率 2.9%、不完整的任務 無、1727 秒",
+  "call_fail_rate": 0.028736639214999124,
   "incomplete": [],
   "addrs_polled": 2500,
-  "addrs_known": 3200,
+  "addrs_known": 3329,
   "coverage_partial": true,
-  "coverage_frac": 0.1632884410569255,
-  "n_addresses": 3200,
+  "coverage_frac": 0.179303476106155,
+  "n_addresses": 3329,
   "stat": {
     "addrs_ok": 2500,
-    "positions": 23758,
-    "with_liq": 13945,
+    "positions": 23947,
+    "with_liq": 14334,
     "geom_violations": 0
   },
   "did": {
@@ -26,12 +26,12 @@
       "complete": 1.0
     },
     "orders": {
-      "addrs_ok": 2359,
-      "n_orders": 52241,
-      "n_trigger": 2894,
-      "resting_rows": 2601
+      "addrs_ok": 2349,
+      "n_orders": 50475,
+      "n_trigger": 2649,
+      "resting_rows": 2504
     }
   },
-  "snapshots": 14,
-  "asof": "2026-09-11 16:33:50"
+  "snapshots": 15,
+  "asof": "2026-09-11 17:33:49"
 }

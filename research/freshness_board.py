@@ -246,6 +246,12 @@ REGISTRY = [
     ("cloud train parity", "db",
      "train_parity:updated_at", 2.5,
      "cloud recorder alive (weakness-#1 migration; RED until service up)"),
+    ("arb universe recorder (§1.25)", "json_flag",
+     "../arb/engine/logs/universe/_flag.json:ok", 0.6,
+     "record_universe.py 常駐自報（150 個配對、264 個訂閱、三條 WS）。"
+     "ok 的語意是「連得上且設定對」不是「有資料」——啟動那一瞬間就寫 ok=True，"
+     "否則看門狗會殺掉剛起來的行程（mistake.md 2026-09-11）。"
+     "重啟由 ../arb/ops/arb_watchdog.ps1 負責"),
     ("arb recorder (§0.75)", "file",
      "../arb/engine/logs/minutes.csv", 1.0,
      "two-venue premium recording; silence = the week of data quietly stops"),
