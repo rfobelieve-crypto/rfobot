@@ -144,9 +144,71 @@ def turnover(f, col):
     return w, dw.dropna()
 
 
+def weights_from(p, halflife=None):
+    """特徵矩陣 -> 橫斷面 z -> 總槓桿 1 的權重。halflife 給了就先做 EMA。"""
+    if halflife:
+        p = p.ewm(halflife=halflife, min_periods=1).mean()
+    z = p.sub(p.mean(axis=1), axis=0).div(p.std(axis=1).replace(0, np.nan), axis=0)
+    return z.div(z.abs().sum(axis=1).replace(0, np.nan), axis=0)
+
+
+def apply_band(w, band):
+    """不交易帶：|Δw| 小於 band 就沿用上一期的權重。
+
+    **逐列前推**，不能向量化——因為「上一期」是抑制後的值不是原始值，
+    這個遞迴正是抑制的本體。寫錯成拿原始權重比會低估抑制效果。
+    """
+    if band <= 0:
+        return w
+    out = w.copy()
+    prev = None
+    for i in range(len(w)):
+        cur = w.iloc[i]
+        if prev is None:
+            prev = cur.fillna(0.0)
+            out.iloc[i] = prev
+            continue
+        keep = (cur - prev).abs() < band
+        nw = cur.where(~keep, prev).fillna(prev)
+        # 動完之後重新縮放回總槓桿 1（否則帶會讓槓桿漂走）
+        s_ = nw.abs().sum()
+        if s_ > 1e-12:
+            nw = nw / s_
+        out.iloc[i] = nw
+        prev = nw
+    return out
+
+
+def sweep_damping(f, col):
+    """回傳一張表：抑制強度 -> (換手, 成本, 與原始權重的相關)。"""
+    p = f.pivot_table(index="minute", columns="sym", values=col)
+    base = weights_from(p)
+    base_flat = base.values.ravel()
+
+    def row(name, w):
+        dw = (w.diff().abs().sum(axis=1) / 2.0).dropna()
+        m = float(dw.mean())
+        ok = np.isfinite(base_flat) & np.isfinite(w.values.ravel())
+        corr = (float(np.corrcoef(base_flat[ok], w.values.ravel()[ok])[0, 1])
+                if ok.sum() > 10 else float("nan"))
+        return dict(name=name, turnover=round(m, 4),
+                    cost_taker_bps_h=round(m * 2 * HL_TAKER_BPS, 3),
+                    cost_maker_bps_h=round(m * 2 * HL_MAKER_BPS, 3),
+                    corr_with_base=round(corr, 4))
+
+    out = [row("原始（無抑制）", base)]
+    for band in (0.005, 0.01, 0.02, 0.05):
+        out.append(row("不交易帶 %.3f" % band, apply_band(base, band)))
+    for hl in (1, 2, 4, 8):
+        out.append(row("EMA 半衰期 %dh" % hl, weights_from(p, halflife=hl)))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=30)
+    ap.add_argument("--sweep", action="store_true",
+                    help="掃換手抑制（一樣只看成本，不看損益）")
     a = ap.parse_args()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -195,6 +257,27 @@ def main():
               % (k, v["cost_bps_per_hour_taker"], v["cost_bps_per_hour_maker"]))
         print("           換算每天 %.1f bps（taker）"
               % v["cost_bps_per_day_taker"])
+    if a.sweep:
+        print("\n" + "=" * 72)
+        print("=== 換手抑制掃描（**一樣不算損益**）===")
+        print("相關＝抑制後的權重向量 vs 原始權重向量。它量的是『部位變了多少』，")
+        print("**不是**『賺多少』。相關撐住只是必要條件不是充分條件 ——")
+        print("如果訊號的價值集中在它變化最快的時刻，抑制會砍掉最值錢的部分，")
+        print("而權重相關仍然很高。")
+        for bnd in BANDS:
+            col = "combo%d" % bnd
+            if col not in f:
+                continue
+            print("\n--- %d bps 帶 ---" % bnd)
+            print("%-18s %10s %12s %12s %10s"
+                  % ("抑制", "換手", "taker bps/h", "maker bps/h", "與原始相關"))
+            rows = sweep_damping(f, col)
+            res.setdefault("damping", {})["%dbps" % bnd] = rows
+            for r in rows:
+                print("%-18s %10.4f %12.2f %12.2f %10.3f"
+                      % (r["name"], r["turnover"], r["cost_taker_bps_h"],
+                         r["cost_maker_bps_h"], r["corr_with_base"]))
+
     print("\n**本支刻意沒有算任何損益。** 先看成本再決定要不要看損益 ——")
     print("反過來會捨不得（CLAUDE.md 核心原則 11 / common_cause_scan 假說 1）。")
     print("\n註：換手率用 Binance 的 %d 天歷史算（HL 中價才錄幾分鐘），"

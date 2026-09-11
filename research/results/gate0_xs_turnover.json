@@ -1,5 +1,5 @@
 {
-  "asof": "2026-09-11 15:03:21",
+  "asof": "2026-09-11 15:08:29",
   "days": 14,
   "pairs": 2507,
   "rebalances": 320,
@@ -23,5 +23,137 @@
       "cost_bps_per_day_taker": 116.29,
       "n_rebalances": 320
     }
+  },
+  "damping": {
+    "5bps": [
+      {
+        "name": "原始（無抑制）",
+        "turnover": 0.5052,
+        "cost_taker_bps_h": 4.547,
+        "cost_maker_bps_h": 1.516,
+        "corr_with_base": 1.0
+      },
+      {
+        "name": "不交易帶 0.005",
+        "turnover": 0.5299,
+        "cost_taker_bps_h": 4.769,
+        "cost_maker_bps_h": 1.59,
+        "corr_with_base": 0.9917
+      },
+      {
+        "name": "不交易帶 0.010",
+        "turnover": 0.5297,
+        "cost_taker_bps_h": 4.767,
+        "cost_maker_bps_h": 1.589,
+        "corr_with_base": 0.9917
+      },
+      {
+        "name": "不交易帶 0.020",
+        "turnover": 0.5288,
+        "cost_taker_bps_h": 4.759,
+        "cost_maker_bps_h": 1.586,
+        "corr_with_base": 0.9916
+      },
+      {
+        "name": "不交易帶 0.050",
+        "turnover": 0.5224,
+        "cost_taker_bps_h": 4.702,
+        "cost_maker_bps_h": 1.567,
+        "corr_with_base": 0.9884
+      },
+      {
+        "name": "EMA 半衰期 1h",
+        "turnover": 0.4124,
+        "cost_taker_bps_h": 3.712,
+        "cost_maker_bps_h": 1.237,
+        "corr_with_base": 0.7037
+      },
+      {
+        "name": "EMA 半衰期 2h",
+        "turnover": 0.3219,
+        "cost_taker_bps_h": 2.897,
+        "cost_maker_bps_h": 0.966,
+        "corr_with_base": 0.5756
+      },
+      {
+        "name": "EMA 半衰期 4h",
+        "turnover": 0.2349,
+        "cost_taker_bps_h": 2.114,
+        "cost_maker_bps_h": 0.705,
+        "corr_with_base": 0.4504
+      },
+      {
+        "name": "EMA 半衰期 8h",
+        "turnover": 0.1692,
+        "cost_taker_bps_h": 1.523,
+        "cost_maker_bps_h": 0.508,
+        "corr_with_base": 0.3492
+      }
+    ],
+    "10bps": [
+      {
+        "name": "原始（無抑制）",
+        "turnover": 0.5384,
+        "cost_taker_bps_h": 4.846,
+        "cost_maker_bps_h": 1.615,
+        "corr_with_base": 1.0
+      },
+      {
+        "name": "不交易帶 0.005",
+        "turnover": 0.5526,
+        "cost_taker_bps_h": 4.974,
+        "cost_maker_bps_h": 1.658,
+        "corr_with_base": 0.991
+      },
+      {
+        "name": "不交易帶 0.010",
+        "turnover": 0.5525,
+        "cost_taker_bps_h": 4.972,
+        "cost_maker_bps_h": 1.657,
+        "corr_with_base": 0.9909
+      },
+      {
+        "name": "不交易帶 0.020",
+        "turnover": 0.5515,
+        "cost_taker_bps_h": 4.964,
+        "cost_maker_bps_h": 1.655,
+        "corr_with_base": 0.9907
+      },
+      {
+        "name": "不交易帶 0.050",
+        "turnover": 0.5423,
+        "cost_taker_bps_h": 4.881,
+        "cost_maker_bps_h": 1.627,
+        "corr_with_base": 0.9877
+      },
+      {
+        "name": "EMA 半衰期 1h",
+        "turnover": 0.3931,
+        "cost_taker_bps_h": 3.538,
+        "cost_maker_bps_h": 1.179,
+        "corr_with_base": 0.7228
+      },
+      {
+        "name": "EMA 半衰期 2h",
+        "turnover": 0.3039,
+        "cost_taker_bps_h": 2.735,
+        "cost_maker_bps_h": 0.912,
+        "corr_with_base": 0.5921
+      },
+      {
+        "name": "EMA 半衰期 4h",
+        "turnover": 0.2236,
+        "cost_taker_bps_h": 2.013,
+        "cost_maker_bps_h": 0.671,
+        "corr_with_base": 0.4605
+      },
+      {
+        "name": "EMA 半衰期 8h",
+        "turnover": 0.161,
+        "cost_taker_bps_h": 1.449,
+        "cost_maker_bps_h": 0.483,
+        "corr_with_base": 0.3574
+      }
+    ]
   }
 }
