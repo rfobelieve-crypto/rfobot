@@ -1,0 +1,27 @@
+{
+  "asof": "2026-09-11 15:03:21",
+  "days": 14,
+  "pairs": 2507,
+  "rebalances": 320,
+  "symbols": 11,
+  "arms": {
+    "5bps": {
+      "turnover_median": 0.5231,
+      "turnover_mean": 0.5052,
+      "turnover_p90": 0.759,
+      "cost_bps_per_hour_taker": 4.547,
+      "cost_bps_per_hour_maker": 1.516,
+      "cost_bps_per_day_taker": 109.13,
+      "n_rebalances": 320
+    },
+    "10bps": {
+      "turnover_median": 0.5448,
+      "turnover_mean": 0.5384,
+      "turnover_p90": 0.7862,
+      "cost_bps_per_hour_taker": 4.846,
+      "cost_bps_per_hour_maker": 1.615,
+      "cost_bps_per_day_taker": 116.29,
+      "n_rebalances": 320
+    }
+  }
+}
