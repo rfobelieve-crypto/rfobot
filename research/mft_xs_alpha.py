@@ -188,9 +188,14 @@ def main():
     print("=== 毛利、淨值、功效（每小時 bps）===")
     print("%-10s %9s %8s %9s %9s %8s %10s %10s"
           % ("訊號", "毛利", "SE", "CI下", "CI上", "P(>0)", "淨(吃單)", "淨(掛單)"))
+    # 2026-09-11 第二輪：**把 new / old 也當成完整的臂**。第一輪只對 combo
+    # 算了組合報酬，而 C2 量到 `new` 單獨的 |IC| 是 combo 的兩倍（0.0291 vs
+    # 0.0149，兩個帶一致）。只報 IC 不報組合報酬，等於「量到它比較好卻沒有
+    # 量它值多少錢」—— 而那個錢才是 Gate 0 的分子。
     arms = {}
-    for bnd in XS.BANDS:
-        col = "combo%d" % bnd
+    cols = ["%s%d" % (nm, bnd) for bnd in XS.BANDS
+            for nm in ("new", "old", "combo")]
+    for col in cols:
         r, ic, w = port_returns(f, col)
         dmap = f.drop_duplicates("minute").set_index("minute")["day"]
         dys = dmap.reindex(r.index).values
@@ -198,14 +203,15 @@ def main():
         _, dw = XS.turnover(f, col)
         tk = float(dw.mean()) * 2 * TAKER       # 單邊換手 x 兩邊 x 費率
         mk = float(dw.mean()) * 2 * MAKER
-        arms["%dbps" % bnd] = dict(
+        arms[col] = dict(
+            turnover=float(dw.mean()),
             gross_bps_h=m, se_bps_h=se, ci_lo=lo, ci_hi=hi, p_pos=ppos,
             ic_mean=float(ic.mean()), n_reb=int(len(r)),
             cost_taker_bps_h=tk, cost_maker_bps_h=mk,
             net_taker=m - tk, net_maker=m - mk,
             inconclusive_by_design=bool(se >= MAKER))
         print("%-10s %+9.3f %8.3f %+9.3f %+9.3f %7.1f%% %+10.3f %+10.3f"
-              % ("combo%d" % bnd, m, se, lo, hi, 100 * ppos, m - tk, m - mk))
+              % (col, m, se, lo, hi, 100 * ppos, m - tk, m - mk))
     res["arms"] = arms
 
     # ---------- C3 零成本對照 ----------
@@ -222,6 +228,58 @@ def main():
                    else "有測量能力")
         print("  %-8s SE %.3f bps/h  vs 掛單門檻 %.2f / 吃單門檻 %.2f  -> %s"
               % (k, v["se_bps_h"], MAKER, TAKER, verdict))
+
+    # ---------- 符號必須在樣本外決定 ----------
+    # 第二輪跑出一個反直覺的東西：`new` 的 |IC| 最大（0.0291）但組合報酬最差
+    # （−0.747）。原因是**符號**——IC 是負的，而權重是做多高 z，所以 IC 越負
+    # 組合越虧。也就是說 `new` 是最強的訊號，只是方向要反過來。
+    #
+    # **但「在同一份樣本上挑符號」是白送一個自由度**（mistake.md 2026-09-09：
+    # 事後找到的維度通過多少檢查都不算數）。所以這一關照那條規矩做：
+    # **只用前半挑符號與臂，再看後半**，並且**報「前半選到什麼」**，
+    # 不只報「我選的那個在後半如何」。
+    print("")
+    print("=== 符號與臂**只用前半挑**，後半才是樣本外 ===")
+    halves = {}
+    mins = sorted(f.minute.unique())
+    cut = mins[len(mins) // 2]
+    f1, f2 = f[f.minute < cut], f[f.minute >= cut]
+    print("  前半 %d 次再平衡 / 後半 %d 次（切點 %s）"
+          % (f1.minute.nunique(), f2.minute.nunique(),
+             pd.to_datetime(cut * 60000, unit="ms", utc=True).strftime("%m-%d %H:%M")))
+    print("  %-10s %11s %11s %8s" % ("臂", "前半毛(帶符號)", "後半毛(同符號)", "符號"))
+    pick = None
+    for col in cols:
+        r1, _, _ = port_returns(f1, col)
+        r2, _, _ = port_returns(f2, col)
+        if not len(r1) or not len(r2):
+            continue
+        sgn = 1.0 if r1.mean() >= 0 else -1.0      # 符號由**前半**決定
+        g1, g2 = sgn * r1.mean(), sgn * r2.mean()
+        halves[col] = dict(sign=sgn, first=float(g1), second=float(g2))
+        print("  %-10s %+11.3f %+11.3f %8s" % (col, g1, g2, "+" if sgn > 0 else "−"))
+        if pick is None or g1 > halves[pick]["first"]:
+            pick = col
+    if pick:
+        h = halves[pick]
+        print("")
+        print("  >> **只用前半，程序會挑 `%s`（符號 %s）**：前半 %+.3f -> 後半 %+.3f bps/h"
+              % (pick, "+" if h["sign"] > 0 else "−", h["first"], h["second"]))
+        print("  >> 後半 vs 掛單門檻 %.2f bps/h -> **%s**"
+              % (MAKER, "越過" if h["second"] > MAKER else "不過"))
+        res["oos_sign_pick"] = dict(arm=pick, **h)
+
+    best = max(arms, key=lambda k: arms[k]["net_maker"])
+    v = arms[best]
+    print("")
+    print("=== 哪一臂最好（**這是事後挑的，要標明**）===")
+    print("  %s：毛 %+.3f、掛單淨 %+.3f bps/h、SE %.3f、換手 %.3f"
+          % (best, v["gross_bps_h"], v["net_maker"], v["se_bps_h"],
+             v["turnover"]))
+    print("  **臂是事後挑的，所以這不是判決**（mistake.md 2026-09-09：事後找到")
+    print("  的維度通過多少一致性檢查都不算數）。它只回答「值不值得繼續」。")
+    print("  要變成判決必須**只用前半挑臂**，再看後半。")
+    res["best_arm_posthoc"] = best
 
     print("\n=== 讀法（核心原則 9）===")
     print("  **這不是 alpha 的判決，是 Gate 0 的分子。** 單一樣本、沒有樣本外")
