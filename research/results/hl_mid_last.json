@@ -1,13 +1,13 @@
 {
   "ok": true,
-  "reason": "取樣 65 次、寫 6500 列、訊息 73200、重連 0、最後訊息 1 秒前",
+  "reason": "取樣 80 次、寫 8000 列、訊息 89900、重連 0、最後訊息 4 秒前",
   "coins": 100,
-  "samples": 65,
-  "rows": 6500,
+  "samples": 80,
+  "rows": 8000,
   "reconnects": 0,
-  "uptime_sec": 3902,
+  "uptime_sec": 4802,
   "mid_dir": "D:\\flowbot_data\\hl\\mid",
   "top_n": 100,
   "sample_sec": 60,
-  "asof": "2026-09-11 19:59:06"
+  "asof": "2026-09-11 20:14:06"
 }

@@ -1,0 +1,278 @@
+{
+ "_readme": "研究圖表的真相源。複製到 ../product-site/content/research_charts.json。**每一個數字都由 research/publish_research_charts.py 從做決定的那份結果檔生成，不得手改**——手抄的數字會漂而且沒人會發現。公開面規則同 research_nogo：只出百分比、方向、時間、計數；不出美元、張數、模型內部。",
+ "updated": "2026-09-11",
+ "charts": [
+  {
+   "id": "gate0",
+   "kind": "two_column",
+   "zh": {
+    "title": "訊號是真的，但價格拿不到",
+    "lede": "把已經結案的判決橫著讀，最大的一群有六個成員，而且每一個都是我們自己寫下來的：**資訊層過了，執行層死掉。**這不是「交易很難」這種廢話——尖銳的版本是：我們的流程永遠把資訊層排在前面、把執行可行性排在最後，所以每條線都花幾個月才撞到它的約束，而那個約束每次都是同一個。",
+    "colA": "資訊層",
+    "colB": "執行／經濟層",
+    "note": "所以從 2026-09-11 起，任何新研究線的第一關是**執行可行性**，排在資訊層之前。"
+   },
+   "en": {
+    "title": "The signal is real. The price is not available.",
+    "lede": "Read the closed verdicts sideways and the largest cluster has six members, each one written down by us: **the information layer passes, the execution layer kills it.** The sharp version is not 'trading is hard' — it is that our process always put the information layer first and execution feasibility last, so every line spent months before hitting its binding constraint, and it was the same constraint every time.",
+    "colA": "Information layer",
+    "colB": "Execution / economics",
+    "note": "So since 2026-09-11 the first gate on any new line is execution feasibility, before any information work."
+   },
+   "series": [
+    {
+     "name": "分鐘級訊號",
+     "info": "15/15 個月同號",
+     "exec_": "138 格淨值全負"
+    },
+    {
+     "name": "清算位密度",
+     "info": "四道檢定全過",
+     "exec_": "交易假設沒過"
+    },
+    {
+     "name": "掃單失敗（舊線）",
+     "info": "引擎自審六項全過",
+     "exec_": "歷史優勢是成交假設造的"
+    },
+    {
+     "name": "事件交會（SDV）",
+     "info": "毛利為正、區間離零",
+     "exec_": "誠實錨點後扣成本全負"
+    },
+    {
+     "name": "執行落差",
+     "info": "天花板顯著為正",
+     "exec_": "落差是天花板的 132%"
+    },
+    {
+     "name": "被動基準",
+     "info": "—",
+     "exec_": "六個場館對全負"
+    }
+   ],
+   "source": "CLAUDE.md 核心原則 11 / docs/common_cause_scan.md"
+  },
+  {
+   "id": "mft_halves",
+   "kind": "slope",
+   "zh": {
+    "title": "前半很漂亮，後半翻號",
+    "lede": "一個一小時頻率的橫斷面訊號，六種組法。**符號與組法只用前半決定**，後半完全沒看過。六個裡有五個在後半翻了號——而唯一沒翻的那個，是前半表現最差的那一個。",
+    "xlabel": "前半（挑參數用的）",
+    "ylabel": "後半（沒看過的）",
+    "unit": "每小時毛利（基點）",
+    "note": "前半會挑到 `new5`：前半 +3.57 -> 後半 -2.20。這不是「差一點」，是雜訊的指紋。"
+   },
+   "en": {
+    "title": "Beautiful in the first half, sign-flipped in the second",
+    "lede": "One hourly cross-sectional signal, six constructions. **The sign and the construction are chosen on the first half only**; the second half is never looked at. Five of six flip sign out of sample — and the one that does not is the worst performer in sample.",
+    "xlabel": "First half (used to choose)",
+    "ylabel": "Second half (never seen)",
+    "unit": "gross basis points per hour",
+    "note": "The first half would pick `new5`: +3.57 -> -2.20. That is not 'nearly passing'. That is what noise looks like."
+   },
+   "series": [
+    {
+     "arm": "new5",
+     "first": 3.569,
+     "second": -2.201,
+     "flipped": true
+    },
+    {
+     "arm": "new10",
+     "first": 3.288,
+     "second": -1.496,
+     "flipped": true
+    },
+    {
+     "arm": "combo5",
+     "first": 3.046,
+     "second": -2.214,
+     "flipped": true
+    },
+    {
+     "arm": "combo10",
+     "first": 2.575,
+     "second": -3.004,
+     "flipped": true
+    },
+    {
+     "arm": "old10",
+     "first": 1.13,
+     "second": 3.599,
+     "flipped": false
+    },
+    {
+     "arm": "old5",
+     "first": 0.306,
+     "second": -3.127,
+     "flipped": true
+    }
+   ],
+   "source": "research/results/mft_xs_alpha.json"
+  },
+  {
+   "id": "percoin_noise",
+   "kind": "rank_slope",
+   "zh": {
+    "title": "「這個標的表現特別好」——通常不是真的",
+    "lede": "同一條策略、九個標的，按前半的表現排名，再看它們在後半的排名。**線如果大致平行，代表「哪個標的比較好」是可以事先知道的；線如果交叉成一團，那個排名就是雜訊。**",
+    "xlabel": "前半名次",
+    "ylabel": "後半名次",
+    "note": "前後半名次的等級相關是 **-0.267**（負的）。只用前半挑，程序會挑 **ADA** —— 而它在後半是最後一名。"
+   },
+   "en": {
+    "title": "\"This symbol looks especially good\" — usually it isn't",
+    "lede": "One strategy, nine symbols, ranked by first-half performance, then plotted against their second-half rank. **Roughly parallel lines would mean the ranking is knowable in advance. Crossed lines mean it is noise.**",
+    "xlabel": "First-half rank",
+    "ylabel": "Second-half rank",
+    "note": "Rank correlation between halves is **-0.267** (negative). A first-half-only procedure picks **ADA** — which finishes last in the second half."
+   },
+   "series": [
+    {
+     "name": "ADA",
+     "first_rank": 1,
+     "second_rank": 9
+    },
+    {
+     "name": "SOL",
+     "first_rank": 2,
+     "second_rank": 6
+    },
+    {
+     "name": "ETH",
+     "first_rank": 3,
+     "second_rank": 2
+    },
+    {
+     "name": "AVAX",
+     "first_rank": 4,
+     "second_rank": 8
+    },
+    {
+     "name": "LINK",
+     "first_rank": 5,
+     "second_rank": 3
+    },
+    {
+     "name": "DOGE",
+     "first_rank": 6,
+     "second_rank": 1
+    },
+    {
+     "name": "BNB",
+     "first_rank": 7,
+     "second_rank": 4
+    },
+    {
+     "name": "BTC",
+     "first_rank": 8,
+     "second_rank": 7
+    },
+    {
+     "name": "XRP",
+     "first_rank": 9,
+     "second_rank": 5
+    }
+   ],
+   "source": "research/poc/data/results/sdv_percoin_split.json"
+  },
+  {
+   "id": "patience",
+   "kind": "bars",
+   "zh": {
+    "title": "耐心的代價，以及為什麼它看起來有用其實測不動",
+    "lede": "一個想法：既然在速度上贏不了，就只做「已經存在了一段時間」的機會——用耐心換速度。等得越久，機會越可能還在（這個我們量過，而且對照組是平的）。**但等待也會讓機會數變少，而機會數正是我們缺的東西。**",
+    "xlabel": "進場前先等幾分鐘",
+    "note": "看起來最好的那一格把價值拉到 1.93 倍，但**那個差的標準誤比差本身還大**，而且 **87% 的效果集中在單一個配對**——把它拿掉，方向就反過來。所以這是**無效判決不是通過**。"
+   },
+   "en": {
+    "title": "What patience costs, and why it looks useful but cannot be measured",
+    "lede": "An idea: if you cannot win on speed, trade only the opportunities that have already survived a while. The longer one has lasted, the likelier it lasts longer (measured, with a flat control). **But waiting also cuts the number of opportunities — and that is the thing we are short of.**",
+    "xlabel": "Minutes waited before entering",
+    "note": "The best-looking bucket multiplies value by 1.93x, but **the standard error of that difference is larger than the difference**, and **87% of the effect sits in a single pair** — drop it and the direction reverses. So this is inconclusive by design, not a pass."
+   },
+   "series": [
+    {
+     "k": 0,
+     "events_pct": 100.0,
+     "value_x": 1.0
+    },
+    {
+     "k": 1,
+     "events_pct": 97.1,
+     "value_x": 1.09
+    },
+    {
+     "k": 2,
+     "events_pct": 82.4,
+     "value_x": 1.15
+    },
+    {
+     "k": 3,
+     "events_pct": 82.4,
+     "value_x": 1.14
+    },
+    {
+     "k": 5,
+     "events_pct": 61.8,
+     "value_x": 1.4
+    },
+    {
+     "k": 8,
+     "events_pct": 61.8,
+     "value_x": 1.93
+    },
+    {
+     "k": 13,
+     "events_pct": 55.9,
+     "value_x": 1.41
+    },
+    {
+     "k": 21,
+     "events_pct": 44.1,
+     "value_x": 1.48
+    }
+   ],
+   "se_exceeds_effect": true,
+   "source": "research/results/prereg_arb_patience.json"
+  },
+  {
+   "id": "universe",
+   "kind": "counts",
+   "zh": {
+    "title": "三條線在同一天撞到同一個牆：宇宙太窄",
+    "lede": "三個彼此獨立的測試在同一天得到同一個診斷——樣本不夠寬，所以測不動。而原因很平凡：**標的是手動挑的，沒有把「全部都錄下來」自動化。** 規則先凍結（每一個在兩個以上場館都有的標的，不排名、不設門檻、不做任何與績效有關的排除），再開始錄。",
+    "before_label": "原本（手挑）",
+    "after_label": "現在（規則）",
+    "note": "錄製從 8 個配對變成 **150** 個，而且是**先把規則凍結才產生資料**——反過來就沒有樣本外可言。"
+   },
+   "en": {
+    "title": "Three lines hit the same wall on the same day: the universe is too narrow",
+    "lede": "Three independent tests produced the same diagnosis on the same day — the sample is not wide enough to decide. The cause is mundane: **symbols were hand-picked, and 'record everything' was never automated.** The rule is frozen first (every symbol quotable on two or more venues; no ranking, no threshold, no performance-related exclusion), and only then does recording start.",
+    "before_label": "Before (hand-picked)",
+    "after_label": "Now (by rule)",
+    "note": "Recording went from 8 pairs to **150** — and the rule was frozen before the data existed. The other order leaves no out-of-sample at all."
+   },
+   "series": [
+    {
+     "name": "HL-lighter",
+     "count": 95
+    },
+    {
+     "name": "lighter-lighter-rh",
+     "count": 43
+    },
+    {
+     "name": "HL-lighter-rh",
+     "count": 12
+    }
+   ],
+   "before": 8,
+   "after": 150,
+   "tickers": 126,
+   "source": "../arb/results/arb_universe.json"
+  }
+ ]
+}

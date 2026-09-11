@@ -268,6 +268,9 @@ def main():
         print("  >> 後半 vs 掛單門檻 %.2f bps/h -> **%s**"
               % (MAKER, "越過" if h["second"] > MAKER else "不過"))
         res["oos_sign_pick"] = dict(arm=pick, **h)
+    # 整張前後半表也存下來：網站的圖要讀它，而**手抄數字會漂**
+    # （mistake.md 2026-08-26：把既有數字搬到新地方顯示 = 第二份實作）。
+    res["halves"] = halves
 
     best = max(arms, key=lambda k: arms[k]["net_maker"])
     v = arms[best]

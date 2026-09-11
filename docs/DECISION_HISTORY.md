@@ -1,0 +1,330 @@
+# 決策與 override 歷史（全文）
+
+2026-09-11 從 CLAUDE.md 搬出來。**搬的是已被取代的那幾條**——
+挑選規則不是誰的判斷，是 CLAUDE.md 自己那張索引表：
+標「已被取代 / 部分作廢 / 已收尾」的才搬，標「生效」的一條都沒動。
+
+**為什麼搬**：CLAUDE.md 每次開工都會被完整載入，而這幾節的第一句
+就寫著「不要拿歷史章節的數字當現行值」——它們佔位置但不該被當成現況。
+搬到 `docs/` 而不是 `.claude/rules/`，因為 rules 也會被自動載入，
+搬過去省不了任何東西。
+
+**一個字都沒有改寫。** 這份紀錄本身就是紀律的一部分
+（做了什麼、為什麼、放棄了什麼保護），改了就是竄改。
+
+索引（哪一條現在還生效）仍然在 CLAUDE.md 的 §決策與 override 歷史。
+
+---
+
+## Paper cohort 移除（2026-06-05 決策）
+
+**背景**：$100 live（Stage 3, 10x）已上線並穩定運行（reconciliation 連續 CONSISTENT）。使用者決定 **LIVE 是主力**，paper cohort 不再需要——整個移除，系統只留 LIVE。
+
+**觸發點**：2026-06-04 一場 `orphan_local` HALT 把 OKX id4 用 admin_heal 歸零，導致 live 錯過一筆 paper 仍在跑的 trade，兩 cohort 永久交叉。使用者判斷：與其維護「paper 對 live 對齊」的複雜同步邏輯，不如直接砍掉 paper，承認 live 就是真相來源。
+
+**改動**：
+- 刪 `indicator/v7_paper_executor.py`；移除 `v7_paper_positions` 的所有讀寫（DB 表 archive 留底，不再寫入）
+- 兩張圖表（靜態 PNG + 互動）的進出場三角形改抓 `v7_okx_positions`（LIVE 真實進出場）
+- 移除 OKX executor 的 paper-sync gate（`_is_paper_holding`）——live 不再等 paper
+- Telegram「V7 Stats」按鈕 → 改指向既有的 LIVE 報表（`/okx-perf`）
+- dashboard 移除「V7 Paper shadow」+「Paper vs Live drift」區塊
+
+**stage 計畫轉移到 LIVE**：原本 §staged framework 中由 paper 衡量的進階 gate（net bps / WR / 連續週數），全部改由 **LIVE 實盤績效**衡量。Stage 1「paper trading」這格視為已歷史化，當前真實所在 = Stage 3 ($100 live, 10x)。
+
+**代價自負**：失去「paper 作為 edge 真假的獨立並行驗證」。但 live 已是真錢樣本，本身就是最硬的 edge 驗證；維護兩套 cohort + 同步邏輯的複雜度 > 並行驗證的邊際價值。**保留的不可鬆綁規則（金額上限、kill switch、leverage cap、manual approval）完全不受影響**——這次移除的只是「影子 paper」，不是任何風控。
+
+---
+
+## 當前策略：研究 + Small Live 並進（2026-05-27 決策）
+
+**背景**：原 staged framework 要求 Stage 1 滿 100 trades + 4 週才進 Stage 2，按目前 9 天 6 筆的節奏需 5 個月。使用者選擇接受 informed risk：用 $100 live 作為「**operational stress test + edge 二次驗證**」，paper cohort 同時繼續累積。
+
+**改動的規則**：
+- Stage 1 → Stage 2 不再硬要求 100 trades + 4 週；改成「OKX skeleton TODO 全填完 + unit tests 過 + 3-5 天 testnet shakeout」
+- Stage 2 → Stage 3 ($100 live) 不再硬要求 38 項 checklist 全跑完；改成「testnet 連續 3 天對帳 100% + 0 unhandled exception + manual approval 模式跑過 5 筆」
+
+**保留的不可鬆綁**：
+- **金額**：$100 live = Stage 3 上限，未進 Stage 4a 不准加碼（即使 $100 賺到 $200 也是 $100 keep + $100 不再用）
+- **Hard kill switches 必須先驗證能觸發**（不是只寫進 code）：unit test + testnet 至少一次故意觸發
+- **Manual approval 第 1 筆強制人工確認**（2026-05-31 從 5 → 1）：第一次真實執行 OKX trade path 必須 operator 確認 size/方向/stop 都對；之後 auto，因為「量化交易要自動」是 quant 本質
+- ~~**Paper cohort 不停**~~：**2026-06-05 廢止**——paper cohort 已整個移除，LIVE 成為唯一 cohort（見 §Paper cohort 移除）。原本由 paper 衡量的 stage 進階條件全部轉由 LIVE 實盤衡量
+- **Leverage 1.0x 不准動**（Stage 3 階段）
+- **Stage 3 → Stage 4 仍照原硬條件**：live 4 週 net positive + MDD < 20% + 0 kill trigger
+
+**做這個決策的代價自負**：
+- 第一筆 live 訂單 = OKX REST/WS code 第一次真實執行 = 有 ops bug 的風險（mitigations 寫在上面）
+- Edge 若是 fake，$100 是發現的成本（mistake.md 應記：用 $100 換 edge 真假驗證，比 5 個月等更便宜）
+- 一旦 hit 任何 kill trigger，**回到 Stage 1 重新驗證**不是「凹下去」
+
+---
+
+## 分數合約 sizing「B」取代 10x 權宜 (2026-06-06)
+
+**前提推翻**：下面 2026-05-28 的「10x override 是為了讓 1 contract 開得起」整段，**前提是錯的**。OKX BTC-USDT-SWAP 的真實 `minSz`/`lotSz` = **0.01 張**（$6 notional，已用 public instruments API 驗證），根本不是「1 張最小」。會卡在 1 張是 executor 自己的 `int(target_notional/per_contract)` 把 size 無條件捨去成整數張——這是 code 的鍋，不是交易所限制。手動爆倉那天（2026-06-05）的「$89 被逼 ~7x」就是這個 int() 造成的假性 over-leverage。
+
+**現行 sizing（commit 9cc2a64）**：
+- **名目 notional = NOTIONAL_LEV_MULT (2.0) × equity**，round 到 0.01 張。隨 equity 自動縮放（賺多下多、虧多下少，無 leverage creep）。
+- **有效槓桿 = 2x**（對 equity）；$89 → ~$178 名目 / 0.29 張 / ~$18 保證金。
+- 169-trade WF 模擬 + 注入 −10% 跳空：2x 活得下來、10x 一筆歸零。
+- **OKX 帳戶的 leverage 設定（10x）只剩「決定鎖多少保證金」的作用，不再是策略風險槓桿**。真實風險槓桿由 NOTIONAL_LEV_MULT 決定 = 2x。
+- 整條 pipeline 已改成支援小數張（DB DECIMAL、所有 int(size_contracts)→float、對帳容差 0.005）。
+
+**對 leverage 紀律的影響**：實際有效槓桿 2x 落在 §Leverage ladder 數學依據可接受範圍內（Kelly 0.56x 的 ~3.6x，但 2x 的 vol drag 仍可被 edge 覆蓋；遠低於 hard cap 2.0x 的精神…註：2x = 剛好等於 Stage 4d 絕對上限，但這是「為了小帳戶開得起單」的有效槓桿，非加碼意圖，且帳戶極小、kill switch −20%/−30% 收緊中）。下面 2026-05-28 的 10x 段落保留作歷史，但**實務上 sizing 已不靠 10x**。
+
+---
+
+## 10x leverage informed override (2026-05-28)
+
+**背景**：BTC-USDT-SWAP 1 contract = 0.01 BTC ≈ $750 notional。$100 + 1x leverage 連 1 contract 都開不了 → Stage 3 完全卡死。使用者選擇接受 informed override：保 $100 capital、鬆 leverage cap 到 10x 讓 1 contract 開得起來。
+
+**這條 override 違反兩條既有規則**：
+- §Leverage ladder 數學依據：Kelly optimal 0.56x，1x 已超過 Kelly；10x 是 17.8x Kelly
+- §仍然禁止的：「禁因為想賺更多就改 leverage cap——cap 來自數學不是情緒」
+
+**為什麼接受**：
+- 這次不是「想賺更多」，是「為了讓 testnet/live 能跑出第一筆有意義 trade」
+- 沒 leverage 鬆，Stage 3 永遠走不到（連 1 contract 都開不了）
+- Stage 3 的本意是 operational stress test + edge 二次驗證，不是 alpha 機器；$100 全輸的成本可接受
+
+**為了補償 10x 的數學風險，kill switches 同步收緊**：
+- daily_loss_cap_pct: -50% → **-20%**（10x 下 -20% account ≈ -2% BTC，stop-out 3 筆觸發）
+- total_loss_cap_pct: -50% → **-30%**（career-end，Stage 3 結束）
+
+**10x 下單筆風險**：
+- 3xATR stop 在 10x = 約 -6% account = -$6 per stop-out
+- 3 連虧 = -18% = 接近 daily cap → halt
+- 5 連虧 = -30% = total cap → Stage 3 終結
+
+**真會死的情境**（必須接受才能走這條）：
+- BTC 一晚 -3% 跳空（leverage 算下 -30% account 直接掃 total cap）
+- 黑天鵝 -10% 級別 → 算下 -100% 直接歸零，連 cap 都來不及救
+- 這些情境發生過（2024-08, 2025-01），未來會再發生
+
+---
+
+## Staged 進階條件對照表（更新版 2026-05-28，第 2 次 informed override）
+
+**2026-05-28 第二次 override**：使用者選擇**完全跳過 testnet shakeout**，直接接 live。理由是 $100 max loss 可接受，testnet 寶貴的「驗證 OKX 程式碼」功能可由 read-only live smoke 替代（同樣 0 風險）。Stage 2 從 "testnet shakeout 3-5 天" 改成 "read-only live smoke + manual approval"。
+
+| Stage | 描述 | Risk | Leverage | Daily/Total cap | 進階條件 |
+|---|---|---|---|---|---|
+| ~~1~~ | ~~Paper trading~~ | — | — | n/a | **2026-06-05 移除**：paper cohort 整個拔掉，LIVE 成為唯一 cohort + 唯一圖表記錄來源 |
+| 2 | **Read-only live smoke**（取代 testnet shakeout）| 0 | 10x | -20% / -30% | 連 OKX live：讀 balance ✓、server time NTP drift OK ✓、WS auth + 訂閱 ✓、reconciliation CONSISTENT ✓ |
+| 3 | **Live $100**（當前目標）| -$100 上限 | **10x** | -20% / -30% | Stage 2 smoke 全綠 + manual approval mode 跑 5 筆人工確認 |
+| 4a | $1k（3 個月）| 小 | 1.0x | -20% / -30% | Stage 3 跑 4 週 + net positive + MDD < 20% + 0 kill trigger |
+| 4b | $1k 1.2x | 小 | 1.2x | -15% / -25% | 4a 通過 + MDD < 10% |
+| 4c | $5k | 中 | 1.5x | -15% / -25% | 4b 通過 + 連續 6 個月 hit no kill rules |
+| 4d | $10k+ | 高 | **2.0x（絕對上限）** | -10% / -20% | 4c 通過 + 真實 Sharpe ≥ 1.5 |
+
+**跳過 testnet 的風險自負**：
+- 我們新寫的 200 行 OKX 程式碼從未在 demo 環境跑過；read-only smoke 只能驗 read path，trade path 第一次執行 = 真錢
+- 如果 _open_position 有 bug（例如算錯 size_contracts、submit 錯 side）→ 立刻真錢中招
+- Mitigation：manual approval 5 筆 = 你看著 Telegram 推的「準備下單 LONG 5 contracts @ 75000」每筆按 YES 才執行
+- 任何 manual approval 看到不對勁（方向錯、size 異常、價格離譜）→ 按 NO 取消 + 立刻回報
+
+**注意 Stage 3 → 4a 的 leverage 反而從 10x 降回 1x**：Stage 4a 起金額放大到 $1k，1 contract 不再是門檻，回到 Kelly-respecting 1x 是正解。Stage 3 的 10x 是「為了開門」的權宜，不是策略的一部分。
+
+---
+
+## 壓縮版 Stage 3→4 edge 驗證（2026-06-10，第 3 次 informed override）
+
+**背景**：原 Stage 4 ladder（4a→4d，需 12+ 個月 live + 真實 Sharpe ≥1.5）被使用者判定**太嚴、太慢**。問題的根源是它想用「12 個月 live PnL」**同時**證明兩件不同的事，而 live PnL 是證明薄 edge **最沒效率**的資料來源（薄 edge + 高方差 → 30-50 筆 live 的勝率 CI 寬到含硬幣線）。
+
+**核心洞見：把「證 edge」和「證執行」拆開，各用最有統計力的資料證。**
+
+- **Gate A — edge 是真的嗎？（統計，用累積訊號）**
+  - 用 `tracked_signals` 表的**累積 live Strong 訊號回填結果**（幾百筆，不是幾十筆 live PnL）。
+  - 門檻：Strong 勝率 bootstrap 95% CI **下緣 > 52%**（顯著高於硬幣）。
+  - **STATUS：2026-06-10 已通過 ✅** — Strong n=739、勝率 59.5%、CI [56.0%, 63.2%]（下緣 56%）；最近 90 天 n=101、76.2%、CI [67.3%, 84.2%]。Moderate n=1241、54.4%、CI 下緣 51.7% 不顯著（再次佐證只開 Strong）。
+  - **edge 這題已答 YES，不需要再用 live PnL 重證。**
+
+- **Gate B — 執行有沒有把 edge 吃掉？（操作，用 30-50 筆 live）**
+  - 用**今天修好 trailing 的系統**（見 mistake.md 2026-06-10 amend instId bug）跑 30-50 筆乾淨 live trade，要求全部成立：
+    - 扣 8bps 成本後 **net ≥ 0**
+    - **0 kill trigger**
+    - **trailing 確認在 OKX 上真的有 amend 上移**（今天修的重點，必驗）
+    - live 每筆報酬**落在 backtest 分布內**（無大幅負滑點驚喜）
+  - 樣本從**今天（修好後）重新數**；之前 live 紀錄被 broken trailing + 手動爆倉污染，不算。
+
+**新的擴大規則（取代 12mo/Sharpe 1.5 作為「第一次放大」的條件）**：
+- Gate A + Gate B 都過 → 擴大**一級、適度增量**（$300-500 / 2-5x 名目，**不是**一次跳 $5k/$10k）。
+- 之後每多 30-50 筆乾淨樣本 + 重檢兩 Gate → 再放一級。證據累積，規模才累積。
+- 可選嚴謹升級：SPRT 序貫檢定，Gate B 證據夠強就提早收（不用死等固定 50 筆）。
+
+**為什麼這樣「鬆」但不犧牲 edge 證明**：A 用大樣本（訊號）給統計力、B 用小樣本（live）只驗執行——不是降低標準，是把證明搬到對的資料層。原 Stage 4a-4d 的 leverage 階梯與時間/Sharpe 條件**作廢為「第一次放大」的硬門檻**，改由上述兩 Gate 取代；之後的逐級放大仍走「增量 + 重檢」。
+
+**這次 override 不鬆的（ruin 保護，與「擴多快」無關）**：kill switch（daily −20% / total −30%）、leverage cap（有效 2x）、hit kill→降階重驗、max_position_count=1。這三樣是防再歸零一次（2026-06-05 的教訓），跟驗證速度無關，一個都不動。
+
+**注意**：訊號方向準確率（59.5%）≠ 交易獲利（扣成本/停損後）。Gate A 證「edge 存在」，Gate B 才證「執行能把它變成 +EV」——兩個都要，缺一不可。
+
+---
+
+## Stage 3 資本 top-up 至 $197.55（2026-07-14，第 4 次 informed override）
+
+**背景**：2026-07-13 使用者暫時把 OKX 資金轉出（觸發 CAP-4 DEMOTE——kill switch
+分不出 operator 資金調度和策略虧損，見 mistake.md 2026-07-13），轉回時存入
+$197.55（原帳上規模 ~$105.15 + 累計損益 ≈ $105.2）。使用者決定**以 $197.55 作為
+新的 Stage 3 基準**，不轉出多餘部分。
+
+**這條 override 違反的既有規則**：§當前策略「$100 live = Stage 3 上限，未進
+Stage 4a 不准加碼（即使 $100 賺到 $200 也是 $100 keep）」。這次是 deposit 加碼
+（$105 → $197.55），不是獲利留存。
+
+**執行的變更**：
+- Railway env `OKX_INITIAL_CAPITAL_USD` = 197（kill switch 基準；config 上限 $200，197 剛好過）
+- `indicator/okx/report.py` EXECUTOR_RESTART_CAPITAL_USD = 197.55、SINCE = 2026-07-14
+  （live-P&L 報表基準，排除 operator 資金移動）
+
+**新基準下的絕對數字**：
+- daily cap −20% = −$39.5／total cap −30% = −$59.3（DEMOTE）
+- CAP-2 over-funding 上限 = 1.5 × 197 = $295.5
+- 2x 名目 sizing ≈ $395 notional／~$39.5 保證金（10x 帳戶槓桿設定下）
+
+**代價自負**：單筆 stop-out 的美元損失放大 ~1.9x；$197.55 貼著 Stage 3 config
+硬上限 $200，**這是最後一次 Stage 3 內加碼**——再加就必須走 Gate A+B 通過後的
+正式放大（$300-500 一級），不准再用 informed override。
+
+---
+
+## Stage 3 資本再加碼至 $1218.44（2026-07-24，第 6 次 informed override）
+
+**背景**：使用者在 §Stage 3 資本 top-up 至 $197.55（2026-07-14，第 4 次 override）
+明確寫下「這是最後一次 Stage 3 內加碼」之後，又存入更多資金，帳戶餘額查證為
+**$1218.44**（相對 $197.55 基準是 6.17 倍）。這次不是交易獲利（同期累計 net
+仍是 −1.64%），純粹是使用者主動存款。使用者決定直接把 $1218.44 訂為新的
+Stage 3 基準，並繼續維持現有 10x 帳戶槓桿設定（真實風險槓桿 2x，NOTIONAL_LEV_MULT
+不變）。
+
+**這條 override 違反的既有規則**：
+- §Stage 3 資本 top-up「這是最後一次 Stage 3 內加碼——再加就必須走 Gate A+B
+  通過後的正式放大（$300-500 一級），不准再用 informed override」——這次直接
+  跳過 $300-500 一級放大，也沒等 Gate A/B 通過。
+- 規模已經進入本檔案自訂的 **Stage 4a（$1k 等級）**資金範圍，但 Stage 4a 的
+  紀律明講「leverage 必須降回 1.0x」——這次選擇**不降槓桿**，維持 10x 帳戶
+  設定 / 2x 有效槓桿。
+
+**發現的技術性阻礙**：`indicator/okx/config.py` 的 `validate_okx_config()`
+原本寫死「live 模式 `initial_capital_usd > $200` 就 `raise RuntimeError`」
+——這不是文件層級的規則，是真的會讓 executor 啟動失敗的程式碼guard，專門
+設計來擋「沒走完 Gate A/B 就把 Stage 3 金額往上衝」這件事。要落地這次
+override，**必須先改這段程式碼本身**（不是只改 Railway 環境變數）：上限從
+$200 調高到 $1500（保留餘裕但仍是硬上限，不是無限制放行）。
+
+**執行的變更**：
+- `indicator/okx/config.py`：`initial_capital_usd` 預設 197.55→1218.44；
+  live guard 上限 $200→$1500；通用 sanity 上限 $1000→$1500。
+- Railway env `OKX_INITIAL_CAPITAL_USD` = 1218.44（清除 CAP-2 over-funding
+  HALT，該 HALT 是因為舊基準 $197 的 1.5x=$295.5 早就被 $1218 帳戶餘額
+  觸發，此前已連續 halt 多次）。
+- `indicator/okx/report.py` `EXECUTOR_RESTART_CAPITAL_USD` = 1218.44、
+  `EXECUTOR_RESTART_SINCE` = 2026-07-24（報表基準重置，排除這筆存款本身
+  對報酬率的污染）。
+- 槓桿設定**不變**：OKX 帳戶槓桿 10x（僅決定保證金鎖多少）、真實風險槓桿
+  仍是 NOTIONAL_LEV_MULT=2x。daily/total loss cap 百分比不變（−20%/−30%），
+  但絕對美金數字隨基準放大約 6.17 倍（daily −$243.7 / total −$365.5）。
+
+**代價自負**：
+- 單筆 stop-out 的美元損失也放大 ~6.17 倍，遠超 §Stage 3 top-up 段落
+  當時評估的「~1.9x」。
+- Gate A（訊號方向 edge）目前仍在門檻邊緣反覆（見 §Compressed Stage 4
+  Validation 的歷次重跑記錄），Gate B（執行驗證）樣本數也還沒到 30-50 筆
+  下限——這次放大**沒有等兩個 Gate 都過**，是純粹基於使用者對這筆存款的
+  資金調度決定，不是基於新的 edge 證據。
+- $1500 的程式碼上限本身也已經是「留了空間但仍是硬上限」——不是把guard
+  整個拔掉。未來若要再加碼超過 $1500，一樣要回來改這段程式碼並寫新的
+  override 記錄，不會因為這次改過一次就變得容易複製。
+
+**不受影響（ruin 保護，與這次金額調整無關）**：kill switch 機制本身（daily
+/total loss cap 百分比、CAP-2 over-funding 檢查邏輯、CAP-4 total-loss
+DEMOTE 邏輯）、max_position_count=1、leverage hard cap 10x。這次只動了
+「基準金額」這一個數字，防護機制的結構完全沒變。
+
+---
+
+---
+
+## conviction_decay 出場機制上線——0 shadow 樣本（2026-07-25）
+
+**背景**：conviction_decay（用進場模型連續原始輸出取代固定 3xATR 停損判斷出場，
+見 research/conviction_decay_exit.py）2026-07-24 完成 shadow-mode 部署，
+設計上要等真實 live 樣本累積夠了才轉正式（TODO.md 原始任務：「Shadow/dry-run
+模式驗證新出場邏輯」→「正式上線——沿用「第一批人工確認」的先例」，兩步驟
+分開，先觀察再啟用）。但 shadow-mode 部署後帳戶因為資金基準卡在 CAP-2
+HALT（見上一節），整段時間沒有任何真實倉位開過，累積樣本數 = **0**。
+使用者知情選擇跳過「等 shadow 樣本」直接正式上線，接受 0 樣本風險。
+
+**這違反的是專案自訂的驗證紀律（code comment 明講「not yet shadow-mode
+verified... per this project's 'verify before touching real trades'
+discipline」），不是某條寫死的 hard rule**——跟 leverage/capital 那幾次
+override 性質不同，這裡是跳過一個計畫中的驗證步驟，不是推翻一個數字上限。
+
+**風險特徵評估（決定用什麼保護機制）**：conviction_decay 只會在**已經開倉**
+的真實倉位上觸發出場，不會創造新的曝險——最壞情況是「在不理想的時機平倉一筆
+已存在的倉位」，不是「用全新資金開錯方向/錯部位大小的倉」。這跟原本
+entry-side 的 ApprovalGate（第一批人工確認）保護的風險類型不同：entry
+approval 擋的是部署新資本前的錯誤，可以安全地卡在 Telegram 等回覆（沒送出
+訂單 = 沒曝險）；exit 卻是風險已經存在、正在被降低的動作，如果也卡一個
+blocking 的人工核准流程，等於讓已經判定該出場的倉位多曝險等操作員回覆，
+反而更危險。
+
+**採用的保護機制（不是完整重建 entry 那套 approval round-trip）**：
+`indicator/okx/executor.py._maybe_flag_first_conviction_decay`——第一次
+真實觸發 conviction_decay 平倉時，在 Telegram 出場告警前面加一段醒目標記
+（「🔔 FIRST LIVE conviction_decay EXIT — verify this looks correct」），
+讓操作員第一時間看到結果並人工核對，但**不阻擋**平倉動作本身。用
+`OkxStateStore.count_closed_by_exit_reason("conviction_decay")` 查詢
+是否為第一次（DB 查詢失敗時 fail-open，照常送出不帶標記的告警，不讓
+這個輔助檢查變成一個新的單點故障）。4 個新單元測試涵蓋：第一次有標記、
+第二次以後沒有、非 conviction_decay 出場完全不查、DB 失敗不影響告警送出。
+
+**執行**：Railway `OKX_CONVICTION_DECAY_BARS=2`（executor.py 已支援此
+env var，`load_okx_config_from_env` 讀取，無需改程式碼即可切換）。
+
+**代價自負**：這條 call path（`pred_ret` 從 app.py 傳入 → executor 判斷
+streak → 觸發平倉）從沒被真實 OKX 帳戶執行過，第一次真實觸發就是真錢。
+Mitigation 是上面的第一次告警旗標，不是 blocking 驗證——如果第一次觸發
+的結果看起來不對（平倉時機/方向/金額異常），操作員要**立刻**回來檢查
+並視情況把 `OKX_CONVICTION_DECAY_BARS` 改回 0（Railway env var，無需
+改程式碼）。
+
+---
+
+---
+
+## V7 多幣化提前啟動（2026-07-23，第 5 次 informed override）
+
+**背景**：§V7 多幣化可行性研究（本檔案外，見 TODO.md §4.6）原本的紀律鎖是
+「BTC 自己的 Gate A 乾淨版都還沒過關（2026-06-19 重跑：n=262、WR 57.6%、
+CI 下緣 51.5% < 52% 門檻），多幣化是把現有機制乘以 N，乘的對象要先證明——
+production 化討論必須在 Gate A 重跑通過之後」。這條規則本身仍然成立、沒有
+被推翻；這次 override 的是**順序**：不再等 Gate A 過關才開始 ETH/SOL 的
+Step 2 研究基礎建設（backfill 歷史、建特徵表、跑乾淨 WF），改成現在就平行
+推進。
+
+**使用者理由（原話）**：「一直拖都是成本的磨損及消耗，同時做其他幣種不影響
+什麼」——等待本身有機會成本（樣本、時間都在流逝），而 §4.6 從頭就定位是
+「純 research track，不碰生產」，平行做研究不會對現有 BTC 系統的任何正式
+決策造成影響，兩件事不衝突。
+
+**這次 override 不變的部分**：
+- BTC 自己的 Gate A 仍然是**唯一**決定「要不要把多幣化推進到 production 化
+  討論」的判準——ETH/SOL 就算 Step 2/3 跑出漂亮數字，在 BTC Gate A 乾淨
+  過關之前，一律停在 research track，不得進生產、不得用來加碼、不得作為
+  「BTC edge 是真的」的替代證據（多幣化證明的是「機制可複製」，不是
+  「機制本身有 edge」——兩件事不能互相背書，這正是原始紀律鎖要擋的邏輯
+  謬誤）。
+- §4.6 原定的 Go/No-Go 判準不變：ETH clean AUC ≥ ~0.54 且與 BTC Strong
+  重合率 <50% → 才有資格「繼續」（考慮 SOL、談 production 化）；任一不過
+  → 多幣化對 V7 無性價比，資源回異源資料線。
+
+**代價自負**：如果 BTC Gate A 最終沒能重新過關（目前卡在門檻邊緣），這批
+提前投入的 ETH/SOL 研究基礎建設就是純沉沒成本——這是明知故犯接受的風險，
+換取的是不用等未知長度的時間才能開始累積多幣化這條線自己的證據。
+
+---
+
+# 現行規則與系統
+
+（以下全部是**現在生效**的內容，與上面的歷史章節分開讀。）
+
+---
