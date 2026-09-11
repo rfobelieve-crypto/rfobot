@@ -13,7 +13,11 @@ set LOG=research\results\hl_record.log
 set PYTHONIOENCODING=utf-8
 
 echo [%date% %time%] ===== hl_record start ===== >> %LOG%
-python research/hl/hl_fuel_recorder.py --max-addr 900 >> %LOG% 2>&1
+REM max-addr 2500: SLEEP=0.15 xia quan sao yue 12 fen, yi xiao shi nei you yu.
+REM dizhi yuzhou hui chixu zhang (chengjiaodai mei tian jia shang qian),
+REM chaoguo 2500 zhihou yao gai cheng AN SHANG YI LUN DE BUWEI MINGMU PAIXU
+REM qu qian N, fouze dahu hui bei suiji lou diao.
+python research/hl/hl_fuel_recorder.py --max-addr 2500 >> %LOG% 2>&1
 echo [%date% %time%] verify units >> %LOG%
 python research/hl/hl_verify.py >> %LOG% 2>&1
 
