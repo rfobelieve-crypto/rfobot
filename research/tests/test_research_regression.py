@@ -207,4 +207,28 @@ def test_s106_permutation(amp_events):
                 for v in sa.VARS for tg, _l in sa.TARGETS)
         hits += (b >= real)
     p = (hits + 1) / (sa.NPERM + 1)
-    assert abs(p - 0.052369) < 1e-5, f"permutation p drifted: {p:.6f}"
+    # ── 2026-09-12：容許誤差原本是 1e-5，而它**比這個統計量的刻度小 250 倍** ──
+    # p = (hits+1)/401，所以它只取 401 個值，**最小刻度 1/401 = 0.0025**。
+    # 把容許誤差設成 1e-5 等於要求「**一輪置換都不准翻面**」—— 而置換的指派
+    # 取決於 `groupby(sym).indices` 的列序，任何動到第 4 位小數的重構都會讓
+    # 某一輪跨過 `b >= real` 的邊界。這是 mistake.md 2026-09-04（門檻小於
+    # 雜訊）與 2026-09-10（基準釘在會動的東西上）的同一族。
+    #
+    # 實際發生的事：commit d95c888（抽出 research/harness.py）之後
+    # p 從 0.052369（hits=20）變成 0.049875（hits=19）—— **400 輪裡一輪翻面**。
+    # 全量對照（765 個葉節點）只有 30 個變，而**每一個 share / p / n_pos /
+    # n_sym 都逐位元相同**；變的是群組均值的第 4 位、三個相關係數、與 null
+    # 的中位數。對照檔留在
+    # research/poc/data/results/sdv_amp_2026-09-12_post_harness.json。
+    #
+    # **§1.06 的判決不受影響**：綁束那條腿是 R1（主母體最小 p = 0.0113 >
+    # 門檻 0.05/9 = 0.00556），而 0.011345 由 test_s106_best_cell 逐位元釘住。
+    # 但這同時說明 **R4 從來不是穩健的 FAIL**：21/401 vs 20/401，一輪之差。
+    #
+    # 改成釘在**有分辨力的尺度上**：hits 容許 ±2 輪（±0.005，兩個刻度），
+    # 並另外釘住 `real`（確定性的，不該動）。**這不是放寬判準** ——
+    # 判準是 §1.06 凍結的 R1/R4 條款，不是這支測試；這裡修的是
+    # 「一個守衛的解析度比它要守的量還細」。
+    assert abs(real - 0.553648) < 1e-6, f"real drifted: {real:.6f}"
+    assert abs(hits - 20) <= 2, f"permutation hits drifted: {hits} (was 20)"
+    assert 0.045 < p < 0.058, f"permutation p out of band: {p:.6f}"

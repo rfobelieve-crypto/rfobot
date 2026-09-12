@@ -144,18 +144,65 @@ def main():
             frac = v / day if day else float("nan")
             rows.append((coin, v, day, frac,
                          frac / expect if expect else float("nan")))
-        # **判準看中位，不看每一個**（2026-09-11 第三次修）。
-        # 單位錯會讓**所有**幣同幅偏移（差 10 倍就全部差 10 倍）；
-        # 而薄市場在一個 60 秒窗裡的單一大單只會打中它自己 —— 前一版
-        # 要求每個幣都在 [0.1,10]，結果被一個沒印出來的薄幣判紅，
-        # 而那是自然的爆發性不是單位問題。
+        # ── 2026-09-12 第四次修：判準改成「跨幣總額、跨多個窗取中位」 ──
+        #
+        # 前三版都在**逐幣**的數字上設判準，而那個數字量不到它要量的東西：
+        #
+        #   · 第三版的「中位」寫成 `r5[len(r5)//2]`，偶數長度取的是**上半的
+        #     中間值**不是中位數。6 個幣 3 高 3 低時它必然挑到高的那個 ——
+        #     2026-09-12 實測 r5 = [0.019, 0.101, 0.136, 7.01, 7.25, 9.41]，
+        #     它回 7.01（紅），真中位數是 3.57（綠）。一個幣的差別就跳 50 倍。
+        #   · 更根本的：分子取**最密集**的窗、分母用**日平均**速率 ——
+        #     依建構是「極大值 ÷ 平均值」，所以偏高是必然的，而門檻只給到 5。
+        #     那天 ZEC 在噴（9.41x）而 ETH 安靜（0.019x），**跨幣差 500 倍**。
+        #   · 而「跨幣一致性」也不能當判準：單位錯**不改變幣與幣的比值**，
+        #     所以 100 倍的錯照樣是 500 倍的分散度 —— 這條修法過不了反向證明，
+        #     所以沒有採用（先量再改，避免第二次修到錯的東西上）。
+        #
+        # 有分辨力的統計量是**跨幣總額**（籃子平均掉個別幣的爆發）配上
+        # **多個滑動窗的中位**（不挑極大值）。2026-09-12 在兩個不同的 tape 檔
+        # 上實測：**0.402x**（76 個窗）與 **0.293x**（136 個窗），
+        # 窗內 p5~p95 只有 0.131~1.035 —— 8 倍區間，對比逐幣那個 500 倍。
+        # 小於 1 是預期的：`dayNtlVlm` 與我們錄到的宇宙不完全相同。
+        #
+        # **帶 [0.05, 5]，以 0.29~0.40 的基線算，解析度是上方約 13~17 倍、
+        # 下方約 6~8 倍。** 反向證明過（scratchpad/v4_reverse.py）：
+        # 注入 `px x100` -> 中位 **29.269x** -> FAIL；還原 -> 0.293x -> PASS。
+        # 注意注入後逐幣仍是 118x~2145x 的 18 倍分散度 ——
+        # **分散度在單位錯之下照樣存在**，所以它不能當單位錯的指紋。
+        #
+        # 要更緊的單位檢查看 **V2**（每 1 BTC 的名目 vs 現價，實測差 0.06%）；
+        # V4 的價值在於它用的是**交易所公布的成交額**這個獨立數字。
+        import statistics as _st
+        W_STEP = 10_000
+        lo0, hi0 = int(ts[0]), int(ts[-1]) - W
+        coins_seen = sorted(t.coin.unique())
+        exp_tot = (sum(meta[c]["vlm"] for c in coins_seen)
+                   * (W / 1000.0) / 86400.0)
+        ratios = []
+        if hi0 > lo0 and exp_tot > 0:
+            ntl_all = t.ntl.to_numpy()
+            for lo in range(lo0, hi0, W_STEP):
+                m = (ts >= lo) & (ts < lo + W)
+                if m.any():
+                    ratios.append(float(ntl_all[m].sum()) / exp_tot)
         r5 = sorted(r[4] for r in rows if r[4] == r[4])
-        med = r5[len(r5) // 2] if r5 else float("nan")
-        wild = sum(1 for x in r5 if not (0.02 <= x <= 50))
-        check("V4", r5 and 0.2 <= med <= 5 and wild <= len(r5) // 3,
-              "最密 60 秒窗 %d 筆，觀測/預期佔比中位 %.2fx（離群 %d/%d）："
-              % (best_n, med, wild, len(r5))
-              + "、".join("%s %.2fx" % (r[0], r[4]) for r in rows))
+        if ratios:
+            med_tot = _st.median(ratios)
+            v4_ok = 0.05 <= med_tot <= 5.0
+            det = ("跨幣總額/預期，%d 個滑動 60s 窗中位 %.3fx（帶 0.05~5）；"
+                   "逐幣僅供參考（爆發性，不設判準）：" % (len(ratios), med_tot)
+                   + "、".join("%s %.2fx" % (r[0], r[4]) for r in rows))
+            res["V4_total_median"] = med_tot
+            res["V4_windows"] = len(ratios)
+        else:
+            # 檔案不足一個窗：退回單一最密窗，只擋**離譜**的量級
+            med_tot = _st.median(r5) if r5 else float("nan")
+            v4_ok = bool(r5) and 0.02 <= med_tot <= 50.0
+            det = ("檔案不足一個滑動窗，退回最密 60s 窗逐幣中位 %.2fx"
+                   "（寬帶 0.02~50）：" % med_tot
+                   + "、".join("%s %.2fx" % (r[0], r[4]) for r in rows))
+        check("V4", v4_ok, det)
         res["V4_rows"] = [dict(coin=r[0], ntl=r[1], day_ntl=r[2],
                                frac=r[3], frac_over_expected=r[4])
                           for r in rows]
