@@ -41,7 +41,7 @@
 ===========================================================================
     size 變大 -> 滑價變大（吃掉更深的檔位）          淨值往下
     size 變大 -> 閒置資金攤薄                         淨值往上
-                 （桶 3：小場館各壓 $300 閒置，
+                 （第 3 項：小場館各壓 $300 閒置，
                   在 size=200 時那是名目的 3.0 倍）
 
 所以淨值對 size 是一個**有峰的曲線**，而「容量」有兩個答案，兩個都要報：
@@ -178,7 +178,7 @@ def main():
     ap.add_argument("--mode", default="maker_taker",
                     choices=("taker_taker", "maker_taker", "maker_maker"))
     ap.add_argument("--keep-transfer", action="store_true",
-                    help="不把桶 5 歸零（預設歸零，照 gate0_arb_unhedged 的誠實版）")
+                    help="不把第 5 項 歸零（預設歸零，照 gate0_arb_unhedged 的誠實版）")
     a = ap.parse_args()
     no_transfer = not a.keep_transfer
 
@@ -321,7 +321,7 @@ def main():
     res["n_pairs_positive"] = len(live)
     print("\n**全家族合計 $%.2f / 年**（%d 個配對有正的格子）" % (tot, len(live)))
     print("毛利沿用凍結模型的 `band/2`，**沒有重新推導**；")
-    print("桶 3 的閒置資金、桶 5/6/7 的機率仍是 ASSUMED —— 見 cost_model 的 tags。")
+    print("第 3 項 的閒置資金、第 5/6/7 項 的機率仍是 ASSUMED —— 見 cost_model 的 tags。")
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(res, ensure_ascii=False, indent=2, default=str),
                    encoding="utf-8")

@@ -111,7 +111,7 @@ def main() -> int:
     cm = json.loads((AH.RESULTS / "arb_cost_model.json")
                     .read_text(encoding="utf-8"))
     dep = measured_depth()
-    no_transfer = True     # 與 §1.20 的誠實版一致（桶 5 歸零）
+    no_transfer = True     # 與 §1.20 的誠實版一致（第 5 項 歸零）
 
     print("=== §1.20 容量的誤差棒（傳遞帶寬與事件率的取樣誤差）===")
     print(f"重抽單位 = {BLOCK_MIN} 分（一天）的連續區塊，{DRAWS} 次\n")
