@@ -91,8 +91,10 @@ def flush():
         addrs = set(_addrs)
     if rows:
         import pandas as pd
+        # rx_ms = 我們收到那則訊息的本機時刻（2026-09-13 加，見 lighter_tape
+        # 同名欄位的理由：兩個交易所的時戳無法互比，偏移 +371 ms > 效應 250 ms）
         df = pd.DataFrame(rows, columns=["ts", "coin", "side", "px", "sz",
-                                         "tid", "a0", "a1"])
+                                         "tid", "a0", "a1", "rx_ms"])
         for hr, part in df.groupby(df.ts // 3_600_000):
             d = TAPE_DIR / time.strftime("%Y%m%d", time.gmtime(hr * 3600))
             d.mkdir(parents=True, exist_ok=True)
@@ -200,6 +202,7 @@ def run(seconds=None):
                                 "subscription": {"type": "trades", "coin": c}}))
 
     def on_msg(ws, m):
+        rx_ms = int(time.time() * 1000)      # 先取，解析之前
         try:
             d = json.loads(m)
         except Exception:
@@ -212,7 +215,7 @@ def run(seconds=None):
                 _buf.append((int(t["time"]), t["coin"], t.get("side"),
                              float(t["px"]), float(t["sz"]), int(t["tid"]),
                              us[0] if len(us) > 0 else None,
-                             us[1] if len(us) > 1 else None))
+                             us[1] if len(us) > 1 else None, rx_ms))
                 for u in us:
                     if isinstance(u, str) and len(u) == 42:
                         _addrs.add(u.lower())

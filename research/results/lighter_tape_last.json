@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "reason": "成交 273961 筆（11.4/秒）、清算 1687、帳戶 7047、市場 80、重連 0、最後一筆 0 秒前",
+  "trades": 273961,
+  "liqs": 1687,
+  "accounts": 7047,
+  "markets": 80,
+  "reconnects": 0,
+  "rows_written": 275648,
+  "uptime_sec": 24009,
+  "tape_dir": "D:\\flowbot_data\\lighter\\trades",
+  "asof": "2026-09-13 07:24:12"
+}
