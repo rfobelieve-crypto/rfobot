@@ -875,6 +875,24 @@ Desktop/linkedin_posts/*.docx        ← 授權格式（人寫的）
   → npm run build 驗證 → push origin **master**
 ```
 
+> **⚠ 2026-09-12：上面那條管線已經不存在了。** `assets/extract_for_site.py`
+> 與 `assets/site_writeups.json` **兩個檔案都沒有**，`writeups.json` 現在
+> 只活在 product-site 一側。ep8 是怎麼進去的沒有留下腳本。
+>
+> **現行做法（ep9 起）是一篇一支腳本，而且內文只有一個真相源：**
+>
+> ```
+> assets/make_epN_<slug>.py       BODY 字串 = 真相源 -> 產 docx 到 Desktop/linkedin_posts/
+> assets/publish_epN_to_site.py   import 同一個 BODY -> 轉 blocks -> 寫 product-site
+>   → npm run build 驗證（看**頁數有沒有 +1** 與 .next 裡的 html 真的產出）
+>   → push origin master
+> ```
+>
+> 兩支共用同一個 `BODY`，所以改稿只改一個地方，docx 與網站不會漂開 ——
+> 這正是舊管線那個「手動加一筆」斷點的結構性修法（mistake.md 2026-09-01：
+> 三篇 docx 躺了六週沒上站，而網站看起來完全正常）。
+> `publish_*` 那支帶兩道自曝：小標找不到就停、公開面出現金額字樣就停。
+
 **第二條內容流（2026-09-05 起）：陣亡名冊**——`/writeups` 文章下方那一節
 `flow_system/assets/research_nogo.json`（真相源，手工從 TODO.md 判決節策展）
 → 複製到 `../product-site/content/research_nogo.json` → build → push master。
