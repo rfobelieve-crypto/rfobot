@@ -230,9 +230,22 @@ def simulate(w: pd.DataFrame, fwd: pd.DataFrame, mid0: pd.DataFrame,
             dwabs_tgt[k] = float(np.abs(cur[mm] - prev[mm]).sum())
         for j, s in enumerate(syms):
             tgt, fw, m0 = W[k, j], F[k, j], M[k, j]
-            # 只在 §1.23 的估計量有定義的格子上動作（見檔頭）。
-            # 這一行同時就是參考那側 `min_count=1` 的同一個條件。
-            if not (np.isfinite(tgt) and np.isfinite(fw) and m0 > 0):
+            if not (m0 > 0):
+                # 這個名字這一期不在資料裡 -> 不能交易也不能評分，部位留著
+                continue
+            if not (np.isfinite(tgt) and np.isfinite(fw)):
+                # **不可評分的格子：把部位對齊到「估計量認定我們持有的東西」，
+                # 但不下單、不計量。**
+                #   · 目標有值但缺下一根 mid -> 對齊到目標
+                #   · 目標是 NaN            -> 對齊到 **0**，因為 §1.23 的
+                #     估計量就是這樣算的（`w.where(both)` 讓 NaN 貢獻 0 =
+                #     沒有部位）。分子說空倉、分母說還抱著，會是兩個故事。
+                # 為什麼不在這裡下單：下了就會被記進成交/未成交，而這一期
+                # **不會被評分**，於是 D1c 的歸因等式少一塊（實測殘差 +0.562，
+                # 那一關當場擋下來了）。只在估計量有定義的地方動手，才閉合。
+                # 不對齊的後果也實測過：`held` 卡在舊值，下一個可評分期的 Δw
+                # 被缺口撐大，分母比真實的目標換手大 15%。
+                held[j] = tgt if np.isfinite(tgt) else 0.0
                 continue
             used = True
             dw = tgt - held[j]
@@ -289,6 +302,14 @@ def simulate(w: pd.DataFrame, fwd: pd.DataFrame, mid0: pd.DataFrame,
             port[k] = acc
     s = pd.Series(port, index=w.index).dropna()
     valid = ~np.isnan(port)
+    # **一律用「總量對總量」，不要用「每期平均」。**（2026-09-12 更正）
+    # 第一版把每期的毛利平均（977 期）減掉每期的手續費平均（1452 期攤），
+    # 兩個不同的分母 —— 費被低估 1452/977 = 1.49 倍，而那個數字已經被我
+    # 發佈出去了（見 TODO §1.27 的更正框）。
+    # 「每單位成交量賺多少」對「每單位成交量付多少」才是沒有歧義的比較，
+    # 因為費率本來就是按成交量收的，跟「有幾期能評分」無關。
+    tot_g = float(np.nansum(port))
+    tot_v = float(np.nansum(dwabs))
     return dict(port=s, fill_rate=(fills / tries if tries else np.nan),
                 fills=fills, tries=tries, nodata=nodata,
                 edges=np.asarray(edges, float),
@@ -299,6 +320,9 @@ def simulate(w: pd.DataFrame, fwd: pd.DataFrame, mid0: pd.DataFrame,
                 # dwabs_all：算全部期 -> 才跟 §1.24 的凍結換手率同母體
                 dwabs_valid=float(dwabs[valid].mean()) if valid.any() else np.nan,
                 dwabs_all=float(dwabs.mean()),
+                total_gross=tot_g, total_volume=tot_v, n_scored=int(valid.sum()),
+                # 每單位成交量的毛利 —— 本支的主指標，直接跟費率比
+                per_vol=(tot_g / tot_v if tot_v > 0 else np.nan),
                 # 目標對目標的換手，帶索引回傳 —— 要跟凍結那支在**同一組期數**
                 # 上比才是同一個量（不然就是在比兩個不同的平均）
                 dwabs_tgt=pd.Series(dwabs_tgt, index=w.index),
@@ -414,9 +438,11 @@ def main() -> int:
     ar2 = abs(mine - theirs) < 1e-9
     print("  目標對目標換手 %.6f   2 × §1.24 凍結單邊換手 %.6f（同 %d 期）-> %s"
           % (mine, theirs, len(idx), "PASS" if ar2 else "**FAIL**"))
-    print("  實際部位換手 Σ|Δw| = %.4f（**比目標換手大，因為缺格時部位會落後**；"
+    print("  實際成交量 Σ|Δw| = %.4f  > 上面那個目標對目標的值。"
           % u1["dwabs_all"])
-    print("   手續費要用這一個，它才是真的成交量）")
+    print("   **差額不是誤差，是約定**：NaN 權重 = 空倉，所以「退出」與")
+    print("   「重新進場」各算一筆真的交易，而凍結那支的 `w.diff()` 在 NaN")
+    print("   上得到 NaN、整個跳過那些進出。手續費要用這一個，它才是成交量。")
     res["D1b_arith"] = bool(ar1)
     res["D1b_vs_frozen_turnover"] = bool(ar2)
     res["sum_abs_dw_valid"] = u1["dwabs_valid"]
@@ -463,7 +489,11 @@ def main() -> int:
         res["deltas"][str(dl)] = dict(fill_rate=r["fill_rate"], gross=mu,
                                       se=se, lo=lo, hi=hi,
                                       fills=r["fills"], tries=r["tries"],
-                                      nodata=r["nodata"])
+                                      nodata=r["nodata"],
+                                      per_vol=r["per_vol"],
+                                      total_gross=r["total_gross"],
+                                      total_volume=r["total_volume"],
+                                      n_scored=r["n_scored"])
     print()
 
     # ---------- D2 / D3 ----------
@@ -563,45 +593,55 @@ def main() -> int:
 
     # ---------- 決策題：掛單省下的吃單費，抵不抵得過被動執行的代價 ----------
     tk, mk, src = XS.fees_for(a.venue, a.rebate)
-    tno = res["sum_abs_dw_all"]            # Σ|Δw| —— 成本的乘數
-    print("=== R1 要回答的那個決策：吃單 vs 掛單，淨值哪邊大 ===")
+    print("=== R1 要回答的那個決策：吃單 vs 掛單（一律換算成每單位成交量）===")
     print("  場館 %s（%s）：吃單 %.2f / 掛單 %.2f bps 每邊" % (a.venue, src, tk, mk))
-    print("  成本乘數 Σ|Δw| = %.4f /小時" % tno)
-    net_taker = got - tk * tno
+    print("  **為什麼用每單位成交量**：手續費是按成交量收的，而能評分的期數")
+    print("  （%d）少於總期數（%d）。拿「每期毛利」減「每期攤的費」會混到"
+          % (u["n_scored"], len(w)))
+    print("  兩個不同的分母 —— 第一版就是這樣把費低估了 %.2f 倍。"
+          % (len(w) / max(u["n_scored"], 1)))
     print()
-    print("%8s %12s %12s %12s %10s"
-          % ("執行方式", "毛利", "手續費", "淨值", "成交率"))
-    print("%8s %+12.4f %12.4f %+12.4f %10s"
-          % ("吃單", got, tk * tno, net_taker, "100%"))
+    print("%10s %12s %12s %12s %12s %9s"
+          % ("執行方式", "毛/量", "費率", "淨/量", "淨 bps/h", "成交率"))
+    tv_t = u["total_volume"]
+    pv_t = u["per_vol"]
+    net_t_vol = pv_t - tk
+    # 換回 bps/小時只是為了可讀：乘以「每期平均成交量」
+    vol_per_h = tv_t / max(u["n_scored"], 1)
+    print("%10s %+12.4f %12.2f %+12.4f %+12.4f %9s"
+          % ("吃單", pv_t, tk, net_t_vol, net_t_vol * vol_per_h, "100%"))
     best = None
     for dl in DELTAS:
         v = res["deltas"][str(dl)]
-        n = v["gross"] - mk * tno * v["fill_rate"]
-        res["deltas"][str(dl)]["net_maker"] = n
-        print("%8s %+12.4f %12.4f %+12.4f %9.1f%%"
-              % ("掛單δ=%.1f" % dl, v["gross"], mk * tno * v["fill_rate"], n,
+        pv = v["per_vol"]
+        nv = pv - mk
+        v["net_per_vol"] = nv
+        v["net_bps_h"] = nv * (v["total_volume"] / max(v["n_scored"], 1))
+        print("%10s %+12.4f %12.2f %+12.4f %+12.4f %8.1f%%"
+              % ("掛單δ=%.1f" % dl, pv, mk, nv, v["net_bps_h"],
                  v["fill_rate"] * 100))
-        if best is None or n > best[1]:
-            best = (dl, n)
-    res["net_taker"] = net_taker
-    res["best_maker"] = {"delta": best[0], "net": best[1]}
+        if best is None or nv > best[1]:
+            best = (dl, nv, v["net_bps_h"])
+    res["net_taker_per_vol"] = net_t_vol
+    res["net_taker_bps_h"] = net_t_vol * vol_per_h
+    res["best_maker"] = {"delta": best[0], "net_per_vol": best[1],
+                         "net_bps_h": best[2]}
     print()
-    print("  吃單淨 %+.4f   最好的掛單淨 %+.4f（δ=%.1f）   差 %+.4f bps/小時"
-          % (net_taker, best[1], best[0], best[1] - net_taker))
-    print("  （掛單的手續費按成交率打折 —— 沒成交就不付。這對掛單有利。）")
+    print("  吃單淨 %+.4f   最好的掛單淨 %+.4f（δ=%.1f）   差 %+.4f bps/單位量"
+          % (net_t_vol, best[1], best[0], best[1] - net_t_vol))
     print()
-    # **這一行才是可以搬到別條線去的東西**：把代價除掉換手率之後，它不再
-    # 跟這個訊號的強弱有關，只跟「小時級被動執行」這個執行方式有關。
-    pen_unit = -gap / tno
+    # **這一行才是可以搬到別條線去的東西**：它不再跟這個訊號的強弱有關，
+    # 只跟「小時級被動執行」這個執行方式有關。
+    pen_unit = pv_t - res["deltas"]["0.0"]["per_vol"]
     print("  **正規化之後的那個常數（可搬到任何小時級再平衡的設計）**：")
-    print("    被動執行的代價 = %.4f / %.4f = **%.2f bps 每單位 Σ|Δw|**"
-          % (-gap, tno, pen_unit))
-    print("    吃單手續費     = %.2f bps 每單位 Σ|Δw|" % tk)
+    print("    被動執行的代價 = %+.4f − (%+.4f) = **%.2f bps 每單位成交量**"
+          % (pv_t, res["deltas"]["0.0"]["per_vol"], pen_unit))
+    print("    吃單手續費     = %.2f bps 每單位成交量" % tk)
     print("    -> 當價格接受者便宜 %.1f 倍。這個比值與訊號好壞無關，"
           % (pen_unit / tk if tk else np.nan))
     print("       它是「一小時只掛一次、不改價」這個執行方式的性質。")
-    res["passive_penalty_bps_per_unit_turnover"] = float(pen_unit)
-    res["taker_bps_per_unit_turnover"] = float(tk)
+    res["passive_penalty_bps_per_unit_volume"] = float(pen_unit)
+    res["taker_bps_per_unit_volume"] = float(tk)
     print()
 
     print("=== 讀法 ===")

@@ -24,9 +24,15 @@ CLAUDE.md 核心原則 11（Gate 0）說執行可行性排在資訊層之前。
 每個小時的**再平衡時刻 t** 需要兩筆：t 與 **t−1 分鐘**（新舊拆分要比對前一筆）。
 
 **不是拿 HL 的資料算**：HL 的中價錄製 2026-09-11 才開始，只有幾分鐘。
-用 Binance 的 120 天歷史算換手率，然後**套 HL 的費率**——
-換手率是特徵的性質（跨場館差不多），費率才是場館的性質。
-這個借用要明說，因為它是一個假設。
+用 Binance 的 120 天歷史算換手率 —— 換手率是特徵的性質（跨場館差不多），
+費率才是場館的性質。這個借用要明說，因為它是一個假設。
+
+> **2026-09-12 更正**：上面原本寫「然後**套 HL 的費率**」。那句話在 09-12
+> 被判為錯配（訊號是 Binance、執行路徑是 Bitget，卻套 Hyperliquid 的費率），
+> 當天加了 `VENUE_FEES` / `fees_for()` —— **但只改了新寫的那條路**，
+> `sweep_damping()` 與 `main()` 還在用 `HL_*` 常數，所以它們印出來的成本
+> 又多活了一天。現在費率一律從 `--venue`（預設 bitget）傳進來，
+> 而 `TAKER_BPS` / `MAKER_BPS` 改成 **NaN**，讓「忘了傳」不再靜默。
 
     python research/gate0_xs_turnover.py --days 30
 """
@@ -47,8 +53,14 @@ OUT = ROOT / "research" / "results" / "gate0_xs_turnover.json"
 
 OLD_USD = 100.0              # 抄自外部來源，未經我們驗證（見 hl_mid 的同名常數）
 BANDS = (5, 10)              # 他用的兩個帶
-HL_TAKER_BPS = 4.5           # gate0.py 實查
-HL_MAKER_BPS = 1.5
+# **這兩個常數刻意是 NaN**（2026-09-12）。原本是 4.5 / 1.5（Hyperliquid），
+# 而本支量的訊號整個是 Binance、執行路徑是 Bitget —— 下面 VENUE_FEES 那段
+# 就是為了修這個錯配而加的，但當時**只修了新寫的那條路，`sweep_damping()`
+# 與 `main()` 仍然在用 HL_*，於是它們印出來的成本一直是 Hyperliquid 的**。
+# 這正是 mistake.md 反覆記的「修一組對稱的路徑只修了一側」。
+# 設成 NaN 的理由跟 mft_xs_alpha.py 一樣：**讓它不可能再安靜地預設**——
+# 誰忘了傳費率，算出來的會是 nan 而不是一個看起來合理的錯數字。
+TAKER_BPS = MAKER_BPS = float("nan")
 
 # ── 費率：**要跟「實際會在哪下單」同一個場館** ─────────────────────────
 # 2026-09-12 使用者問「MFT 是在 DEX 還是 CEX 執行、算過返佣沒有」，查出來
@@ -201,11 +213,28 @@ def weights_from(p, halflife=None):
     return z.div(z.abs().sum(axis=1).replace(0, np.nan), axis=0)
 
 
-def apply_band(w, band):
+def apply_band(w, band, renorm=False):
     """不交易帶：|Δw| 小於 band 就沿用上一期的權重。
 
     **逐列前推**，不能向量化——因為「上一期」是抑制後的值不是原始值，
     這個遞迴正是抑制的本體。寫錯成拿原始權重比會低估抑制效果。
+
+    ⚠ **`renorm` 的預設在 2026-09-12 從「總是縮放」改成 False，而且舊行為
+    是錯的。** 原本抑制完會把整列重新縮放回總槓桿 1（理由寫著「否則帶會讓
+    槓桿漂走」）——但那個縮放會乘到**每一個**名字上，包括剛剛才被判定
+    「不要交易」的那些。結果不交易帶沒有停止交易，它只是把一筆大單換成
+    **每個名字都來一筆小單**。
+
+    實測（120 天、new5）：帶 0.005~0.05 的 Σ|Δw| 只從 0.826 掉到 0.770，
+    而且**不單調**（0.7743 -> 0.7743 -> 0.7747），因為縮放量本身在動。
+    不縮放之後才真的是一個帶。
+
+    縮放原本要防的那件事（槓桿漂走）其實幾乎不發生：抑制後的列是
+    「這一列的一部分 + 上一列的一部分」，而兩列各自 Σ|w| = 1，
+    所以混出來的 Σ|w| 本來就貼著 1。**這支的呼叫端要把 Σ|w| 印出來**，
+    不要用一個會破壞儀器的修法去防一個不存在的問題。
+
+    §1.24 成本表裡「不交易帶」那幾列是在舊行為下量的，量的不是帶。
     """
     if band <= 0:
         return w
@@ -219,17 +248,60 @@ def apply_band(w, band):
             continue
         keep = (cur - prev).abs() < band
         nw = cur.where(~keep, prev).fillna(prev)
-        # 動完之後重新縮放回總槓桿 1（否則帶會讓槓桿漂走）
-        s_ = nw.abs().sum()
-        if s_ > 1e-12:
-            nw = nw / s_
+        if renorm:
+            # 舊行為，**保留但不再是預設**（見 docstring：它會讓「不交易」
+            # 的名字也動，於是帶量不到自己要量的東西）
+            s_ = nw.abs().sum()
+            if s_ > 1e-12:
+                nw = nw / s_
         out.iloc[i] = nw
         prev = nw
     return out
 
 
-def sweep_damping(f, col):
-    """回傳一張表：抑制強度 -> (換手, 成本, 與原始權重的相關)。"""
+def partial_rebalance(w, lam):
+    """部分再平衡：`w_t = (1−λ)·w_{t−1} + λ·目標_t`。λ=1 就是原始。
+
+    **這是「少交易」良好定義的版本，取代 `apply_band`**（2026-09-12）。
+    不交易帶在已正規化的權重上是病的，兩種寫法各有一種病：
+
+      · 抑制後重新縮放 -> 縮放乘到每個名字上，**「不交易」的也動了**，
+        於是換手幾乎沒降（0.826 -> 0.770）而且不單調
+      · 不重新縮放     -> **棘輪**：被判定不交易的名字永遠不縮小，
+        Σ|w| 一路爬到 **1.313**，換手反而**上升**到 0.92
+
+    部分再平衡沒有這兩個問題，而且兩個性質都是構造上的：
+      Σ|w_t| ≤ (1−λ)Σ|w_{t−1}| + λΣ|目標| ≤ 1     （凸組合，槓桿不漂）
+      Σ|Δw_t| = λ · Σ|目標_t − w_{t−1}|            （λ 直接是換手的乘數）
+
+    目標是 NaN 的格子**沿用上一期**（那是「這個名字今天沒有訊號」，
+    不是「目標是零」—— 後者會憑空造出一筆平倉單）。
+    """
+    lam = float(lam)
+    if lam >= 1.0:
+        return w
+    out = w.copy()
+    prev = None
+    for i in range(len(w)):
+        tgt = w.iloc[i]
+        if prev is None:
+            prev = tgt.fillna(0.0)
+            out.iloc[i] = prev
+            continue
+        nw = prev + lam * (tgt.fillna(prev) - prev)
+        out.iloc[i] = nw
+        prev = nw
+    return out
+
+
+def sweep_damping(f, col, taker=None, maker=None):
+    """回傳一張表：抑制強度 -> (換手, 成本, 與原始權重的相關)。
+
+    `taker` / `maker` 不給就是 NaN —— 見 TAKER_BPS 的註解，寧可印 nan
+    也不要印一個用錯場館費率算出來的數。
+    """
+    taker = TAKER_BPS if taker is None else taker
+    maker = MAKER_BPS if maker is None else maker
     p = f.pivot_table(index="minute", columns="sym", values=col)
     base = weights_from(p)
     base_flat = base.values.ravel()
@@ -241,8 +313,8 @@ def sweep_damping(f, col):
         corr = (float(np.corrcoef(base_flat[ok], w.values.ravel()[ok])[0, 1])
                 if ok.sum() > 10 else float("nan"))
         return dict(name=name, turnover=round(m, 4),
-                    cost_taker_bps_h=round(m * 2 * HL_TAKER_BPS, 3),
-                    cost_maker_bps_h=round(m * 2 * HL_MAKER_BPS, 3),
+                    cost_taker_bps_h=round(m * 2 * taker, 3),
+                    cost_maker_bps_h=round(m * 2 * maker, 3),
                     corr_with_base=round(corr, 4))
 
     out = [row("原始（無抑制）", base)]
@@ -258,12 +330,18 @@ def main():
     ap.add_argument("--days", type=int, default=30)
     ap.add_argument("--sweep", action="store_true",
                     help="掃換手抑制（一樣只看成本，不看損益）")
+    # 2026-09-12：費率改成參數。預設 bitget，因為執行路徑是 jarvis -> Bitget。
+    ap.add_argument("--venue", default="bitget")
+    ap.add_argument("--rebate", type=float, default=None)
     a = ap.parse_args()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
 
+    tk, mk, fee_src = fees_for(a.venue, a.rebate)
+    print("費率：%s -> 吃單 %.2f / 掛單 %.2f bps 每邊（%s）"
+          % (a.venue, tk, mk, fee_src))
     print("撈 %d 天的整點與前一分鐘快照…" % a.days)
     raw = load_pairs(a.days)
     print("  %d 列、%d 標的" % (len(raw), raw.canonical_symbol.nunique()))
@@ -287,8 +365,8 @@ def main():
             continue
         m, med, p90 = float(dw.mean()), float(dw.median()), float(dw.quantile(.9))
         # 單邊換手 x 2（進出各一次）x 費率
-        c_tk = m * 2 * HL_TAKER_BPS
-        c_mk = m * 2 * HL_MAKER_BPS
+        c_tk = m * 2 * tk
+        c_mk = m * 2 * mk
         res["arms"]["%dbps" % bnd] = dict(
             turnover_median=round(med, 4), turnover_mean=round(m, 4),
             turnover_p90=round(p90, 4),
@@ -320,7 +398,7 @@ def main():
             print("\n--- %d bps 帶 ---" % bnd)
             print("%-18s %10s %12s %12s %10s"
                   % ("抑制", "換手", "taker bps/h", "maker bps/h", "與原始相關"))
-            rows = sweep_damping(f, col)
+            rows = sweep_damping(f, col, taker=tk, maker=mk)
             res.setdefault("damping", {})["%dbps" % bnd] = rows
             for r in rows:
                 print("%-18s %10.4f %12.2f %12.2f %10.3f"

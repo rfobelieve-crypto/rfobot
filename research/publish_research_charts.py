@@ -90,22 +90,34 @@ def chart_mft_halves():
     # **同樣從資料算**，而且檔案不在就不加那一句（不要寫死一個會過期的數）。
     fc = load(R / "mft_fill_conditional.json") or {}
     zh_r1 = en_r1 = ""
-    if fc.get("D1") and fc.get("best_maker"):
-        pen = float(fc.get("passive_penalty_bps_per_unit_turnover") or 0)
-        tkn = float(fc.get("taker_bps_per_unit_turnover") or 0)
-        nt = float(fc.get("net_taker") or 0)
-        bm = fc["best_maker"]
+    # **不要用 `or 0` 去取這些值。** 2026-09-12 這份 json 的欄位名改過一次
+    # （`..._per_unit_turnover` -> `..._per_unit_volume`、`net_taker` ->
+    # `net_taker_bps_h`），而 `or 0` 會讓圖表安靜地印出一排 0 —— 那是
+    # mistake.md 2026-09-11 的同一個形狀（生產者改 schema，消費者把
+    # 「讀不到」寫成預設值）。缺欄位就整句不印，並且大聲說。
+    NEED = ("passive_penalty_bps_per_unit_volume", "taker_bps_per_unit_volume",
+            "net_taker_bps_h")
+    miss = [k for k in NEED if fc.get(k) is None]
+    bm = fc.get("best_maker") or {}
+    if miss or bm.get("net_bps_h") is None:
+        if fc:
+            print("  [WARN] mft_fill_conditional.json 缺 %s -> R1 那一句不印"
+                  % (miss or ["best_maker.net_bps_h"]))
+    elif fc.get("D1"):
+        pen = float(fc[NEED[0]])
+        tkn = float(fc[NEED[1]])
+        nt = float(fc[NEED[2]])
         zh_r1 = ("　**而「改掛單」這條路已經量過了，它更差**："
-                 "被動執行每單位換手要付 %.1f bps 的放棄邊際（漏掉的成交"
+                 "被動執行每單位成交量要付 %.1f bps 的放棄邊際（漏掉的成交"
                  "正好是行情最大的那些小時），對照吃單手續費只要 %.1f。"
                  "淨值：吃單 %+.2f、最好的掛單 %+.2f bps/小時。"
-                 % (pen, tkn, nt, float(bm.get("net", 0))))
+                 % (pen, tkn, nt, float(bm["net_bps_h"])))
         en_r1 = (" **And the “quote instead of take” route has now been "
                  "measured — it is worse**: passive execution forgoes %.1f bps "
-                 "of edge per unit of turnover (the fills you miss are exactly "
+                 "of edge per unit of traded volume (the fills you miss are exactly "
                  "the biggest hours), against %.1f bps of taker fee. Net: "
                  "taking %+.2f, best quoting %+.2f bps/hour."
-                 % (pen, tkn, nt, float(bm.get("net", 0))))
+                 % (pen, tkn, nt, float(bm["net_bps_h"])))
     return dict(
         id="mft_halves",
         kind="slope",

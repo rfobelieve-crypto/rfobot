@@ -64,7 +64,7 @@
     "unit": "每小時毛利（基點）",
     "sample": "120 天、1447 次換倉、11 個標的，每小時重組一次",
     "callout": "前半挑到的那條，後半 +0.29 bps/小時。\n而掛單來回手續費是 0.60 —— 訊號比成本小。",
-    "note": "前半會挑到 `new5`：前半 +0.95 -> 後半 +0.29 —— **樣本外仍然為正**。擋住它的是換手：這個訊號每小時重組一次，光是掛單的來回手續費就要 0.60 bps/小時，比它賺的還多。所以唯一的槓桿是**把換手砍下來**，不是換組法。　**而「改掛單」這條路已經量過了，它更差**：被動執行每單位換手要付 9.5 bps 的放棄邊際（漏掉的成交正好是行情最大的那些小時），對照吃單手續費只要 3.0。淨值：吃單 -1.40、最好的掛單 -4.10 bps/小時。"
+    "note": "前半會挑到 `new5`：前半 +0.95 -> 後半 +0.29 —— **樣本外仍然為正**。擋住它的是換手：這個訊號每小時重組一次，光是掛單的來回手續費就要 0.60 bps/小時，比它賺的還多。所以唯一的槓桿是**把換手砍下來**，不是換組法。　**而「改掛單」這條路已經量過了，它更差**：被動執行每單位成交量要付 7.3 bps 的放棄邊際（漏掉的成交正好是行情最大的那些小時），對照吃單手續費只要 3.0。淨值：吃單 -2.29、最好的掛單 -4.41 bps/小時。"
    },
    "en": {
     "title": "The signal survived. It still cannot pay its own fees.",
@@ -74,7 +74,7 @@
     "unit": "gross basis points per hour",
     "sample": "120 days, 1447 rebalances, 11 symbols, hourly",
     "callout": "The first half's pick earns +0.29 bps/hour out of sample.\nThe maker round trip costs 0.60. Smaller than the cost.",
-    "note": "The first half would pick `new5`: +0.95 -> +0.29 — **still positive out of sample**. What stops it is turnover: rebalancing hourly costs 0.60 bps/hour in maker fees alone, more than it earns. The only lever is cutting turnover, not trying another construction. **And the “quote instead of take” route has now been measured — it is worse**: passive execution forgoes 9.5 bps of edge per unit of turnover (the fills you miss are exactly the biggest hours), against 3.0 bps of taker fee. Net: taking -1.40, best quoting -4.10 bps/hour."
+    "note": "The first half would pick `new5`: +0.95 -> +0.29 — **still positive out of sample**. What stops it is turnover: rebalancing hourly costs 0.60 bps/hour in maker fees alone, more than it earns. The only lever is cutting turnover, not trying another construction. **And the “quote instead of take” route has now been measured — it is worse**: passive execution forgoes 7.3 bps of edge per unit of traded volume (the fills you miss are exactly the biggest hours), against 3.0 bps of taker fee. Net: taking -2.29, best quoting -4.41 bps/hour."
    },
    "series": [
     {
