@@ -42,6 +42,7 @@ jobs:
             tests/test_agent_boundary.py \
             tests/test_okx_client.py \
             tests/test_public_payload_shape.py \
+            tests/test_no_control_chars.py \
             | tee out.txt
           grep -Eq '[1-9][0-9]* passed' out.txt \
             || (echo "no test actually ran"; exit 1)

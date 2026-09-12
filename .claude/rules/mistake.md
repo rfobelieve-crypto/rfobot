@@ -4,6 +4,110 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-09-12: 「反斜線被轉義層吃掉」這條規矩寫了一個月、被犯了至少七次，而從來沒有任何東西在檢查——掃一次抓到 10 個，其中一個把 Gate F 的每月計分器變成一顆定時地雷
+
+**What happened:**
+
+清完兩盞紅燈、把一段更正寫進 CLAUDE.md 之後，我在回讀時看到自己剛寫的那行：
+
+    （`research\opsun_hidden.vbs` -> `research\ops\conj_watch.bat`）
+
+`\run_hidden.vbs` 的 `\r` 變成了一個真的 CR。**那逐字就是 mistake.md
+2026-08-19 / 08-20 / 09-06 那三條，而我在同一天才剛引用過其中一條。**
+
+照 09-06 那條自己的處方（**掃整檔的控制字元，不要數行尾**）掃過五個檔，
+抓到 **8 個**，而只有 1 個是我今天寫的：
+
+| 檔案 | 被吃掉的 | 結果 |
+|---|---|---|
+| CLAUDE.md ×3 | `\f` | `D:\flowbot_data\{raw_data,poc_data,hl}` 顯示成 `D:<FF>lowbot_data` |
+| CLAUDE.md ×1 | `\r` | 我今天寫的 `research\ops\run_hidden.vbs` |
+| mistake.md ×2 | `\a` | `flow_system\research\arb\ops\arb_watchdog.ps1` |
+| mistake.md ×2 | `\v` | **描述這個 bug 的那一段自己帶著這個 bug** |
+
+最後那一格值得停一下：2026-09-06 那條在解釋「`\v` 被吃成 0x0B」的時候，
+**那句話裡的 `\v` 也被吃成了 0x0B**，所以讀起來是「`` 的 `` 變成垂直定位符」
+——兩個空的反引號。**一條教訓在記錄自己的那一刻又犯了一次。**
+
+**然後寫了結構性守衛（`tests/test_no_control_chars.py`），它當場又抓到兩個
+我完全不知道的，而且兩個都是會被執行的檔案：**
+
+1. **`scripts/run_monthly_revalidation.cmd` L7** —— 兩個被吃掉的轉義：
+   `C:\Users` + CR + `fo` + BEL + `naconda3\python.exe`（`\r` 與 `\a`）、
+   以及 `research` + CR + `esults`（`\r`）。那一行跑的是
+   **`sweep_forward.py`，Gate F 的每月計分器**。
+   **產物證明它從來沒執行過**：`_revalidation_cron.log` 裡
+   `quarterly_revalidation` 出現 **5 次**、`sweep_forward` **0 次**。
+
+   而 git 歷史是這件事最刺眼的地方 —— 它是 commit **71f4243（2026-09-06）**
+   加進去的，那個 commit 的訊息是
+   「**ops: 看板覆核——兩個從未被排程的計分器掛上班車**」。
+   **一個專門修「從未被排程」的動作，自己從未被執行。**
+
+   誠實範圍：排程是每月 5 號，09-06 之後的第一次開火是 **10-05**，
+   所以**還沒有漏過任何一次**。它是地雷不是損失。同一個 commit 改的
+   `shadow_engine.bat`（161 行）是乾淨的，所以另一個計分器沒事。
+
+2. **`market_data/backfill/setup_schedule.ps1` L7** —— `\f` 被吃掉：
+   `$batPath = "...Desktop\flowbot<FF>low_system\market_data\..."`。
+   目前沒有在跑（那是一次性的註冊腳本），但誰執行它就會註冊一條壞路徑。
+
+**同一天我又犯了兩次，這是本條真正的重點：**
+
+- 把那支新守衛加進 CI 時，我用 `python -c "..."` 改 yml，
+  **`\n` 變成字面的兩個字元** —— bash 在雙引號內吃掉一層。
+- 要驗證修好的 .cmd 時，我跑了 `MSYS_NO_PATHCONV=1 cmd //c "..."` ——
+  **那個組合什麼都不會執行**（09-06 那條原句：「兩個各自正確的修法疊在一起
+  互相抵銷」）。輸出只有 Windows 橫幅和一個提示字元，而我差點把它當成跑過了。
+
+所以今天這個根出現了 **3 次新的**（CLAUDE.md、CI yml、MSYS×`//c`）
+＋ **7 個歷史殘留**。而我在每一次之前都讀過那條規則。
+
+**Root cause:**
+
+**規則寫在文件裡，而手指照著「這樣寫比較短」動。** 這跟
+[[2026-09-07 剛用某個錯誤判掉一條線，四小時後在新程式碼裡又寫了一次]]
+是同一條，只是這次的證據更強：**同一個 session、同一個人、讀過規則、
+寫下規則的更正、然後在三個不同的地方重犯。**
+
+第二層，而且是可修的那一層：**這條規矩存在一個月，沒有任何自動化在檢查。**
+freshness 盯錄製器的產物、guards 跑回歸測試、CI 跑三個結構性守衛 ——
+**沒有一個會看檔案裡有沒有控制位元組**。而它的失效是安靜的：
+`.cmd` 裡壞掉的那一行**不會讓整支失敗**（cmd 跑下一行，退出碼還是 0），
+`.md` 裡壞掉的路徑**看起來只是少了一個斜線**。
+
+**Correct approach（已做）:**
+
+1. **10 個全部修好**，規則最小化、不重建散文：
+   **每個控制位元組換回「反斜線 + 它本來那個字母」**（0x07→`\a`、0x0B→`\v`、
+   0x0C→`\f`、行內 0x0D→`\r`），兩處 `\r` 被吃成真換行的按 dump 逐字接回。
+   .cmd 用 bytes 寫回並保 CRLF（2026-08-19：Edit 把 CRLF 換成 LF 讓 cmd 整支失效）。
+2. **`tests/test_no_control_chars.py`**：掃 repo 裡每個 `.md/.bat/.cmd/.py/.ps1/.vbs`
+   （1,098 個檔），只允許 TAB、LF、成對 CRLF。**反向證明過**：注入一個 CR →
+   紅且指名檔案、行號與位元組（`CR（\r 被吃掉，而且不是行尾）`）；移除 → 綠。
+   自帶一關「掃到的檔案數 > 50」，否則 SKIP_DIRS 過寬時這支測試等於不存在
+   （2026-08-26 的形狀）。**已接進 `.github/workflows/guards.yml`** ——
+   它是純 python、不吃本機資料，所以屬於 CI 那一側。
+3. `U+240B`/`U+240D`（`␋` `␍`）這類**可見的控制圖示字元是允許的** ——
+   mistake.md 本來就用它們來「顯示」控制字元，把它們也判紅會讓這份文件沒法寫。
+
+**Rule:** **這條規矩不可以只存在於文件裡。** 今天的證據是：一個讀過規則、
+剛寫下規則更正的人，在同一個 session 裡還是犯了三次。所以判準從
+「記得不要穿過 heredoc」換成 **「CI 會掃，犯了就紅」**。
+
+操作上仍然照舊（它能減少次數，只是不能歸零）：含反斜線路徑的內容
+**寫成獨立的 .py 檔再執行**，反斜線用 `chr(92)` 組，連 Python 的轉義層也繞開。
+而 `python -c "..."`、`bash heredoc`、`cmd //c` 配 `MSYS_NO_PATHCONV`
+這三個組合要當成已知地雷。
+
+第二條，關於「修了一個『從未被執行』的東西」：
+**那個修法本身要看產物。** 71f4243 的訊息說「掛上班車」，而判準應該是
+「log 裡出現那支腳本的輸出」——那是一次 `grep` 的事，而漏掉的代價是
+一顆會在下個月 5 號才現形的地雷。凡是 commit 訊息寫著
+「**接上／掛上／補進排程**」的改動，**當天就要在產物裡看到它跑過一次**。
+
+---
+
 ## 2026-09-12: 兩盞紅燈，兩個都是守衛自己的解析度問題——一個容許誤差比刻度小 250 倍，一個拿「極大值 ÷ 平均值」當判準
 
 **What happened:**
@@ -1107,8 +1211,7 @@ kept vs vetoed 的 gap ≥ 8pp**。跑到 57/60、gap +5.8pp，看起來像「�
 評分器自己的 `ROOT/LOGS/OUT`。
 
 搬完重啟、10 個成員全活——然後才發現**第 11 個**：看門狗的 **Windows 排程
-action** 還指著 `flow_system
-esearchrb\opsrb_watchdog.ps1`，一個已經
+action** 還指著 `flow_system\research\arb\ops\arb_watchdog.ps1`，一個已經
 不存在的檔案。它不在任何 grep 結果裡，**因為它根本不在 repo 裡**。
 
 **Root cause:**
@@ -3069,9 +3172,7 @@ CI [+0.0140,+0.0625]、9/9 幣、t=+3.03**——**顯著為正**。
 把 `v7_regime_q2_clock.py` 附加進 `shadow_engine.bat` 時，用了
 `python - <<'PY'` 的 heredoc 寫 bytes。落到檔案裡的是
 `python research␋7_regime_q2_clock.py >> research␍esults\...`
-——**`7_` 的 `` 變成垂直定位符 0x0B、`
-esults` 的 `
-` 變成 CR**。
+——**`\v7_` 的 `\v` 變成垂直定位符 0x0B、`\results` 的 `\r` 變成 CR**。
 這**逐字就是 mistake.md 2026-08-20 那條**，而我在同一則訊息裡引用了它
 （「bat 用 bytes 附加，保 CRLF」）。
 

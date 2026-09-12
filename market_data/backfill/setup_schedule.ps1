@@ -4,7 +4,7 @@
 # the 2026-07-05 incident, sitting in a file nobody could see because
 # it was gitignored. Fixed, and now tracked.
 $taskName = "FlowBot_DailyCollect"
-$batPath = "C:\Users\rfo\Desktop\flowbotlow_system\market_data\backfill\daily_collect.bat"
+$batPath = "C:\Users\rfo\Desktop\flowbot\flow_system\market_data\backfill\daily_collect.bat"
 
 $action = New-ScheduledTaskAction -Execute $batPath
 $trigger = New-ScheduledTaskTrigger -Daily -At "04:00"

@@ -249,7 +249,7 @@ $1218）全部是過去式。
 
 **第一件要更正的事：這不是 Railway 的環境變數。**
 `conj_watch.py` 只跑在操作者這台機器的 Windows 排程 **`FlowBot_ConjWatch`** 上
-（`research\opsun_hidden.vbs` -> `research\ops\conj_watch.bat`）。
+（`research\ops\run_hidden.vbs` -> `research\ops\conj_watch.bat`）。
 **Railway 側沒有任何服務在跑偵測器**——agent 只是唯讀 `conj_intents` 這張表、
 吐給 `/public/conj-signals`。所以旗標設在 **`research/ops/conj_watch.bat`**
 （`setlocal` 範圍內，理由寫在那一行上面）。在 Railway 設它會完全沒有作用，
@@ -555,10 +555,9 @@ trigger → 降階重驗」**——性質與 [[2026-06-05 手動爆倉]] 完全�
 
 | 原路徑（程式照舊用這個） | 實體位置 | 大小 |
 |---|---|---|
-| `market_data/raw_data` | `D:lowbot_data
-aw_data` | 33.6 GB |
-| `research/poc/data` | `D:lowbot_data\poc_data` | 5.9 GB |
-| （本來就在 D 槽）| `D:lowbot_data\hl\{trades,mid}` | 成長中 |
+| `market_data/raw_data` | `D:\flowbot_data\raw_data` | 33.6 GB |
+| `research/poc/data` | `D:\flowbot_data\poc_data` | 5.9 GB |
+| （本來就在 D 槽）| `D:\flowbot_data\hl\{trades,mid}` | 成長中 |
 
 `flow_system` 從 **41,227 MB 縮到 1,890 MB**，C 槽可用從 87 GB 到 **125.5 GB**。
 **77 個引用 `raw_data` 的檔案一行都沒改**，因為路徑對它們完全沒變。
