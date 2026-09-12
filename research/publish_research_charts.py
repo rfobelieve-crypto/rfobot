@@ -85,6 +85,27 @@ def chart_mft_halves():
     # 掛單來回成本 = 換手 × 2 × 每邊 maker bps。用本次跑出來的換手。
     thr = d.get("thresholds") or {}
     MAKER_FLOOR = float(thr.get("maker_bps_h") or 1.5)
+    # R1（TODO §1.27）量了「改用掛單」那條路，而這張圖原本的說法會讓人以為
+    # 掛單是便宜的那一條（只講手續費 1.00）。實際上掛單還要付放棄的邊際。
+    # **同樣從資料算**，而且檔案不在就不加那一句（不要寫死一個會過期的數）。
+    fc = load(R / "mft_fill_conditional.json") or {}
+    zh_r1 = en_r1 = ""
+    if fc.get("D1") and fc.get("best_maker"):
+        pen = float(fc.get("passive_penalty_bps_per_unit_turnover") or 0)
+        tkn = float(fc.get("taker_bps_per_unit_turnover") or 0)
+        nt = float(fc.get("net_taker") or 0)
+        bm = fc["best_maker"]
+        zh_r1 = ("　**而「改掛單」這條路已經量過了，它更差**："
+                 "被動執行每單位換手要付 %.1f bps 的放棄邊際（漏掉的成交"
+                 "正好是行情最大的那些小時），對照吃單手續費只要 %.1f。"
+                 "淨值：吃單 %+.2f、最好的掛單 %+.2f bps/小時。"
+                 % (pen, tkn, nt, float(bm.get("net", 0))))
+        en_r1 = (" **And the “quote instead of take” route has now been "
+                 "measured — it is worse**: passive execution forgoes %.1f bps "
+                 "of edge per unit of turnover (the fills you miss are exactly "
+                 "the biggest hours), against %.1f bps of taker fee. Net: "
+                 "taking %+.2f, best quoting %+.2f bps/hour."
+                 % (pen, tkn, nt, float(bm.get("net", 0))))
     return dict(
         id="mft_halves",
         kind="slope",
@@ -110,7 +131,7 @@ def chart_mft_halves():
                   "比它賺的還多。所以唯一的槓桿是**把換手砍下來**，"
                   "不是換組法。"
                   % (pick.get("arm", "—"), pick.get("first", 0),
-                     pick.get("second", 0), MAKER_FLOOR)),
+                     pick.get("second", 0), MAKER_FLOOR)) + zh_r1,
         ),
         en=dict(
             title="The signal survived. It still cannot pay its own fees.",
@@ -137,7 +158,7 @@ def chart_mft_halves():
                   "fees alone, more than it earns. The only lever is cutting "
                   "turnover, not trying another construction."
                   % (pick.get("arm", "—"), pick.get("first", 0),
-                     pick.get("second", 0), MAKER_FLOOR)),
+                     pick.get("second", 0), MAKER_FLOOR)) + en_r1,
         ),
         series=arms,
         source="research/results/mft_xs_alpha.json",
