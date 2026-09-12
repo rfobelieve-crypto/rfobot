@@ -215,11 +215,6 @@ def scan():
 JUNCTIONS = [
     ("market_data/raw_data", "D:/flowbot_data/raw_data"),
     ("research/poc/data", "D:/flowbot_data/poc_data"),
-    # 2026-09-12：外部閱讀的論文與文章。搬去 D 槽的理由跟前兩個不同
-    # （它只有 28 MB，不是為了空間），是為了**跟其他資料一起有人看著**——
-    # 一個沒有進這張表的連結，在 D 槽沒掛載時只會變成一個空目錄，而
-    # 「資料夾是空的」跟「還沒下載」在畫面上長得一模一樣。
-    ("quant arb", "D:/flowbot_data/quant_arb"),
 ]
 
 

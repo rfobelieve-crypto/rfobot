@@ -384,7 +384,7 @@ D2 也把 `HL-lighter-rh` 自己標成**離散**（IQR 4.33，XRP +4.82 撐高�
 > ### ⚠ 2026-09-11 同日更正：診斷寫錯了一層
 >
 > 讀完該文附的碩論〈High Frequency Lead-Lag Relationships In The Bitcoin
-> Market〉（127 頁，已下載到 `quant arb/papers/04_*.pdf`）之後，
+> Market〉（127 頁，已下載到 `D:/flowbot_data/quant_arb/attachments/`）之後，
 > **上面那句「缺的是成交量」不是最根本的那一層**：
 >
 > 1. **缺的是解析度。** 該文用 HY 估計量量到「價格移動在落後的交易所
