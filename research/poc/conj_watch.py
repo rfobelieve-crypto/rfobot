@@ -153,7 +153,33 @@ INTENT_TTL_S = 180          # 意圖過期：超過就別送陳舊的單
 # 達成），必須照 override 儀式寫進 CLAUDE.md，不能靠改這一行悄悄放行。
 # CLAUDE.md 核心原則 #10 說明了為什麼「CI 不跨零」是研究的門檻而不是
 # 下注的門檻——但那是使用者的決定，不是這個檔案的。
-# 設 CONJ_INTENTS=1 可強制開啟（僅測試用）。
+# ── 2026-09-12：使用者開了它。第 8 次 informed override，記在 CLAUDE.md ──
+# 使用者原話：「研究端那邊開 CONJ_INTENTS=1……我用戶端那邊處理好了剩這一步」。
+# 上面那句「必須照 override 儀式寫進 CLAUDE.md，不能靠改這一行悄悄放行」
+# **已經照做**：CLAUDE.md §「SDV 意圖層開啟（2026-09-12，第 8 次 ...）」。
+#
+# 三件當天查清楚、會影響怎麼讀這個旗標的事：
+#
+# 1) **它不是 Railway 的環境變數。** 本檔只跑在操作者機器的 Windows 排程
+#    `FlowBot_ConjWatch`（run_hidden.vbs -> research/ops/conj_watch.bat），
+#    Railway 側沒有任何服務跑偵測器。旗標設在那支 .bat 的 setlocal 裡。
+#    在 Railway 設它不會有作用，而且不會有任何東西報錯。
+#
+# 2) **消費端只有 paper**，而且是寫死的：`../jarvis/public/u.html:2640`
+#    有刻意的註解說明為什麼不吃 uiMode，`tenants.js:608` 也是 mode:'paper'。
+#    所以這次沒有違反「策略 #2 不得進 executor」—— paper 不是 executor。
+#    要變真錢必須改程式碼 + 另開一次 override。
+#
+# 3) **寫入路徑在開它的那天之前從來沒有被執行過**（`conj_intents` 0 列，
+#    註冊於 09-08）。而 `/public/conj-signals` 回 count=0 在這裡是**合法狀態**，
+#    所以寫入若壞了不會有任何東西變紅，而事件率只有 2-3/天。
+#    當天用本檔的 `make_intent` + `intent_gate` + 熱路徑那條 INSERT 實證過：
+#    16 欄全部落地、閘門放行、**端點正確濾掉刻意設成過期的測試列**（反向證明
+#    產品端不會收到假訊號），測試列已刪。腳本：scratchpad/prove_intent_write.py。
+#
+# **維持不變的**：ENTRY_DELAY_MIN = 3（「最大可用 5 分鐘」靠的是 +0.0003 的
+# CI 下緣，那不是餘裕）、九幣等權不挑幣、**paper 的損益不得當 edge 證據**。
+# 設 CONJ_INTENTS=1 可強制開啟（2026-09-12 起：操作者已開，見上）。
 INTENTS_ENABLED = os.environ.get("CONJ_INTENTS", "") == "1"
 UA = {"User-Agent": "conj-watch/1.0"}
 

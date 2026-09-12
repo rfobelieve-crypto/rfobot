@@ -19,6 +19,13 @@ REM exit code says nothing about the child.
 setlocal
 set ROOT=C:\Users\rfo\Desktop\flowbot\flow_system
 set PYTHONIOENCODING=utf-8
+REM 2026-09-12: intents turned ON by the operator (informed override #8).
+REM Consumer is PAPER ONLY (jarvis u.html hardcodes mode:paper, tenants.js:608).
+REM Resume condition (b) is still unmet in the out-of-sample half:
+REM   OOS S+D+V +0.1833, CI [-0.132, +0.550] -> crosses zero. Full-period
+REM   delay=3 is +0.3317, CI low +0.0714, 9/9 coins. User's call, logged in
+REM   CLAUDE.md as override #8. Do NOT widen ENTRY_DELAY_MIN past 3.
+set CONJ_INTENTS=1
 cd /d "%ROOT%"
 python "%ROOT%\research\poc\conj_watch.py" >> "%ROOT%\research\results\conj_watch.log" 2>&1
 endlocal
