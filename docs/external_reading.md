@@ -986,6 +986,89 @@ Opportunities〉裡警告的東西）。
 （mistake.md 2026-09-11：成交價在薄簿口自帶負自相關，會偽裝成反轉）。
 這一項我們比他保守，不是比他寬鬆。
 
+## 17. Advanced Market Making（2025-08-02，**PDF 全文 15 頁**）
+
+**這一篇把 MFT 的結論重新定位了**，而且它不是我們的發現，是他當成常識寫的。
+
+### 一句話：我們量到的東西他早就寫在那裡
+
+> 「Literally just backtest a ranking based strategy of **1h return × −1** and
+>  see how well it does **with no fees** (it does incredibly well but the bps
+>  on volume is extremely low so **you need no fees!**)」
+
+**那逐字就是我們的 §1.23。** 一小時頻率、橫斷面排名、毛利為正、扣費後轉負。
+我們不是發現了一個失敗，我們是**重新發現了一件他當成前提的事**：
+這一族 alpha **靠自己付不起手續費**。〈HFT Alpha Research 101〉講得更死：
+
+> 「All of our factors will be in the high single or even double digit Sharpe
+>  ranges pre-fees, and **unmonetizable post-fees (at least on their own)**」
+
+所以「MFT 扣費後是負的」**不是判決，是這一族的起點**。真正的問題不是
+「這個訊號好不好」，是「**有沒有辦法讓成本趨近零**」。
+
+### 他的答案：positional market making（不是把訊號做得更好）
+
+> 「The best market makers are able to execute positions at **effectively 0 cost**,
+>  and often are able to put on size in small cap names.」
+> 「One of the main ways these top names make their money is not just on the
+>  HFT book but by having **1000 or so alphas and skewing into each of them**」
+
+做法不是「用訊號去吃單」，是**把訊號變成報價的偏移**（skew）——
+你本來就在雙邊掛單，訊號只是讓你某一邊掛得積極一點。
+
+**但它不是免費的**，他給了數字：
+
+> 「if I normally make 2 bps doing my usual MM, I might be at **0.5 bps of loss**
+>  when skewing into positions」
+
+所以 positional MM 的成本約是「少賺 0.5 bps」，對照我們現在**付** 1.0 bps/邊
+（Bitget 返佣後）。差距仍然很大，但不是零。
+
+### 三個可以直接用的
+
+| # | 他說的 | 對我們 |
+|---|---|---|
+| A | **「You want to be forecasting conditional on you getting filled.」** 「most of the moves you are forecasting are ones you will **never get filled on**」 | **R1 的正身。** 我們的 +0.93 bps/h 是「不管成不成交」的毛利；掛單只有在市場往我們反向動時才成交。**那個數字可能整個不適用** |
+| B | 「if you **increase the size of your universe**, the same alphas will start performing much much better... **small caps tend to have more edge**」 | R3 有機制了：加寬宇宙不只降 SE，**薄的標的本來 edge 就大** |
+| C | 「use the **average markout (say over 5 seconds) of every single trade** that happens on that instrument... track the EWMA... Dynamic selection of what to quote」 | **我們有 `hl_tape`（全市場逐筆成交）**，這個可以直接算。他說這能「把一個沒有 edge 的系統變成打平或獲利」 |
+
+### 對套利線的重新定位（這條我沒預期到）
+
+> 「So when you hear people say 'just quote around Binance mid on a crappy
+>  exchange' what they are really saying is '**just do full maker arbitrage
+>  against Binance**'.」
+> 「This is actually the **final form of arbitrage** as it is the lowest cost way
+>  to pull it off (**no hedge leg cost, and full maker**)」
+
+我們的 §0.75／§1.20 一直把跨場館價差當成**吃單套利＋兩腿＋轉帳成本**在算。
+他的版本**沒有對沖腿、全是 maker**。這不是同一個生意的優化，是另一種形狀——
+而我們量到的「容量 = 一個配對、區間跨零」是在**前者**的成本結構下算的。
+
+### 獎勵那一段補了一個我們沒想到的角度
+
+> 「maker reward programs make the quotes **artificially tight**... so you'll
+>  often be able to **take against them** and put on arbitrage positions at very
+>  very reasonable costs. **Maker reward programs bleed through into money on
+>  the taker side as an arbitrage player**」
+
+也就是說：**別人在挖獎勵，會讓我們這種吃單的套利者受益**——因為他們為了拿
+獎勵把價差壓到不合理地窄。這是一條**不需要做市系統**就能用的路。
+
+## 18. HFT Alpha Research 101（2026-06-02，**PDF 全文 12 頁**）
+
+方法論。**兩條我們已經在做**（disjoint 區間、mid 不用成交價——兩條都是
+mistake.md 2026-09-11 那天自己撞到的，這裡確認方向對）。三條我們沒做：
+
+1. **Barra 橫斷面殘差化**：先把已知因子（他舉例 orderbook imbalance、
+   reversal_1m）從報酬裡回歸掉，再測新特徵，看的是「**超出已知因子之外**」的
+   表現。附了完整程式碼。**限制：因子數不得超過 N/5**（N = 宇宙大小）——
+   我們 N=11，所以**最多只能放 2 個因子**。這本身就是宇宙太窄的另一個代價。
+2. **部位構造用 `tanh(zscore(feature, 24h) / 3)`**，不是我們現在的
+   「橫斷面 z 縮放到總槓桿 1」。tanh 在 ±1 自然夾住，clip 門檻 2~3。
+   他說不夾通常**更差**。這是一個我們可以直接換掉的具體差異。
+3. **回測一律 pre-cost，成本只在最終模擬才算。** 所以他所有的 Sharpe 數字
+   依定義都是零成本 —— 再次確認他的數字與我們的淨值不可直接比。
+
 ## 還沒讀（依對我們的相關性排序）
 
 **2026-09-11 更新：用站內 archive 搜 `Arbitrage` ＋ 他自己的 Arb Wiki
