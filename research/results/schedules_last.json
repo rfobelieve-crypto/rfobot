@@ -46,7 +46,7 @@
     },
     {
       "task": "FlowBot_ConjWatch",
-      "state": "Ready",
+      "state": "Running",
       "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\run_hidden.vbs",
       "exists": true,
       "inside_repo": true,
@@ -54,7 +54,7 @@
     },
     {
       "task": "FlowBot_ConjWatch",
-      "state": "Ready",
+      "state": "Running",
       "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\conj_watch.bat",
       "exists": true,
       "inside_repo": true,
@@ -62,7 +62,7 @@
     },
     {
       "task": "FlowBot_DailyCollect",
-      "state": "Ready",
+      "state": "Running",
       "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\market_data\\backfill\\daily_collect.bat",
       "exists": true,
       "inside_repo": true,
@@ -86,7 +86,7 @@
     },
     {
       "task": "FlowBot_HLRecord",
-      "state": "Running",
+      "state": "Ready",
       "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\run_hidden.vbs",
       "exists": true,
       "inside_repo": true,
@@ -94,7 +94,7 @@
     },
     {
       "task": "FlowBot_HLRecord",
-      "state": "Running",
+      "state": "Ready",
       "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\hl_record.bat",
       "exists": true,
       "inside_repo": true,
@@ -110,7 +110,7 @@
     },
     {
       "task": "SweepShadow",
-      "state": "Running",
+      "state": "Ready",
       "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\ops\\run_hidden.vbs",
       "exists": true,
       "inside_repo": true,
@@ -118,12 +118,12 @@
     },
     {
       "task": "SweepShadow",
-      "state": "Running",
+      "state": "Ready",
       "path": "C:\\Users\\rfo\\Desktop\\flowbot\\flow_system\\research\\sweep_failure\\shadow_engine.bat",
       "exists": true,
       "inside_repo": true,
       "tracked": true
     }
   ],
-  "asof": "2026-09-11 11:06:54"
+  "asof": "2026-09-13 04:02:05"
 }

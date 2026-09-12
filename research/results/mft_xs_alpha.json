@@ -1,14 +1,14 @@
 {
-  "asof": "2026-09-12 05:11:30",
+  "asof": "2026-09-12 05:15:47",
   "days": 120,
   "rebalances": 1447,
   "symbols": 11,
   "rows": 8303,
   "venue": "bitget",
-  "fee_src": "Bitget U 本位永續 VIP0 公開費率；返佣 50%",
+  "fee_src": "Bitget U 本位永續 VIP0 公開費率；返佣 70%",
   "thresholds": {
-    "taker_bps_h": 3.0,
-    "maker_bps_h": 1.0
+    "taker_bps_h": 1.8000000000000003,
+    "maker_bps_h": 0.6000000000000001
   },
   "C1": true,
   "C2_mechanism": {
@@ -35,10 +35,10 @@
       "p_pos": 0.31925,
       "ic_mean": -0.03666163769237798,
       "n_reb": 973,
-      "cost_taker_bps_h": 1.667566517152986,
-      "cost_maker_bps_h": 0.5558555057176621,
-      "net_taker": -2.1915459036331413,
-      "net_maker": -1.0798348921978174,
+      "cost_taker_bps_h": 1.0005399102917918,
+      "cost_maker_bps_h": 0.33351330343059726,
+      "net_taker": -1.5245192967719472,
+      "net_maker": -0.8574926899107527,
       "inconclusive_by_design": true
     },
     "old5": {
@@ -50,10 +50,10 @@
       "p_pos": 0.403,
       "ic_mean": -0.0026809486010154412,
       "n_reb": 991,
-      "cost_taker_bps_h": 1.8122093859054744,
-      "cost_maker_bps_h": 0.6040697953018248,
-      "net_taker": -2.0989551954954733,
-      "net_maker": -0.8908156048918234,
+      "cost_taker_bps_h": 1.0873256315432849,
+      "cost_maker_bps_h": 0.36244187718109494,
+      "net_taker": -1.3740714411332835,
+      "net_maker": -0.6491876867710935,
       "inconclusive_by_design": true
     },
     "combo5": {
@@ -65,10 +65,10 @@
       "p_pos": 0.1995,
       "ic_mean": -0.016985114886850443,
       "n_reb": 1053,
-      "cost_taker_bps_h": 2.0679309242708053,
-      "cost_maker_bps_h": 0.6893103080902685,
-      "net_taker": -2.8891749875582735,
-      "net_maker": -1.5105543713777365,
+      "cost_taker_bps_h": 1.2407585545624835,
+      "cost_maker_bps_h": 0.41358618485416115,
+      "net_taker": -2.0620026178499518,
+      "net_maker": -1.2348302481416293,
       "inconclusive_by_design": true
     },
     "new10": {
@@ -80,10 +80,10 @@
       "p_pos": 0.4395,
       "ic_mean": -0.02309575733244524,
       "n_reb": 1049,
-      "cost_taker_bps_h": 1.955905223023981,
-      "cost_maker_bps_h": 0.6519684076746604,
-      "net_taker": -2.135855685191578,
-      "net_maker": -0.8319188698422572,
+      "cost_taker_bps_h": 1.173543133814389,
+      "cost_maker_bps_h": 0.39118104460479625,
+      "net_taker": -1.3534935959819858,
+      "net_maker": -0.571131506772393,
       "inconclusive_by_design": true
     },
     "old10": {
@@ -95,11 +95,11 @@
       "p_pos": 0.27875,
       "ic_mean": -0.0031905493422890456,
       "n_reb": 1064,
-      "cost_taker_bps_h": 2.1744144928564126,
-      "cost_maker_bps_h": 0.7248048309521375,
-      "net_taker": -2.7834620158983086,
-      "net_maker": -1.3338523539940332,
-      "inconclusive_by_design": false
+      "cost_taker_bps_h": 1.3046486957138477,
+      "cost_maker_bps_h": 0.4348828985712826,
+      "net_taker": -1.9136962187557434,
+      "net_maker": -1.0439304216131782,
+      "inconclusive_by_design": true
     },
     "combo10": {
       "turnover": 0.3769793094877311,
@@ -110,11 +110,11 @@
       "p_pos": 0.472,
       "ic_mean": -0.007903030072496804,
       "n_reb": 1093,
-      "cost_taker_bps_h": 2.2618758569263866,
-      "cost_maker_bps_h": 0.7539586189754622,
-      "net_taker": -2.342849362295981,
-      "net_maker": -0.8349321243450565,
-      "inconclusive_by_design": false
+      "cost_taker_bps_h": 1.3571255141558323,
+      "cost_maker_bps_h": 0.4523751713852774,
+      "net_taker": -1.4380990195254264,
+      "net_maker": -0.5333486767548716,
+      "inconclusive_by_design": true
     }
   },
   "C3": true,
@@ -156,5 +156,5 @@
       "second": -0.33621581921271004
     }
   },
-  "best_arm_posthoc": "new10"
+  "best_arm_posthoc": "combo10"
 }

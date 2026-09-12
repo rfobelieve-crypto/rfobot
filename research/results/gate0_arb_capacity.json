@@ -1,159 +1,159 @@
 {
-  "asof": "2026-09-11 17:16:47",
+  "asof": "2026-09-12 21:51:48",
   "mode": "maker_taker",
   "transfer_zeroed": true,
   "depth": {
     "NBIS": {
-      "n_rows": 1149,
+      "n_rows": 1504,
       "per_side": {
         "sell": [
-          365.36,
-          1129.04,
-          3567.99
+          361.68,
+          923.38,
+          3182.09
         ],
         "buy": [
-          367.53,
-          1066.96,
-          3194.94
+          365.5,
+          1004.0250000000001,
+          2947.71
         ]
       },
       "side_used": "buy",
-      "top": 367.53,
-      "d1": 1066.96,
-      "d3": 3194.94
+      "top": 365.5,
+      "d1": 1004.0250000000001,
+      "d3": 2947.71
     },
     "ANTH": {
-      "n_rows": 3701,
+      "n_rows": 4191,
       "per_side": {
         "sell": [
-          166.03,
-          763.13,
-          2115.71
+          147.72,
+          707.58,
+          2064.87
         ],
         "buy": [
-          184.69,
-          800.87,
-          2269.89
+          156.57,
+          721.69,
+          2154.09
         ]
       },
       "side_used": "sell",
-      "top": 166.03,
-      "d1": 763.13,
-      "d3": 2115.71
+      "top": 147.72,
+      "d1": 707.58,
+      "d3": 2064.87
     },
     "BTC": {
-      "n_rows": 3715,
+      "n_rows": 4245,
       "per_side": {
         "sell": [
-          249.67,
-          65881.57,
-          335146.11
+          249.93,
+          68046.62,
+          335439.82
         ],
         "buy": [
-          249.97,
-          63002.52,
-          334230.17
+          258.43,
+          63590.92,
+          329223.17
         ]
       },
       "side_used": "buy",
-      "top": 249.97,
-      "d1": 63002.52,
-      "d3": 334230.17
+      "top": 258.43,
+      "d1": 63590.92,
+      "d3": 329223.17
     },
     "HYPE": {
-      "n_rows": 3708,
+      "n_rows": 4227,
       "per_side": {
         "sell": [
-          1000.12,
-          6483.76,
-          37493.555
+          1000.11,
+          6653.13,
+          38574.09
         ],
         "buy": [
           999.81,
-          6513.93,
-          46505.925
+          6717.24,
+          47913.61
         ]
       },
       "side_used": "sell",
-      "top": 1000.12,
-      "d1": 6483.76,
-      "d3": 37493.555
+      "top": 1000.11,
+      "d1": 6653.13,
+      "d3": 38574.09
     },
     "ZEC": {
-      "n_rows": 3708,
+      "n_rows": 4213,
       "per_side": {
         "sell": [
-          880.475,
-          3983.73,
-          8644.869999999999
+          902.7,
+          4000.09,
+          9428.16
         ],
         "buy": [
-          882.48,
-          4249.92,
-          8749.285
+          934.07,
+          4551.99,
+          9749.62
         ]
       },
       "side_used": "sell",
-      "top": 880.475,
-      "d1": 3983.73,
-      "d3": 8644.869999999999
+      "top": 902.7,
+      "d1": 4000.09,
+      "d3": 9428.16
     },
     "NEAR": {
-      "n_rows": 3713,
+      "n_rows": 4246,
       "per_side": {
         "sell": [
-          406.01,
-          1666.33,
-          5129.57
+          400.1,
+          1619.19,
+          5106.120000000001
         ],
         "buy": [
           400.09,
-          1487.57,
-          5762.47
+          1428.94,
+          5721.05
         ]
       },
       "side_used": "sell",
-      "top": 406.01,
-      "d1": 1666.33,
-      "d3": 5129.57
+      "top": 400.1,
+      "d1": 1619.19,
+      "d3": 5106.120000000001
     },
     "GOLD_LL": {
-      "n_rows": 543,
+      "n_rows": 664,
       "per_side": {
         "sell": [
-          500.19,
-          23773.4,
-          84461.82
+          500.145,
+          21432.559999999998,
+          78775.47
         ],
         "buy": [
-          500.19,
-          22184.13,
-          85196.24
+          500.16,
+          19988.485,
+          77504.33
         ]
       },
-      "side_used": "sell",
-      "top": 500.19,
-      "d1": 23773.4,
-      "d3": 84461.82
+      "side_used": "buy",
+      "top": 500.16,
+      "d1": 19988.485,
+      "d3": 77504.33
     },
     "NVDA_LL": {
-      "n_rows": 3712,
+      "n_rows": 4277,
       "per_side": {
         "sell": [
-          392.38,
-          8497.95,
-          26315.545
+          399.28,
+          8947.25,
+          28708.13
         ],
         "buy": [
-          394.82,
-          9213.8,
-          33821.4
+          398.07,
+          9550.48,
+          38057.31
         ]
       },
       "side_used": "sell",
-      "top": 392.38,
-      "d1": 8497.95,
-      "d3": 26315.545
+      "top": 399.28,
+      "d1": 8947.25,
+      "d3": 28708.13
     }
   },
   "pairs": {
@@ -167,46 +167,46 @@
       "top": null,
       "d3": null,
       "size_star": 1000,
-      "net_star": -1.5679999999999987,
+      "net_star": -7.300999999999999,
       "size_max": null,
       "net_at_max": null,
-      "trades_per_year": 104.73457675753228,
+      "trades_per_year": 96.62475181998677,
       "usd_per_trade_at_max": null,
       "usd_per_year_at_max": null
     },
     "NBIS": {
-      "size_dollar": 3000,
-      "net_at_dollar": 3.8870000000000005,
-      "usd_per_trade_best": 1.1661000000000001,
-      "usd_per_year_best": 72.32395921835175,
+      "size_dollar": null,
+      "net_at_dollar": null,
+      "usd_per_trade_best": null,
+      "usd_per_year_best": null,
       "pid": "NBIS",
       "side": "buy",
-      "top": 367.53,
-      "d3": 3194.94,
-      "size_star": 3000,
-      "net_star": 3.8870000000000005,
-      "size_max": 3000,
-      "net_at_max": 3.8870000000000005,
-      "trades_per_year": 62.022090059473236,
-      "usd_per_trade_at_max": 1.1661000000000001,
-      "usd_per_year_at_max": 72.32395921835175
+      "top": 365.5,
+      "d3": 2947.71,
+      "size_star": 2000,
+      "net_star": -1.9800000000000004,
+      "size_max": null,
+      "net_at_max": null,
+      "trades_per_year": 56.41421947449768,
+      "usd_per_trade_at_max": null,
+      "usd_per_year_at_max": null
     },
     "ANTH": {
       "size_dollar": 2000,
-      "net_at_dollar": 219.061,
-      "usd_per_trade_best": 43.8122,
-      "usd_per_year_best": 1358.6621070518265,
+      "net_at_dollar": 194.8,
+      "usd_per_trade_best": 38.96,
+      "usd_per_year_best": 1098.9489953632149,
       "pid": "ANTH",
       "side": "sell",
-      "top": 166.03,
-      "d3": 2115.71,
+      "top": 147.72,
+      "d3": 2064.87,
       "size_star": 2000,
-      "net_star": 219.061,
+      "net_star": 194.8,
       "size_max": 2000,
-      "net_at_max": 219.061,
-      "trades_per_year": 31.011045029736618,
-      "usd_per_trade_at_max": 43.8122,
-      "usd_per_year_at_max": 1358.6621070518265
+      "net_at_max": 194.8,
+      "trades_per_year": 28.20710973724884,
+      "usd_per_trade_at_max": 38.96,
+      "usd_per_year_at_max": 1098.9489953632149
     },
     "BTC": {
       "size_dollar": null,
@@ -215,10 +215,10 @@
       "usd_per_year_best": null,
       "pid": "BTC",
       "side": "buy",
-      "top": 249.97,
-      "d3": 334230.17,
+      "top": 258.43,
+      "d3": 329223.17,
       "size_star": 200,
-      "net_star": -1.0059999999999998,
+      "net_star": -6.634,
       "size_max": null,
       "net_at_max": null,
       "trades_per_year": 0.0,
@@ -232,13 +232,13 @@
       "usd_per_year_best": null,
       "pid": "HYPE",
       "side": "sell",
-      "top": 1000.12,
-      "d3": 37493.555,
+      "top": 1000.11,
+      "d3": 38574.09,
       "size_star": 5000,
-      "net_star": -0.5549999999999997,
+      "net_star": -6.241,
       "size_max": null,
       "net_at_max": null,
-      "trades_per_year": 187.17948717948715,
+      "trades_per_year": 200.54945054945057,
       "usd_per_trade_at_max": null,
       "usd_per_year_at_max": null
     },
@@ -249,13 +249,13 @@
       "usd_per_year_best": null,
       "pid": "ZEC",
       "side": "sell",
-      "top": 880.475,
-      "d3": 8644.869999999999,
+      "top": 902.7,
+      "d3": 9428.16,
       "size_star": 3000,
-      "net_star": -0.041999999999999815,
+      "net_star": -5.648,
       "size_max": null,
       "net_at_max": null,
-      "trades_per_year": 124.04418011894647,
+      "trades_per_year": 112.82843894899536,
       "usd_per_trade_at_max": null,
       "usd_per_year_at_max": null
     },
@@ -266,32 +266,32 @@
       "usd_per_year_best": null,
       "pid": "NEAR",
       "side": "sell",
-      "top": 406.01,
-      "d3": 5129.57,
-      "size_star": 5000,
-      "net_star": -4.9799999999999995,
+      "top": 400.1,
+      "d3": 5106.120000000001,
+      "size_star": 2000,
+      "net_star": -8.587,
       "size_max": null,
       "net_at_max": null,
-      "trades_per_year": 31.011045029736618,
+      "trades_per_year": 56.41421947449768,
       "usd_per_trade_at_max": null,
       "usd_per_year_at_max": null
     },
     "GOLD_LL": {
-      "size_dollar": 25000,
-      "net_at_dollar": 2.233,
-      "usd_per_trade_best": 5.5825,
-      "usd_per_year_best": 0.0,
+      "size_dollar": null,
+      "net_at_dollar": null,
+      "usd_per_trade_best": null,
+      "usd_per_year_best": null,
       "pid": "GOLD_LL",
-      "side": "sell",
-      "top": 500.19,
-      "d3": 84461.82,
+      "side": "buy",
+      "top": 500.16,
+      "d3": 77504.33,
       "size_star": 500,
-      "net_star": 3.293,
-      "size_max": 50000,
-      "net_at_max": 0.7970000000000006,
+      "net_star": -3.137,
+      "size_max": null,
+      "net_at_max": null,
       "trades_per_year": 0.0,
-      "usd_per_trade_at_max": 3.985000000000003,
-      "usd_per_year_at_max": 0.0
+      "usd_per_trade_at_max": null,
+      "usd_per_year_at_max": null
     },
     "NVDA_LL": {
       "size_dollar": null,
@@ -300,13 +300,13 @@
       "usd_per_year_best": null,
       "pid": "NVDA_LL",
       "side": "sell",
-      "top": 392.38,
-      "d3": 26315.545,
+      "top": 399.28,
+      "d3": 28708.13,
       "size_star": 500,
-      "net_star": -0.014000000000000012,
+      "net_star": -6.444,
       "size_max": null,
       "net_at_max": null,
-      "trades_per_year": 807.9427083333335,
+      "trades_per_year": 825.7918552036199,
       "usd_per_trade_at_max": null,
       "usd_per_year_at_max": null
     }
@@ -314,6 +314,6 @@
   "D1": true,
   "D2": true,
   "D3": true,
-  "total_usd_per_year": 1430.9860662701783,
-  "n_pairs_positive": 2
+  "total_usd_per_year": 1098.9489953632149,
+  "n_pairs_positive": 1
 }

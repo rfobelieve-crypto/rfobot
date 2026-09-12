@@ -5694,3 +5694,2041 @@ conj_watch: events=0  cycle=4017ms  ok=True  intents=**HALTED**（2026-09-09 前
 conj_watch: events=0  cycle=3724ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
 conj_watch: events=0  cycle=4010ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
 conj_watch: events=0  cycle=3976ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=7222975ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5526ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3997ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3964ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=7325ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4133ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4057ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3918ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3981ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4115ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3825ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4136ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3812ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3989ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4083ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+[HALT] 意圖層已停止（2026-09-09 前視判決，見檔頭 INTENTS_ENABLED）——本輪 1 個事件只記 shadow，不產生任何訂單意圖
+conj_watch: events=1  cycle=4223ms  ok=True  max_latency=6033ms  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4965ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4010ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3932ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5091ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3824ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4593ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3806ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3988ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4243ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4076ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5396ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4026ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3886ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4019ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4317ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5002ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4095ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4326ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4204ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4071ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=7185ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4211ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3951ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4473ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4252ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4080ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4046ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4107ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3924ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4077ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4224ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4157ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4093ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5032ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4049ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4286ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4013ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4061ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4296ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4033ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4510ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4273ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3980ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4192ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4031ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4058ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5600ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4203ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3911ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4037ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3917ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4749ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4052ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3988ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3906ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4307ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4055ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4080ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4086ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4163ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3968ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4108ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4087ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3812ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3913ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5502ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4161ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3874ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3965ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4075ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3954ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4005ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3827ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4058ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3835ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5752ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4457ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4116ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3816ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4564ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3938ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3978ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3909ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4716ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3821ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4046ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4143ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3793ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3856ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3845ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3918ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3870ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4024ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3892ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3960ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4252ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3840ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3867ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4137ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3943ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4025ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3753ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3900ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4456ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3860ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4343ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3940ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5152ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4364ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4203ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4564ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4214ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3794ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4083ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4018ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4111ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4092ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4212ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4031ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3933ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3821ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3970ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3961ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4075ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4197ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3926ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3940ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4065ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3931ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3954ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4072ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4108ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4094ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3971ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4110ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5640ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5484ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3844ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4114ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3791ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3896ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3919ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4053ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4001ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4015ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3969ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3733ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3757ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3897ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3885ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4055ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3856ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3936ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3880ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3818ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3900ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3991ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4025ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3984ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4099ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3792ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3859ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3920ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3993ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3693ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3929ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4188ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3922ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5350ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3839ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3916ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3903ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3922ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3823ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3913ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3895ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3802ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3781ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3915ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3924ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3978ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3815ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3932ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3933ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3845ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3875ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4104ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3926ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3843ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3900ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4170ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3765ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3781ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3849ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3856ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5619ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3933ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3829ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3792ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3847ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3903ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4164ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3904ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3980ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3924ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3945ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3700ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3839ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3788ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3744ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4133ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4408ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3788ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3878ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4434ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3734ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3801ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3826ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3831ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3984ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3773ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3838ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4006ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3733ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3902ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3879ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3637ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3870ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3820ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5400ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3900ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3988ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3915ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3881ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3985ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3863ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3861ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3748ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4001ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3871ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3845ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3862ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3849ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3866ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3854ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3916ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3882ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3816ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3828ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3804ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4024ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3875ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3781ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3825ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3933ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5242ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3836ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3823ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3864ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3857ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3961ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3862ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4076ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4047ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4026ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3831ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3744ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3844ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3768ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3751ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3835ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3932ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3917ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3919ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3907ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3945ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3916ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4012ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3754ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4017ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3955ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3763ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3951ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3858ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3803ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3801ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3857ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3814ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3885ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3834ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5439ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3844ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3791ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3798ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3829ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4008ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3785ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3878ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3824ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3758ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4089ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4156ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3964ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3873ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3862ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3773ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3896ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3906ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3846ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3916ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3756ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3954ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3786ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3778ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4377ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5774ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3854ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3870ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3960ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3885ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3939ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3993ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3923ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3968ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3942ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4027ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3919ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3860ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3711ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3834ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3921ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3842ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3778ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3871ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3900ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3796ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3977ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3811ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3879ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3894ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3779ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3826ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3877ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3729ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3865ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3928ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4100ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3688ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3887ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4504ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3707ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5336ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3945ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3724ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3854ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3891ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3833ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4303ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3788ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3904ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4036ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3945ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3877ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3878ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3769ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3918ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3838ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3795ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3715ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3937ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3972ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3864ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3754ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3683ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3838ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5000ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3995ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3918ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3999ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3844ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3865ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4078ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3932ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4037ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3868ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3757ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3843ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3811ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3788ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3854ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3994ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3890ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3773ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3969ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3871ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3806ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3956ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3743ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3755ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3803ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3849ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3965ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3926ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3651ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3796ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3935ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3935ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3984ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4372ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3767ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3749ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3977ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5069ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3952ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3975ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3823ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3803ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3984ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4021ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3759ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3807ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3880ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3861ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4034ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3790ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3786ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3945ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3714ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3937ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3954ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3836ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3760ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3989ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3779ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3854ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5286ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3845ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3808ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3763ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3845ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3865ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3936ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4012ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3849ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3836ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3954ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3857ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3885ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3877ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3814ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3768ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3811ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3925ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3751ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3841ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3843ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3954ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3962ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4531ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3983ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3876ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3768ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3958ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3842ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3931ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4108ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3824ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4134ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4073ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3794ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3934ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3833ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3893ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5172ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3985ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3791ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3893ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4012ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3959ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3917ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3945ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3868ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3782ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3885ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3859ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3933ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3892ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3816ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3777ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3829ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3751ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3882ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3985ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3826ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3957ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5245ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3795ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3915ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3869ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3875ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3993ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4009ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4067ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3921ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4025ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3796ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3791ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3911ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3797ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3946ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4032ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3873ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4086ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3815ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3905ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3946ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3947ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3832ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3820ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3926ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3812ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3798ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4159ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4598ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3893ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3852ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4499ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3778ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3838ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3944ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3752ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3771ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3952ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3838ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5582ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4257ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3973ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3795ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3716ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3935ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3896ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3761ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3770ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4027ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3778ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3723ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3875ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3844ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3839ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4015ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3785ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3770ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3945ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3935ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3906ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5801ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3813ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=6051ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3883ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3922ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3944ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4088ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3879ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4082ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3880ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3818ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3878ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3802ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3950ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3842ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3783ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3855ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3908ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3882ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3916ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3808ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3905ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3735ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3855ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3919ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3829ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3762ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3738ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3922ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3750ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3852ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3755ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3878ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3841ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3970ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3830ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3778ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3769ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3936ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3906ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5235ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3837ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3794ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3868ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3822ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3919ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3769ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3930ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5303ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3895ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3813ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3899ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3820ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3855ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3808ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3833ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3759ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3843ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3808ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3970ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5884ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3836ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3873ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4074ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4385ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4383ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4046ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4276ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4537ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4137ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3855ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4045ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3851ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4127ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3922ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3863ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3835ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3819ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4252ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3861ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3862ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3864ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3925ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4128ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3929ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3830ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4080ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4133ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4019ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3837ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4254ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3979ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3856ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3981ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4116ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4281ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3858ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3879ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3807ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3964ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3779ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5213ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3894ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4365ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3877ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3932ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3732ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3743ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3877ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3923ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3799ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3699ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3776ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3879ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3813ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3899ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3904ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3792ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3869ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3858ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=6177ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3906ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3900ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3905ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3957ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3884ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4037ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4071ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3855ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3894ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5079ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3890ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3766ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3912ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3923ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3857ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3770ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3771ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4102ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3890ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3941ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5087ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3925ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3828ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3957ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3801ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3847ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3997ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3911ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4024ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4021ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4119ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4002ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4160ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3984ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4060ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3994ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4045ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4289ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4141ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5140ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3914ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5924ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4315ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4222ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4300ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4075ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4597ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4415ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4561ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4162ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4523ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4187ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4717ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4328ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4213ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4270ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4110ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3880ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4247ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4851ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4330ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4093ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4403ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3842ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4096ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4356ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4113ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4666ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5273ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4133ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4448ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4792ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3966ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3764ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4014ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4319ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4558ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4455ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4429ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4406ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4291ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4204ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4024ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3938ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4010ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4333ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4025ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4512ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3860ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3938ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4293ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3717ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4189ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3996ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4122ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4231ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4215ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4198ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4186ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4182ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4437ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4588ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5793ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4034ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4238ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4221ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4441ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4426ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4190ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4224ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4546ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4382ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3912ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3955ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4677ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4288ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4076ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4056ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4291ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5255ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4448ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4039ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4313ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4592ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4430ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4467ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4242ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4775ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4147ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4184ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4777ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4247ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4323ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4097ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4701ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3907ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3835ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=7120ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4604ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4668ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3769ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4229ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3962ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4307ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4258ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4542ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4218ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4326ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4028ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4357ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4733ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4196ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4050ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5505ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4383ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4112ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4567ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4192ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4117ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4697ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4815ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4037ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4464ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5738ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4475ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4513ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4031ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4088ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4466ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3711ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3902ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4045ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4476ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4392ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4018ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4271ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4266ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4873ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3970ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5747ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4647ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3965ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4618ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4116ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4797ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4462ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4684ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5008ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=9185ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4660ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4670ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4334ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4333ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4246ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4464ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4560ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4662ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4599ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4528ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4460ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4666ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4469ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4301ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4958ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4889ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4875ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4465ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4767ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4041ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4361ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4240ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4110ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4242ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4500ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4905ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4130ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3987ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4262ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4515ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4239ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4078ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5251ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4509ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3947ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5552ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3892ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4260ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4394ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4246ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4344ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4128ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4523ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3761ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3796ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4013ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4254ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3873ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4737ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4711ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5387ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4338ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3846ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4200ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3716ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4003ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4561ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4465ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4143ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3905ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4703ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4229ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4606ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4020ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4306ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4202ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4120ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3978ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4155ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4045ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4379ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4187ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4352ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4161ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4035ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4097ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4481ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4063ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4346ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3907ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4518ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4024ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4724ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4588ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4150ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4163ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4230ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4296ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4437ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4556ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4484ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4020ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3977ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4615ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3779ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3892ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5378ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4538ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4287ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4122ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4924ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4299ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4224ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4449ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5508ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4356ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4412ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4404ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3804ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4546ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4799ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4566ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4056ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4785ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4404ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4118ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4112ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4705ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4288ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4857ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4471ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4279ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4199ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4480ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4504ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4453ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4345ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4358ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4771ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4256ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4472ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4017ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4398ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4013ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4579ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4023ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4076ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4267ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4523ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4155ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4204ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5199ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4618ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4185ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4098ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3997ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4389ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4113ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4009ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5512ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4336ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3947ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4110ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4479ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4362ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4448ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4948ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5472ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4226ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4211ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4733ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4607ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4096ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4505ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4473ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4235ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4228ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4635ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4285ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=3778ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=5207ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4346ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4527ms  ok=True  intents=**HALTED**（2026-09-09 前視判決）
+conj_watch: events=0  cycle=4821ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4195ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4298ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4365ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3928ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4227ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4493ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4288ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4291ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4071ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3901ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4299ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4543ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4577ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4076ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4268ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4311ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4216ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4005ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4609ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3909ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4333ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4376ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4445ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4125ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3809ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4013ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4426ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4336ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3921ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4010ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4623ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4262ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4386ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4471ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4362ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4368ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4504ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4149ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4324ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4731ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4024ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4765ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4018ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4212ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5854ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4345ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4297ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3823ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3851ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3891ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3885ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4000ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3999ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4174ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4341ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4005ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5265ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4503ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4490ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3911ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4158ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4410ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4451ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4317ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4531ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4947ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5239ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3977ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4007ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4215ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4441ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4602ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4829ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4263ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4135ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3759ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4533ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4076ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4298ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4003ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4662ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4485ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4737ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3950ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3821ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4137ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4268ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4244ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3895ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4190ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4579ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4343ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4406ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3945ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4080ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3971ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5699ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4067ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4045ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4116ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3962ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4271ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3948ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3764ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4391ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5530ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4333ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4024ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4149ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4265ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4159ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4100ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4359ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4183ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4346ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3889ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5257ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4368ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3853ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4219ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4598ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4156ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4528ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4427ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4534ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4150ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4790ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4263ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4184ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4481ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4665ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4246ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4326ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4074ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4404ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4148ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4552ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4131ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3955ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4435ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4334ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4203ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4493ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3869ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4469ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4158ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4484ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4108ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4373ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4663ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4143ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3922ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4393ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4425ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4244ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3998ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4234ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3919ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4076ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4104ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4604ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4831ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4066ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4165ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4368ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4089ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5735ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3823ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4453ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4377ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4241ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4418ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4470ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4332ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4667ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3983ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4521ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4404ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3836ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4107ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4091ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3917ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4091ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4210ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4318ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4229ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3771ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3979ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4052ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4237ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4137ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3936ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3892ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4340ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4070ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4148ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3878ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4103ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3980ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3764ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4071ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4374ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4268ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4106ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4200ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4497ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4534ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4223ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4306ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4025ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4109ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5020ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4156ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4313ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4550ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4170ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4035ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3797ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3933ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4487ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4293ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3839ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3785ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3908ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4230ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4326ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3963ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5628ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4092ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4320ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4687ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4363ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4206ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4065ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4264ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4543ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5279ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4398ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4160ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4441ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4230ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3879ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4109ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4646ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4494ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4155ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4306ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4053ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4184ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4622ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4087ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4447ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5362ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4394ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4382ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3821ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4087ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4001ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4407ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3994ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4445ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3934ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4169ms  ok=True  intents=ON
+conj_watch: events=0  cycle=8713ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4445ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3915ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4527ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4325ms  ok=True  intents=ON
+conj_watch: events=0  cycle=8302ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4519ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3847ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4058ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4009ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3775ms  ok=True  intents=ON
+conj_watch: events=0  cycle=8274ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3808ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4162ms  ok=True  intents=ON
+conj_watch: events=0  cycle=7159ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4275ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4853ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4251ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4057ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4242ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4516ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4556ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4112ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4508ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4837ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5528ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4692ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6147ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4415ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4476ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3904ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4325ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3933ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4999ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4021ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4566ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4280ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4861ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4292ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4919ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4647ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4446ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4609ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4174ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4596ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4353ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4078ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4749ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5767ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4219ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4313ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4529ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4342ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5265ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4493ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5472ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5040ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4656ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4727ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4675ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4726ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4092ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4518ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4918ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4501ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3836ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4526ms  ok=True  intents=ON
+conj_watch: events=0  cycle=24451ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4322ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4216ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4961ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4259ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4526ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4656ms  ok=True  intents=ON
+conj_watch: events=0  cycle=7271ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4513ms  ok=True  intents=ON
+conj_watch: events=0  cycle=20905ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4213ms  ok=True  intents=ON
+conj_watch: events=0  cycle=13963ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4327ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5212ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4313ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5211ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4424ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4218ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4448ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5582ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4356ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4658ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4846ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4276ms  ok=True  intents=ON
+conj_watch: events=0  cycle=18447ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4375ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5163ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4055ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4390ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4626ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4604ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5194ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4796ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5300ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4395ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4509ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4477ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5989ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5007ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4761ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3881ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4151ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4477ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4802ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4741ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4337ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5454ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4478ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4718ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4818ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4561ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4286ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4616ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4380ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5126ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4436ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6380ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4365ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5695ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5116ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4339ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4357ms  ok=True  intents=ON
+conj_watch: events=0  cycle=10723ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5309ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4097ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4711ms  ok=True  intents=ON
+conj_watch: events=0  cycle=7065ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5493ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5777ms  ok=True  intents=ON
+conj_watch: events=0  cycle=19097ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5288ms  ok=True  intents=ON
+conj_watch: events=0  cycle=7300ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4430ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6088ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6924ms  ok=True  intents=ON
+conj_watch: events=0  cycle=13019ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5199ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4551ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6357ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5060ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6565ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5402ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4126ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4897ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4575ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3825ms  ok=True  intents=ON
+conj_watch: events=0  cycle=7626ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4200ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4479ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5056ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4884ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5048ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4706ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4320ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5474ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4435ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4396ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5344ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4548ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4487ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4963ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5649ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4522ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4280ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4338ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4688ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5342ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4796ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4382ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4346ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5807ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5044ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5973ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5527ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5429ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4892ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5180ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5290ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4621ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4340ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4529ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4004ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4274ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4458ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5234ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4455ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4738ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4382ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4605ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5139ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4230ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4396ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5296ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6021ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4507ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5469ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5924ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5749ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4438ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4247ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4437ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6537ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3844ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3894ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4956ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5173ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5298ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3950ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4506ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4834ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5336ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4306ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4657ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4837ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4162ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4720ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4710ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5075ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4245ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4228ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4601ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4806ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5830ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4256ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6109ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4188ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4773ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4747ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4452ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4260ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5662ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5632ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4605ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5039ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6555ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5142ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5044ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4472ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4947ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5674ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5408ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4067ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4643ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5361ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5395ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5021ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4541ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5180ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5107ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6901ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5042ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5902ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4321ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6756ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5729ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4526ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4420ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5500ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4750ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5004ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5081ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5517ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5832ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4483ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4034ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4712ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4653ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4607ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4686ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4701ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5294ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5327ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6091ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5162ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4892ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5008ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4410ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4247ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5733ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4230ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4819ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4139ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4479ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4019ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4277ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4990ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4221ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5356ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4894ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4636ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5385ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4293ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4577ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3812ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4930ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4585ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4546ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4460ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4028ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4814ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4816ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4281ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4673ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4591ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4213ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5246ms  ok=True  intents=ON
+conj_watch: events=0  cycle=7303ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4050ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5013ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4587ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4413ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5094ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4053ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4730ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5687ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3971ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5077ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4023ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4603ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4914ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4403ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4659ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4892ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5890ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4265ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4172ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5686ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4838ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5094ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4558ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4724ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4287ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4167ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4640ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4652ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4721ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3853ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5612ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4611ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4096ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3928ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4432ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4912ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4345ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4994ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4447ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4394ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4188ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3947ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3921ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4941ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4474ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4756ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4453ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4887ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4428ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4828ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4577ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4097ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4711ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5054ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4465ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4094ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6040ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5119ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4424ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3977ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4593ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4101ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4293ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4749ms  ok=True  intents=ON
+conj_watch: events=0  cycle=6247ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4540ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4168ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4469ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4000ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4947ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4174ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3978ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4587ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4392ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4476ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4219ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4261ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5722ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4301ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4567ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4523ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4553ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4526ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4216ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3956ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4324ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4423ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4322ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4361ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4378ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3929ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4317ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4508ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4494ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4816ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4542ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4059ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4378ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4406ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4198ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4492ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4302ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4012ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4707ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4513ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4136ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5070ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3911ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4187ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4129ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4755ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4139ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4343ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4102ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3971ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4243ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3925ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4663ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3964ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3885ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4094ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4191ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3976ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4049ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4018ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4011ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3886ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3924ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3975ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3799ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3960ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3874ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3950ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3858ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3928ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3987ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3700ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3863ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5227ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4924ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3975ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3827ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4063ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3887ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4001ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3975ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4028ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4277ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4017ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3822ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3952ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4020ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3930ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4084ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3949ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3859ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3919ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4004ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3917ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3946ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3857ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3819ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3930ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4016ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3918ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3869ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4083ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3857ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3893ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4136ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3821ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3858ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3949ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3938ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3935ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3974ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4110ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3872ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4060ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3904ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3878ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3893ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3964ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3939ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4012ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3795ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4262ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4011ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3881ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3795ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3828ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3928ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3958ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3941ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4163ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3891ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3845ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4014ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3941ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5964ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3840ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3880ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3914ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3872ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3897ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3936ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3865ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4393ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3976ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3889ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3967ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3879ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3878ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3944ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3962ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3899ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3907ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4046ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3720ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3798ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4137ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3793ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3853ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4017ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3953ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3945ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3924ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3974ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3908ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3851ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3845ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3943ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3798ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4340ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3737ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4071ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3814ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3885ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4182ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4030ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3793ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3984ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3799ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3868ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3790ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3858ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3931ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3991ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3914ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3737ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3890ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3864ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3748ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3958ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3899ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3964ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3826ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3808ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3788ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5155ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5227ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3936ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3879ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3783ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3817ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3963ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3873ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4237ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3954ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3944ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3867ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3788ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3780ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3840ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3755ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4006ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3845ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3981ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4158ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3701ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4122ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3860ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3768ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4814ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3832ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3954ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3853ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3825ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3770ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3846ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4034ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3919ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3904ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3894ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3830ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3819ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3872ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3797ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3829ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3775ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3822ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3702ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4056ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3912ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3988ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3852ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3770ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3890ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3793ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3894ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3927ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3827ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3887ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3890ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3929ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3755ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3969ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3816ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4100ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5053ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3979ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5118ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3849ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3820ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3881ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4118ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4014ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4259ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3865ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3901ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4046ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3923ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3938ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3946ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3876ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4019ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3971ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4430ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3900ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3859ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4002ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4205ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3838ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3938ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3933ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3919ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3864ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3828ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3789ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3963ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3970ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4148ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3930ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3907ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3926ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3782ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3981ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3813ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3841ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3942ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3865ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3987ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3926ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3850ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4010ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3966ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3952ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3987ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3936ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3808ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3876ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3841ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3895ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3951ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3923ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3824ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3812ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3776ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3846ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4743ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3795ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3709ms  ok=True  intents=ON
+conj_watch: events=0  cycle=5500ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3778ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3841ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3920ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3912ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4181ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3872ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3908ms  ok=True  intents=ON
+conj_watch: events=0  cycle=4831ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3785ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3903ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3848ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3889ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3917ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3890ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3997ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3938ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3866ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3866ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3750ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3859ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3933ms  ok=True  intents=ON
+conj_watch: events=0  cycle=3992ms  ok=True  intents=ON

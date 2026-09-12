@@ -1360,3 +1360,63 @@ source, not more same-source features.
 **PASS** — edge is where it was; no structural drift detected. Keep running; re-check next quarter.
 
 Report → C:\Users\rfo\Desktop\flowbot\flow_system\research\results\dual_model\quarterly_revalidation_20260905.md
+==============================================================================
+  SWEEP-FAILURE — corrected bps-cost accounting  (gross engine, SLIP=0)
+==============================================================================
+
+  Scenario A  (entry 7 / t-exit 3 / stop 10 bps)
+  sym        n    meanR   WR%    PF      t   halves(meanR)
+  BTC      767  +0.0578   55%  1.25  +2.33   +0.0723/+0.0433
+  ETH      768  +0.0279   56%  1.12  +1.19   -0.0028/+0.0585
+  SOL      804  +0.0224   53%  1.10  +1.01   -0.0350/+0.0798
+  BNB      812  +0.0327   57%  1.14  +1.48   +0.0500/+0.0154
+  XRP      801  +0.0061   54%  1.02  +0.26   +0.0253/-0.0131
+  DOGE     777  +0.0030   55%  1.01  +0.14   -0.0470/+0.0528
+  ADA      785  +0.0619   56%  1.29  +2.73   +0.0599/+0.0639
+  LINK     764  +0.0171   53%  1.08  +0.80   -0.0104/+0.0446
+  AVAX     794  +0.0307   53%  1.14  +1.36   -0.0140/+0.0753
+  pool    7072  +0.0288   55%  1.12  +3.80   CI95[+0.0145,+0.0436]   positive 9/9
+
+  Scenario B  (entry 7 / t-exit 6 / stop 10 bps)
+  sym        n    meanR   WR%    PF      t   halves(meanR)
+  BTC      767  +0.0448   54%  1.19  +1.82   +0.0608/+0.0290
+  ETH      768  +0.0194   55%  1.08  +0.83   -0.0105/+0.0494
+  SOL      804  +0.0151   53%  1.07  +0.68   -0.0411/+0.0713
+  BNB      812  +0.0211   56%  1.09  +0.96   +0.0398/+0.0025
+  XRP      801  -0.0020   53%  0.99  -0.09   +0.0181/-0.0221
+  DOGE     777  -0.0036   53%  0.99  -0.16   -0.0523/+0.0450
+  ADA      785  +0.0553   55%  1.26  +2.44   +0.0536/+0.0569
+  LINK     764  +0.0105   52%  1.05  +0.49   -0.0162/+0.0371
+  AVAX     794  +0.0242   53%  1.11  +1.07   -0.0195/+0.0679
+  pool    7072  +0.0205   54%  1.09  +2.71   CI95[+0.0063,+0.0354]   positive 7/9
+
+==============================================================================
+  FORWARD (freeze 2026-07-28, THE gate)
+==============================================================================
+  BTC    n=  42  sumR=  +6.680  meanR= +0.1590
+  ETH    n=  41  sumR=  +7.145  meanR= +0.1743
+  SOL    n=  47  sumR=  +0.977  meanR= +0.0208
+  BNB    n=  40  sumR=  -2.566  meanR= -0.0641
+  XRP    n=  46  sumR=  -2.923  meanR= -0.0635
+  DOGE   n=  39  sumR=  +0.599  meanR= +0.0154
+  ADA    n=  43  sumR=  -1.843  meanR= -0.0429
+  LINK   n=  38  sumR=  -1.064  meanR= -0.0280
+  AVAX   n=  29  sumR=  +5.372  meanR= +0.1852
+  pool   n= 365  meanR= +0.0339  WR=58%  clustered-CI95[-0.0720,+0.1477]  positive 5/9
+
+  Gate F progress: n=365/1400  |  clustered CI-low>0: no  |  >=6/9 positive: no  ->  accumulating
+  artifact -> C:\Users\rfo\Desktop\flowbot\flow_system\research\results\sweep_forward_gate.json
+
+==============================================================================
+  quasi-forward (sandbox freeze 2026-07-11, informational)
+==============================================================================
+  BTC    n=  53  sumR=  +4.040  meanR= +0.0762
+  ETH    n=  52  sumR=  +8.950  meanR= +0.1721
+  SOL    n=  61  sumR=  +2.366  meanR= +0.0388
+  BNB    n=  55  sumR=  -0.122  meanR= -0.0022
+  XRP    n=  57  sumR=  -4.522  meanR= -0.0793
+  DOGE   n=  59  sumR=  -0.524  meanR= -0.0089
+  ADA    n=  58  sumR=  +2.407  meanR= +0.0415
+  LINK   n=  52  sumR=  -2.922  meanR= -0.0562
+  AVAX   n=  44  sumR=  +1.476  meanR= +0.0336
+  pool   n= 491  meanR= +0.0227  WR=56%  clustered-CI95[-0.0661,+0.1097]  positive 5/9

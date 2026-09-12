@@ -460,3 +460,15 @@
 {"t": 1789059647786, "mode": "paper", "marketId": "ADAUSDT", "side": "sell", "price": 0.2078177978515625, "sizeBase": 375.31757, "fee": 0.046799, "pnl": null, "src": "raid", "cid_known": true}
 {"t": 1789063247542, "mode": "paper", "marketId": "LINKUSDT", "side": "sell", "price": 11.676, "sizeBase": 8.930685, "fee": 0.062565, "pnl": null, "src": "raid", "cid_known": true}
 {"t": 1789063249235, "mode": "paper", "marketId": "ADAUSDT", "side": "sell", "price": 0.2097, "sizeBase": 375.31757, "fee": 0.047222, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789074047398, "mode": "paper", "marketId": "ADAUSDT", "side": "sell", "price": 0.20898873729705808, "sizeBase": 375.856958, "fee": 0.04713, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789096128300, "mode": "paper", "marketId": "ADAUSDT", "side": "buy", "price": 0.2059, "sizeBase": 423.836569, "fee": 0.052361, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789113828608, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 77165.42881202698, "sizeBase": 0.051835, "fee": 2.399922, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1789117247697, "mode": "paper", "marketId": "ADAUSDT", "side": "sell", "price": 0.20754606924653052, "sizeBase": 423.836569, "fee": 0.052779, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789128468036, "mode": "paper", "marketId": "AVAXUSDT", "side": "buy", "price": 7.3398125, "sizeBase": 24.668943, "fee": 0.108639, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789128470036, "mode": "paper", "marketId": "AVAXUSDT", "side": "buy", "price": 7.33858203125, "sizeBase": 24.870255, "fee": 0.109507, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789128527852, "mode": "paper", "marketId": "AVAXUSDT", "side": "sell", "price": 7.338, "sizeBase": 24.668943, "fee": 0.108612, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789128529453, "mode": "paper", "marketId": "AVAXUSDT", "side": "sell", "price": 7.338, "sizeBase": 24.870255, "fee": 0.109499, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789129826627, "mode": "paper", "marketId": "BTCUSDT", "side": "sell", "price": 76255.98967556687, "sizeBase": 0.05183499999999999, "fee": 2.371638, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1789149828906, "mode": "paper", "marketId": "BTCUSDT", "side": "buy", "price": 77154.40559054846, "sizeBase": 0.051842, "fee": 2.399903, "pnl": null, "src": "v7", "cid_known": true}
+{"t": 1789229199339, "mode": "paper", "marketId": "AVAXUSDT", "side": "buy", "price": 7.415, "sizeBase": 25.517885, "fee": 0.113529, "pnl": null, "src": "raid", "cid_known": true}
+{"t": 1789236004924, "mode": "paper", "marketId": "AVAXUSDT", "side": "sell", "price": 7.397, "sizeBase": 25.517885, "fee": 0.113253, "pnl": null, "src": "raid", "cid_known": true}
