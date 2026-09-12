@@ -1,0 +1,59 @@
+{
+ "asof": "2026-09-12 15:18",
+ "span_days": 13.02,
+ "rows": 12676396,
+ "pairs_scored": 3107,
+ "sample_gap_sec": 180.0,
+ "d1_pass": true,
+ "d1_overlap": 30,
+ "overlap_R0_R1": 9,
+ "overlap_R0_R2": 0,
+ "run_R0": 1.315,
+ "run_R1": 1.085,
+ "run_all": 1.47,
+ "hypothesis_persistence": false,
+ "top": {
+  "R0": [
+   "GOLD@bitget-binance",
+   "GOLD@okx-binance",
+   "QNT@xyz-binance",
+   "GOLD@xyz-binance",
+   "ETH@HL-okx",
+   "ETH@HL-binance",
+   "GOLD@xyz-okx",
+   "QNT@okx-binance",
+   "ETH@HL-bitget",
+   "GOLD@xyz-bitget",
+   "BTC@HL-okx",
+   "BTC@HL-binance"
+  ],
+  "R1": [
+   "GOLD@bitget-binance",
+   "GOLD@okx-binance",
+   "GOLD@xyz-binance",
+   "ETH@HL-binance",
+   "ETH@HL-okx",
+   "GOLD@xyz-bitget",
+   "GOLD@okx-bitget",
+   "ETH@HL-bitget",
+   "BTC@HL-okx",
+   "GOLD@lighter-binance",
+   "BTC@HL-binance",
+   "GOLD@lighter-rh-binance"
+  ],
+  "R2": [
+   "BOTZ@lighter-bitget",
+   "OAI@lighter-bitget",
+   "ANTH@lighter-bitget",
+   "OAI@lighter-binance",
+   "ANTH@lighter-binance",
+   "QNT@okx-bitget",
+   "ANTH@IO-bitget",
+   "OAI@lighter-lighter-rh",
+   "ANTH@lighter-lighter-rh",
+   "OAI@IO-bitget",
+   "OAI@lighter-rh-bitget",
+   "QNT@xyz-bitget"
+  ]
+ }
+}
