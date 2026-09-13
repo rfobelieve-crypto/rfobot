@@ -79,3 +79,9 @@ REM book summary. V7's one decidable weakness is chase-vs-fade (47%% vs 69%%);
 REM gamma is the mechanism candidate. No history exists anywhere, so record.
 python research\gex_recorder.py >> research\results\sweep_shadow_run.log 2>&1
 python research\v7_regime_q2_clock.py >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-09-13: data accumulation snapshot + local HTML. Answers
+REM 'is it accumulating' (an hourly time series), which freshness_board
+REM structurally cannot -- it only measures how old the last row is, so
+REM hl_mid could be killed 70 times and stay green (mistake.md 09-11).
+python research\ops\accum_snapshot.py --quiet >> research\results\sweep_shadow_run.log 2>&1
+python research\ops\accum_render.py >> research\results\sweep_shadow_run.log 2>&1
