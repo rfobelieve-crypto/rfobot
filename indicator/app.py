@@ -645,7 +645,17 @@ def update_cycle() -> dict:
             f"{risk_text}"
         )
         tg_result = _send_telegram_photo(png, caption)
-        dc_result = _send_discord_photo(png, caption)
+        # 2026-09-13 使用者：「把 V7 在 discord 的圖表每小時推送取消，那邊改為
+        # 數據監控站」。那個頻道現在由本機 freshness_board 的每日心跳使用
+        # （research/ops/notify.station_text()）—— 每小時一張圖會把監控站的
+        # 訊息淹掉。
+        # **訊號告警（Strong/Moderate，下方 _send_discord_text）沒有取消**：
+        # 它是事件驅動不是每小時的，而那才是這個頻道本來有用的部分。
+        # 旗標預設關；要復原設 V7_DISCORD_HOURLY_CHART=1。
+        if os.environ.get("V7_DISCORD_HOURLY_CHART", "0") == "1":
+            dc_result = _send_discord_photo(png, caption)
+        else:
+            dc_result = "disabled: V7_DISCORD_HOURLY_CHART!=1 (頻道給監控站用)"
 
         # Pre-init so they're always defined before the signal-alert block.
         shap_result = None

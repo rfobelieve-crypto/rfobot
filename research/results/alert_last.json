@@ -1,0 +1,11 @@
+{
+  "asof": "2026-09-13T01:35:35+00:00",
+  "source": "freshness",
+  "tried": {
+    "discord": "HTTP 204"
+  },
+  "delivered": true,
+  "configured": true,
+  "ok": true,
+  "reason": "已送達：discord"
+}

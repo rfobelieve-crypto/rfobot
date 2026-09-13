@@ -174,6 +174,14 @@ REGISTRY = [
      "accum_snapshot.py 每小時自報；紅 = 本支沒跑、或掃不到任何資料集。"
      "注意 ok 的語意是「儀器自己健康」不是「沒有洞」——洞在 hours_missing，"
      "那是被監測對象的事"),
+    # 2026-09-13：**看板要監測自己的嘴。** 09-05~09-13 有 11 次狀態轉換
+    # 全部沒送達，而唯一的痕跡是 log 裡一行 WARN —— 告警管道的失敗只有
+    # 告警自己知道，那是一個完整的盲區（mistake.md 2026-07-05）。
+    # 門檻 26h：心跳是每日的，所以超過一天沒有成功投遞就該紅。
+    ("告警管道 (alert)", "json_flag",
+     "research/results/alert_last.json:ok", 26.0,
+     "notify.py 每次投遞後自報；紅 = 沒有設定任何管道、或投遞失敗。"
+     "管道是 Discord（主）與 Telegram（備），設定走 env 或 .env"),
     ("hl 單位驗證", "json_flag",
      "research/results/hl_verify_last.json:ok", 26.0,
      "hl_verify.py 每日自報十關；紅 = 名目與 |數量|x價格 不符、szDecimals 違反、"
@@ -532,16 +540,49 @@ def main() -> int:
         encoding="utf-8")
 
     # ── transition-only alerting ─────────────────────────────────────────
-    prev = set()
+    prev, last_hb = set(), 0.0
     if STATE.exists():
         try:
-            prev = set(json.loads(STATE.read_text())["reds"])
+            _st = json.loads(STATE.read_text())
+            prev = set(_st["reds"])
+            last_hb = float(_st.get("last_heartbeat", 0) or 0)
         except Exception:
-            prev = set()
+            prev, last_hb = set(), 0.0
     cur = set(reds)
     new_red = sorted(cur - prev)
     recovered = sorted(prev - cur)
-    STATE.write_text(json.dumps({"reds": sorted(cur)}), encoding="utf-8")
+
+    # **每日心跳。** 沒有它，沉默分不出「沒事」與「管道又死了」—— 而那正是
+    # 2026-09-05~09-13 那 8 天的形狀（每 6 小時跑、轉換有發生、投遞全失敗，
+    # 而畫面上跟健康完全一樣）。心跳讓**沉默本身變成警報**。
+    _now = time.time()
+    _send_hb = (not args.no_alert) and (_now - last_hb > 20 * 3600)
+    if _send_hb:
+        try:
+            sys.path.insert(0, str(ROOT))
+            from research.ops import notify as _nt
+            # 心跳的內容就是**資料監控站**（使用者 2026-09-13 把 Discord
+            # 那個頻道從「V7 每小時圖表」改成這個用途）。station_text() 只讀
+            # 現成的兩份 json，不重算任何東西 —— 第二份實作會安靜地跟第一份
+            # 不一致（mistake.md 2026-08-26）。
+            _txt = ("flowbot 資料監控站 — %d red / %d tracked\n"
+                    % (len(reds), len(rows)))
+            try:
+                _txt += _nt.station_text()
+            except Exception as _e2:            # noqa: BLE001
+                _txt += "station_text 失敗：%s" % _e2
+                if reds:
+                    _txt += "\n  紅：" + ", ".join(reds[:8])
+            if _nt.heartbeat(_txt)["delivered"]:
+                last_hb = _now
+                print("heartbeat DELIVERED: " + _txt.replace("\n", " | "))
+            else:
+                print("[WARN] heartbeat NOT delivered")
+        except Exception as _e:       # noqa: BLE001
+            print("[WARN] heartbeat error: %s" % _e)
+
+    STATE.write_text(json.dumps({"reds": sorted(cur),
+                                 "last_heartbeat": last_hb}), encoding="utf-8")
 
     if not args.no_alert and (new_red or recovered):
         msg_lines = ["Freshness board transition:"]
@@ -554,18 +595,15 @@ def main() -> int:
             msg_lines.append(f"  recovered: {n}")
         msg = "\n".join(msg_lines)
         try:
-            import os
-
-            from indicator.okx.alerter import send_critical
-            chat = (os.environ.get("TG_ALERT_CHAT_ID")
-                    or os.environ.get("TG_CRITICAL_CHAT_ID") or "")
-            sent = False
-            if chat:
-                for _ in range(6):
-                    if send_critical(chat, msg):
-                        sent = True
-                        break
-                    time.sleep(60)
+            # 2026-09-13：改走 research/ops/notify.py。舊版只讀 os.environ，
+            # 而 chat id 只在 .env 裡 -> chat="" -> **連嘗試都沒嘗試**，
+            # 於是 09-05 到 09-13 有 11 次轉換全部沒送達，唯一痕跡是一行
+            # WARN。notify.cfg() 做 env -> .env 回退，並把投遞結果寫成
+            # alert_last.json（本檔下方已把它註冊成一列，所以「告警送不出去」
+            # 自己會變成一盞紅燈）。
+            sys.path.insert(0, str(ROOT))
+            from research.ops import notify
+            sent = notify.send(msg, source="freshness")["delivered"]
             # Success must leave a trace too — during the 08-21/22 outage
             # the log could not answer "did the alert deliver?" because
             # success printed nothing. An alert channel whose delivery is
