@@ -146,6 +146,28 @@
 零行新程式碼。`maker.py` 的三條規則（本地狀態只由交易所真相清除／成交逐筆
 消化／未確認的撤單是悲觀的）已經寫好並審過。
 
+> **⚠ 2026-09-13 同日更正：「零行新程式碼」是錯的，而查出它的是第一次
+> `--shadow` 彩排。** 第一個評估週期就死在
+> `AttributeError: 'LighterVenue' object has no attribute 'maker_fee_bps'`
+> —— 那個屬性只存在於 `VenueConf`，**兩個 venue class 都沒有**，
+> 所以 `mode: maker` 在**兩條腿上都是壞的**。B3 那條掛單路徑寫完、審過、
+> 在 `plan_maker` / `maker.py` 那一層單元測試過，但**從來沒有用真的 venue
+> 物件跑過 `_scan_maker`**。引擎測試用的 StubVenue 是照測試需要定義屬性的，
+> 所以它結構性地看不見這件事。
+>
+> 這是 flow_system facade-skip 那一族（重演三次才有人寫 AST 測試）。
+> 修法照同一個處方：補上兩個 venue 的 `maker_fee_bps`，
+> **再加一道結構性守衛** `engine/tests/test_venue_surface.py` —— AST 掃
+> `engine.py` 讀過的每一個 venue 屬性，斷言兩個 class 都有，豁免必須具名
+> 並寫理由。它當場又抓到第二個：`self.entropy._query_address()` 掛在一個
+> 只檢查 `hedge.kind` 的條件後面，所以 `entropy.venue: lighter` 配
+> `--hedge tradexyz` 會炸（潛伏的，這台機器還沒有那個組合）。
+>
+> **所以正確的說法是：執行層的「難的部分」已經存在（B3 狀態機、對沖、
+> 對帳、HALT），但它從來沒被執行過，而沒被執行過的程式碼不算能跑。**
+> 彩排重跑之後：零 traceback、兩條 WS 都連上、strict reconcile 讀到兩個
+> 帳戶的真實部位。修法在 ../arb `6d29e8c`。
+
 **但這件事同時砍掉 §1.40 的大部分候選。** `HEDGE_VENUES = (lighter,
 lighter-rh, tradexyz)`，entropy 腿是 HL —— **CEX 不是可對沖場館**：
 
