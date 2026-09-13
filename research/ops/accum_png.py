@@ -17,7 +17,7 @@
   * 深淺 = 該小時列數 ÷ 營運水準（p90），所以「量掉一半」看得出來，
     不是只有「完全沒有」才看得出來
 
-樣式照 `hft-alphas-pt-2` 的參照標準（純 matplotlib、單色鋼藍 #4c72b0、
+樣式照 `hft-alphas-pt-2` 的參照標準（純 matplotlib、單色 #55a868、
 標題寫明量的是什麼／期間／樣本），而不是塞滿顏色。
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 SNAP = os.path.join(ROOT, "research", "results", "accum_snapshot.json")
 OUT = os.path.join(ROOT, "research", "results", "accum.png")
 
-BLUE = "#4c72b0"
+GREEN = "#55a868"       # 取代原本的鋼藍 #4c72b0（使用者 2026-09-13）
 RED = "#c0392b"
 GREY = "#8a93a3"
 
@@ -76,9 +76,9 @@ def render(snap, out=OUT):
                              else (0.75, 0.23, 0.17))     # 灰=可補 紅=永久
             else:
                 a = 0.25 + 0.75 * min(1.0, r[k] / lvl)
-                img[i, j] = (1 - a * (1 - 0x4c / 255),
-                             1 - a * (1 - 0x72 / 255),
-                             1 - a * (1 - 0xb0 / 255))
+                img[i, j] = (1 - a * (1 - 0x55 / 255),
+                             1 - a * (1 - 0xa8 / 255),
+                             1 - a * (1 - 0x68 / 255))
 
     fig, (ax, ax2) = plt.subplots(
         2, 1, figsize=(11.5, 1.05 + 0.34 * n + 1.1),
@@ -96,15 +96,27 @@ def render(snap, out=OUT):
         lab.append("%s%s%s" % (s["name"], tag, ev)
                    + ("  缺%d" % miss if miss else ""))
     ax.set_yticklabels(lab, fontsize=8)
-    # x 軸只標日期邊界
-    ticks, tl = [], []
+    # 時間軸：**每小時一格**（使用者 2026-09-13）。336 格全部標字沒有人讀得完，
+    # 所以分兩層 —— 次刻度每 1 小時一根（看得出格線、數得出第幾小時），
+    # 主刻度每 6 小時標 HH，日界另外標日期。
+    hticks = list(range(len(hours)))
+    ax.set_xticks([j - 0.5 for j in hticks], minor=True)
+    # 標籤只放 00 與 12。第一版每 6 小時一個、而且日界用兩行（日期\n00），
+    # 結果相鄰標籤直接黏成「1808/3106」—— 14 天 x 4 = 56 個標籤塞不進 11.5 吋。
+    major, mlab = [], []
     for j, k in enumerate(hours):
         if k[8:] == "00":
-            ticks.append(j)
-            tl.append("%s/%s" % (k[4:6], k[6:8]))
-    ax.set_xticks(ticks)
-    ax.set_xticklabels(tl, fontsize=7.5)
-    ax.tick_params(length=2)
+            major.append(j)
+            mlab.append("%s/%s" % (k[4:6], k[6:8]))
+        elif k[8:] == "12":
+            major.append(j)
+            mlab.append("12")
+    ax.set_xticks(major)
+    ax.set_xticklabels(mlab, fontsize=6.5)
+    ax.tick_params(axis="x", which="major", length=3)
+    ax.tick_params(axis="x", which="minor", length=1.5, color="#bbbbbb")
+    ax.grid(axis="x", which="minor", color="#ffffff", linewidth=0.25, alpha=0.5)
+    ax.set_axisbelow(False)
     for sp in ("top", "right", "left", "bottom"):
         ax.spines[sp].set_visible(False)
     ax.set_title(
@@ -119,7 +131,7 @@ def render(snap, out=OUT):
     vals = [s.get("rows_24h", 0) for s in sets]
     order = sorted(range(n), key=lambda i: -vals[i])[:6]
     ax2.barh([names[i] for i in order][::-1], [vals[i] for i in order][::-1],
-             color=BLUE, height=0.62)
+             color=GREEN, height=0.62)
     # 用 log 不用 symlog：全部 > 0，而 symlog 會多畫一段沒有意義的線性區，
     # 讓軸從 0 起跳、再跳到 10^0，讀起來像壞掉。
     ax2.set_xscale("log")
