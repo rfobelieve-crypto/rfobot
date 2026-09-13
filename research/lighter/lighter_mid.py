@@ -36,7 +36,9 @@ Lighter 與 HL 的能力差異 —— 兩個方向都有，都要寫下來
 ===========================================================================
 凍結的設計決定
 ===========================================================================
-    宇宙      與 `lighter_tape.py` **同一組**（永續、日成交額前 80）。
+    宇宙      與 `lighter_tape.py` **同一組**（永續、日成交額前 `TOP_N`，
+              2026-09-13 起預設 250 = 全部 active；原為 80，理由與放寬
+              的理由都在 lighter_tape 檔頭的警示框）。
               刻意相同：兩份資料要能逐 coin join，宇宙不同就會在 join 上
               安靜地掉標的。
     取樣      **牆鐘對齊 5 秒**（`LIGHTER_MID_SAMPLE_SEC` 可覆寫）。
@@ -120,7 +122,10 @@ TOB_COLS = ["rx_ms", "book_time", "coin", "market_id",
 FLUSH_SEC = 300
 DEPTH_LEVELS = 5
 BANDS = (1, 2, 5, 10, 25, 50, 100)     # 距 mid 幾 bps 內的累計名目
-TOP_N_DEFAULT = 80
+# 2026-09-13 從 80 放寬到 250（= 全部 active，現為 217）。tob 事件是
+# TODO §1.40 算 markout 的 mid 來源，而長尾的半價差才是那條線的標的
+# （前 80 名 BTC 0.03 / ETH 0.20 bps，長尾 20-60）。前提是訂閱分批。
+TOP_N_DEFAULT = 250
 
 def _to_ms(v):
     """把場館的時間戳正規化成毫秒。**不假設單位。**
@@ -464,6 +469,24 @@ async def flusher(stop: asyncio.Event) -> None:
             print("flush 失敗:", e)
 
 
+SUB_BATCH = 20             # 每批幾個訂閱（實測值，見 connected 那段）
+SUB_PAUSE = 1.0            # 批與批之間（秒）
+
+
+async def _subscribe_batched(ws) -> None:
+    """分批訂閱簿口。**不要在讀訊息的迴圈裡 await sleep** —— 那會停住讀取。"""
+    mids = list(_id2sym)
+    for i in range(0, len(mids), SUB_BATCH):
+        for mid in mids[i:i + SUB_BATCH]:
+            try:
+                await ws.send(json.dumps(
+                    {"type": "subscribe", "channel": "order_book/%d" % mid}))
+            except Exception as e:                           # noqa: BLE001
+                print("訂閱中斷於第 %d 個：%r" % (i, e))
+                return
+        await asyncio.sleep(SUB_PAUSE)
+
+
 async def ws_loop(stop: asyncio.Event) -> None:
     import websockets
     while not stop.is_set():
@@ -488,10 +511,19 @@ async def ws_loop(stop: asyncio.Event) -> None:
                     if t == "connected":
                         # **要等 connected 才訂閱**，太早送會被靜默忽略
                         # （arb/engine/entropy_arb/feeds.py 的實測註解）
-                        for mid in _id2sym:
-                            await ws.send(json.dumps(
-                                {"type": "subscribe",
-                                 "channel": "order_book/%d" % mid}))
+                        #
+                        # **而且要分批、而且要丟成背景 task。** 2026-09-13 實測
+                        # （`ws_sub_limit.py --channel order_book`，217 個市場）：
+                        #     一次 burst  215/217 ack
+                        #     20 個一批、批間 1 秒  **217/217 ack**
+                        # 成交帶那支更嚴重（burst 有一次在第 7 秒被伺服器關連線）。
+                        # 而 `order_book` 的訂閱回的是**整本簿口快照**
+                        # （BTC 有上千檔），217 本一次湧進來比 217 個成交 ack 重
+                        # 得多 —— 所以宇宙放寬到長尾之後，分批是必要的不是保險。
+                        #
+                        # 丟成 task 的理由：在 `async for raw in ws` 裡面 await
+                        # sleep 會**停住讀取**，快照就會堆在緩衝區裡。
+                        asyncio.create_task(_subscribe_batched(ws))
                         subbed = True
                         continue
                     if t == "ping":

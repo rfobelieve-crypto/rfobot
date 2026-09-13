@@ -85,6 +85,8 @@ def main():
     ap.add_argument("--seconds", type=int, default=75)
     ap.add_argument("--spacing", type=float, default=0.0,
                     help="每個 subscribe 之間的間隔秒數（測節流有沒有幫助）")
+    ap.add_argument("--channel", default="trade",
+                    help="trade（成交帶）或 order_book（簿口，回整本快照、重得多）")
     ap.add_argument("--batch", type=int, default=0,
                     help="每批幾個（0 = 不分批）；配 --pause 用")
     ap.add_argument("--pause", type=float, default=1.0,
@@ -127,7 +129,7 @@ def main():
                     for mid in lst[i:i + step]:
                         try:
                             ws.send(json.dumps({"type": "subscribe",
-                                                "channel": "trade/%d" % mid}))
+                                                "channel": "%s/%d" % (a.channel, mid)}))
                             sent[0] += 1
                         except Exception as e:              # noqa: BLE001
                             errs.append(("send", "%r @ #%d" % (e, sent[0])))
@@ -141,7 +143,7 @@ def main():
         if t == "ping":
             ws.send(json.dumps({"type": "pong"}))
             return
-        if t == "subscribed/trade":
+        if t == "subscribed/%s" % a.channel:
             # **訂閱時送 `trade/N`，回來的 channel 是 `trade:N`** —— 分隔符
             # 不同。第一版用 "/" 切，217 個訂閱拿到 0 個 ack，而同時有 39 個
             # 頻道在收成交 —— 那個矛盾就是「我的儀器壞了不是場館有上限」的
@@ -158,7 +160,7 @@ def main():
             else:
                 unparsed.append(str(d.get("channel"))[:40])
             return
-        if t == "update/trade":
+        if t == "update/%s" % a.channel:
             n = len(d.get("trades") or []) + len(d.get("liquidation_trades") or [])
             trades[_mid(d.get("channel"))] += n
             return
