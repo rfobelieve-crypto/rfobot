@@ -93,10 +93,16 @@ def strip_svg(hours, rows, level, first, backfillable, w=4, h=17, gap=1):
     # 通常只剩十幾個 rect。逐格 tooltip 一併拿掉 —— 帶子的工作是「一眼看出
     # 洞在哪」，滑鼠細節不值那個節點數。
     cols = []
+    last = hours[-1] if hours else None
     for k in hours:
         v = rows.get(k)
         if first and k < first:
             cols.append("#1a1e25")
+        elif k == last and not v:
+            # **最後一格是進行中的那一小時，不是洞。** 錄製器每 300 秒才落盤，
+            # 整點過後前幾分鐘那個小時檔還不存在 -> 舊版塗紅，於是每小時都
+            # 冒一道假紅線。缺口計數本來就排除它了，漏的是畫圖這一側。
+            cols.append("#2a3038")
         elif v is None or v <= 0:
             cols.append("#5a6472" if backfillable else "#c0392b")
         else:

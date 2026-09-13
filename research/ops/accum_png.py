@@ -71,6 +71,13 @@ def render(snap, out=OUT):
         for j, k in enumerate(hours):
             if first and k < first:
                 img[i, j] = (0.93, 0.93, 0.94)            # 上線前
+            elif j == m - 1 and not r.get(k):
+                # **最後一格是「還在進行中的那一小時」，不是洞。**
+                # 錄製器每 300 秒才落盤，所以整點過後的前幾分鐘那個小時檔
+                # 還不存在 -> 舊版把它塗紅，於是**每小時都會冒一道假紅線**。
+                # 缺口計數本來就排除了它（span_all = keys[:-1]），漏的是畫圖。
+                # 假紅燈會訓練人忽略整個頻道 —— 這張圖最該避免的就是這件事。
+                img[i, j] = (0.88, 0.90, 0.92)
             elif not r.get(k):
                 img[i, j] = ((0.62, 0.66, 0.71) if fill
                              else (0.75, 0.23, 0.17))     # 灰=可補 紅=永久
@@ -121,8 +128,8 @@ def render(snap, out=OUT):
         ax.spines[sp].set_visible(False)
     ax.set_title(
         "資料累積逐小時落地｜每格 1 小時、共 %d 天｜深淺 = 該小時列數 ÷ 營運水準(p90)\n"
-        "紅 = 不可回填的洞（永久損失）　灰 = 可回填的洞　淺灰 = 上線前　"
-        "名稱後的 * = 不可回填　UTC %s"
+        "紅 = 不可回填的洞（永久損失）　灰 = 可回填的洞　淺灰 = 上線前／"
+        "最右一格 = 進行中的小時　名稱後的 * = 不可回填　UTC %s"
         % (snap["days"], snap["asof_utc"][:16].replace("T", " ")),
         fontsize=9.5, loc="left", pad=8)
 
