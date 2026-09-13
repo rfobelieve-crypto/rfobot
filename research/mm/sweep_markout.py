@@ -67,7 +67,10 @@ OUT = os.path.join(ROOT, "research", "results", "sweep_markout.json")
 
 TAPE = "D:/flowbot_data/lighter/trades/*/*.parquet"
 TOB = "D:/flowbot_data/lighter/tob/*/*.parquet"
-HORIZONS = [0.0, 0.1, 0.5, 1.0, 5.0, 30.0]      # 秒
+# **視窗必須長於該市場簿口的更新間隔**,否則 markout 量到的是半價差本身
+# (AI 的簿口年齡中位 917ms / p90 28 秒,所以它的 markout@1s = +57 bps
+#  其實是半價差;拉到 30 秒變 −32.6)。所以這裡要有長視窗。
+HORIZONS = [0.0, 0.1, 0.5, 1.0, 5.0, 15.0, 30.0, 60.0, 300.0]   # 秒
 
 
 def load():
@@ -134,8 +137,21 @@ def markout(tp, tb):
                              b[["book_time", "mid", "hs"]].rename(
                                  columns={"book_time": "t"}),
                              on="t", direction="backward")
+        # **C1 的對照要用「成交當下的半價差」，而且要 usd 加權** ——
+        # 不是該幣半價差的中位。宇宙放寬到 200 個幣之後 C1 從 PASS 變成
+        # 「查 join」（0.577 vs 0.358），而那不是 join 壞了：薄的標的價差
+        # 變動大，**成交集中在價差寬的時刻**，所以 markout(0) 依建構就大於
+        # 半價差的中位。拿中位去比是把兩個不同的加權混在一起
+        # （mistake.md 2026-09-12：觀測÷預期型的判準，分子分母要同一種統計量）。
+        # 母體也要一致:C1 比的是 mo_no(單獨成交),所以對照的半價差
+        # 只能取**單獨成交那一刻**的,不能把掃單那一刻的混進來。
+        hsf = pd.to_numeric(base.hs, errors="coerce").values
+        uw = f.usd.values
+        okh = np.isfinite(hsf) & (~f.is_sweep.values)
         rec = dict(coin=coin, n=len(f), usd=float(f.usd.sum()),
-                   hs=float(np.nanmedian(base.hs)))
+                   hs=float(np.nanmedian(base.hs)),
+                   hs_fill=float(np.average(hsf[okh], weights=uw[okh]))
+                   if okh.sum() > 10 else np.nan)
         sign = np.where(f.is_maker_ask.values, 1.0, -1.0)   # 賣在 ask -> +1
         px = f.px.values
         for d in HORIZONS:
@@ -187,13 +203,26 @@ def main():
     # 掃單吃穿好幾檔，深處那幾筆的成交價離 mid 比頂檔半價差遠得多，
     # 所以掃單成交的 markout(0) 依建構就大於半價差（實測 1.450 vs 0.394）。
     # 第一版拿全體比，看起來像 join 壞了 —— 而那是我比錯對象。
+    # **而對照的半價差也要 usd 加權、也要只取單獨成交那一刻**（`hs_fill`）。
+    # 宇宙從 80 放寬到 200 個幣之後這一關紅了（0.577 vs 中位 0.358），
+    # 而它不是 join 壞了：薄的標的價差本身在變動，**成交集中在價差寬的
+    # 時刻**，所以「成交加權的半價差」必然大於「時間中位的半價差」。
+    # 拿中位去比 = 觀測與預期用了兩種不同的統計量
+    # （mistake.md 2026-09-12 第二條）。中位那個仍然印出來當對照。
     m0 = pd.to_numeric(r["mo_no_0.0"], errors="coerce")
-    hs = pd.to_numeric(r["hs"], errors="coerce")
-    k = m0.notna() & hs.notna()
-    a, b = np.average(m0[k], weights=w[k]), np.average(hs[k], weights=w[k])
-    print("  C1 **單獨成交**的 markout(δ=0) = **%.3f bps** vs 半價差 **%.3f**"
-          "  -> %s" % (a, b, "**PASS**（差 %.0f%%）" % (100 * abs(a / b - 1))
-                       if b > 0 and abs(a / b - 1) < 0.5 else "**查 join**"))
+    hsf = pd.to_numeric(r["hs_fill"], errors="coerce")
+    hsm = pd.to_numeric(r["hs"], errors="coerce")
+    k = m0.notna() & hsf.notna() & hsm.notna()
+    a = np.average(m0[k], weights=w[k])
+    b = np.average(hsf[k], weights=w[k])
+    bm = np.average(hsm[k], weights=w[k])
+    print("  C1 **單獨成交**的 markout(δ=0) = **%.3f bps** vs "
+          "**成交加權**半價差 **%.3f**  -> %s"
+          % (a, b, "**PASS**（差 %.0f%%）" % (100 * abs(a / b - 1))
+             if b > 0 and abs(a / b - 1) < 0.5 else "**查 join**"))
+    print("     （時間中位的半價差 %.3f —— 比成交加權低 %.0f%%，"
+          "那是「價差寬的時候才有人交易」，不是 join 錯）"
+          % (bm, 100 * (1 - bm / b) if b > 0 else float("nan")))
     ma = pd.to_numeric(r["mo_sw_0.0"], errors="coerce")
     ka = ma.notna()
     print("     （掃單成交 %.3f —— 比半價差大是對的：那些成交在簿口深處）"

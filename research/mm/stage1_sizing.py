@@ -84,7 +84,9 @@ def main():
     ib = pd.read_json(os.path.join(RES, "inventory_bound.json"))
     mo = pd.read_json(os.path.join(RES, "sweep_markout.json"))
     st = tape_stats()
-    j = (ib.merge(mo[["coin", "hs", "mo_1.0"]], on="coin", how="inner")
+    MOC = [c for c in ["hs", "mo_1.0", "mo_15.0", "mo_30.0", "mo_60.0"]
+           if c in mo.columns]
+    j = (ib.merge(mo[["coin"] + MOC], on="coin", how="inner")
            .merge(st, on="coin", how="inner"))
     try:
         r = requests.get(API + "/api/v1/orderBookDetails", timeout=20).json()
@@ -95,11 +97,39 @@ def main():
         mins = {}
     j["min_usd"] = j.coin.map(mins).replace(0, np.nan).fillna(10.0)
 
-    j["E"] = (j["mo_1.0"] > MAKER_FEE).fillna(False)
+    # ── E 必須跨視窗穩定，不是單一個 1 秒（2026-09-13 更正）──────────
+    # **AI 的 markout@1s 是 +57.3 bps，而它是假的。** 查它的時候發現
+    # 半價差 64.88 bps、**簿口年齡中位 917 ms、p90 28 秒** —— 所以
+    # `mid(t+1s)` 常常就是 `mid(t)`，markout@1s 量到的是**半價差本身**，
+    # 不是扣掉逆選擇之後的東西。1 秒的視窗比簿口的更新間隔還短，裡面沒有資訊。
+    # （mistake.md 2026-09-07：「兩個時點拿到一模一樣的東西永遠是切點失效
+    # 的徵兆」—— 這次是視窗短於更新率。）
+    #
+    # 拉長視窗就現形了：
+    #   AI    +47.0(1s) +41.5(5s) +27.4(15s) **−32.6(30s)** −13.3(60s) −36.0(300s)
+    #   GRAM  +4.7 +5.0 +5.5 +7.1 **+8.1** +4.6    <- 跨視窗穩定
+    #   NEAR  +2.8 +3.4 +5.2 +5.4 **+5.6** +3.4    <- 跨視窗穩定
+    #   ZEC   +0.8 +1.1 +0.4 −0.3 **−1.3** −1.8    <- 衰退轉負
+    #
+    # **所以 E 改成「15s / 30s / 60s 三個視窗都 > maker 費」** ——
+    # 單一視窗的 markout 對「簿口更新率」這個混淆因子沒有免疫力。
+    # 通則：**markout 的視窗必須長於該市場簿口的更新間隔**，而一個固定視窗
+    # 套在更新率差 100 倍的宇宙上必然錯。
+    HZ = ["mo_15.0", "mo_30.0", "mo_60.0"]
+    have = [h for h in HZ if h in j.columns]
+    if len(have) < len(HZ):
+        print("  **sweep_markout.json 沒有 15/30/60 秒的欄位 —— "
+              "先把 HORIZONS 加上去重跑那一支，否則 E 退化成單視窗**")
+        j["E"] = (j["mo_1.0"] > MAKER_FEE).fillna(False)
+    else:
+        j["E"] = np.all([(j[h] > MAKER_FEE).fillna(False) for h in have],
+                        axis=0)
     j["C"] = j["alt"].between(0.25, 0.75).fillna(False)
     print("\n兩個硬閘門")
-    print("  E markout@1s > maker %.2f        **%d / %d**"
-          % (MAKER_FEE, int(j.E.sum()), len(j)))
+    print("  E markout > maker %.2f **在 %s 全部成立**   **%d / %d**"
+          % (MAKER_FEE, "/".join("%gs" % float(h.split("_")[1])
+                                 for h in have) or "1s",
+             int(j.E.sum()), len(j)))
     print("  C 換邊率 25-75%%（非洗量非方向性） **%d / %d**"
           % (int(j.C.sum()), len(j)))
     k = j[j.E & j.C].copy()
@@ -123,7 +153,12 @@ def main():
     k["myusd_day"] = k.myfills_day * k["size"]
     k["inv"] = k.myusd_day * k.onesided            # 一天累積的庫存
     k["cap"] = k.inv * SAFETY
-    k["pnl_day"] = k.myfills_day * k["size"] * (k["mo_1.0"] - MAKER_FEE) / 1e4
+    # **損益的邊際要跟閘門信任的視窗一致。** E 要求 15/30/60 秒三格全過,
+    # 而損益如果還用 1 秒,就是用一個已被判定不可信的量去算錢
+    # (AI 的 1 秒是 +47 bps,30 秒是 −32.6)。取三格的**最小值** = 下界。
+    k["mo_edge"] = (k[have].min(axis=1) if len(have) == len(HZ)
+                    else k["mo_1.0"])
+    k["pnl_day"] = k.myfills_day * k["size"] * (k.mo_edge - MAKER_FEE) / 1e4
     # **Stage 1 受限於風險不是機會數，所以排序要用報酬÷風險。**
     # 按絕對損益排會把最大的庫存上限配給最弱的候選：GOOGL 佔庫存上限 72%
     # 卻只貢獻 4% 的損益（markout +0.76、單邊性 0.984、而且它有一個
@@ -135,11 +170,11 @@ def main():
     print("候選（兩關全過）：size 與庫存上限由**單邊性**決定，不是排除它")
     print("=" * 112)
     print("  %-9s %8s %6s %7s %6s %8s %7s %8s %9s %9s %8s"
-          % ("coin", "markout", "換邊%", "單邊性", "做市者", "我成交/天",
+          % ("coin", "邊際bps", "換邊%", "單邊性", "做市者", "我成交/天",
              "size$", "幾天到30", "庫存上限$", "日損益$", "日報酬%"))
     for _, x in k.head(20).iterrows():
         print("  %-9s %8.3f %5.0f%% %7s %6.0f %8.1f %7.0f %8s %9s %9.2f %8s"
-              % (x.coin, x["mo_1.0"], 100 * x["alt"],
+              % (x.coin, x.mo_edge, 100 * x["alt"],
                  "—" if pd.isna(x.ratio_p50_300) else "%.3f" % x.ratio_p50_300,
                  x.makers, x.myfills_day, x["size"],
                  "—" if pd.isna(x.days_to_30) else "%.2f" % x.days_to_30,
@@ -150,10 +185,10 @@ def main():
     print("  **合計日損益量級 $%.2f**（%d 個市場）｜我方日成交額合計 $%.0f"
           % (k.pnl_day.sum(), len(k), k.myusd_day.sum()))
     # 數字大到不合理先查儀器：markout 超過 maker 費 20 倍的要標出來
-    od = k[k["mo_1.0"] > 20 * MAKER_FEE]
+    od = k[k.mo_edge > 20 * MAKER_FEE]
     if len(od):
-        print("  **markout 超過 maker 費 20 倍的 %d 個 —— 先查儀器不要直接用**："
-              "%s" % (len(od), ", ".join("%s %+.1f bps" % (x.coin, x["mo_1.0"])
+        print("  **邊際超過 maker 費 20 倍的 %d 個 —— 先查儀器不要直接用**："
+              "%s" % (len(od), ", ".join("%s %+.1f bps" % (x.coin, x.mo_edge)
                                         for _, x in od.iterrows())))
     print("  拿到 30 筆成交最快的：%s（%.2f 天）"
           % (k.sort_values("days_to_30").iloc[0].coin,
@@ -170,7 +205,7 @@ def main():
     print("\n  **庫存上限那個數字是 Stage 1 的真實風險暴露**（不對沖），")
     print("  所以它要你點頭，不是我決定。上表用安全倍數 %.0f；" % SAFETY)
     print("  要更保守就把 SAFETY 調小，或把 CAP_SIZE 從 $%.0f 壓下去。" % CAP_SIZE)
-    print("\n  日損益是**量級不是預測**：markout 樣本 5.76 小時、"
+    print("\n  日損益是**量級不是預測**：markout 的樣本只有幾小時、"
           "G3 集中度 74% 在單一市場。")
     k.to_json(os.path.join(RES, "stage1_sizing.json"), orient="records",
               force_ascii=False)
