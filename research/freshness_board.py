@@ -346,7 +346,21 @@ REGISTRY = [
      "zero-fee control: lighter NVDA vs lighter-rh NVDA"),
     ("arb scanner (§0.75b)", "glob_newest",
      "../arb/engine/logs/scan/scan_*.csv", 0.5,
-     "cross-venue REST scanner, ~2 min cycle over ~110 pairs"),
+     "跨場館 REST 掃描器。**2026-09-13 起它跑在 Railway 上**，本機這些檔是"
+     "拉回來的（檔名帶 _rw，見 ../arb/tools/scan_pull.py）。搬家的理由是"
+     "per-IP 的 WAF 預算：掃描器一支 65 次/分，是十支引擎合計的十六倍，"
+     "而被擋住的是**引擎的重連**，那時引擎手上有部位（docs/DEPLOY.md §6）。"
+     "節奏同時從 180 秒放寬到 600 秒 —— §1.39 量到這支掃描器自己的腿差就有"
+     "53 秒，所以 180 秒的格本來就比它能分辨的細。"
+     "**這一列答的是「本機有沒有收到新資料」**，斷掉的原因看下一列"),
+    ("arb 掃描器拉取 (Railway)", "json_flag",
+     "../arb/results/scan_pull_last.json:ok", 0.3,
+     "每 5 分鐘由 arb_watchdog.ps1 拉一次 Railway 掃描器的產物。"
+     "**判準是本機的位元組有沒有在長，不是遠端有沒有回 200** —— Railway "
+     "活著而拉取斷了的話，本機資料會靜靜地停在昨天，而十個消費者一個都"
+     "不會報錯（mistake.md 2026-08-29：計數類的下游對這種病的反應不是壞掉，"
+     "是從零重數）。旗標每一輪都寫，所以 mtime 變舊本身就是拉取沒在跑。"
+     "reason 會說拉了幾個位元組、或遠端讀不到"),
     # -- daily --
     # 2026-09-01 (§0.85): mtime answers "is the writer running"; content
     # age answers "is the data moving".  During an upstream outage those
