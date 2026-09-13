@@ -144,6 +144,12 @@ def main():
               % (len(pos), pos.sym.nunique(), ", ".join(sorted(set(pos.post)))))
         print("  深度中位 **$%.0f**（這是單邊頂檔，容量的上界）"
               % pos.dep.median())
+
+    # 寫出給 G1（流量）那一關接 —— 下游不得自己重算毛邊際（第二份實作）
+    out = os.path.join(os.path.dirname(os.path.dirname(HERE)),
+                       "research", "results", "spread_arb_pairs.json")
+    live.to_json(out, orient="records", force_ascii=False)
+    print("\n寫出 %s（%d 個不凍結的配對，含負的）" % (out, len(live)))
     return 0
 
 
