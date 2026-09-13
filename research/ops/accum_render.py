@@ -96,7 +96,10 @@ def strip_svg(hours, rows, level, first, backfillable, w=4, h=17, gap=1):
     last = hours[-1] if hours else None
     for k in hours:
         v = rows.get(k)
-        if first and k < first:
+        # 紅色只能代表「我知道資料缺了」，不能代表「我不知道」。
+        # first is None = 剛上線、完整小時數不到 3 個，判不出上線時刻 ——
+        # 舊版讓整列全紅（PNG 那側同一個 bug，2026-09-13 使用者截圖回報）。
+        if first is None or k < first:
             cols.append("#1a1e25")
         elif k == last and not v:
             # **最後一格是進行中的那一小時，不是洞。** 錄製器每 300 秒才落盤，

@@ -69,8 +69,14 @@ def render(snap, out=OUT):
         first = s.get("first_hour")
         fill = s.get("backfillable", False)
         for j, k in enumerate(hours):
-            if first and k < first:
-                img[i, j] = (0.93, 0.93, 0.94)            # 上線前
+            # **紅色只能代表「我知道資料缺了」，不能代表「我不知道」。**
+            # first is None = 還判不出上線時刻（剛上線的錄製器完整小時數
+            # 不到 3 個，覆蓋率規則湊不到樣本）。舊版讓這種列每一格都掉進
+            # 「沒資料」分支 -> **整列 14 天全紅**（Lighter 頂檔事件上線
+            # 一小時後就這樣，使用者截圖回報）。這是今天第三個假紅燈，
+            # 而三個的根都一樣：缺資訊時的預設值選了紅。
+            if first is None or k < first:
+                img[i, j] = (0.93, 0.93, 0.94)            # 上線前／還判不出來
             elif j == m - 1 and not r.get(k):
                 # **最後一格是「還在進行中的那一小時」，不是洞。**
                 # 錄製器每 300 秒才落盤，所以整點過後的前幾分鐘那個小時檔
