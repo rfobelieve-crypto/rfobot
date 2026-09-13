@@ -96,6 +96,30 @@ API = "https://mainnet.zklighter.elliot.ai"
 FLUSH_SEC = 300            # 每 5 分鐘落盤（斷電最多損失 5 分鐘）
 TOP_N_DEFAULT = 80
 
+# ── 訂閱節流與自我修復（2026-09-13，TODO §1.40）─────────────────────────
+# **把全部訂閱一次 burst 出去會被伺服器關連線。** 實測（`ws_sub_limit.py`，
+# 217 個 active 市場、獨立連線）：
+#     無間隔 213 ack 撐滿 102 秒 ／ 間隔 20ms 200 ack 撐滿 ／
+#     無間隔 **189 ack 在第 7 秒被斷**（WebSocketConnectionClosedException，
+#     而且是在還在送訂閱的時候斷的）
+# 三次有一次被斷 —— 間歇性，而**失敗方式是連線被關，不是回錯誤訊息**。
+# 對常駐錄製器來說那是最糟的形狀：watchdog 重啟 -> 重新訂閱 -> 再被斷
+# （mistake.md 2026-09-11 `hl_mid` 被殺 70 次、丟 6 小時的同一個形狀）。
+#
+# 所以三件事：
+#   1. **分批**，批間有間隔，而且**從背景執行緒送** —— 原本是在 `on_msg` 裡
+#      同步迴圈，那會擋住自己的訊息泵，讓 burst 變成可能的最快速度。
+#   2. **數 ack**。`subscribed/trade` 回來的 channel 是 **`trade:N`**
+#      （訂閱時送的是 `trade/N`，分隔符不同 —— 這個差異咬過我一次，
+#      用 "/" 切會拿到 0 個 ack 而同時有資料在進來）。
+#   3. **缺的自動補訂**，並把 `subs/acks` 寫進旗標，少訂到不會是隱形的。
+#      注意 `ok` **刻意不因為缺 ack 而變 False** —— 那會讓 watchdog 殺掉
+#      一個正在正常錄的行程，而那正是上面那個 70 次的病。
+SUB_BATCH = 20             # 每批幾個訂閱
+SUB_PAUSE = 1.0            # 批與批之間（秒）
+SUB_REPAIR_SEC = 90        # 每隔這麼久補訂一次沒有 ack 的
+SUB_REPAIR_MAX = 5         # 最多補幾輪
+
 COLS = ["ts", "tx_us", "market_id", "coin", "trade_id", "is_liq",
         "px", "sz", "usd", "is_maker_ask",
         "maker_fee", "taker_fee",
@@ -113,8 +137,51 @@ _buf = []
 _accts = set()
 _lock = threading.Lock()
 _stat = dict(trades=0, liqs=0, reconnects=0, flushes=0, rows_written=0,
-             started=time.time(), last_trade_ms=0, markets=0)
+             started=time.time(), last_trade_ms=0, markets=0,
+             subs=0, repairs=0)
 _id2sym = {}
+_acked = set()          # 收到 subscribed/trade 的 market_id
+
+
+def _chan_mid(ch):
+    """`trade:231` -> 231。**回來的分隔符是 `:`，送出去的是 `/`。**"""
+    s = str(ch or "")
+    for sep in (":", "/"):
+        if sep in s:
+            try:
+                return int(s.rsplit(sep, 1)[-1])
+            except ValueError:
+                return -1
+    return -1
+
+
+def _subscribe_all(ws, mids):
+    """分批訂閱，**在背景執行緒跑**，不擋訊息泵。"""
+    mids = list(mids)
+    for i in range(0, len(mids), SUB_BATCH):
+        batch = mids[i:i + SUB_BATCH]
+        for mid in batch:
+            try:
+                ws.send(json.dumps({"type": "subscribe",
+                                    "channel": "trade/%d" % mid}))
+                _stat["subs"] += 1
+            except Exception as e:                          # noqa: BLE001
+                print("訂閱中斷於第 %d 個：%r" % (_stat["subs"], e))
+                return
+        time.sleep(SUB_PAUSE)
+
+
+def _repair_subs(ws, mids):
+    """補訂沒有 ack 的。間歇性的上限靠重試吃掉，而不是靠祈禱。"""
+    for _ in range(SUB_REPAIR_MAX):
+        time.sleep(SUB_REPAIR_SEC)
+        missing = [m for m in mids if m not in _acked]
+        if not missing:
+            return
+        _stat["repairs"] += 1
+        print("補訂 %d 個沒有 ack 的市場（第 %d 輪）"
+              % (len(missing), _stat["repairs"]))
+        _subscribe_all(ws, missing)
 
 
 def _get(path):
@@ -204,12 +271,22 @@ def write_flag(starting=False):
         ok=ok,
         reason=("啟動中（已訂閱，還沒有成交）" if starting else
                 "成交 %d 筆（%.1f/秒）、清算 %d、帳戶 %d、市場 %d、重連 %d、"
-                "最後一筆 %s 秒前"
+                "最後一筆 %s 秒前%s"
                 % (_stat["trades"], _stat["trades"] / max(up, 1),
                    _stat["liqs"], len(_accts), _stat["markets"],
                    _stat["reconnects"],
-                   "—" if lag is None else "%.0f" % lag)),
+                   "—" if lag is None else "%.0f" % lag,
+                   # **訂閱缺口要看得見。** 伺服器對一次 burst 會關連線
+                   # （實測三次有一次），所以「少訂到幾個市場」是真實的
+                   # 失敗模式，而它不會讓任何別的數字變難看。
+                   # `ok` 刻意不因此變 False —— 那會讓 watchdog 殺掉一個
+                   # 正在正常錄的行程（mistake.md 2026-09-11）。
+                   "" if len(_acked) >= _stat["subs"] > 0 else
+                   "｜**訂閱 %d 送出 / %d 確認，缺 %d**（補訂 %d 輪）"
+                   % (_stat["subs"], len(_acked),
+                      _stat["subs"] - len(_acked), _stat["repairs"]))),
         trades=_stat["trades"], liqs=_stat["liqs"], accounts=len(_accts),
+        subs=_stat["subs"], acks=len(_acked), sub_repairs=_stat["repairs"],
         markets=_stat["markets"], reconnects=_stat["reconnects"],
         rows_written=_stat["rows_written"], uptime_sec=round(up),
         tape_dir=str(TAPE_DIR),
@@ -299,13 +376,21 @@ def run(seconds=None, top_n=TOP_N_DEFAULT):
             return
         t = d.get("type")
         if t == "connected":
-            for mid in _id2sym:
-                ws.send(json.dumps({"type": "subscribe",
-                                    "channel": "trade/%d" % mid}))
+            # **分批、在背景執行緒送** —— 原本是在這裡同步迴圈，那會擋住
+            # 自己的訊息泵，而一次 burst 全部訂閱會被伺服器關連線（見檔頭
+            # SUB_BATCH 那一段的實測）。
+            mids = list(_id2sym)
+            threading.Thread(target=_subscribe_all, args=(ws, mids),
+                             daemon=True).start()
+            threading.Thread(target=_repair_subs, args=(ws, mids),
+                             daemon=True).start()
             return
         if t == "ping":
             ws.send(json.dumps({"type": "pong"}))
             return
+        if t == "subscribed/trade":
+            _acked.add(_chan_mid(d.get("channel")))
+            # 不 return —— 這則訊息會重播近期成交，下面照收
         if t not in ("subscribed/trade", "update/trade"):
             return
         with _lock:
@@ -333,6 +418,10 @@ def run(seconds=None, top_n=TOP_N_DEFAULT):
         if stop_at and time.time() > stop_at:
             break
         _stat["reconnects"] += 1
+        # **新連線要重新訂閱，所以 ack 必須歸零** —— 不清的話旗標會顯示
+        # 「訂閱齊了」而實際上新連線上一個都沒訂，那是隱形的資料缺口。
+        _acked.clear()
+        _stat["subs"] = 0
         print("WS 斷線，第 %d 次重連" % _stat["reconnects"])
         time.sleep(min(30, 2 ** min(_stat["reconnects"], 5)))
 
