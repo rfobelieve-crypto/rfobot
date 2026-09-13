@@ -177,8 +177,56 @@ def main():
              np.average(slow.mo, weights=slow.usd) if len(slow) else np.nan))
     print("     （前者該明顯更差；不然就是方向符號寫反了）")
 
+    # ── 逐市場 ＋ G3 集中度 ──────────────────────────────────────────
+    # **整體那張單調表不可以直接讀成「延遲是綁束」。** 2026-09-13 實測：
+    # 75% 的窗內虧損來自**一個市場**。所以整體數字不是決策變數，
+    # 逐市場分布才是（backtest-audit 第 2 項：「所有損益來自 3 次大跳
+    # —— 3 次不多」，而這裡是 1 次）。
+    R2 = R[np.isfinite(R.win)].copy()
+    R2["pnl"] = R2.usd * R2.mo / 1e4
+    rows2 = []
+    for c, x in R2.groupby("coin"):
+        b, o = x[x.win < OUR_LAT_MS], x[x.win >= OUR_LAT_MS]
+        rows2.append(dict(
+            coin=c, usd=float(x.usd.sum()),
+            exp=100 * b.usd.sum() / x.usd.sum(),
+            pnl_in=float(b.pnl.sum()),
+            mo_in=np.average(b.mo, weights=b.usd) if len(b) > 20 else np.nan,
+            mo_out=np.average(o.mo, weights=o.usd) if len(o) > 20 else np.nan,
+            mo=np.average(x.mo, weights=x.usd)))
+    G = pd.DataFrame(rows2)
+    big = G[G.usd > 3e5].copy()
+    print("\n" + "=" * 78)
+    print("逐市場：曝露比例不預測 markout，而虧損極度集中")
+    print("=" * 78)
+    rho = big.exp.corr(big.mo, method="spearman")
+    print("  Spearman(曝露%%, 全體 markout) = **%.3f**  -> %s"
+          % (rho, "曝露低的市場更好" if rho < -0.2 else
+             "**兩者無關 —— 選標的不能只看曝露**"))
+    tot = R2.loc[R2.win < OUR_LAT_MS, "pnl"].sum()
+    s = (R2[R2.win < OUR_LAT_MS].groupby("coin").pnl.sum()
+         .sort_values())
+    print("  窗內 markout 金額合計 **$%.0f**（負 = 做市方虧）" % tot)
+    print("  **G3 集中度：最虧 1 個佔 %.0f%%、前 3 個 %.0f%%**"
+          % (100 * s.iloc[0] / tot, 100 * s.head(3).sum() / tot))
+    print("  最虧的 5 個：%s"
+          % ", ".join("%s $%.0f" % (c, v) for c, v in s.head(5).items()))
+    worst = list(s.head(1).index)
+    for drop in (worst, list(s.head(3).index)):
+        k = R2[~R2.coin.isin(drop)]
+        kb = k[k.win < OUR_LAT_MS]
+        print("  排除 %-22s 窗內 %+.3f、全體 %+.3f bps"
+              % (",".join(drop), np.average(kb.mo, weights=kb.usd),
+                 np.average(k.mo, weights=k.usd)))
+    print("\n  -> **降延遲不是槓桿，逐市場下架才是**：排除一個市場的效果"
+          "大於把延遲砍半，而前者免費。")
+    print("     所以監控面板不是裝飾，**它就是風控本身** ——"
+          "最有價值的單一元件是逐市場滾動 markout ＋ 自動下架。")
+
     R.to_json(OUT, orient="records", force_ascii=False)
-    print("\n寫出 %s（%s 列）" % (OUT, format(len(R), ",")))
+    G.to_json(OUT.replace(".json", "_by_coin.json"), orient="records",
+              force_ascii=False)
+    print("\n寫出 %s（%s 列）＋ 逐市場版" % (OUT, format(len(R), ",")))
     return 0
 
 
