@@ -556,7 +556,23 @@ def main() -> int:
     # 2026-09-05~09-13 那 8 天的形狀（每 6 小時跑、轉換有發生、投遞全失敗，
     # 而畫面上跟健康完全一樣）。心跳讓**沉默本身變成警報**。
     _now = time.time()
-    _send_hb = (not args.no_alert) and (_now - last_hb > 20 * 3600)
+    # 2026-09-13：station_post 現在每小時推一張圖（使用者：「圖表每小時更新
+    # 一次就好了」），所以這裡的每日心跳變成**備援**：station 最近 6 小時
+    # 推過就不要再貼一次文字版。留著而不是刪掉，是因為兩者跑在**不同排程**
+    # 上（station 在 SweepShadow、本支在 FreshnessBoard）—— 班車停了的時候
+    # 這條還會出聲。
+    _station_fresh = False
+    try:
+        _af = ROOT / "research" / "results" / "alert_last.json"
+        if _af.exists():
+            _aj = json.loads(_af.read_text(encoding="utf-8"))
+            if _aj.get("source") == "station" and _aj.get("delivered"):
+                _station_fresh = (_now - _af.stat().st_mtime) < 6 * 3600
+    except Exception:                                   # noqa: BLE001
+        _station_fresh = False
+    _now = time.time()
+    _send_hb = ((not args.no_alert) and (not _station_fresh)
+                and (_now - last_hb > 20 * 3600))
     if _send_hb:
         try:
             sys.path.insert(0, str(ROOT))

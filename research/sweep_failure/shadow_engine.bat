@@ -83,5 +83,8 @@ REM 2026-09-13: data accumulation snapshot + local HTML. Answers
 REM 'is it accumulating' (an hourly time series), which freshness_board
 REM structurally cannot -- it only measures how old the last row is, so
 REM hl_mid could be killed 70 times and stay green (mistake.md 09-11).
-python research\ops\accum_snapshot.py --quiet >> research\results\sweep_shadow_run.log 2>&1
+REM 2026-09-13: station_post 自己產快照＋圖＋推 Discord（使用者：圖表
+REM 每小時更新一次）。規律的脈搏讓沉默本身變成警報 —— 09-05~09-13
+REM 那 8 天是『只在轉換時才送』，於是投遞全失敗跟一切正常長得一樣。
+python research\ops\station_post.py >> research\results\sweep_shadow_run.log 2>&1
 python research\ops\accum_render.py >> research\results\sweep_shadow_run.log 2>&1
