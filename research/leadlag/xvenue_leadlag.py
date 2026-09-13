@@ -34,15 +34,15 @@ L1  在 rx_ms 上仍有非零 lead-lag：峰值相關 CI 下緣 > 0 且峰值 la
     大標的至少 6/9 同號。**L1 不過 -> 整條線停，不做 L2-L5**
     （Gate 0 排在資訊層之前，核心原則 11）。
 
-L3 可行性關  每個成交額三分位裡「兩邊都有成交」的桶要 >= 70%。
+L3 可行性關  每個成交額三分位裡「兩邊都有成交」的時間格要 >= 70%。
     不到就判 **INSUFFICIENT（儀器不足），不判 FAIL** —— 250 ms 下成交帶有
-    三分之二的桶至少一邊沒成交，三分位會退化成 nan，而那是儀器的事不是
-    主張的事（mistake.md 2026-08-02：有桶為 0 一律先當儀器壞掉）。
+    三分之二的時間格至少一邊沒成交，三分位會退化成 nan，而那是儀器的事不是
+    主張的事（mistake.md 2026-08-02：有格為 0 一律先當儀器壞掉）。
 
 自曝關（每次都跑，紅了就不准解讀下面任何數字）：
   S1  兩個場館都要有 rx_ms 的列，否則印「錄製器還沒重啟過」並停
   S2  逐場館印 rx_ms - ts 的 min / p1 / 中位 —— 那就是污染量本身
-  S3  逐三分位印桶覆蓋率，即 L3 可行性關的原始數字
+  S3  逐三分位印格覆蓋率，即 L3 可行性關的原始數字
 """
 from __future__ import annotations
 
@@ -56,10 +56,10 @@ import pandas as pd
 
 LIGHTER = "D:/flowbot_data/lighter/trades"
 HL = "D:/flowbot_data/hl/trades"
-MIN_BUCKETS = 600          # 兩邊都有成交的桶下限
+MIN_CELLS = 600          # 兩邊都有成交的時間格下限
 COVERAGE_MIN = 0.70        # L3 可行性關
 BOOT = 400                 # bootstrap 次數
-BLOCK = 40                 # block bootstrap 的 block 長度（桶）
+BLOCK = 40                 # block bootstrap 的 block 長度（時間格）
 
 
 def _load(root: str, dates, cols):
@@ -119,7 +119,7 @@ def prepare(dates, strict=True):
 def xcorr_ci(x, y, lag, nboot=BOOT, seed=0):
     """相關 + block bootstrap CI。
 
-    用 block（預設 40 桶）而不是逐點重抽：相鄰桶的報酬有買賣價跳動造成的
+    用 block（預設 40 格）而不是逐點重抽：相鄰格的報酬有買賣價跳動造成的
     負自相關，逐點重抽會把 CI 算得太窄。
     """
     if lag >= 0:
@@ -154,7 +154,7 @@ def run(dates, bucket_s=0.25, max_lag=12, strict=True):
              else "exchange ts（**已污染，方向不可引用**）")
     print("=" * 100)
     print("跨場館 lead-lag 計分器｜時鐘 = %s" % clock)
-    print("桶 %0.0f ms｜lag 掃 +-%d 桶｜日期 %s"
+    print("時間格 %0.0f ms｜lag 掃 +-%d 格｜日期 %s"
           % (bucket_s * 1000, max_lag, ",".join(dates)))
     print("=" * 100)
     print("S1 / S2 自曝關：")
@@ -176,7 +176,7 @@ def run(dates, bucket_s=0.25, max_lag=12, strict=True):
     lt = lt[(lt.t >= lo) & (lt.t <= hi)]
     ht = ht[(ht.t >= lo) & (ht.t <= hi)]
     nb = int((hi - lo) // bucket_s) + 1
-    print("\n共同時窗 %.3f 小時｜桶數 %s" % ((hi - lo) / 3600, format(nb, ",")))
+    print("\n共同時窗 %.3f 小時｜格數 %s" % ((hi - lo) / 3600, format(nb, ",")))
 
     def ser(d, c):
         x = d[d.coin == c]
@@ -193,7 +193,7 @@ def run(dates, bucket_s=0.25, max_lag=12, strict=True):
         pa, va, ha = ser(lt, c)
         pb, vb, hb = ser(ht, c)
         both = (ha & hb)[1:]
-        if both.sum() < MIN_BUCKETS:
+        if both.sum() < MIN_CELLS:
             continue
         ra, rb = np.diff(np.log(pa)), np.diff(np.log(pb))
         best = (-9.0, 0, float("nan"), float("nan"), 0)
@@ -206,22 +206,22 @@ def run(dates, bucket_s=0.25, max_lag=12, strict=True):
         q = np.quantile(tot, [1 / 3, 2 / 3])
         sel = (tot <= q[0], (tot > q[0]) & (tot <= q[1]), tot > q[1])
         cov = [float(both[s].mean()) if s.sum() else float("nan") for s in sel]
-        rows.append(dict(coin=c, n=n, both_buckets=int(both.sum()),
+        rows.append(dict(coin=c, n=n, both_cells=int(both.sum()),
                          peak_lag_ms=pl * bucket_s * 1000, peak_c=pc,
                          ci_lo=cl, ci_hi=ch,
                          cov_lo=cov[0], cov_mid=cov[1], cov_hi=cov[2]))
 
     r = pd.DataFrame(rows)
     if r.empty:
-        print("\n**沒有任何標的湊到 %d 個兩邊都有成交的桶 —— "
-              "樣本還不夠，這不是判決。**" % MIN_BUCKETS)
+        print("\n**沒有任何標的湊到 %d 個兩邊都有成交的時間格 —— "
+              "樣本還不夠，這不是判決。**" % MIN_CELLS)
         return r
     r = r.sort_values("peak_c", ascending=False)
     pd.set_option("display.width", 200)
     fmt = lambda v: "%9.4f" % v
 
     print("\nL1｜峰值相關與它的 block-bootstrap CI（正 lag = Lighter 領先）")
-    print(r[["coin", "both_buckets", "peak_lag_ms", "peak_c", "ci_lo", "ci_hi"]]
+    print(r[["coin", "both_cells", "peak_lag_ms", "peak_c", "ci_lo", "ci_hi"]]
           .to_string(index=False, float_format=fmt))
     ok = r[(r.ci_lo > 0) & (r.peak_lag_ms != 0)]
     print("\nL1：CI 下緣 > 0 且 lag != 0 的標的 **%d / %d**" % (len(ok), len(r)))
