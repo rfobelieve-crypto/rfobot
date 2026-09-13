@@ -1,0 +1,2319 @@
+[
+ {
+  "file": "2025-06-04_building-an-ai-agent-hedge-fund.txt",
+  "lines": 617,
+  "words": 11166,
+  "index": "",
+  "feats": [
+   "base_dir",
+   "data_path",
+   "resampled_ohlc",
+   "file_pattern",
+   "read_csv",
+   "to_datetime",
+   "set_index",
+   "mid_price",
+   "bid_price",
+   "ask_price",
+   "resampled_mid",
+   "resampled_ask",
+   "resampled_bid",
+   "open_ask_price"
+  ],
+  "hits": {
+   "code": [
+    35,
+    36,
+    43,
+    48,
+    60,
+    62,
+    63,
+    74
+   ],
+   "numbers": [],
+   "definitions": [
+    497,
+    500,
+    505,
+    529,
+    531,
+    536,
+    567
+   ]
+  },
+  "score": 50
+ },
+ {
+  "file": "2024-07-09_small-trader-alpha-6-perpetual-arbitrage.txt",
+  "lines": 402,
+  "words": 6694,
+  "index": "1. Introduction 2. Index 3. Part 1: Basics",
+  "feats": [
+   "nest_asyncio",
+   "tardis_dev",
+   "exchange_name",
+   "exchange_list",
+   "base_assets",
+   "dtypes_list",
+   "book_snapshot_25",
+   "start_date",
+   "end_date",
+   "tardis_api_key",
+   "tardis_key",
+   "print_exceptions",
+   "exchange_suffix",
+   "symbol_prefix"
+  ],
+  "hits": {
+   "code": [
+    63,
+    65,
+    66,
+    159,
+    166,
+    175,
+    176,
+    178
+   ],
+   "numbers": [],
+   "definitions": [
+    49,
+    50,
+    52,
+    56,
+    59,
+    75
+   ]
+  },
+  "score": 48
+ },
+ {
+  "file": "2026-06-02_hft-alpha-research-101.txt",
+  "lines": 100,
+  "words": 2369,
+  "index": "1. Introduction 2. Index 3. The Research Data Setup 4. HFT Factors 5. Backtesting Signals 6. Similarity Analysis 7. Horizon Analysis 8. Forecasting 9. Monetisation",
+  "feats": [
+   "return_col",
+   "return_1m",
+   "factor_cols",
+   "orderbook_imbalance",
+   "reversal_1m",
+   "weight_col",
+   "time_col",
+   "asset_col",
+   "required_cols",
+   "missing_cols",
+   "to_numpy",
+   "column_stack",
+   "sqrt_w",
+   "common_factor_return"
+  ],
+  "hits": {
+   "code": [
+    35,
+    37,
+    41,
+    44,
+    45,
+    47,
+    48,
+    50
+   ],
+   "numbers": [
+    95
+   ],
+   "definitions": [
+    31,
+    65,
+    79,
+    80
+   ]
+  },
+  "score": 45
+ },
+ {
+  "file": "2023-06-09_seasonality-in-commodities-markets.txt",
+  "lines": 49,
+  "words": 569,
+  "index": "",
+  "feats": [
+   "get_primes",
+   "numpy_ext",
+   "contract_df",
+   "get_group",
+   "multiple_tests",
+   "j_test",
+   "f_test",
+   "f_pvalue",
+   "t_tests",
+   "adj_pvals",
+   "coeff_vals",
+   "coeff_ps",
+   "insamp_ret",
+   "classical_df"
+  ],
+  "hits": {
+   "code": [
+    23,
+    26,
+    27,
+    31,
+    32,
+    35,
+    36,
+    37
+   ],
+   "numbers": [],
+   "definitions": [
+    24,
+    28,
+    30
+   ]
+  },
+  "score": 42
+ },
+ {
+  "file": "2023-03-08_non-sparse-synthetic-portfolios.md",
+  "lines": 125,
+  "words": 1229,
+  "index": "",
+  "feats": [
+   "w_1456",
+   "c_limit",
+   "f_auto",
+   "q_auto",
+   "fl_progressive",
+   "d6b6e756e20a_464x119",
+   "autocov_matrix_calc",
+   "arr_demeaned",
+   "portmanteau_gep",
+   "df_normalized",
+   "rho_inv_sqrt",
+   "pmt_matrix",
+   "ffda95f07390_912x466"
+  ],
+  "hits": {
+   "code": [
+    64,
+    67,
+    69,
+    73,
+    81,
+    86,
+    89,
+    90
+   ],
+   "numbers": [
+    46
+   ],
+   "definitions": [
+    38,
+    58
+   ]
+  },
+  "score": 41
+ },
+ {
+  "file": "2025-01-26_professional-options-market-making.txt",
+  "lines": 415,
+  "words": 6759,
+  "index": "1. Introduction 2. What’s a Vol Curve? 3. How to fit an SVI model so that it is arbitrage-free 4. Options Data Wrangling 5. Fitting SSVI parameters to the market 6. Patterns in SSVI models and exploiting them 7. When SSVI isn’t enough (it rarely is enough) 8. How to trade parameters themselves",
+  "feats": [
+   "ssvi_total_variance",
+   "k_values",
+   "theta_list",
+   "rho_fixed",
+   "phi_fixed",
+   "implied_vol",
+   "rho_list",
+   "theta_fixed",
+   "phi_list",
+   "tight_layout",
+   "w_raw",
+   "w_mkt",
+   "butterly_arb",
+   "m_range"
+  ],
+  "hits": {
+   "code": [
+    34,
+    35,
+    41,
+    44,
+    49,
+    125,
+    133,
+    136
+   ],
+   "numbers": [],
+   "definitions": [
+    26,
+    52
+   ]
+  },
+  "score": 40
+ },
+ {
+  "file": "2023-02-26_election-cycle-seasonality-effects.txt",
+  "lines": 195,
+  "words": 3006,
+  "index": "",
+  "feats": [
+   "country_tickers",
+   "supported_tickers",
+   "read_csv",
+   "reset_index",
+   "token_file",
+   "token_json",
+   "tiingo_token",
+   "select_columns",
+   "rename_columns",
+   "start_date",
+   "end_date",
+   "to_datetime",
+   "data_address_manager",
+   "etf_file_names"
+  ],
+  "hits": {
+   "code": [
+    38,
+    59,
+    80,
+    86,
+    95,
+    97,
+    98,
+    115
+   ],
+   "numbers": [],
+   "definitions": [
+    121
+   ]
+  },
+  "score": 38
+ },
+ {
+  "file": "2023-03-16_truncation-method-for-smrps.md",
+  "lines": 134,
+  "words": 1188,
+  "index": "",
+  "feats": [
+   "portmanteau_gep",
+   "df_train",
+   "w_1456",
+   "c_limit",
+   "f_auto",
+   "q_auto",
+   "fl_progressive",
+   "adjustment_factor",
+   "contribution_list",
+   "sort_values",
+   "ticker_weights",
+   "c2014a085c74_271x268",
+   "sparse_tickers",
+   "sparse_weights"
+  ],
+  "hits": {
+   "code": [
+    34,
+    36,
+    52,
+    65,
+    75,
+    79,
+    109,
+    111
+   ],
+   "numbers": [],
+   "definitions": [
+    20
+   ]
+  },
+  "score": 38
+ },
+ {
+  "file": "2023-12-29_automating-charting-slightly-less.txt",
+  "lines": 104,
+  "words": 1452,
+  "index": "1. Introduction 2. Index 3. Data & Research Methodology 4. Cumulative Volume Traded 5. Pivot Points Method 6. Conclusions",
+  "feats": [
+   "fx_pairs",
+   "crypto_pairs",
+   "tiingo_api_key",
+   "to_parquet",
+   "to_datetime",
+   "exponential_decay",
+   "trade_time",
+   "current_time",
+   "half_life",
+   "create_weighted_histogram",
+   "bin_size",
+   "weighted_volume",
+   "price_bin",
+   "dollar_formatter"
+  ],
+  "hits": {
+   "code": [
+    33,
+    36,
+    44,
+    45,
+    47,
+    57,
+    58,
+    63
+   ],
+   "numbers": [],
+   "definitions": [
+    5
+   ]
+  },
+  "score": 38
+ },
+ {
+  "file": "2024-03-10_finding-fair-value-code-inside.txt",
+  "lines": 169,
+  "words": 3045,
+  "index": "1. Introduction 2. Index 3. Fitting Fair Value 4. SVI Surface Parameterization",
+  "feats": [
+   "calculate_total_implied_variance",
+   "base_level",
+   "skew_modulation",
+   "smile_convexity",
+   "smile_slope",
+   "smile_peak",
+   "w_imp_svi",
+   "calculate_residuals",
+   "time_to_expiry",
+   "market_data",
+   "time_to_expiry_yrs",
+   "log_moneyness",
+   "mid_iv",
+   "specific_expiry_data"
+  ],
+  "hits": {
+   "code": [
+    39,
+    41,
+    42,
+    43,
+    46,
+    50,
+    52,
+    63
+   ],
+   "numbers": [],
+   "definitions": [
+    28
+   ]
+  },
+  "score": 38
+ },
+ {
+  "file": "2024-04-06_small-trader-alpha-5-market-making.txt",
+  "lines": 104,
+  "words": 1746,
+  "index": "1. Introduction 2. Index",
+  "feats": [
+   "py_vollib_vectorized",
+   "bs_call_price",
+   "bs_vega",
+   "find_implied_volatility",
+   "market_price",
+   "sigma_estimate",
+   "max_iterations",
+   "price_difference",
+   "implied_volatility",
+   "binary_option_price",
+   "option_type",
+   "binary_call_price",
+   "binary_put_price"
+  ],
+  "hits": {
+   "code": [
+    48,
+    50,
+    68,
+    69,
+    70
+   ],
+   "numbers": [],
+   "definitions": [
+    27,
+    36,
+    41,
+    61,
+    65
+   ]
+  },
+  "score": 37
+ },
+ {
+  "file": "2024-12-15_seasonal-alpha-in-small-caps.txt",
+  "lines": 82,
+  "words": 1094,
+  "index": "",
+  "feats": [
+   "list_of_numbers",
+   "get_prime_factors",
+   "prime_counting_function",
+   "regression_parameter_fits",
+   "saved_logs",
+   "forward_pvalues",
+   "backtest_performance",
+   "data_path",
+   "daily_data",
+   "read_parquet",
+   "additional_data_path",
+   "drop_duplicates",
+   "prime_period",
+   "close_time"
+  ],
+  "hits": {
+   "code": [
+    28,
+    31,
+    33,
+    37,
+    41,
+    42,
+    46,
+    52
+   ],
+   "numbers": [
+    67
+   ],
+   "definitions": []
+  },
+  "score": 37
+ },
+ {
+  "file": "2023-03-20_greedy-method-for-smrps.md",
+  "lines": 139,
+  "words": 401,
+  "index": "",
+  "feats": [
+   "only_paid",
+   "start_train",
+   "to_datetime",
+   "start_test",
+   "end_test",
+   "df_train",
+   "df_test",
+   "sampled_tickers",
+   "sp500_constituents",
+   "autocov_matrix_calc",
+   "arr_demeaned",
+   "portmanteau_gep",
+   "df_normalized",
+   "rho_inv_sqrt"
+  ],
+  "hits": {
+   "code": [
+    22,
+    23,
+    24,
+    25,
+    29,
+    52,
+    55,
+    61
+   ],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 36
+ },
+ {
+  "file": "2023-03-29_greedy-method-for-smrps-part-2.md",
+  "lines": 93,
+  "words": 230,
+  "index": "",
+  "feats": [
+   "only_paid",
+   "btcd_gep",
+   "df_normalized",
+   "var_1",
+   "fitted_model",
+   "var_coefs",
+   "cov_matrix",
+   "inv_sqrt_cov_matrix",
+   "var_pred_matrix",
+   "grid_search_pred",
+   "portmanteau_gep",
+   "eig_val",
+   "df_train",
+   "crossing_gep"
+  ],
+  "hits": {
+   "code": [
+    30,
+    39,
+    44,
+    45,
+    48,
+    49,
+    63,
+    67
+   ],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 36
+ },
+ {
+  "file": "2024-05-08_calculating-implied-volatility-fast.txt",
+  "lines": 153,
+  "words": 3559,
+  "index": "1. Introduction 2. Index 3. Newton 4. Really Fast Newton??? 5. SR 6. Low Accuracy 7. Let’s Be Rational 8. How does Optiver etc. do it",
+  "feats": [
+   "bs_call",
+   "bs_put",
+   "bs_vega",
+   "nr_solve",
+   "option_type",
+   "initial_guess",
+   "price_fn",
+   "obj_fn",
+   "find_root",
+   "call_iv_guess",
+   "call_vega",
+   "approximate_vol",
+   "helper_1",
+   "bridge_1"
+  ],
+  "hits": {
+   "code": [
+    21,
+    22,
+    24,
+    27
+   ],
+   "numbers": [],
+   "definitions": [
+    13,
+    16,
+    46,
+    49,
+    134,
+    138
+   ]
+  },
+  "score": 36
+ },
+ {
+  "file": "2025-03-01_options-mm-part-2-options-trade-impact.txt",
+  "lines": 110,
+  "words": 1778,
+  "index": "1. Introduction",
+  "feats": [
+   "tardis_api_key",
+   "research_tools",
+   "process_oa_orders",
+   "parse_option_characteristics",
+   "scrape_tardis_data",
+   "data_types_list",
+   "derivative_ticker",
+   "start_date",
+   "end_date",
+   "instrument_type",
+   "symbols_to_scrape",
+   "options_tickers",
+   "get_tickers",
+   "return_type"
+  ],
+  "hits": {
+   "code": [
+    26,
+    43,
+    46,
+    47,
+    51,
+    58,
+    66,
+    68
+   ],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 36
+ },
+ {
+  "file": "2024-09-21_hft-research-for-dummies.txt",
+  "lines": 175,
+  "words": 3711,
+  "index": "1. Introduction 2. Index 3. Orderbook Impacts",
+  "feats": [
+   "book_snapshot_25",
+   "nest_asyncio",
+   "tardis_dev",
+   "exchange_name",
+   "start_date",
+   "end_date",
+   "tardis_api_key",
+   "tardis_key",
+   "current_data_type",
+   "current_symbol",
+   "data_types",
+   "from_date",
+   "to_date",
+   "download_dir"
+  ],
+  "hits": {
+   "code": [
+    31,
+    32,
+    43,
+    50,
+    51,
+    52,
+    56
+   ],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 33
+ },
+ {
+  "file": "2026-06-29_lessons-from-the-desk.txt",
+  "lines": 85,
+  "words": 2918,
+  "index": "",
+  "feats": [
+   "read_csv",
+   "load_tardis_data",
+   "start_date",
+   "end_date",
+   "klines_1min",
+   "storage_key",
+   "get_data_path",
+   "base_dir",
+   "date_range",
+   "ignore_index",
+   "from_pandas",
+   "scan_parquet",
+   "to_pandas",
+   "previous_utc_day"
+  ],
+  "hits": {
+   "code": [
+    27,
+    53,
+    56,
+    58,
+    59,
+    60,
+    63
+   ],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 33
+ },
+ {
+  "file": "2026-04-06_A_Real_HFT_MFT_Alpha.md",
+  "lines": 66,
+  "words": 421,
+  "index": "",
+  "feats": [
+   "external_reading",
+   "safe_imbalance",
+   "zeros_like",
+   "new_imbalance",
+   "old_imbalance"
+  ],
+  "hits": {
+   "code": [
+    21,
+    36,
+    42,
+    43,
+    50,
+    53
+   ],
+   "numbers": [
+    17,
+    30,
+    61,
+    63,
+    64
+   ],
+   "definitions": [
+    25,
+    40
+   ]
+  },
+  "score": 32
+ },
+ {
+  "file": "2023-04-16_non-linearity-without-machine-learning.txt",
+  "lines": 89,
+  "words": 2599,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [
+    24,
+    26,
+    28,
+    39,
+    48
+   ],
+   "numbers": [],
+   "definitions": [
+    13,
+    20,
+    21,
+    26,
+    28,
+    49,
+    61,
+    64
+   ]
+  },
+  "score": 31
+ },
+ {
+  "file": "2023-05-19_timeframe-crowding-an-interesting.txt",
+  "lines": 66,
+  "words": 1207,
+  "index": "",
+  "feats": [
+   "get_sp500_tickers",
+   "read_html",
+   "sp500_tickers",
+   "start_date",
+   "end_date",
+   "stock_data",
+   "pct_change",
+   "sp500_returns",
+   "filtered_stocks",
+   "absolute_momentum",
+   "fip_scores",
+   "relative_momentum",
+   "dual_momentum",
+   "weighted_signal"
+  ],
+  "hits": {
+   "code": [
+    24,
+    28,
+    34,
+    37,
+    40,
+    41
+   ],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 30
+ },
+ {
+  "file": "2025-05-21_live-options-market-making-quoter.txt",
+  "lines": 909,
+  "words": 9028,
+  "index": "",
+  "feats": [
+   "wing_model",
+   "py_utils",
+   "ticker_universe",
+   "unused_variables",
+   "unreachable_code",
+   "unused_imports",
+   "dead_code",
+   "unused_mut",
+   "color_eyre",
+   "tracing_subscriber",
+   "max_level",
+   "connect_mainnet",
+   "get_instruments",
+   "start_quoting"
+  ],
+  "hits": {
+   "code": [
+    535,
+    551,
+    559,
+    565,
+    566,
+    570
+   ],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 30
+ },
+ {
+  "file": "2024-04-18_where-will-crypto-go.txt",
+  "lines": 65,
+  "words": 1035,
+  "index": "",
+  "feats": [
+   "calculate_d2",
+   "cdf_values",
+   "pdf_values",
+   "price_range",
+   "bid_iv",
+   "ask_iv",
+   "mid_iv",
+   "weighted_pdf"
+  ],
+  "hits": {
+   "code": [
+    19,
+    21,
+    24,
+    32,
+    37,
+    39,
+    40
+   ],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 29
+ },
+ {
+  "file": "2023-11-27_continuous-trading.txt",
+  "lines": 91,
+  "words": 2317,
+  "index": "1. Introduction 2. A Simple & Dirty Example 3. When Should We Exit? 4. Continuous Trading:",
+  "feats": [
+   "num_assets",
+   "num_periods",
+   "txn_cost",
+   "max_leverage",
+   "risk_aversion",
+   "historical_volatility",
+   "initial_portfolio",
+   "initial_portfolio_matrix",
+   "total_transaction_cost",
+   "portfolio_volatility",
+   "quad_form",
+   "expected_returns",
+   "optimized_weights"
+  ],
+  "hits": {
+   "code": [
+    56,
+    57,
+    58,
+    60,
+    63
+   ],
+   "numbers": [
+    53
+   ],
+   "definitions": []
+  },
+  "score": 28
+ },
+ {
+  "file": "2024-01-30_small-trader-alpha-4-funding-arbitrage.txt",
+  "lines": 133,
+  "words": 3553,
+  "index": "1. Introduction 2. Index 3. Regime Variability 4. Managing Shock Risk & Margin 5. Sources For Borrow 6. Expected Holding Times 7. Entry & Exit Timing 8. Risk Premiums 9. Reducing Impact & It’s Importance 10. When Is Cross-Exchange Funding Priced-In? 11. Differences In Funding Intervals 12. Implement",
+  "feats": [
+   "all_tickers",
+   "exchange_id",
+   "exchange_client",
+   "unique_tickers",
+   "df_tickers",
+   "symbol_map",
+   "mapped_values",
+   "search_space",
+   "norm_to_raw",
+   "raw_symbol",
+   "norm_symbol",
+   "funding_intervals",
+   "funding_annual_adj_mult",
+   "adj_rate"
+  ],
+  "hits": {
+   "code": [
+    109,
+    115,
+    119,
+    127
+   ],
+   "numbers": [],
+   "definitions": [
+    92,
+    95
+   ]
+  },
+  "score": 28
+ },
+ {
+  "file": "2025-12-15_forecasting-done-right.txt",
+  "lines": 123,
+  "words": 3289,
+  "index": "",
+  "feats": [
+   "combine_forecasts",
+   "expected_pnl",
+   "cov_matrix",
+   "risk_aversion",
+   "effective_forecasts",
+   "correlation_matrix",
+   "avg_corr"
+  ],
+  "hits": {
+   "code": [
+    23,
+    27,
+    102
+   ],
+   "numbers": [
+    89
+   ],
+   "definitions": [
+    15,
+    22,
+    51,
+    62,
+    68
+   ]
+  },
+  "score": 27
+ },
+ {
+  "file": "2023-02-07_ranked-ls-turning-a-formula-into.txt",
+  "lines": 51,
+  "words": 1868,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [
+    19,
+    26
+   ],
+   "numbers": [
+    30,
+    31,
+    33
+   ],
+   "definitions": [
+    1,
+    2,
+    5,
+    10,
+    12,
+    14,
+    19,
+    27
+   ]
+  },
+  "score": 25
+ },
+ {
+  "file": "2023-12-09_hide-n-seek-pt2-detection.txt",
+  "lines": 89,
+  "words": 1291,
+  "index": "1. Introduction 2. Index 3. Data 4. Overview of Methodologies 5. Simple Methods",
+  "feats": [
+   "binance_futures_base_url",
+   "binance_futures_agg_trades",
+   "ts_24h_ago",
+   "start_id",
+   "to_parquet",
+   "binance_spot_base_url",
+   "binance_spot_agg_trades"
+  ],
+  "hits": {
+   "code": [
+    58,
+    61,
+    70,
+    74
+   ],
+   "numbers": [],
+   "definitions": [
+    11,
+    33,
+    34
+   ]
+  },
+  "score": 25
+ },
+ {
+  "file": "2026-04-06_a-real-hftmft-alpha.txt",
+  "lines": 24,
+  "words": 386,
+  "index": "",
+  "feats": [
+   "safe_imbalance",
+   "zeros_like",
+   "new_imbalance",
+   "old_imbalance"
+  ],
+  "hits": {
+   "code": [
+    5,
+    10,
+    12,
+    13
+   ],
+   "numbers": [
+    5,
+    9,
+    17,
+    18,
+    20
+   ],
+   "definitions": [
+    7,
+    11
+   ]
+  },
+  "score": 25
+ },
+ {
+  "file": "2026-04-07_options-alphas-pt-1.txt",
+  "lines": 35,
+  "words": 661,
+  "index": "",
+  "feats": [
+   "total_options_volume_1h",
+   "call_volume",
+   "put_volume",
+   "upside_volatility",
+   "downside_volatility"
+  ],
+  "hits": {
+   "code": [
+    12,
+    33
+   ],
+   "numbers": [
+    5,
+    6,
+    18,
+    26,
+    28,
+    30
+   ],
+   "definitions": [
+    11
+   ]
+  },
+  "score": 19
+ },
+ {
+  "file": "2024-05-22_automating-alpha-pt1-the-overview.txt",
+  "lines": 139,
+  "words": 3385,
+  "index": "1. Introduction",
+  "feats": [
+   "z_score",
+   "and_then"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    5,
+    13,
+    45,
+    50,
+    53,
+    54,
+    63,
+    65
+   ]
+  },
+  "score": 18
+ },
+ {
+  "file": "2026-06-17_hft-alphas-pt-2.txt",
+  "lines": 52,
+  "words": 643,
+  "index": "1. Introduction 2. Index 3. Alphas 4. Analysis 5. Conclusions",
+  "feats": [
+   "features_5s",
+   "best_size_imbalance",
+   "obi_1bp",
+   "obi_5bp",
+   "obi_10bp",
+   "volume_imbalance_demeaned_5m",
+   "buy_volume_share",
+   "trade_volume_imbalance",
+   "candle_body",
+   "ret_5s",
+   "momentum_15s",
+   "buy_volume",
+   "momentum_60s",
+   "features_15s"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [
+    5,
+    37
+   ],
+   "definitions": [
+    9,
+    20
+   ]
+  },
+  "score": 18
+ },
+ {
+  "file": "2023-02-10_monte-carlo-minimization-for-synthetic.md",
+  "lines": 157,
+  "words": 1023,
+  "index": "",
+  "feats": [
+   "w_1456",
+   "c_limit",
+   "f_auto",
+   "q_auto",
+   "fl_progressive",
+   "b29bcfec5bc0_883x485",
+   "bc3497e28692_763x185",
+   "f7d711c05160_1232x434",
+   "dual_annealing"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    42,
+    62,
+    70,
+    78
+   ]
+  },
+  "score": 17
+ },
+ {
+  "file": "2024-09-21_sentiment-alpha-practical-bits.txt",
+  "lines": 175,
+  "words": 2366,
+  "index": "1. Introduction 2. Index",
+  "feats": [
+   "api_token",
+   "base_url",
+   "news_ext",
+   "get_bulk_download_list",
+   "bulk_download",
+   "raise_for_status",
+   "download_batch_file",
+   "file_id",
+   "get_latest_news",
+   "start_date",
+   "end_date",
+   "sort_by",
+   "as_completed",
+   "api_key"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    127
+   ]
+  },
+  "score": 14
+ },
+ {
+  "file": "2024-08-26_market-making-for-dummies-code-inside.txt",
+  "lines": 121,
+  "words": 3656,
+  "index": "",
+  "feats": [
+   "apply_diming_logic",
+   "px_tick_sz",
+   "buy_maker_active",
+   "sell_maker_active",
+   "get_orders_present",
+   "fv_maker_bid_price",
+   "fv_maker_ask_price",
+   "create_markup",
+   "existing_px",
+   "existing_amt",
+   "inv_mgr",
+   "ob_mgr",
+   "get_maker_quote",
+   "buy_maker"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [
+    81
+   ],
+   "definitions": []
+  },
+  "score": 13
+ },
+ {
+  "file": "2023-02-08_using-order-size-for-alpha.txt",
+  "lines": 36,
+  "words": 1133,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [
+    11
+   ],
+   "numbers": [
+    19
+   ],
+   "definitions": [
+    7,
+    9,
+    11,
+    14
+   ]
+  },
+  "score": 12
+ },
+ {
+  "file": "2023-02-27_semi-definite-programming-for-mrps.md",
+  "lines": 229,
+  "words": 1178,
+  "index": "",
+  "feats": [
+   "w_1456",
+   "c_limit",
+   "f_auto",
+   "q_auto",
+   "fl_progressive",
+   "b121155d8d92_194x60",
+   "cov_matrix",
+   "autocov_matrix",
+   "a7e6b621705b_1226x102",
+   "ccf3ab781ce5_589x80",
+   "minimum_eigen",
+   "c0a2bd65c74e_630x291",
+   "ff12e8503b4a_931x490",
+   "a2cc8fa16c59_924x517"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 12
+ },
+ {
+  "file": "2023-07-03_small-trader-alpha-another-real-strategy.txt",
+  "lines": 131,
+  "words": 5545,
+  "index": "1. Introduction 2. Index 3. General Idea 4. Two Types, One Favorite 5. Fixed vs. Variable Costs 6. Hedging:",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    48,
+    50,
+    51,
+    112,
+    114,
+    121
+   ],
+   "definitions": [
+    16,
+    17,
+    128
+   ]
+  },
+  "score": 12
+ },
+ {
+  "file": "2023-07-31_sentiment-and-news-data.txt",
+  "lines": 133,
+  "words": 4636,
+  "index": "1. Introduction 2. Index 3. Specific v.s. General",
+  "feats": [],
+  "hits": {
+   "code": [
+    39,
+    40,
+    63
+   ],
+   "numbers": [
+    52
+   ],
+   "definitions": [
+    83
+   ]
+  },
+  "score": 12
+ },
+ {
+  "file": "2024-06-18_automating-alpha-pt2-best-practices.txt",
+  "lines": 85,
+  "words": 2298,
+  "index": "1. Introduction 2. Index 3. Input Data Normalization 4. Tuning of Selection Likelihoods 5. Known Strategies as Base Alphas 6. Too Many Inputs & Unrelated Data 7. Automated Alpha is Great For Bad Researchers",
+  "feats": [
+   "pct_change"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [
+    74
+   ],
+   "definitions": [
+    13,
+    31,
+    50,
+    63,
+    70
+   ]
+  },
+  "score": 12
+ },
+ {
+  "file": "2024-07-18_deploying-strategies-helpful-advice.txt",
+  "lines": 145,
+  "words": 2375,
+  "index": "",
+  "feats": [
+   "name_of_screen",
+   "initialize_algorithm_state",
+   "initialize_flask",
+   "state_a",
+   "state_b",
+   "state_c",
+   "state_d",
+   "state_e",
+   "flask_app",
+   "algorithm_server",
+   "flask_log",
+   "use_reloader",
+   "health_check",
+   "get_data_a"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 12
+ },
+ {
+  "file": "2024-10-01_small-trader-alpha-7-perpetual-arbitrage.txt",
+  "lines": 257,
+  "words": 2526,
+  "index": "",
+  "feats": [
+   "rand_xoshiro",
+   "barter_data",
+   "barter_integration",
+   "try_join",
+   "latency_ema",
+   "time_between_updates",
+   "time_between_updates_ema",
+   "best_bid",
+   "best_ask",
+   "last_update_time",
+   "received_time",
+   "exchange_time",
+   "try_into",
+   "unwrap_or"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 12
+ },
+ {
+  "file": "2023-04-04_breaking-down-momentum-strategies.txt",
+  "lines": 145,
+  "words": 4371,
+  "index": "1. Introduction 2. Index 3. Time Series vs Cross-Sectional 4. Beta Adjustment 5. Volatility Targeting 6. Regime Dependent Performance 7. Information Discreteness 8. Unexpected Volume Changes 9. Turnover Reduction & Portfolio Optimization 10. Continuous Features 11. PSD Momentum 12. Ensemble Ensemble",
+  "feats": [
+   "cephalopod_v7"
+  ],
+  "hits": {
+   "code": [
+    57,
+    59
+   ],
+   "numbers": [
+    70,
+    106
+   ],
+   "definitions": [
+    54
+   ]
+  },
+  "score": 11
+ },
+ {
+  "file": "2023-05-26_outliers-a-deep-dive-part-1.txt",
+  "lines": 55,
+  "words": 1560,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [
+    14,
+    28,
+    34
+   ],
+   "numbers": [],
+   "definitions": [
+    39
+   ]
+  },
+  "score": 11
+ },
+ {
+  "file": "2024-04-16_developing-trading-algorithms-python.txt",
+  "lines": 116,
+  "words": 2821,
+  "index": "1. Introduction 2. Index 3. API Interaction 4. Pandas = SLOW! 5. Optimizing I/O 6. Hybrid Systems 7. Multiple Methods of State Verification 8. Doing Logging Properly 9. Algorithm Management 10. Dashboards",
+  "feats": [
+   "to_numpy",
+   "to_numeric",
+   "make_df_numeric",
+   "col_name",
+   "to_datetime"
+  ],
+  "hits": {
+   "code": [
+    38,
+    39
+   ],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 11
+ },
+ {
+  "file": "2026-04-14_options-alphas-pt-2.txt",
+  "lines": 34,
+  "words": 565,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    8,
+    20,
+    29
+   ],
+   "definitions": [
+    2,
+    16,
+    18,
+    25
+   ]
+  },
+  "score": 11
+ },
+ {
+  "file": "2026-06-08_hft-alphas-pt-1.txt",
+  "lines": 45,
+  "words": 1005,
+  "index": "1. Introduction 2. Index 3. The Data 4. The Alphas 5. Analysis 6. Conclusions",
+  "feats": [
+   "bar_ret",
+   "best_size_imbalance",
+   "candle_body",
+   "close_pos_in_range",
+   "momentum_15s",
+   "obi_1bp",
+   "range_ret",
+   "reversal_15s",
+   "reversal_5s",
+   "features_5s",
+   "features_15s"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 11
+ },
+ {
+  "file": "2023-03-23_pairs-trading-framework-and-process.md",
+  "lines": 431,
+  "words": 4775,
+  "index": "",
+  "feats": [
+   "w_1456",
+   "c_limit",
+   "f_auto",
+   "q_auto",
+   "fl_progressive",
+   "b90206e58332_907x518",
+   "fbff270fee6f_828x313"
+  ],
+  "hits": {
+   "code": [
+    246
+   ],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 10
+ },
+ {
+  "file": "2026-03-07_its-all-alphas.txt",
+  "lines": 49,
+  "words": 2339,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    9,
+    10,
+    12,
+    17,
+    22
+   ]
+  },
+  "score": 10
+ },
+ {
+  "file": "2024-05-31_event-based-alpha-a-quick-guide.txt",
+  "lines": 92,
+  "words": 3366,
+  "index": "1. Introduction 2. Index 3. Having Something To Trade 4. Expectations Come Priced In",
+  "feats": [
+   "elon_tweet",
+   "quant_arb"
+  ],
+  "hits": {
+   "code": [
+    34,
+    72
+   ],
+   "numbers": [
+    81
+   ],
+   "definitions": []
+  },
+  "score": 9
+ },
+ {
+  "file": "2025-03-22_why-is-my-backtest-wrong.txt",
+  "lines": 121,
+  "words": 3737,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [
+    17
+   ],
+   "numbers": [
+    34,
+    64
+   ],
+   "definitions": [
+    27,
+    72
+   ]
+  },
+  "score": 9
+ },
+ {
+  "file": "2025-06-20_ultimate-crypto-arbitrage-guide.txt",
+  "lines": 176,
+  "words": 7384,
+  "index": "1. Introduction 2. Index 3. Types of Arbitrage 4. Where can *I* find alpha?",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    81,
+    82,
+    85,
+    88
+   ]
+  },
+  "score": 8
+ },
+ {
+  "file": "2023-05-15_alpha-pipeline-raw-data-trades.txt",
+  "lines": 74,
+  "words": 2038,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    57
+   ],
+   "definitions": [
+    37,
+    38,
+    48
+   ]
+  },
+  "score": 7
+ },
+ {
+  "file": "2024-04-07_how-to-level-up-your-arb-game.txt",
+  "lines": 135,
+  "words": 3046,
+  "index": "1. Introduction 2. Index 3. Execution 4. Statistical 5. Exposures",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    27
+   ],
+   "definitions": [
+    10,
+    99,
+    112
+   ]
+  },
+  "score": 7
+ },
+ {
+  "file": "2023-04-24_execution-without-the-fluff.txt",
+  "lines": 105,
+  "words": 4477,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    22,
+    27,
+    46,
+    68
+   ],
+   "definitions": [
+    77
+   ]
+  },
+  "score": 6
+ },
+ {
+  "file": "2023-11-11_pairs-trading-papers-review.md",
+  "lines": 1231,
+  "words": 2844,
+  "index": "",
+  "feats": [
+   "w_1456",
+   "c_limit",
+   "f_auto",
+   "q_auto",
+   "fl_progressive",
+   "b11cbb5c98a9_1280x1001"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 6
+ },
+ {
+  "file": "2025-08-02_advanced-market-making.txt",
+  "lines": 101,
+  "words": 4522,
+  "index": "1. Introduction 2. Index 3. What matters 4. Fair Value 5. Spread 6. Inventory Skew 7. Latency 8. Positional Market Making 9. Arbitrage, Alphas, and PnL 10. Game Theory 11. Order Placement 12. Rewards 13. Being selective of what you quote",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    29,
+    32,
+    62,
+    77
+   ],
+   "definitions": [
+    69
+   ]
+  },
+  "score": 6
+ },
+ {
+  "file": "2025-11-18_advanced-options-market-making.txt",
+  "lines": 73,
+  "words": 2407,
+  "index": "1. Introduction 2. Index 3. Recapping the basic model 4. Spreads & Skewing 5. How to determine quote sizes 6. The relationship between size and spread 7. Risk dimensions 8. Why OTC/RFQ?",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    37,
+    38,
+    71
+   ]
+  },
+  "score": 6
+ },
+ {
+  "file": "2026-03-19_options-mft-strategies.txt",
+  "lines": 45,
+  "words": 1670,
+  "index": "1. Introduction 2. Index 3. Trading Options Like Linear Stuff 4. Structures Over Time 5. Delta Hedged Options Returns 6. Volatility Curves",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    14,
+    22,
+    25
+   ]
+  },
+  "score": 6
+ },
+ {
+  "file": "2023-06-08_outliers-a-deep-dive-part-2.txt",
+  "lines": 43,
+  "words": 1733,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [
+    9
+   ],
+   "numbers": [
+    20,
+    22
+   ],
+   "definitions": []
+  },
+  "score": 5
+ },
+ {
+  "file": "2023-11-04_strategy-discussion-lead-lag.txt",
+  "lines": 138,
+  "words": 1729,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [
+    23
+   ],
+   "numbers": [],
+   "definitions": [
+    14
+   ]
+  },
+  "score": 5
+ },
+ {
+  "file": "2024-10-17_real-strategies-the-cpi-trade.txt",
+  "lines": 48,
+  "words": 898,
+  "index": "1. Introduction 2. Index 3. Basic Overview 4. Reacting To Information 5. Engineering The Latency Side 6. The Statistical Angle 7. The Lead-Lag Play",
+  "feats": [],
+  "hits": {
+   "code": [
+    12
+   ],
+   "numbers": [],
+   "definitions": [
+    11
+   ]
+  },
+  "score": 5
+ },
+ {
+  "file": "2024-10-12_wheres-the-edge.txt",
+  "lines": 110,
+  "words": 4244,
+  "index": "1. Introduction 2. The Sad Reality (everyone runs the same) 3. The Data (Budget) Edge 4. Theory of Edge (why you get paid) 5. Being Around The Money 6. Inherited Alpha (dynamic of PMs etc) 7. Forcing Ideas (how to get inspiration) 8. Stealing Ideas 9. Developing Theories 10. Expert Alpha (becoming a",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    55,
+    98
+   ]
+  },
+  "score": 4
+ },
+ {
+  "file": "2025-07-12_beginner-mistakes-in-quant.txt",
+  "lines": 66,
+  "words": 2652,
+  "index": "1. Introduction 2. Index 3. Market Making 4. Machine Learning 5. Models vs. Features 6. Dashboards 7. Time Optimisation 8. Cynicism 9. Nothing beats doing it",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    29,
+    30
+   ]
+  },
+  "score": 4
+ },
+ {
+  "file": "2026-06-28_fixing-learning-to-rank.txt",
+  "lines": 57,
+  "words": 1394,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    18,
+    31
+   ],
+   "definitions": [
+    42
+   ]
+  },
+  "score": 4
+ },
+ {
+  "file": "2023-08-18_seasonality-a-comprehensive-overview.txt",
+  "lines": 186,
+  "words": 3660,
+  "index": "1. Introduction 2. Index 3. General Overview 4. Seasonality Effects",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    72,
+    81,
+    83
+   ],
+   "definitions": []
+  },
+  "score": 3
+ },
+ {
+  "file": "2026-05-27_Analysing_Real_Fills.md",
+  "lines": 77,
+  "words": 498,
+  "index": "",
+  "feats": [
+   "external_reading",
+   "future_mid",
+   "fill_price"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 3
+ },
+ {
+  "file": "2023-04-18_tick-talk-ep1-s1.txt",
+  "lines": 16,
+  "words": 45,
+  "index": "",
+  "feats": [
+   "alex_bcg",
+   "quant_arb"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 2
+ },
+ {
+  "file": "2023-06-11_a-real-pairs-trading-strategy.md",
+  "lines": 199,
+  "words": 424,
+  "index": "",
+  "feats": [
+   "only_paid"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [
+    10
+   ],
+   "definitions": []
+  },
+  "score": 2
+ },
+ {
+  "file": "2023-07-17_small-trader-alpha-2-advanced-arbitrage.txt",
+  "lines": 99,
+  "words": 3607,
+  "index": "1. Introduction 2. Index 3. Going Deeper 4. Getting Aggressive 5. Why not both? 6. Spotting idiots 7. Not-so-pure 8. Wrapping it all up",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    40,
+    55
+   ],
+   "definitions": []
+  },
+  "score": 2
+ },
+ {
+  "file": "2023-09-17_small-trader-alpha-3-triangles.txt",
+  "lines": 74,
+  "words": 2340,
+  "index": "1. Introduction",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    17
+   ]
+  },
+  "score": 2
+ },
+ {
+  "file": "2024-01-10_data-pre-processing-guide.txt",
+  "lines": 88,
+  "words": 2267,
+  "index": "1. Introduction 2. Index 3. Ensuring Accuracy 4. Transformation and Reduction of Data 5. Final Remarks",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    57
+   ]
+  },
+  "score": 2
+ },
+ {
+  "file": "2024-11-17_tick-talk-ep2-s1.txt",
+  "lines": 14,
+  "words": 45,
+  "index": "",
+  "feats": [
+   "alex_bcg",
+   "quant_arb"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 2
+ },
+ {
+  "file": "2025-07-01_researching-hft-strategies.txt",
+  "lines": 112,
+  "words": 4547,
+  "index": "1. Introduction 2. Index",
+  "feats": [
+   "msg_type",
+   "pit_zoom"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 2
+ },
+ {
+  "file": "2026-04-20_the-industry.txt",
+  "lines": 59,
+  "words": 2511,
+  "index": "1. Introduction 2. Index 3. IC vs PM 4. Compensation 5. Cost Attributions 6. External vs. Internal 7. Final Words",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": [
+    21
+   ]
+  },
+  "score": 2
+ },
+ {
+  "file": "2026-05-27_analysing-real-fills.txt",
+  "lines": 31,
+  "words": 485,
+  "index": "",
+  "feats": [
+   "future_mid",
+   "fill_price"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 2
+ },
+ {
+  "file": "2023-03-01_a-novel-approach-to-frontrunning.txt",
+  "lines": 47,
+  "words": 1258,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    25
+   ],
+   "definitions": []
+  },
+  "score": 1
+ },
+ {
+  "file": "2023-06-17_equity-option-mispricing-effects.txt",
+  "lines": 46,
+  "words": 892,
+  "index": "1. Introduction 2. Index 3. PEAIV 4. Growth Premium 5. IV vs. RV Effect 6. DHOR vs. Idiosyncratic Volatility 7. Distress Premium 8. Option Momentum 9. Risk-Adjusted Option Momentum 10. Delta Hedging",
+  "feats": [
+   "zakamouline_paper"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 1
+ },
+ {
+  "file": "2023-06-23_thinking-about-stationarity-the-right.md",
+  "lines": 124,
+  "words": 194,
+  "index": "",
+  "feats": [
+   "only_paid"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 1
+ },
+ {
+  "file": "2023-08-13_levering-to-the-tits-dead-simple.txt",
+  "lines": 50,
+  "words": 2036,
+  "index": "1. Introduction 2. Index 3. General Overview 4. Orderbook Behaviour 5. Trading Considerations 6. Leverage Considerations 7. Practical Implementation 8. Conclusion",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [
+    22
+   ],
+   "definitions": []
+  },
+  "score": 1
+ },
+ {
+  "file": "2024-02-18_starting-your-quant-trading-business.txt",
+  "lines": 68,
+  "words": 1622,
+  "index": "",
+  "feats": [
+   "quant_arb"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 1
+ },
+ {
+  "file": "2025-05-19_Easy_Alpha_Portfolio.md",
+  "lines": 133,
+  "words": 1146,
+  "index": "",
+  "feats": [
+   "seasonality_month_end"
+  ],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 1
+ },
+ {
+  "file": "2023-02-26_manipulating-elections-with-statistics.txt",
+  "lines": 36,
+  "words": 662,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2023-03-08_hedging-crypto-exchange-risk-howwhere.txt",
+  "lines": 56,
+  "words": 1613,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2023-10-07_low-latency-dup-data-aggregation.txt",
+  "lines": 65,
+  "words": 1833,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2023-11-19_hide-n-seek-pt1-avoiding-detection.txt",
+  "lines": 85,
+  "words": 2120,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2024-01-02_data-sourcing-the-guide.txt",
+  "lines": 62,
+  "words": 1179,
+  "index": "1. Introduction 2. Index",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2024-04-11_options-volatility-quant-resources.txt",
+  "lines": 872,
+  "words": 2761,
+  "index": "1. Introduction 2. Index 3. Alphas, Momentum, and Factors 4. Delta Hedging 5. FX Volatility 6. Machine Learning 7. Market Microstructure",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2024-05-14_timeframes-and-research-types.txt",
+  "lines": 91,
+  "words": 2357,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2024-11-17_geographic-arbitrage.txt",
+  "lines": 48,
+  "words": 1070,
+  "index": "1. Introduction 2. Index 3. How the trade works 4. Where it works 5. Bribes & Smuggling 6. Getting money out of Türkiye 7. Liquidity maximization 8. Price Effects",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2025-03-22_alpha-in-reading-the-contract-specs.txt",
+  "lines": 33,
+  "words": 698,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2025-05-19_Momentum_Strategy_Report.txt",
+  "lines": 1,
+  "words": 0,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2025-05-19_easy-alpha-portfolio-5-strategies.txt",
+  "lines": 56,
+  "words": 1437,
+  "index": "1. Introduction 2. Index 3. Strategy 1 - Funding Arbitrage 4. Strategy 2 - Momentum 5. Strategy 3 - Seasonality 6. Strategy 4 - Special Situations Arbitrage 7. Strategy 5 - Reward farming",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2025-09-22_finding-arbitrage-opportunities.txt",
+  "lines": 54,
+  "words": 1667,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2026-02-08_ultimate-crypto-latency-guide.txt",
+  "lines": 64,
+  "words": 2439,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ },
+ {
+  "file": "2026-04-26_more-advanced-latency-tricks.txt",
+  "lines": 27,
+  "words": 583,
+  "index": "",
+  "feats": [],
+  "hits": {
+   "code": [],
+   "numbers": [],
+   "definitions": []
+  },
+  "score": 0
+ }
+]
