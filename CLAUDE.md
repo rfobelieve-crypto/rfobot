@@ -179,6 +179,7 @@ exit` 的列是真前瞻，判 Gate 只能用前者」——**這條是錯的，
 | **資料實際放在哪（D 槽目錄連結、不可回填清單）** | 本檔 §大資料在 D 槽 ＋ `research/ops/data_manifest.py` |
 | 踩過的坑（**開工前必讀**） | `.claude/rules/mistake.md` |
 | 策略／因子研究的十道檢查（**開新研究線前必讀**） | `.claude/rules/factor-research.md` |
+| **回測的二十道檢討（回測收工前、寫進判決前必讀）** | `.claude/rules/backtest-audit.md`（2026-09-13；**§價差那一項目前有矛盾，Lighter 的成本數字暫停引用**）|
 | 當前任務、預註冊、凍結假設 | `TODO.md` |
 | **外部閱讀轉譯成「我們要驗什麼」**（2026-09-11 起） | `docs/external_reading.md` |
 | **已結案判決的橫向讀法（共同死因，全是假說不是判決）** | `docs/common_cause_scan.md` |
