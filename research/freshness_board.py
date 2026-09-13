@@ -573,7 +573,20 @@ def main() -> int:
                 _txt += "station_text 失敗：%s" % _e2
                 if reds:
                     _txt += "\n  紅：" + ", ".join(reds[:8])
-            if _nt.heartbeat(_txt)["delivered"]:
+            # **回報用圖表**（使用者 2026-09-13）。圖畫不出來就退回純文字 ——
+            # 一個只會用圖回報的管道，在畫圖壞掉的那天就完全沉默了。
+            _sent = False
+            try:
+                from research.ops import accum_png as _ap
+                _p, _sn, _age = _ap.build()
+                _cap = ("flowbot 資料監控站 — %d red / %d tracked"
+                        % (len(reds), len(rows)))
+                if reds:
+                    _cap += "  |  紅：" + ", ".join(reds[:6])
+                _sent = _nt.send_image(_p, _cap, source="station")["delivered"]
+            except Exception as _e3:            # noqa: BLE001
+                print("[WARN] 監控站圖失敗，退回文字：%s" % _e3)
+            if _sent or _nt.heartbeat(_txt)["delivered"]:
                 last_hb = _now
                 print("heartbeat DELIVERED: " + _txt.replace("\n", " | "))
             else:

@@ -185,6 +185,71 @@ def send(text: str, source: str = "freshness", write_flag: bool = True) -> dict:
     return res
 
 
+def send_image(path: str, caption: str = "", source: str = "station",
+               write_flag: bool = True) -> dict:
+    """把 PNG 推到 Discord（webhook multipart）／Telegram（sendPhoto）。
+
+    使用者 2026-09-13：「回報用圖表的方式」。那個頻道本來就在收 V7 的 PNG
+    （`indicator/app.py:_send_discord_photo`），所以這條路早就證明通了。
+    用 `requests` 而不是 urllib：multipart 手刻容易出錯，而 requests 本來
+    就是這個專案的相依（.claude/rules/coding.md）。
+    """
+    import requests
+    res = {"asof": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+           "source": source, "tried": {}, "delivered": False,
+           "configured": bool(channels())}
+    try:
+        with open(path, "rb") as fh:
+            png = fh.read()
+    except OSError as e:
+        res["tried"]["file"] = str(e)[:80]
+        png = b""
+
+    url = cfg("DISCORD_WEBHOOK_URL")
+    if url and png:
+        for i in range(RETRIES):
+            try:
+                r = requests.post(url, data={"content": caption[:DISCORD_LIMIT]},
+                                  files={"file": ("accum.png", png, "image/png")},
+                                  timeout=40)
+                res["tried"]["discord"] = "HTTP %d" % r.status_code
+                if r.ok:
+                    res["delivered"] = True
+                    break
+            except Exception as e:                      # noqa: BLE001
+                res["tried"]["discord"] = type(e).__name__ + ": " + str(e)[:60]
+            if i < RETRIES - 1:
+                time.sleep(3 * (i + 1))
+
+    tok, chat = cfg("TELEGRAM_BOT_TOKEN"), (cfg("TG_ALERT_CHAT_ID")
+                                            or cfg("TG_CRITICAL_CHAT_ID")
+                                            or cfg("TELEGRAM_CHAT_ID"))
+    if tok and chat and png and not res["delivered"]:
+        try:
+            r = requests.post(
+                "https://api.telegram.org/bot%s/sendPhoto" % tok,
+                data={"chat_id": chat, "caption": caption[:1000]},
+                files={"photo": ("accum.png", png, "image/png")}, timeout=40)
+            res["tried"]["telegram"] = "HTTP %d" % r.status_code
+            res["delivered"] = bool(r.ok)
+        except Exception as e:                          # noqa: BLE001
+            res["tried"]["telegram"] = type(e).__name__ + ": " + str(e)[:60]
+
+    if write_flag:
+        payload = dict(res)
+        payload["ok"] = bool(res["delivered"])
+        payload["reason"] = ("已送達（圖）：" + ",".join(res["tried"])
+                             if res["delivered"]
+                             else "**圖片投遞失敗**：" + "；".join(
+                                 "%s=%s" % (k, v) for k, v in res["tried"].items()))
+        try:
+            with open(FLAG, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, ensure_ascii=False, indent=2)
+        except OSError:
+            pass
+    return res
+
+
 def station_text() -> str:
     """**資料監控站**的那一則 —— 這是 Discord 頻道從「V7 圖表」換過來的內容。
 
