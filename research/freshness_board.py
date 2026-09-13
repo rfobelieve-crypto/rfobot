@@ -588,7 +588,9 @@ def main() -> int:
                 print("[WARN] 監控站圖失敗，退回文字：%s" % _e3)
             if _sent or _nt.heartbeat(_txt)["delivered"]:
                 last_hb = _now
-                print("heartbeat DELIVERED: " + _txt.replace("\n", " | "))
+                # log 不可以說謊：送的是圖的時候，別印一整段文字裝成是它送的。
+                print("heartbeat DELIVERED (%s): %s"
+                      % ("圖" if _sent else "文字", _txt.split("\n")[0]))
             else:
                 print("[WARN] heartbeat NOT delivered")
         except Exception as _e:       # noqa: BLE001
