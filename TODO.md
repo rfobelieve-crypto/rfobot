@@ -148,6 +148,34 @@ under a measurement already in flight」。三支測試釘住，其中一支直�
 
 ---
 
+#### ⚠ 語意分界：GMX 的 `minutes.csv` 從 2026-09-13 23:2x 起，`samples` 換了定義
+
+這是這次改動**唯一**動到既有資料的地方，而它是 CLAUDE.md 核心原則 7
+（「產生某個欄位的程式碼改了意義，它之前的每一列就在量別的東西」）。
+
+`recorder.py:341` 用 `is_fresh(staleness_sec)` 決定一秒算不算一個 sample。
+`staleness_sec` 從 10 改成 30，於是：
+
+    改之前 153 分鐘   samples 中位 **39/60**
+    改之後  12 分鐘   samples 中位 **59/60**
+
+**50% 的跳躍**，而價格一個都沒變 —— 多出來的是「連線活著但簿口十幾秒沒更新」
+的那些秒，它們記的是同一組價格。所以受影響的是**分母與分鐘內的加權**，
+不是價格本身。
+
+**範圍只有 GMX。** 九支錄製器的設定一個字沒動（`test_recording_family_
+configs_have_no_ws_ping` 直接掃設定檔釘住），所以 §0.75／§1.02 的證據基礎
+完全不受影響 —— 那正是 `ws_ping_sec` 預設 0.0 的理由。
+
+**為什麼還是要寫下來**：`arblib/half_life.py` 會**自動掃 LOGS 底下每個
+有 minutes.csv 的目錄**（`os.scandir(LOGS)`），所以它會撿到 GMX；
+而 `band_convergence.py:85` 連 `minutes.csv.*.old` 一起讀，所以輪替也隔不開。
+兩支都不在任何排程上（是手動分析工具），所以今天沒有損失 ——
+**但下一次有人手動跑它，兩種定義就會被合在一起而且不會有任何東西報錯。**
+
+任何用到 GMX minutes 的分析，`since` 要 floor 在這個分界，或明說它跨了。
+（同族：CLAUDE.md 的 `DECODE_EPOCH` / `CONFIDENCE_EPOCH`。）
+
 #### 未做（登記，不擋今晚）：`staleness_sec` 應該是逐場館的
 
 現在它是一個全域值，而兩條腿的自然節奏差兩個數量級：
