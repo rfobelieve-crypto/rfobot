@@ -292,6 +292,16 @@ REGISTRY = [
      "ok 的語意是「連得上且設定對」不是「有資料」——啟動那一瞬間就寫 ok=True，"
      "否則看門狗會殺掉剛起來的行程（mistake.md 2026-09-11）。"
      "重啟由 ../arb/ops/arb_watchdog.ps1 負責"),
+    ("HMM 引擎 GMX (§1.41)", "json_flag",
+     "../arb/engine/logs/GMX/status.json:ok", 0.2,
+     "HMM（對沖做市）的引擎自報。**盯的是引擎不是錄製器** —— 看板既有那幾列"
+     "讀的是 minutes.csv，而那是 recorder 寫的，引擎的策略層死掉它照樣更新。"
+     "ok 的語意是「連得上且設定對」不是「有成交」：只有 RED guard 會讓它 false，"
+     "所以安靜的市場不會看起來像故障（mistake.md 2026-09-03）。"
+     "帳戶級閘門（B6）擋住開倉時會在這裡以 ACCOUNT OUT OF MARGIN / "
+     "ACCOUNT CAP HIT 現形 —— 那是「引擎跑著但什麼都不送」唯一看得見的地方。"
+     "重啟由 ../arb/ops/arb_watchdog.ps1 的 HMM_GMX 負責。"
+     "**另外九支錄製器還沒加**：它們跑的是沒有 ok 欄位的舊碼，現在加會誤報紅"),
     ("arb 帳戶額度加總 (B6)", "json_flag",
      "../arb/results/account_budget.json:ok", 0.5,
      "引擎的每一道風控閘門都是**逐行程**的（cap_usd 逐場館、max_gross_usd "
