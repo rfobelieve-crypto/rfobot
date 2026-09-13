@@ -78,6 +78,104 @@
 那個交換是不是值得，取決於 09-18 那個數字。**在它出來之前，
 把資本或工程投到任何一條線上都是在賭一個還沒量的量。**
 
+### 1.41b 【shadow 第一輪】三個缺陷，全部是「跑起來才看得見」（2026-09-13 深夜）
+
+使用者：「今晚可以把 live 上線嗎」。答案是**不能，而理由是量出來的**：
+HMM 從 `--record-only` 換成 `--shadow` 之後 **22:44 開機、22:59 HALT**，
+十五分鐘用完 `max_stale_episodes: 5`，而位置全程是空的、WS 一次都沒斷。
+
+**為什麼 record-only 看不到**：它根本不跑 `_strategy_loop`（engine.py:375），
+所以沒有 evaluation、沒有 stale 計數、沒有報價決策、也不跑 `_balance_loop`
+（status.json 那兩盞 `ACCOUNT UNKNOWN` 就是這麼來的）。
+**這三個缺陷離線一個都測不到。**
+
+---
+
+#### 一、`_scan_maker` 少了 `_scan` 的防重發，而它的 docstring 說「Same guards」
+
+shadow 第一分鐘：**4,394 次報價決策 / 90 秒（49 次/秒）**，
+而 live 的節奏是每 `maker_timeout_sec`（20 秒）一張。**差 1400 倍。**
+
+live 一直看不出來：一張掛著的報價讓 `_maker_open` 有值、函式開頭就 return。
+shadow 什麼都不掛，於是裸奔。而既有的
+`test_shadow_does_not_refire_faster_than_live` **只跑 `mode="taker"`** ——
+HMM 走的掛單路徑從來沒被覆蓋。
+
+修了（arb `98aef93`），49/s -> 0.19/s，log 寫入量少 88 倍。
+live 只有一種情況會變：成交之後（那正是吃單路徑一直以來的行為）。
+
+#### 二、M5 沒有儀表 —— 會 HALT 的那個計數器沒有任何地方看得到
+
+X4 四個判準裡 M2/M3/M4 都在看板上，**M5 缺席**。而 `max_stale_episodes` 的
+計數在 HALT 之前完全隱形：新鮮度看板讀 `ok`，而 `ok` 只有 RED guard 會翻。
+接進 `status.json` 的 counts ＋ 看板一欄（arb `3d6397a`），
+著色刻意在**上限前一格就紅** —— 那時還來得及調設定，HALT 之後只剩人工重啟。
+
+#### 三、根因：HL 的 feed 每 5 秒自我證明存活，Lighter 從來不會
+
+`staleness_sec` 比的是 `book.alive_ts`，而 `alive_ts` 由**任何入站訊框**蓋。
+`book.py` 的檔頭寫著設計意圖：「a quiet market is not stale, only a dead
+feed is」—— **而那句話對 HL 成立、對 Lighter 不成立**：
+
+    HLBookFeed._pinger   每 5 秒送 {"method":"ping"}  -> alive_ts 建構上每 ≤5s 刷新
+    LighterBookFeed      只被動回 {"type":"pong"}      -> 完全看市場臉色
+
+`feeds.py` 甚至把這個不對稱描述出來了（第 6 行 server pings / 第 9 行
+client app-pings），只是沒有人發現它跟 `staleness_sec` 有交互作用。
+GMX 把它放大到會痛：**日成交額 $9,534、頂檔中位 32 秒才動一次**。
+
+量測（10 分鐘、同一條 WS、兩段對照）：
+
+| | n | 中位 | p90 | max | >10s |
+|---|---|---|---|---|---|
+| 被動 | 61 | 0.95s | 17.85 | **20.10** | **24.6%** |
+| 每 5 秒 ping | 101 | 2.05s | 6.07 | **12.08** | **1.0%** |
+
+伺服器回 pong 中位 **38 毫秒**。12.08 不是 5：約每六次 ping 有一次沒被回。
+
+修法（arb `f600539`）：`LighterBookFeed._pinger` 鏡像 HL 那支，
+`execution.ws_ping_sec` **預設 0.0 = 關**，只有 `config_HMM_GMX` 打開；
+`staleness_sec` 10 -> 30（同樣只有那一份）。
+
+**預設關是這件事最重要的一行**：`recorder.py:341` 用
+`is_fresh(staleness_sec)` 數 `samples`，而那走 `alive_ts` ——
+全域打開會膨脹九支錄製器的樣本數，那正是 `book.is_fresh` 的 docstring
+明文禁止的「moving what counts as a sample would move the instrument
+under a measurement already in flight」。三支測試釘住，其中一支直接掃設定檔。
+
+驗收（同一個時間窗前後對照）：修之前 6 分鐘 -> episode 2/5、15 分鐘 -> HALT；
+修之後 **4.5 分鐘 -> 0/5、streak 0**，Lighter age 穩定在 4.5 秒。
+
+---
+
+#### 未做（登記，不擋今晚）：`staleness_sec` 應該是逐場館的
+
+現在它是一個全域值，而兩條腿的自然節奏差兩個數量級：
+
+    HL       訊框間隔 0.3 秒
+    LIGHTER  訊框間隔 中位 3.6 秒 / max 34 秒（無心跳時）
+
+**一個全域門檻必須遷就慢的那腿，於是它對快的那腿一定太鬆。**
+現在的 30.0 對 HL 的意思是「容許一本比它自然節奏舊 100 倍的簿口」。
+心跳把 Lighter 拉近了，所以這件事今晚不痛 —— 但它是**結構性的**，
+第二個市場上線（尤其一條腿換成別的場館）就會再咬一次。
+
+修法：`staleness_sec` 拆成 `entropy` / `hedge` 兩個，或給 `VenueConf` 一個
+覆寫欄位（`ws_ping_sec` 已經走了後者那條路，可以照抄）。
+
+#### 還開著的（今晚剩下的）
+
+* **episode 曲線要跑滿一小時**才算數 —— 4.5 分鐘只證明它不再立刻爆。
+* **M2 在 shadow 裡量不到**（`quotes_rested = 0`）。成交率 ≥30% 是四個判準
+  的第一個，而它本質上只有 live 才有 —— 那正是第 9 次 override 的理由。
+  但要有預期：**日成交額 $9,534、頂檔中位 32 秒才動一次**，
+  M2 會累積得很慢，不是幾小時看得出來的東西。
+* `[LIGHTER] position fetch failed: 405 (CloudFront/WAF)` 偶發於 balance
+  loop 的 REST。會重試，未量頻率。
+
+
+---
+
 ### 1.41 【Stage 1 上線準備】C1 的紅燈是我比錯統計量、候選名單修正，而**下單層早就寫好了** —— 第 9 次 override 草案 ＋ 金鑰綁定（2026-09-13）
 
 使用者：「先查一下然後起草 override 跟規劃一下交易所的金鑰綁定準備」。
