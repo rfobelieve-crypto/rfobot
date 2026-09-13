@@ -96,6 +96,27 @@ API = "https://mainnet.zklighter.elliot.ai"
 # 0.126–0.139，對 15 秒掉到 0.107 —— 衰減很陡，60 秒取樣等於把它丟掉。
 # 而簿口沒有歷史端點，**錄得不夠細是不可回填的**（mistake.md 2026-09-11）。
 SAMPLE_SEC = int(os.environ.get("LIGHTER_MID_SAMPLE_SEC", "5"))
+# ── 頂檔事件錄製（2026-09-13）────────────────────────────────────────
+# TODO §1.37 的 L3/L4（文章 3b 的成交額主張）**用逐筆帶永遠答不了**：
+# 250 ms 一格之下只有 0.8% 的格子兩邊都有成交。只有簿口答得了，因為
+# **買賣報價不需要有人成交就會變**。
+#
+# 成本是量出來的不是估的（`research/ops/tob_event_rate.py`，180 秒、33 個
+# 共同標的）：每則訊息都記 143.2/秒（618 MB/日）、頂檔價或量變了 59.0/秒、
+# **只有頂檔價變了 57.0/秒 = 246 MB/日**。我原本估 1-2 GB/日，**高估 4-8 倍**。
+#
+# 而邊際成本接近零：這支**本來就**在每一則訊息上維護整本簿口（snapshot+diff），
+# 我們只是把已經算出來的頂檔丟掉而已。文章 `data-pre-processing-guide` 的
+# Reduction 那節正是這個處方：「remove new quotes where the data that is
+# relevant to us has not changed」「we drop the duplicate midprices」。
+#
+# 只看**價**不看量：量變了而價沒變的那 60%（143.2 -> 57.0）對 lead-lag 與
+# 中價報酬沒有資訊，而它們佔了大半的位元組。
+TOB_ON = os.environ.get("LIGHTER_TOB", "1") == "1"
+TOB_DIR = Path(os.environ.get("LIGHTER_TOB_DIR",
+                              r"D:\flowbot_data\lighter\tob"))
+TOB_COLS = ["rx_ms", "book_time", "coin", "market_id",
+            "bid", "ask", "bid_sz", "ask_sz", "nonce"]
 FLUSH_SEC = 300
 DEPTH_LEVELS = 5
 BANDS = (1, 2, 5, 10, 25, 50, 100)     # 距 mid 幾 bps 內的累計名目
@@ -139,8 +160,11 @@ _btime: dict[int, int] = {}
 _resync: dict[int, int] = {}
 _id2sym: dict[int, str] = {}
 _rows: list = []
+_tob: list = []                       # 頂檔事件緩衝
+_tob_last: dict[int, tuple] = {}      # market_id -> (bid, ask) 上次寫的價
 _stat = dict(samples=0, rows=0, flushes=0, reconnects=0, crossed=0,
-             gaps=0, msgs=0, started=time.time(), last_sample=0, markets=0)
+             gaps=0, msgs=0, started=time.time(), last_sample=0, markets=0,
+             tob_rows=0, tob_written=0)
 
 
 def _chan_id(channel: str):
@@ -267,6 +291,35 @@ def sample_once() -> int:
     return got
 
 
+def tob_capture(mid: int) -> None:
+    """頂檔**價**變了就記一列。時鐘用 `rx_ms`（我們自己的），不用交易所的。
+
+    2026-09-13 實測：兩個交易所的時戳無法互比（偏移 +168 ~ +371 ms，
+    而跨場館 lead-lag 的效應本身只有 100-270 ms）。而照
+    `small-trader-alpha-6` Part 3c，收到的時刻本來就是**決策該用的**那個：
+    「the message that is received first is the most accurate price」。
+    """
+    if not TOB_ON:
+        return
+    b, a = _bids.get(mid), _asks.get(mid)
+    if not b or not a:
+        return
+    bb, aa = max(b), min(a)
+    if bb >= aa:
+        return                      # 交錯的簿口不寫（同取樣那側的自曝關）
+    if _tob_last.get(mid) == (bb, aa):
+        return                      # 價沒變 -> 不是事件
+    _tob_last[mid] = (bb, aa)
+    # **`_to_ms` 不是可選的**：Lighter 的 `last_updated_at` 是**微秒**，
+    # 而 `rx_ms` 是毫秒。第一版直接存原始值，於是 rx_ms − book_time 的中位
+    # 是 −1.787e15 —— 跟這個專案今天稍早在 stale_ms 上踩到的**同一個數字**。
+    # 取樣那一側早就走 `_to_ms`（第 277 行），我寫新路徑時沒沿用。
+    _tob.append((int(time.time() * 1000), _to_ms(_btime.get(mid) or 0),
+                 _id2sym.get(mid), mid, bb, aa, b[bb], a[aa],
+                 _nonce.get(mid)))
+    _stat["tob_rows"] += 1
+
+
 def flush() -> None:
     rows, _rows[:] = list(_rows), []
     if rows:
@@ -282,6 +335,24 @@ def flush() -> None:
                                         keep="last")
             part.to_parquet(p, index=False)
         _stat["rows"] += len(rows)
+
+    tob, _tob[:] = list(_tob), []
+    if tob:
+        import pandas as pd
+        d = pd.DataFrame(tob, columns=TOB_COLS)
+        for hr, part in d.groupby(d.rx_ms // 3_600_000):
+            dd = TOB_DIR / time.strftime("%Y%m%d", time.gmtime(hr * 3600))
+            dd.mkdir(parents=True, exist_ok=True)
+            p = dd / (time.strftime("%H", time.gmtime(hr * 3600)) + ".parquet")
+            if p.exists():
+                part = pd.concat([pd.read_parquet(p), part], ignore_index=True)
+            # 只去掉**完全相同**的列（同毫秒同市場同價）。不要用
+            # (rx_ms, market_id) 當鍵 —— 同一毫秒內的兩個不同頂檔是兩個事件。
+            part = part.drop_duplicates(
+                subset=["rx_ms", "market_id", "bid", "ask"], keep="first")
+            part.to_parquet(p, index=False)
+        _stat["tob_written"] += len(tob)
+
     _stat["flushes"] += 1
     write_flag()
 
@@ -438,6 +509,7 @@ async def ws_loop(stop: asyncio.Event) -> None:
                     if t == "subscribed/order_book":
                         _nonce[mid] = ob.get("nonce")
                         _apply(mid, ob, True)
+                        tob_capture(mid)
                         continue
                     prev, beg = _nonce.get(mid), ob.get("begin_nonce")
                     if prev is not None and beg is not None and beg > prev + 1:
@@ -459,6 +531,7 @@ async def ws_loop(stop: asyncio.Event) -> None:
                         continue          # 等新快照
                     _nonce[mid] = ob.get("nonce")
                     _apply(mid, ob, False)
+                    tob_capture(mid)
         except Exception as e:                               # noqa: BLE001
             if stop.is_set():
                 return

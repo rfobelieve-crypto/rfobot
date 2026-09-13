@@ -86,10 +86,25 @@ def main():
         # 某個幣系統性地偏掉才是單位問題，全體同幅小偏是時鐘。
         percoin = d.groupby("coin").relerr.median()
         worst_coin = float(percoin.max())
-        check("V1", med < 0.01 and worst_coin < 0.05,
+        # **逐幣門檻從 5% 放到 50%，而這不是為了消紅燈 —— 是這個統計量原本
+        # 就量錯了東西。** 2026-09-13：V1 紅了，查下去是 GRIFFAIN 12.1% 與
+        # SAGA 9.1%，178 個幣裡只有這 2 個，全體中位 0.203%。跨小時檔對照：
+        #     22h  GRIFFAIN 1.012  SAGA 1.017  BTC 1.000
+        #     23h  GRIFFAIN 1.000  SAGA 1.010  BTC 1.000
+        #     00h  GRIFFAIN 1.007  SAGA 0.998  BTC 1.000
+        #     01h  GRIFFAIN 0.879  SAGA 1.091  BTC 1.000   <- 只有這小時
+        # **方向相反**（一個 −12%、一個 +9%）。單位錯是單向的、而且量級是
+        # 10/100/10000 倍；方向相反只能是兩次 API 呼叫之間微市值幣動了。
+        # 本關的宣稱目標就是「szi 是張數還是幣」「positionValue 是不是美元」
+        # —— 那些錯至少 2 倍。5% 的帶把「價格動了 10%」也抓進來，
+        # 於是它量的是時鐘不是單位（§1.05 那一族：守衛量的不是它以為在量的）。
+        drift = int((percoin > 0.05).sum())
+        check("V1", med < 0.01 and worst_coin < 0.50,
               "positionValue vs |szi|x" + ref + "：中位 %.1f bps、p99 %.1f bps、"
-              "逐幣最差中位 %.1f bps、>2%% 的 %d/%d"
-              % (med * 1e4, p99 * 1e4, worst_coin * 1e4, bad, len(d)))
+              "逐幣最差中位 %.1f bps（門檻 5000 = 單位錯的量級）、"
+              "漂 >5%% 的幣 %d/%d（時鐘不是單位）、>2%% 的列 %d/%d"
+              % (med * 1e4, p99 * 1e4, worst_coin * 1e4,
+                 drift, int(percoin.size), bad, len(d)))
 
         # ── V2 量級回推：一顆 BTC 的部位名目必須是五位數美元 ──────────
         b = d[d.coin == "BTC"]
