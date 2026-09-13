@@ -344,6 +344,14 @@ REGISTRY = [
     ("arb recorder NVDA_LL (§1.02)", "file",
      "../arb/engine/logs/NVDA_LL/minutes.csv", 1.0,
      "zero-fee control: lighter NVDA vs lighter-rh NVDA"),
+    ("arb recorder MET (§1.41b)", "file",
+     "../arb/engine/logs/MET/minutes.csv", 1.0,
+     "HMM 候選，2026-09-14 開錄。它要回答 GMX 死掉的那一關：premium 會不會"
+     "震盪（GMX 173 分鐘裡 96% 為負 -> 只能單邊賣 -> 4 張滿了就卡住）。"
+     "判準凍結在 arb/arblib/hmm_screen.py。**它的 samples 跟凍結的九支不可比**"
+     "——MET 用 HMM 的條件錄（staleness 30s ＋ 5 秒心跳），因為用錄製家族的"
+     "條件會跳過約 40% 的秒，而被跳過的正好是安靜的那些，那會讓 premium 的"
+     "符號分佈偏向活躍時段。要跟那九支比的是 GMX，不是 MET"),
     ("arb scanner (§0.75b)", "glob_newest",
      "../arb/engine/logs/scan/scan_*.csv", 0.5,
      "跨場館 REST 掃描器。**2026-09-13 起它跑在 Railway 上**，本機這些檔是"
