@@ -292,6 +292,15 @@ REGISTRY = [
      "ok 的語意是「連得上且設定對」不是「有資料」——啟動那一瞬間就寫 ok=True，"
      "否則看門狗會殺掉剛起來的行程（mistake.md 2026-09-11）。"
      "重啟由 ../arb/ops/arb_watchdog.ps1 負責"),
+    ("arb 帳戶額度加總 (B6)", "json_flag",
+     "../arb/results/account_budget.json:ok", 0.5,
+     "引擎的每一道風控閘門都是**逐行程**的（cap_usd 逐場館、max_gross_usd "
+     "逐行程），而一個行程只跑一個 ticker —— N 個市場 = N 個行程共用同一個 "
+     "Lighter/HL 帳號，五個各守 $1,000 的行程在帳戶層可以是 $5,000。"
+     "`engine/tools/account_budget.py` 每 5 分鐘由 arb_watchdog 跑一次，"
+     "把 live 行程的額度按資金池加總（B1 開關齊全 / B2 同池同天花板 / "
+     "B3 Σ 不超過天花板 / B4 沒有不在註冊表裡的 live 啟動器）。"
+     "執行期那一半在 entropy_arb/account.py（讀交易所回報的帳戶層曝險）"),
     ("arb recorder (§0.75)", "file",
      "../arb/engine/logs/minutes.csv", 1.0,
      "two-venue premium recording; silence = the week of data quietly stops"),
