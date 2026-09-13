@@ -169,18 +169,20 @@ def resample_log(lp, hours):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--group", default="all", choices=sorted(GROUPS))
+    ap.add_argument("--freq", default="1h", choices=["1h", "4h", "1d"])
     ap.add_argument("--k", type=int, nargs="*", default=[3, 4, 6, 8])
     ap.add_argument("--train", type=int, default=24 * 90)
     ap.add_argument("--test", type=int, default=24 * 30)
     ap.add_argument("--objs", nargs="*", default=["portmanteau", "crossing", "btcd"])
     a = ap.parse_args()
 
-    px = load()
+    px = load(a.freq)
     g = GROUPS[a.group]
     if g:
         px = px[[c for c in px.columns if c.replace("USDT", "") in g]]
     lp = np.log(px)
-    print("分組 %s｜%d 標的｜%s 根" % (a.group, lp.shape[1], format(len(lp), ",")))
+    print("分組 %s｜頻率 %s｜%d 標的｜%s 根"
+          % (a.group, a.freq, lp.shape[1], format(len(lp), ",")))
     if lp.shape[1] < max(a.k) + 1:
         print("標的數 %d 不夠做 k=%s" % (lp.shape[1], a.k))
 
@@ -273,7 +275,8 @@ def main():
         print("   %2d 次  %s" % (n, c))
 
     with open(OUT, "w", encoding="utf-8") as fh:
-        json.dump({"group": a.group, "rows": rows, "summary": summ},
+        json.dump({"group": a.group, "freq": a.freq,
+                   "rows": rows, "summary": summ},
                   fh, ensure_ascii=False, indent=1, default=str)
     print("\n寫出 %s" % OUT)
 

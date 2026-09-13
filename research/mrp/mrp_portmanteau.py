@@ -172,15 +172,31 @@ def halflife(x: np.ndarray) -> float:
     return float(-np.log(2) / np.log(1 + b))
 
 
-def load():
+BARS_PER = {"1h": 1, "4h": 4, "1d": 24}
+
+
+def load(freq: str = "1h"):
+    """小時快取 -> 指定頻率的收盤價。
+
+    **降頻取「每個區塊的最後一根收盤」**，不是平均 —— 平均會人為引入
+    負自相關（平滑），那正好會偽裝成均值回歸，是這條線最該避免的事。
+    """
     fs = sorted(glob.glob(os.path.join(CACHE, "*_1h.csv")))
     ser = {}
     for f in fs:
         sym = os.path.basename(f).split("_")[0]
         d = pd.read_csv(f, usecols=["time", "close"])
         ser[sym] = pd.Series(d["close"].values, index=d["time"].values)
-    px = pd.DataFrame(ser).sort_index()
-    px = px.dropna()
+    px = pd.DataFrame(ser).sort_index().dropna()
+    n = BARS_PER[freq]
+    if n > 1:
+        # 對齊到區塊邊界再取最後一根：用時戳而不是位置，否則資料頭部
+        # 一移動（.cache 是滾動 930 天窗）分界就跟著漂。
+        sec = px.index.values.astype("int64")
+        sec = sec // (1000 if sec.max() > 1e11 else 1)
+        blk = sec // (3600 * n)
+        px = px.groupby(blk).last()
+        px.index = (pd.Series(sec).groupby(blk).last().values)
     return px
 
 
@@ -188,11 +204,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--lags", type=int, default=LAGS)
     ap.add_argument("--group", default="all", choices=sorted(GROUPS))
+    ap.add_argument("--freq", default="1h", choices=["1h", "4h", "1d"])
     ap.add_argument("--train", type=int, default=TRAIN)
     ap.add_argument("--test", type=int, default=TEST)
     a = ap.parse_args()
 
-    px = load()
+    px = load(a.freq)
     g = GROUPS[a.group]
     if g:
         keep = [c for c in px.columns if c.replace("USDT", "") in g]
@@ -203,7 +220,8 @@ def main():
     # **對數價**（與他不同的一處，理由見檔頭）
     lp = np.log(px)
     print("分組 = %s" % a.group)
-    print("宇宙 %d 個標的｜%s 根小時 bar｜完整重疊"
+    print("頻率 %s" % a.freq)
+    print("宇宙 %d 個標的｜%s 根 bar｜完整重疊"
           % (lp.shape[1], format(len(lp), ",")))
     print("標的：%s" % ", ".join(lp.columns))
 
@@ -230,8 +248,14 @@ def main():
             w = rng.normal(size=lp.shape[1])
             w /= np.abs(w).sum()
             rnd.append(portmanteau_stat(te.values @ w, a.lags))
+        # **樣本內的 K2 純診斷用**（樣本內 MR<動量 是建構保證，不是績效）。
+        # 要看的是：樣本內對、樣本外**穩定反過來** = 過擬合的一種具體形狀，
+        # 而那與「樣本外只是變雜訊」是不同的病，處置也不同。
+        pm_mr_is = portmanteau_stat(tr.values @ w_mr, a.lags)
+        pm_mo_is = portmanteau_stat(tr.values @ w_mo, a.lags)
         rows.append(dict(
             i=int(i), t0=int(te.index[0]), t1=int(te.index[-1]),
+            pm_mr_is=pm_mr_is, pm_mo_is=pm_mo_is,
             pm_mr=portmanteau_stat(s_mr, a.lags),
             pm_mo=portmanteau_stat(s_mo, a.lags),
             pm_eq=portmanteau_stat(s_eq, a.lags),
@@ -242,7 +266,7 @@ def main():
             nz=int((np.abs(w_mr) > 0.02).sum()),
             top=", ".join("%s%+.2f" % (lp.columns[k], w_mr[k])
                           for k in np.argsort(-np.abs(w_mr))[:4])))
-        i += STEP
+        i += a.test       # 步長 = 測試窗（原本寫死 24*30，在日線上那是 720 天 -> 只有 1 個窗）
 
     r = pd.DataFrame(rows)
     pd.set_option("display.width", 200)
@@ -257,8 +281,15 @@ def main():
     n = len(r)
     print("\nK1 樣本外窗數 %d（樣本內必然贏，不報）" % n)
     k2 = int((r.pm_mr < r.pm_mo).sum())
+    k2is = int((r.pm_mr_is < r.pm_mo_is).sum())
     print("K2 他的對稱性：MR 比動量更均值回歸的窗 **%d / %d**"
           "（沒分開 = 這個解沒抓到東西）" % (k2, n))
+    print("   樣本內同一關 %d / %d（**建構保證，純診斷**）-> %s"
+          % (k2is, n,
+             "樣本內對、樣本外**穩定反過來** = 過擬合的反轉"
+             if k2is >= n * 0.9 and k2 <= n * 0.2 else
+             "樣本外只是退化成雜訊" if k2is >= n * 0.9 else
+             "**樣本內都不對 -> 先查程式**"))
     k3a = int((r.pm_mr < r.pm_rnd_med).sum())
     k3b = int((r.pm_mr < r.pm_rnd_p05).sum())
     print("K3 對隨機權重：贏中位 %d/%d｜贏 p05 %d/%d"
@@ -267,14 +298,14 @@ def main():
           % (r.pm_mr.median(), r.pm_mo.median(), r.pm_eq.median(),
              r.pm_rnd_med.median()))
     fin = r.hl_mr[np.isfinite(r.hl_mr)]
-    print("   MR 半衰期中位 %.1f 小時（%d/%d 個窗有限）"
+    print("   MR 半衰期中位 %.1f 根 bar（%d/%d 個窗有限）"
           % (fin.median() if len(fin) else float("nan"), len(fin), n))
     print("\n權重最大的四個（每窗）：")
     for _, x in r.iterrows():
         print("   %s  nz=%2d  %s" % (str(int(x.t0))[:10], int(x.nz), x.top))
 
     with open(OUT, "w", encoding="utf-8") as fh:
-        json.dump({"rows": rows, "group": a.group,
+        json.dump({"rows": rows, "group": a.group, "freq": a.freq,
                    "universe": list(lp.columns),
                    "lags": a.lags, "train": a.train, "test": a.test,
                    "k2": k2, "k3_med": k3a, "k3_p05": k3b, "n": n},
