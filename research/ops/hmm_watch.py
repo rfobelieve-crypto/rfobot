@@ -1,0 +1,222 @@
+# -*- coding: utf-8 -*-
+"""HMM live 引擎的看護 —— 有問題就送 Discord，沒問題就安靜。
+
+    python research/ops/hmm_watch.py --pair AERO
+    python research/ops/hmm_watch.py --pair AERO --heartbeat   # 強制送一次現況
+
+===========================================================================
+為什麼在 flow_system 而不是 arb（2026-09-14）
+===========================================================================
+CLAUDE.md §第 4 線的隔離：arb 是單向的 —— **flow_system 讀它，它不讀
+flow_system**。`freshness_board` 與 `prereg_publish` 已經是這個形狀
+（讀 `arb/engine/logs/*/minutes.csv`）。告警管線（`notify.py`，Discord 主
+Telegram 備）住在這裡，所以看護也住在這裡，而不是讓 arb 去 import 它。
+
+===========================================================================
+它盯什麼（每一條都有一個真實的來歷）
+===========================================================================
+    行程不在        引擎死了而看門狗還沒補上 —— 或者它被停了而沒人知道
+    HALT            一次性事件，而 HALT 是單向的：**要人去重啟**
+    帳戶層拒絕      交易所因保證金／持倉限制撤我們的單 —— 不是行情問題
+    裸曝險過大      net 超過 max_net_base 的八成 = 快要 HALT 了
+    停止報價        活著但一小時沒報價 = 帶設錯或市場沒機會（FIL 的病）
+    API 斷線頻繁    WAF 在擋，而它擋的是**重連**，那時引擎手上有部位
+    旗標過期        status.json 不動 = 引擎卡住，而行程還在
+
+**狀態轉換才送，不是每次都送**（`_last.json` 記上次送的是什麼）——
+一個每五分鐘說一次「還好」的頻道，出事那次會被當成雜訊
+（transition-only，freshness_board 的同一條）。
+
+===========================================================================
+訊息裡不放什麼
+===========================================================================
+不放美元金額、帳戶權益、webhook。**放的是狀態、方向、時間與計數** ——
+跟公開面同一條規矩，而理由不同：這個頻道在手機上，手機會掉。
+唯一的例外是裸曝險，它以**佔上限的百分比**表示，不以金額。
+"""
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+
+import notify                                            # noqa: E402
+
+ARB = os.path.join("C:", os.sep, "Users", "rfo", "Desktop", "flowbot", "arb")
+LOGS = os.path.join(ARB, "engine", "logs")
+STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                     "hmm_watch_last.json")
+
+STALE_FLAG_SEC = 180.0        # status.json 多久沒動就算引擎卡住
+QUIET_QUOTE_SEC = 3600.0      # 活著但這麼久沒報價 = 帶設錯（FIL 的病）
+NET_WARN_FRAC = 0.8           # 裸曝險到上限的八成就先說
+
+
+def _proc_alive(pair: str) -> bool:
+    """引擎在不在。用指令列比對，跟看門狗同一個判準。"""
+    import subprocess
+    # `@(...)` 不是裝飾：Windows PowerShell 5.1 對**單一物件**回傳的 `.Count`
+    # 是空的,於是 int("") -> 0 -> 「行程不在」。第一版就是這樣對一個正在
+    # 報價的引擎報死 —— 而這支會把那個假警報送到 Discord,每五分鐘一次。
+    # 抓到它的是「一個正在報價的引擎不可能不在」這個矛盾,不是我的警覺。
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "@(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+             "Where-Object { $_.CommandLine -match 'symbol %s' }).Count" % pair],
+            capture_output=True, text=True, timeout=60)
+        s = (out.stdout or "").strip()
+        if not s.isdigit():
+            return True    # 讀不懂就**不要**宣告它死了
+        return int(s) >= 1
+    except Exception:
+        return True        # 查不到也一樣（fail-safe，mistake.md 2026-09-11：
+                           # 看門狗的例外分支預設必須是不動手）
+
+
+def look(pair: str) -> tuple[list, dict]:
+    """回傳 (問題清單, 現況)。問題是字串，現況給心跳用。"""
+    d = os.path.join(LOGS, pair)
+    probs, now = [], time.time()
+    sj = os.path.join(d, "status.json")
+    st = {}
+    if not os.path.exists(sj):
+        return ["沒有 status.json —— 這個配對從來沒起來過"], {}
+    age = now - os.path.getmtime(sj)
+    try:
+        st = json.load(io.open(sj, encoding="utf-8"))
+    except Exception as e:
+        return ["status.json 讀不了：%s" % e], {}
+    pub = st.get("public") or {}
+    pri = st.get("private") or {}
+    cnt = pub.get("counts") or {}
+
+    if not _proc_alive(pair):
+        probs.append("**引擎行程不在**（看門狗五分鐘內會補；沒補就是註冊被拿掉了）")
+    if age > STALE_FLAG_SEC:
+        probs.append("**status.json %.0f 分鐘沒動** —— 行程可能卡住了" % (age / 60))
+    if not st.get("ok", True):
+        probs.append("**ok=False**：%s" % str(st.get("reason", ""))[:120])
+    if cnt.get("stale_episodes", 0) >= (cnt.get("stale_episode_limit", 5) - 1):
+        probs.append("**stale episodes %s/%s** —— 再一次就 HALT"
+                     % (cnt.get("stale_episodes"), cnt.get("stale_episode_limit")))
+    if cnt.get("post_only_rejects", 0) > 20:
+        probs.append("post-only 被拒 %s 次 —— 我們一直掛進對手價裡"
+                     % cnt["post_only_rejects"])
+
+    net = abs(float(pri.get("net_base") or 0.0))
+    cap = float((pub.get("guards_cap") or 0) or 0)
+    if not cap:                                   # 設定值不在 status 裡就讀 yaml
+        try:
+            import yaml
+            y = yaml.safe_load(io.open(os.path.join(
+                ARB, "engine", "config_%s.yaml" % pair), encoding="utf-8"))
+            cap = float((y.get("risk") or {}).get("max_net_base") or 0)
+        except Exception:
+            cap = 0.0
+    if cap and net >= cap * NET_WARN_FRAC:
+        probs.append("**裸曝險 %.0f%% 上限**（對沖沒跟上，超過就 HALT）"
+                     % (net / cap * 100))
+
+    rl = os.path.join(d, "runner.log")
+    quotes = fills = waf = 0
+    last_quote_age = None
+    if os.path.exists(rl):
+        try:
+            txt = io.open(rl, encoding="utf-8", errors="replace").read()[-400000:]
+            if "HALTED" in txt:
+                probs.append("**HALTED** —— 單向的，要人去重啟（重啟會用 "
+                             "strict=True 重讀真實部位）")
+            if "MAKER ORDER CANCELLED BY THE VENUE FOR AN ACCOUNT" in txt:
+                probs.append("**交易所因帳戶原因撤我們的單** —— 不是行情，"
+                             "查保證金／持倉限制")
+            quotes = txt.count("[QUOTE] ")
+            fills = txt.count("[QUOTE FILL]")
+            waf = txt.count("API unreachable")
+            if quotes == 0 and age < STALE_FLAG_SEC:
+                up = float(pub.get("uptime_sec") or 0)
+                if up > QUIET_QUOTE_SEC:
+                    probs.append("**活著但 %.0f 小時沒報價** —— 帶設錯或這個"
+                                 "市場沒機會（FIL 的病）" % (up / 3600))
+        except Exception:
+            pass
+    if waf >= 6:
+        probs.append("Lighter API 斷線 %d 次 —— WAF 在擋，而它擋的是**重連**" % waf)
+
+    cur = {"pair": pair, "ok": st.get("ok"), "quotes": quotes, "fills": fills,
+           "hedges": cnt.get("hedges", 0), "waf": waf,
+           "net_frac": (net / cap * 100) if cap else None,
+           "uptime_h": float(pub.get("uptime_sec") or 0) / 3600.0,
+           "fill_rate": pub.get("fill_rate_pct"),
+           "markout": (pub.get("markout") or {}).get("vs_mid_bps")}
+    return probs, cur
+
+
+def text_for(pair: str, probs: list, cur: dict) -> str:
+    head = "🔴 HMM %s" % pair if probs else "🟢 HMM %s" % pair
+    lines = [head]
+    for p in probs:
+        lines.append("• " + p)
+    mk = cur.get("markout")
+    lines.append("— 上線 %.1f 小時｜報價 %d｜成交 %d｜對沖 %d"
+                 % (cur.get("uptime_h", 0), cur.get("quotes", 0),
+                    cur.get("fills", 0), cur.get("hedges", 0)))
+    bits = []
+    if cur.get("fill_rate") is not None:
+        bits.append("成交率 %.0f%%" % cur["fill_rate"])
+    if mk is not None:
+        bits.append("markout(vs mid) %+.1f bps" % mk)
+    if cur.get("net_frac") is not None:
+        bits.append("裸曝險 %.0f%% 上限" % cur["net_frac"])
+    if bits:
+        lines.append("— " + "｜".join(bits))
+    return "\n".join(lines)
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--pair", default="AERO")
+    ap.add_argument("--heartbeat", action="store_true",
+                    help="不管有沒有轉換都送一次（開場／收工用）")
+    ap.add_argument("--dry", action="store_true", help="印出來但不送")
+    a = ap.parse_args(argv)
+
+    probs, cur = look(a.pair)
+    msg = text_for(a.pair, probs, cur)
+    key = "|".join(sorted(probs))              # 狀態轉換的指紋
+    last = {}
+    if os.path.exists(STATE):
+        try:
+            last = json.load(io.open(STATE, encoding="utf-8"))
+        except Exception:
+            last = {}
+    changed = last.get(a.pair) != key
+    print(msg)
+    if a.dry:
+        print("\n[乾跑] 轉換=%s，沒有送出" % changed)
+        return 0
+    if changed or a.heartbeat:
+        r = notify.send(msg, source="hmm_watch")
+        print("[送出] delivered=%s tried=%s" % (r.get("delivered"), r.get("tried")))
+        if not r.get("delivered"):
+            # 送不出去本身是一盞紅燈 —— notify 會寫 alert_last.json，
+            # 而那個旗標已經在新鮮度看板上（2026-09-13 那條的修法）。
+            print("**告警送不出去** —— 看 alert_last.json", file=sys.stderr)
+    else:
+        print("[安靜] 狀態沒變，不重複送")
+    last[a.pair] = key
+    io.open(STATE, "w", encoding="utf-8").write(
+        json.dumps(last, ensure_ascii=False, indent=1))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.exit(main())
