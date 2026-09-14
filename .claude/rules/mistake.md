@@ -4,6 +4,72 @@ Record logic errors and bad decisions to avoid repeating them.
 
 ---
 
+## 2026-09-14: shadow 跑了十小時全綠，而 live 會在啟動的第一秒 RuntimeError —— 因為 shadow 唯一不做的那件事，正好是唯一會擋住開機的那件事
+
+**What happened:**
+
+使用者問「確認現在情況跟下單的管線都有沒有通」。我去讀兩條腿的 `init_signer`，
+確認「探一下」不會送出任何東西（HL 是建構 `HLAccount`；Lighter 是
+`SignerClient(...)` + `check_client()`，兩個都不下單），然後順手查了套件：
+
+    lighter                    已安裝
+    hyperliquid-python-sdk     **沒有**
+
+而 HL 的 `init_signer` 第一件事就是 import 它，import 不到就
+`RuntimeError("live trading on Hyperliquid needs the official SDK")`。
+**live 開不起來，而且是在第一秒。**
+
+**十小時的 GMX shadow 對這件事零資訊量**，因為 shadow **刻意不呼叫
+`init_signer()`** —— 那正是它保證「一張單都不送」的手段之一
+（六個送出點裡有五個被 `_blocked()` 擋掉，第六個靠
+`assert signer is not None`）。所以「shadow 很乾淨」跟「live 啟動得了嗎」
+是兩個不相干的命題，而我一整天都把前者當成後者的旁證在報告。
+
+**最刺眼的是 shadow 自己的檔頭，那段話是為了這件事寫的：**
+
+> 「A rehearsal that cannot start is not a rehearsal, so shadow warns where
+> live refuses -- because **finding that out at go-live is the failure this
+> mode exists to prevent**.」
+
+它已經照這句話做了三件事（風控區塊、設定完整性、憑證齊不齊），
+**唯獨漏掉最會發生的那一個：套件沒裝。** 檔頭描述的是應然，
+而應然讀起來像是已經做到了 —— 同族第三次，前兩次是
+[[2026-09-11 在檔頭寫下判準不等於那個判準存在]] 與
+[[2026-09-08 我在檔頭寫下這個病的名字，然後把同一個病留在那個檔案裡]]。
+
+**Correct approach（已做，而且反向證明過）:**
+
+shadow 啟動時也跑一次 `init_signer()`，失敗只 WARNING 不中止。
+**只建構與驗證、不送任何東西**，所以 shadow 的不變式沒有動。
+反向證明用的是真實條件不是注入 —— 先修好、SDK 還沒裝：
+
+    [SHADOW] live would REFUSE to start — [HL] signer: ... needs the official SDK
+    [SHADOW] [LIGHTER] signer would initialise OK
+
+裝 `hyperliquid-python-sdk==0.24.0`（`--no-deps`，相依全部已滿足）之後：
+
+    [HL] signer=0xA8fB... account=0x5777... (agent mode)
+    [SHADOW] [HL] signer would initialise OK
+    [SHADOW] [LIGHTER] signer would initialise OK
+
+順手釘版（原本是 `>=0.9`，正是 [[2026-07-29 未釘版的 mcp]] 那個坑），
+並在旁邊記下一個落差：這個 SDK 宣告 `websocket-client>=1.5.1` 而本機是
+0.58.0 —— 我們只用它的簽章模組，而升級它會動到正在跑的 `lighter_tape`，
+所以刻意不升，並把這件事寫在釘版的旁邊當作下次的第一嫌疑。
+
+**Rule:** **一個「彩排模式」的價值，等於它跟正式演出**共用**的路徑有多長；
+而它跳過的每一段，就是它結構上看不見的每一段。** 所以列出
+「shadow 不做哪些事」這張清單，比列出「shadow 做了哪些事」有用得多 ——
+清單上的每一項都是一個 live 專屬的失敗模式，而它們全部會在 go-live 那一秒
+同時到齊。
+
+第二條，具體到這次：**「相依套件裝了沒」是 live 專屬失敗模式裡最便宜也最常
+發生的一個**，而它在任何 shadow / dry-run / paper 模式裡都測不到（那些模式
+的存在理由就是不碰那條路徑）。判斷法很便宜：**把 live 才會走的那幾行
+（建構簽章、讀憑證、連私有頻道）在 shadow 裡也跑一次，只是不送單。**
+
+---
+
 ## 2026-09-14: 同一個判準我猜了兩次，兩次都跟引擎自己的行為對不上——而正確的做法是不要猜，去讀引擎寫的那個檔
 
 **What happened:**
