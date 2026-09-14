@@ -48,6 +48,7 @@ sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 import notify                                            # noqa: E402
+from live_hmm import live_hmm_pairs                      # noqa: E402
 
 ARB = os.path.join("C:", os.sep, "Users", "rfo", "Desktop", "flowbot", "arb")
 LOGS = os.path.join(ARB, "engine", "logs")
@@ -248,21 +249,9 @@ def text_for(pair: str, probs: list, cur: dict) -> str:
     return "\n".join(lines)
 
 
-def main(argv=None) -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--pair", default="AERO")
-    ap.add_argument("--heartbeat", action="store_true",
-                    help="不管有沒有轉換都送一次（開場／收工用）")
-    ap.add_argument("--dry", action="store_true", help="印出來但不送")
-    a = ap.parse_args(argv)
-
-    probs, cur = look(a.pair)
-    last = {}
-    if os.path.exists(STATE):
-        try:
-            last = json.load(io.open(STATE, encoding="utf-8"))
-        except Exception:
-            last = {}
+def _watch_one(pair: str, a, last: dict) -> int:
+    """盯一個標的。`last` 會被就地更新,**寫檔由呼叫端負責**（一次寫完）。"""
+    probs, cur = look(pair)
 
     # 「行程不在」要連續兩次才報（2026-09-14）。
     #
@@ -279,7 +268,7 @@ def main(argv=None) -> int:
     # **只放寬這一條。** HALT、帳戶拒絕、裸曝險那幾條是單次就算數的,
     # 它們描述的是一個持續狀態,不是一個可能正在恢復的瞬間。
     GONE = "**引擎行程不在**"
-    miss_key = a.pair + ":procmiss"
+    miss_key = pair + ":procmiss"
     gone_now = any(p.startswith(GONE) for p in probs)
     misses = (int(last.get(miss_key, 0)) + 1) if gone_now else 0
     last[miss_key] = misses
@@ -291,20 +280,18 @@ def main(argv=None) -> int:
         print("[抑制] 引擎行程第 1 次沒看到 —— 啟動器 30 秒會補，"
               "連續兩次才算數")
 
-    msg = text_for(a.pair, probs, cur)
+    msg = text_for(pair, probs, cur)
     key = "|".join(sorted(probs))              # 狀態轉換的指紋
-    changed = last.get(a.pair) != key
+    changed = last.get(pair) != key
     print(msg)
     if a.dry:
         print("\n[乾跑] 轉換=%s，沒有送出" % changed)
         # 乾跑預設**不動狀態**（預覽就該沒有副作用）。唯一的例外是狀態檔
         # 被明確覆寫的時候 —— 那只發生在測試裡,而「連續兩次才報」這條
         # 沒有累積的狀態就驗不了(彩排跳過的那一段,正是要驗的那一段)。
-        if os.environ.get("HMM_WATCH_STATE"):
-            last[a.pair] = key
-            io.open(STATE, "w", encoding="utf-8").write(
-                json.dumps(last, ensure_ascii=False, indent=1))
-            print("[乾跑] 狀態已寫入沙盒 %s" % STATE)
+        # **寫檔搬到 main()**（多個標的時只寫一次）,這裡只更新 dict;
+        # 那個「乾跑要不要寫」的判斷跟著搬,語意一個字沒變。
+        last[pair] = key
         return 0
     if changed or a.heartbeat:
         r = notify.send(msg, source="hmm_watch")
@@ -315,10 +302,58 @@ def main(argv=None) -> int:
             print("**告警送不出去** —— 看 alert_last.json", file=sys.stderr)
     else:
         print("[安靜] 狀態沒變，不重複送")
-    last[a.pair] = key
+    last[pair] = key
+    return 0
+
+
+def _save(last: dict) -> None:
     io.open(STATE, "w", encoding="utf-8").write(
         json.dumps(last, ensure_ascii=False, indent=1))
-    return 0
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--pair", default=None,
+                    help="省略 = 自己推導現在在跑的 live 標的（排程用這個）")
+    ap.add_argument("--heartbeat", action="store_true",
+                    help="不管有沒有轉換都送一次（開場／收工用）")
+    ap.add_argument("--dry", action="store_true", help="印出來但不送")
+    a = ap.parse_args(argv)
+
+    # **排程不可以寫死標的（2026-09-14）。** 這個形狀當天出現四次,
+    # 而代價不是噪音 —— AERO 停掉而看護沒停,整個下午每五分鐘一則假警報,
+    # 於是 scan_pull 連死 31 次那個真紅燈沒有人看見。
+    # 真相源是看門狗的 `$Members` 減去 STOP 旗標,**跟 freshness_board
+    # 讀同一支** `live_hmm.live_hmm_pairs()` —— 兩份實作會安靜地不同意。
+    pairs = [a.pair] if a.pair else live_hmm_pairs()
+    if not pairs:
+        # **這不是「沒事」,是「不知道」。** 但不在這裡另開一條告警路徑:
+        # freshness_board 的 HMM 那一列讀同一支函式,推導不出來時它會紅,
+        # 而那一列已經接上通知了（少一個沒驗過的送出路徑,就少一個
+        # 「守衛存在但從沒開火過」的候選）。
+        print("**推導不出在跑的 live HMM 標的** —— 這一輪不盯任何東西。"
+              "這一格由 freshness_board 的 HMM 那一列負責（同一支函式）。")
+        return 0
+
+    last = {}
+    if os.path.exists(STATE):
+        try:
+            last = json.load(io.open(STATE, encoding="utf-8"))
+        except Exception:
+            last = {}
+
+    rc = 0
+    for pair in pairs:
+        rc |= _watch_one(pair, a, last)
+
+    # 乾跑預設**不動狀態**（預覽就該沒有副作用）—— 這一條原本寫在
+    # `_watch_one` 裡,搬上來之後語意一個字沒變。唯一的例外仍然是狀態檔
+    # 被明確覆寫的時候,那只發生在測試裡。
+    if not a.dry or os.environ.get("HMM_WATCH_STATE"):
+        _save(last)
+        if a.dry:
+            print("[乾跑] 狀態已寫入沙盒 %s" % STATE)
+    return rc
 
 
 if __name__ == "__main__":

@@ -79,32 +79,18 @@ def _live_hmm_pair():
     **解析不出來時回 None,而呼叫端會留一列紅的** —— 一列消失的守衛會被
     讀成「有人採用了它」,而不是「它壞了」（mistake.md 2026-09-04）。
     """
-    import glob as _g
-    import re as _re
+    # **實作搬到 `research/ops/live_hmm.py`（2026-09-14 稍晚）。**
+    # 理由:`hmm_watch.py` 變成排程之後也要問同一個問題,而兩份實作會安靜地
+    # 不同意 —— 那正是這個專案被咬過最多次的形狀（mistake.md 2026-08-26）。
+    # 上面那段 docstring 留著,它記的是**為什麼要算而不是寫死**,而那件事
+    # 不會因為實作搬家而改變。這裡只保留「取第一個」這個此處專屬的決定。
     try:
-        arb = os.path.join(ROOT, "..", "arb")
-        wd = os.path.join(arb, "ops", "arb_watchdog.ps1")
-        src = io.open(wd, encoding="utf-8").read()
-        members = _re.findall(
-            r"^\s*'([A-Za-z0-9_]+)'\s*=\s*@\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)",
-            src, _re.M)
-        if not members:
-            return None
-        stopped = {os.path.basename(f)[:-len(".stop")] + ".bat"
-                   for f in _g.glob(os.path.join(arb, "engine", "logs",
-                                                 "stop", "*.stop"))}
-        for name, _sig, bat in members:
-            if bat in stopped or not bat.startswith("run_hmm_"):
-                continue
-            body = io.open(os.path.join(arb, "engine", bat),
-                           "rb").read().decode("ascii", "replace")
-            # record-only / shadow 不是 live,而 live 才是這一列要盯的
-            if "--record-only" in body or "--shadow" in body:
-                continue
-            return name
+        sys.path.insert(0, str(ROOT / "research" / "ops"))
+        from live_hmm import live_hmm_pairs
+        ps = live_hmm_pairs()
+        return ps[0] if ps else None
     except Exception:
         return None
-    return None
 
 
 _HMM = _live_hmm_pair()
