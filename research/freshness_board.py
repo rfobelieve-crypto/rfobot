@@ -35,7 +35,9 @@ Exit: 0 all green, 1 any red.
 from __future__ import annotations
 
 import argparse
+import io
 import json
+import os
 import sys
 import time
 
@@ -59,6 +61,53 @@ STATE = ROOT / "research" / "results" / "freshness_state.json"
 OUT = ROOT / "research" / "results" / "freshness_board.json"
 
 H = 3600.0
+
+
+def _live_hmm_pair():
+    """現在真正在跑的那支 HMM live 引擎的代號,或 None。
+
+    **為什麼要算而不是寫死（2026-09-14）**：這一列原本寫死 `GMX`,而 GMX
+    當天退場,於是看板掛著一盞永遠紅的燈。同一天這個形狀出現四次
+    （AERO 的 Discord 看護、XPL 的看護、重啟 MON 的空窗、和這裡）,
+    而代價不是噪音 —— **真的紅燈會被埋在假的紅燈裡**:scan_pull 連死
+    31 次的那個下午,唯一在響的頻道報的是別的東西。
+
+    真相源是看門狗的 `$Members` 減去 `logs/stop/*.stop`,也就是今天為
+    「停止」建立的那個單一狀態。這裡是它的第四個讀者（.bat 的迴圈、
+    arb_watchdog.ps1、account_budget.py，加上這支）。
+
+    **解析不出來時回 None,而呼叫端會留一列紅的** —— 一列消失的守衛會被
+    讀成「有人採用了它」,而不是「它壞了」（mistake.md 2026-09-04）。
+    """
+    import glob as _g
+    import re as _re
+    try:
+        arb = os.path.join(ROOT, "..", "arb")
+        wd = os.path.join(arb, "ops", "arb_watchdog.ps1")
+        src = io.open(wd, encoding="utf-8").read()
+        members = _re.findall(
+            r"^\s*'([A-Za-z0-9_]+)'\s*=\s*@\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)",
+            src, _re.M)
+        if not members:
+            return None
+        stopped = {os.path.basename(f)[:-len(".stop")] + ".bat"
+                   for f in _g.glob(os.path.join(arb, "engine", "logs",
+                                                 "stop", "*.stop"))}
+        for name, _sig, bat in members:
+            if bat in stopped or not bat.startswith("run_hmm_"):
+                continue
+            body = io.open(os.path.join(arb, "engine", bat),
+                           "rb").read().decode("ascii", "replace")
+            # record-only / shadow 不是 live,而 live 才是這一列要盯的
+            if "--record-only" in body or "--shadow" in body:
+                continue
+            return name
+    except Exception:
+        return None
+    return None
+
+
+_HMM = _live_hmm_pair()
 
 # ── the frozen registry ──────────────────────────────────────────────────
 # kind: file  = mtime of one file
@@ -292,8 +341,14 @@ REGISTRY = [
      "ok 的語意是「連得上且設定對」不是「有資料」——啟動那一瞬間就寫 ok=True，"
      "否則看門狗會殺掉剛起來的行程（mistake.md 2026-09-11）。"
      "重啟由 ../arb/ops/arb_watchdog.ps1 負責"),
-    ("HMM 引擎 GMX (§1.41)", "json_flag",
-     "../arb/engine/logs/GMX/status.json:ok", 0.2,
+    ("HMM 引擎 %s (§1.41)" % (_HMM or "**解析不出來**"), "json_flag",
+     "../arb/engine/logs/%s/status.json:ok" % (_HMM or "__NO_LIVE_HMM__"), 0.2,
+     # 標的**不寫死**（2026-09-14）：這一列原本寫 GMX,而 GMX 當天退場,
+     # 於是看板掛著一盞永遠紅的燈 —— 而永遠紅的燈跟壞掉的燈一樣沒用
+     # （mistake.md 2026-09-03）。現在從看門狗註冊表減去 STOP 檔算出來,
+     # 見本檔的 _live_hmm_pair()。算不出來時路徑會指向一個不存在的目錄,
+     # 那一列因此變紅 —— **那是要的**:沒有 live HMM 引擎、或解析壞了,
+     # 兩者都該被看見,而不是讓這一列安靜消失。
      "HMM（對沖做市）的引擎自報。**盯的是引擎不是錄製器** —— 看板既有那幾列"
      "讀的是 minutes.csv，而那是 recorder 寫的，引擎的策略層死掉它照樣更新。"
      "ok 的語意是「連得上且設定對」不是「有成交」：只有 RED guard 會讓它 false，"
@@ -344,8 +399,9 @@ REGISTRY = [
     ("arb recorder NVDA_LL (§1.02)", "file",
      "../arb/engine/logs/NVDA_LL/minutes.csv", 1.0,
      "zero-fee control: lighter NVDA vs lighter-rh NVDA"),
-    ("arb recorder MET (§1.41b)", "file",
-     "../arb/engine/logs/MET/minutes.csv", 1.0,
+    ("arb recorder %s (§1.41b)" % (_HMM or "**解析不出來**"), "file",
+     "../arb/engine/logs/%s/minutes.csv" % (_HMM or "__NO_LIVE_HMM__"), 1.0,
+     # 同樣不寫死（2026-09-14）：原本是 MET,而 MET 當天退場 -> 永遠紅。
      "HMM 候選，2026-09-14 開錄。它要回答 GMX 死掉的那一關：premium 會不會"
      "震盪（GMX 173 分鐘裡 96% 為負 -> 只能單邊賣 -> 4 張滿了就卡住）。"
      "判準凍結在 arb/arblib/hmm_screen.py。**它的 samples 跟凍結的九支不可比**"
