@@ -63,6 +63,36 @@ QUIET_QUOTE_SEC = 3600.0      # 活著但這麼久沒報價 = 帶設錯（FIL �
 NET_WARN_FRAC = 0.8           # 裸曝險到上限的八成就先說
 WAF_WINDOW_MIN = 20           # 只看最近這麼久的 WAF 命中
 WAF_LIMIT = 4                 # 窗內超過這個數才算「現在有事」
+# 撤單確認不了要多久才算「卡住」。引擎每 ~60 秒印一次 CRITICAL，所以 10 分鐘
+# 的窗代表「剛剛還在卡」；用整份 log 會把幾小時前已經重啟解決的那次也算進來。
+UNRESOLVED_WINDOW_MIN = 10
+
+
+def _window_ok(txt: str, window_min: int) -> bool:
+    """這份 log 算不算得出「最近 window_min 分鐘」。
+
+    **為什麼要把這件事分出來（2026-09-15 00:10 的事故）**：`_count_recent`
+    在跨午夜時退回「數全部」，而那個退路對兩個呼叫端的**安全方向是相反的**：
+
+        WAF（「最近有沒有被擋」）  數全部 -> 多報 -> 保守，沒問題
+        quotes（「還有沒有在報價」）數全部 -> **永遠不是 0 -> 警報永遠不響**
+
+    而那晚它真的沒響：MON 在 22:58 卡住（撤單確認不了）、**72 分鐘沒報一張
+    單**，而看護每五分鐘說一次 🟢，因為 00:0x 的那幾輪退回數了大半天的 427。
+
+    同一個退路，一邊是保守一邊是致命 —— 所以呼叫端必須自己決定，
+    而不是共用一個「看起來安全」的預設（mistake.md 2026-09-14：
+    未知狀態不可以長得像一個已知狀態）。
+    """
+    import re
+    ts = re.compile(r"^(\d{2}):(\d{2}):(\d{2})")
+    for ln in reversed(txt.split("\n")):
+        m = ts.match(ln)
+        if m:
+            last = (int(m.group(1)) * 3600 + int(m.group(2)) * 60
+                    + int(m.group(3)))
+            return last - window_min * 60 >= 0
+    return False
 
 
 def _count_recent(txt: str, needle: str, window_min: int) -> int:
@@ -206,11 +236,35 @@ def look(pair: str) -> tuple[list, dict]:
             qwin = int(QUIET_QUOTE_SEC // 60)
             quotes = _count_recent(txt, "[QUOTE DONE]", qwin)
             fills = _count_recent(txt, "[QUOTE FILL]", qwin)
-            if quotes == 0 and age < STALE_FLAG_SEC:
+            # **算不出這個窗就不要判**（`_window_ok` 的 docstring 有事故經過）。
+            # 退回「數全部」在這一格是致命的:它讓警報永遠不響,而且剛好在
+            # 每天午夜後的第一個小時。
+            qwin_ok = _window_ok(txt, qwin)
+            if not qwin_ok:
+                quotes = fills = None
+            if qwin_ok and quotes == 0 and age < STALE_FLAG_SEC:
                 up = float(pub.get("uptime_sec") or 0)
                 if up > QUIET_QUOTE_SEC:
                     probs.append("**活著但 %.0f 小時沒報價** —— 帶設錯或這個"
                                  "市場沒機會（FIL 的病）" % (up / 3600))
+
+            # **撤單確認不了 = 引擎會停在那裡,而它不會自己好。**
+            # 2026-09-15 00:10 實際發生:Lighter 的帳戶 WS 串流在送出撤單的
+            # **同一秒**重連,而 `LighterVenue.poll_order` 只讀那個串流的快取
+            # （設定裡明寫 "There is deliberately no REST fallback here"）——
+            # 單已經從交易所消失,所以不會再有它的更新進快取,於是那張單的
+            # 終態**永遠確認不了**。引擎照設計保持悲觀（未確認的撤單不是
+            # 已撤單),於是 723 次重試、72 分鐘一張新單都沒掛。
+            #
+            # 那 72 分鐘裡它印了 71 行 CRITICAL,而這支一行都沒看 ——
+            # 它只認得 "HALTED" 與帳戶層撤單。重啟時的啟動掃單回報
+            # **零張掛單**,證明那張單一直都撤掉了:沒有曝險,壞的是確認路徑。
+            # 用短窗（不是整份 log）：要答的是「**現在**還卡著嗎」。
+            if _window_ok(txt, UNRESOLVED_WINDOW_MIN) and _count_recent(
+                    txt, "MAKER ORDER STILL UNRESOLVED",
+                    UNRESOLVED_WINDOW_MIN) > 0:
+                probs.append("**撤單確認不了,引擎卡著** —— 它不會自己好,"
+                             "要重啟（啟動時的 REST 掃單會清掉）")
         except Exception:
             pass
     if waf >= WAF_LIMIT:
@@ -234,9 +288,13 @@ def text_for(pair: str, probs: list, cur: dict) -> str:
     mk = cur.get("markout")
     # **報價／成交是「最近一小時」，上線與對沖是「本次行程」** —— 窗不同就
     # 要寫出來，否則讀的人會把它們相除（2026-09-14 那個 1103 就是這樣來的）。
-    lines.append("— 上線 %.1f 小時｜近 1 小時：報價 %d、成交 %d｜對沖 %d"
-                 % (cur.get("uptime_h", 0), cur.get("quotes", 0),
-                    cur.get("fills", 0), cur.get("hedges", 0)))
+    # `None` = 這份 log 算不出那個窗（跨午夜）。**印「未量」不要印 0** ——
+    # 0 會被讀成「真的沒報價」,而那是完全相反的結論。
+    def _n(v):
+        return "未量" if v is None else "%d" % v
+    lines.append("— 上線 %.1f 小時｜近 1 小時：報價 %s、成交 %s｜對沖 %d"
+                 % (cur.get("uptime_h", 0), _n(cur.get("quotes")),
+                    _n(cur.get("fills")), cur.get("hedges", 0)))
     bits = []
     if cur.get("fill_rate") is not None:
         bits.append("成交率 %.0f%%" % cur["fill_rate"])
