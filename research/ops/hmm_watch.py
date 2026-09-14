@@ -177,13 +177,34 @@ def look(pair: str) -> tuple[list, dict]:
             if "MAKER ORDER CANCELLED BY THE VENUE FOR AN ACCOUNT" in txt:
                 probs.append("**交易所因帳戶原因撤我們的單** —— 不是行情，"
                              "查保證金／持倉限制")
-            quotes = txt.count("[QUOTE] ")
-            fills = txt.count("[QUOTE FILL]")
             # **速率不是累計。** 第一版數整份 log 的 "API unreachable",而
             # 累計數遲早一定會跨過任何固定門檻 -> 一盞永遠亮的紅燈,然後被
             # 當成雜訊（mistake.md 2026-09-03：永遠紅的燈跟壞掉的燈一樣沒用）。
             # 改成只數最後 WAF_WINDOW_MIN 分鐘 —— 那才是「現在有沒有在擋」。
             waf = _count_recent(txt, "API unreachable", WAF_WINDOW_MIN)
+            # **2026-09-14：上面那個修法只套用到 waf，而 quotes / fills 就在
+            # 它上面兩行、犯的是同一個病。** 兩者都是 `txt.count(...)`，
+            # 而 `txt` 是 runner.log 的最後 40 萬個字元 ≈ 大半天 ——
+            #
+            #   後果一（嚴重）：`quotes == 0` 幾乎不可能成立，於是下面那盞
+            #     「活著但沒報價」**結構上點不亮**，而它正是為了 FIL 的病建的。
+            #     實測：引擎本次行程只掛了 36 張，而這裡數到 1103。
+            #   後果二：印出來的「上線 N 小時｜報價 M」把**本次行程**的上線
+            #     時間跟**大半天**的報價數放在同一行，而成交率是兩者相除 ——
+            #     同一個容器裡兩個不同的窗（mistake.md 2026-09-13 的形狀）。
+            #
+            # 改成跟 waf 同一個做法：問「最近這段時間」。窗取
+            # QUIET_QUOTE_SEC，因為那正是這盞燈要判的那段。
+            #
+            # **第二個錯,同一行:`"[QUOTE] "` 一張單會命中兩次。** 全 log 實測
+            #     [QUOTE] sell / buy    619   <- 掛出去
+            #     [QUOTE] cancelling    612   <- 撤掉,同一張單
+            #     [QUOTE DONE]          612   <- 一張單剛好一次
+            # 所以用 `[QUOTE DONE]`:它是「一張單解析完」的那一筆,跟 maker.csv
+            # 的列一一對應（612 對 578,差的 34 正好是那批 csv 寫入失敗）。
+            qwin = int(QUIET_QUOTE_SEC // 60)
+            quotes = _count_recent(txt, "[QUOTE DONE]", qwin)
+            fills = _count_recent(txt, "[QUOTE FILL]", qwin)
             if quotes == 0 and age < STALE_FLAG_SEC:
                 up = float(pub.get("uptime_sec") or 0)
                 if up > QUIET_QUOTE_SEC:
@@ -210,7 +231,9 @@ def text_for(pair: str, probs: list, cur: dict) -> str:
     for p in probs:
         lines.append("• " + p)
     mk = cur.get("markout")
-    lines.append("— 上線 %.1f 小時｜報價 %d｜成交 %d｜對沖 %d"
+    # **報價／成交是「最近一小時」，上線與對沖是「本次行程」** —— 窗不同就
+    # 要寫出來，否則讀的人會把它們相除（2026-09-14 那個 1103 就是這樣來的）。
+    lines.append("— 上線 %.1f 小時｜近 1 小時：報價 %d、成交 %d｜對沖 %d"
                  % (cur.get("uptime_h", 0), cur.get("quotes", 0),
                     cur.get("fills", 0), cur.get("hedges", 0)))
     bits = []
