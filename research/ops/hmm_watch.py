@@ -51,12 +51,52 @@ import notify                                            # noqa: E402
 
 ARB = os.path.join("C:", os.sep, "Users", "rfo", "Desktop", "flowbot", "arb")
 LOGS = os.path.join(ARB, "engine", "logs")
-STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                     "hmm_watch_last.json")
+# 可覆寫,唯一的用途是**驗這支自己**：抑制/放行那兩個分支要靠狀態檔累積的
+# 計數,所以測試必須能給它一個乾淨的、不會污染正式狀態的檔案
+# （2026-09-14：加「連續兩次才報」時,沒有這個覆寫就只能拿真的告警去驗）。
+STATE = os.environ.get("HMM_WATCH_STATE") or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "hmm_watch_last.json")
 
 STALE_FLAG_SEC = 180.0        # status.json 多久沒動就算引擎卡住
 QUIET_QUOTE_SEC = 3600.0      # 活著但這麼久沒報價 = 帶設錯（FIL 的病）
 NET_WARN_FRAC = 0.8           # 裸曝險到上限的八成就先說
+WAF_WINDOW_MIN = 20           # 只看最近這麼久的 WAF 命中
+WAF_LIMIT = 4                 # 窗內超過這個數才算「現在有事」
+
+
+def _count_recent(txt: str, needle: str, window_min: int) -> int:
+    """數**最近 window_min 分鐘**內出現幾次,不是整份 log。
+
+    引擎的 log 每行開頭是 `HH:MM:SS.mmm`（本地時間,沒有日期）。所以用
+    最後一行的時刻當「現在」,往回推 —— 不用牆鐘,避免時鐘與 log 不同源。
+    跨午夜時最後一行的時刻會小於前面的,那時就退回數全部（保守方向：
+    多報一次總比在跨日那幾分鐘瞎掉好）。
+    """
+    import re
+    ts = re.compile(r"^(\d{2}):(\d{2}):(\d{2})")
+    lines = txt.split("\n")
+    last = None
+    for ln in reversed(lines):
+        m = ts.match(ln)
+        if m:
+            last = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+            break
+    if last is None:
+        return txt.count(needle)
+    cut = last - window_min * 60
+    if cut < 0:
+        return txt.count(needle)          # 跨午夜,不要假裝算得準
+    n = 0
+    for ln in lines:
+        if needle not in ln:
+            continue
+        m = ts.match(ln)
+        if m is None:
+            continue
+        t = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+        if t >= cut:
+            n += 1
+    return n
 
 
 def _proc_alive(pair: str) -> bool:
@@ -139,7 +179,11 @@ def look(pair: str) -> tuple[list, dict]:
                              "查保證金／持倉限制")
             quotes = txt.count("[QUOTE] ")
             fills = txt.count("[QUOTE FILL]")
-            waf = txt.count("API unreachable")
+            # **速率不是累計。** 第一版數整份 log 的 "API unreachable",而
+            # 累計數遲早一定會跨過任何固定門檻 -> 一盞永遠亮的紅燈,然後被
+            # 當成雜訊（mistake.md 2026-09-03：永遠紅的燈跟壞掉的燈一樣沒用）。
+            # 改成只數最後 WAF_WINDOW_MIN 分鐘 —— 那才是「現在有沒有在擋」。
+            waf = _count_recent(txt, "API unreachable", WAF_WINDOW_MIN)
             if quotes == 0 and age < STALE_FLAG_SEC:
                 up = float(pub.get("uptime_sec") or 0)
                 if up > QUIET_QUOTE_SEC:
@@ -147,8 +191,9 @@ def look(pair: str) -> tuple[list, dict]:
                                  "市場沒機會（FIL 的病）" % (up / 3600))
         except Exception:
             pass
-    if waf >= 6:
-        probs.append("Lighter API 斷線 %d 次 —— WAF 在擋，而它擋的是**重連**" % waf)
+    if waf >= WAF_LIMIT:
+        probs.append("Lighter API 最近 %d 分鐘斷線 %d 次 —— WAF 在擋，"
+                     "而它擋的是**重連**" % (WAF_WINDOW_MIN, waf))
 
     cur = {"pair": pair, "ok": st.get("ok"), "quotes": quotes, "fills": fills,
            "hedges": cnt.get("hedges", 0), "waf": waf,
@@ -189,18 +234,54 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
 
     probs, cur = look(a.pair)
-    msg = text_for(a.pair, probs, cur)
-    key = "|".join(sorted(probs))              # 狀態轉換的指紋
     last = {}
     if os.path.exists(STATE):
         try:
             last = json.load(io.open(STATE, encoding="utf-8"))
         except Exception:
             last = {}
+
+    # 「行程不在」要連續兩次才報（2026-09-14）。
+    #
+    # 啟動器的迴圈 30 秒就會把引擎拉回來,而這支每 300 秒看一次 —— 所以
+    # **「死了」跟「正在重啟」在單次檢查裡長得一模一樣**,而重啟是我們自己
+    # 每天都會做的事。今天因此誤報三次(AERO、XPL、以及重啟 MON 裝儀器
+    # 那 30 秒),而代價不是噪音而已:**真的紅燈會被埋在假的紅燈裡** ——
+    # scan_pull 連死 31 次那一下午,唯一在響的頻道報的是別的東西。
+    #
+    # 這是今天寫進 mistake.md 那條的鏡像:「停止不是瞬間的」,所以
+    # 「不在」也不是單次可判定的。兩次沒看到 = 跨過了一個 .bat 迴圈週期,
+    # 那才是證據。
+    #
+    # **只放寬這一條。** HALT、帳戶拒絕、裸曝險那幾條是單次就算數的,
+    # 它們描述的是一個持續狀態,不是一個可能正在恢復的瞬間。
+    GONE = "**引擎行程不在**"
+    miss_key = a.pair + ":procmiss"
+    gone_now = any(p.startswith(GONE) for p in probs)
+    misses = (int(last.get(miss_key, 0)) + 1) if gone_now else 0
+    last[miss_key] = misses
+    if gone_now and misses < 2:
+        # **完全拿掉,不要換一句話留在 probs 裡** —— probs 就是狀態指紋,
+        # 留一句「第 1 次沒看到」照樣是一次狀態轉換,照樣會送出去,
+        # 那等於沒修。提示只印在本地。
+        probs = [p for p in probs if not p.startswith(GONE)]
+        print("[抑制] 引擎行程第 1 次沒看到 —— 啟動器 30 秒會補，"
+              "連續兩次才算數")
+
+    msg = text_for(a.pair, probs, cur)
+    key = "|".join(sorted(probs))              # 狀態轉換的指紋
     changed = last.get(a.pair) != key
     print(msg)
     if a.dry:
         print("\n[乾跑] 轉換=%s，沒有送出" % changed)
+        # 乾跑預設**不動狀態**（預覽就該沒有副作用）。唯一的例外是狀態檔
+        # 被明確覆寫的時候 —— 那只發生在測試裡,而「連續兩次才報」這條
+        # 沒有累積的狀態就驗不了(彩排跳過的那一段,正是要驗的那一段)。
+        if os.environ.get("HMM_WATCH_STATE"):
+            last[a.pair] = key
+            io.open(STATE, "w", encoding="utf-8").write(
+                json.dumps(last, ensure_ascii=False, indent=1))
+            print("[乾跑] 狀態已寫入沙盒 %s" % STATE)
         return 0
     if changed or a.heartbeat:
         r = notify.send(msg, source="hmm_watch")
