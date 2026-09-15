@@ -171,6 +171,8 @@ exit` 的列是真前瞻，判 Gate 只能用前者」——**這條是錯的，
 | 策略分工、風控階段、**現行** override、網站呈現面 | **本檔（CLAUDE.md）** |
 | **已被取代的 override 全文**（10 條，2026-09-11 搬出） | `docs/DECISION_HISTORY.md` |
 | **HMM（對沖做市）的一切**：override 全文、命名、判準、TODO、看護（2026-09-15 搬出） | `../arb/docs/HMM.md`、`../arb/TODO.md`，**從 arb 開 session**。告警分工：**本 repo 報 V7、arb 報 HMM**（同一個 Discord webhook；本看板只盯 arb 看護活不活著） |
+| **HMM 的研究腳本**（原 `research/mm/`、`mrp/spread_arb_*`、`lighter_flow_*`、`venue_spread_arb`、`hl/gate0.py`、`hl/mm_markout.py` ＋ 10 個結果檔） | `../arb/research/hmm_gate0/`（README 有新舊路徑對照）。**2026-09-15 搬出，本 repo 已刪原檔**；TODO 舊節引用的舊路徑照對照表找 |
+| **HL 燃料錄製器**（逐地址部位、清算價、簿口、觸發單） | Railway 服務 `hl-record`（`research/hl/hl_record_service.py`），本機 `FlowBot_HLRecord` 每小時 :45 用 `hl_record_pull.py` 拉回。搬上雲的理由：跟 HMM 引擎的 HL 腿搶本機 IP 限流 |
 | 名詞白話解釋（含地形層、池子四種） | `docs/GLOSSARY.md` |
 | DB 45 表目錄（writer/reader/新鮮度） | `docs/DB_REGISTRY.md`（`research/gen_db_registry.py` 重生成）|
 | 流動性獵取全貌（變體/配方/評分/上線路徑） | `docs/RAID_PLAYBOOK.md` |

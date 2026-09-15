@@ -55,9 +55,9 @@ RESULT_WHITELIST = {"hl_fuel_last.json", "hl_record_service.json"}
 TIMEOUT = 120
 # **切換點（UTC 小時，檔名格式）。** 早於它的每小時檔是本機錄製器寫的，永不覆寫。
 # 理由：雲端上線當天的驗收試跑寫的是 20260915_09，而本機 17:05（09 UTC）那一輪
-# 已經寫了同名檔；本機 18:05（10 UTC）那一輪也照跑。拉回來會把一個小時的真實
+# 已經寫了同名檔；本機 18:05（10 UTC）那一輪沒有跑 —— 使用者擔心同 IP 限流，切換提前到 18:05 之前，10 UTC 由雲端補錄。拉回來會把一個小時的真實
 # 快照換成另一個時點的，而那兩份檔名一模一樣 —— 事後分不出來。
-CUTOVER_HOUR = "20260915_11"
+CUTOVER_HOUR = "20260915_10"
 HOURLY_DIRS = ("snapshots", "positions", "market", "book", "orders")
 
 

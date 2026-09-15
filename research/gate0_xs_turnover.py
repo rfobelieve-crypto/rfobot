@@ -80,7 +80,7 @@ TAKER_BPS = MAKER_BPS = float("nan")
 # 「一天可捕獲 $30」就是這樣來的）。
 VENUE_FEES = {
     # 場館:      (taker_bps, maker_bps, 出處)
-    "hl": (4.5, 1.5, "research/hl/gate0.py 實查 HL API，零成交量級距；"
+    "hl": (4.5, 1.5, "arb/research/hmm_gate0/hl/gate0.py（2026-09-15 前在 flow_system research/hl/）實查 HL API，零成交量級距；"
                      "掛單返傭要 maker 量佔全所 0.5% 才開始（−0.1 bps），我們拿不到"),
     "binance": (5.0, 2.0, "Binance U 本位永續 VIP0 公開費率（BNB 折扣另計）"),
     "bitget": (6.0, 2.0, "Bitget U 本位永續 VIP0 公開費率"),

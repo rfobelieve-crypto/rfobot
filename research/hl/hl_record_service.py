@@ -77,6 +77,10 @@ def _write_status() -> None:
     os.replace(tmp, STATUS)
 
 
+def _hour_key(t=None) -> str:
+    return time.strftime("%Y%m%d_%H", time.gmtime(t if t is not None else time.time()))
+
+
 def run_once() -> None:
     """跑一輪錄製器。stdout 進 Railway log；結果記進狀態檔。"""
     with _lock:
@@ -84,6 +88,7 @@ def run_once() -> None:
             log("上一輪還在跑，這一輪跳過")
             return
         _state["running"] = True
+        hour = _hour_key()
     t0 = time.time()
     env = dict(os.environ, HL_DATA_DIR=str(DATA),
                HL_FLAG_PATH=str(RESULTS / "hl_fuel_last.json"),
@@ -115,7 +120,12 @@ def run_once() -> None:
     with _lock:
         _state["running"] = False
         _state["runs"] += 1
+        # 這一小時算「做過了」—— 不論 rc。錄製器自己判紅（覆蓋率不足）時重跑
+        # 不會變好，只會一直打 HL；被重啟砍掉的那一輪根本走不到這一行，
+        # 所以 done_hour 不會前進，開機後排程會把它補回來。
+        _state["done_hour"] = hour
         _state["last"] = {"start": t0, "end": time.time(), "rc": rc, "why": why,
+                          "hour": hour,
                           "asof": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
         _write_status()
 
@@ -136,13 +146,24 @@ def _prune() -> None:
 
 
 def scheduler() -> None:
-    last_hour = None
+    """每小時 :05 之後，**這一小時還沒做完**就跑。
+
+    2026-09-15 部署當天實測：flow_system 每 push 一次，Railway 就重新部署這個
+    repo 的全部服務，包括這一個 —— 驗收那一輪跑到一半被砍掉。flow_system 一天
+    push 好幾次，所以「每小時 :05 跑一次」會一天掉好幾個不可回填的小時。
+
+    修法是判準從「這一小時開始過沒」換成「這一小時做完了沒」（`done_hour`，
+    存在 volume 上的狀態檔，重啟後讀回）。被砍掉的那一輪不會寫 done_hour，
+    所以重啟後會在同一小時內補跑；檔名取開始時刻，補跑寫出來的仍是那一小時。
+    一輪沒跑完、下一個整點到了，也會在它結束後補下一小時（只要還在那一小時內）。
+    """
     while True:
         now = time.gmtime()
-        key = (now.tm_yday, now.tm_hour)
-        if now.tm_min >= RUN_MINUTE and key != last_hour:
-            last_hour = key
-            threading.Thread(target=run_once, daemon=True).start()
+        if now.tm_min >= RUN_MINUTE:
+            with _lock:
+                due = (not _state["running"]) and _state.get("done_hour") != _hour_key()
+            if due and (DATA / "addresses.json").exists():
+                threading.Thread(target=run_once, daemon=True).start()
         time.sleep(20)
 
 
@@ -243,6 +264,15 @@ class H(BaseHTTPRequestHandler):
 def main() -> int:
     for d in (DATA, RESULTS):
         d.mkdir(parents=True, exist_ok=True)
+    try:
+        prev = json.loads(STATUS.read_text(encoding="utf-8"))
+        last = prev.get("last") or {}
+        # 舊版狀態檔沒有 done_hour：從上一輪「有真的跑完」的開始時刻推回來。
+        _state["done_hour"] = prev.get("done_hour") or (
+            _hour_key(last["start"]) if last.get("rc") is not None else None)
+        log("上次做完的小時：%s" % _state["done_hour"])
+    except Exception:                                    # noqa: BLE001
+        _state["done_hour"] = None
     if not TOKEN:
         log("**HL_RECORD_TOKEN 沒設** —— 檔案端點全部回 401，本機拉不到任何東西")
     threading.Thread(target=scheduler, daemon=True).start()
