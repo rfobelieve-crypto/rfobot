@@ -78,7 +78,7 @@ REGISTRY = [
     # 跳動，薄的標的會假性反轉。簿口沒有歷史端點，所以它跟 tape 一樣
     # 不可回填。`bid_n/ask_n` 是每檔掛單筆數，CEX 公開簿口沒有這一欄。
     ("hl 中價與佇列", "D:/flowbot_data/hl/mid/*/*.parquet", "append",
-     "hl_mid.py 每 60 秒取樣主場量能前 40 名；不可回填"),
+     "hl_mid.py 每 60 秒取樣主場量能前 40 名；不可回填。2026-09-15 起錄製器在 arb/recorders/"),
     # 2026-09-12：Lighter 逐筆成交帶（D 槽，不在 repo 裡）。**不可回填**。
     # 它比 HL 的成交帶多兩類欄位，而兩類都不是裝飾：
     #   maker_fee / taker_fee        雙方**實付費率**（單位 1e-6，量測驗過：
@@ -87,7 +87,7 @@ REGISTRY = [
     # 前者讓「收據查證」第一次做得到（不需要我們自己的成交），
     # 後者讓「在管庫存 vs 在下方向」分得出來。
     ("lighter 逐筆成交帶", "D:/flowbot_data/lighter/trades/*/*.parquet", "append",
-     "lighter_tape.py 常駐 WS，永續前 80 名（99.7% 成交額）；不可回填。"
+     "lighter_tape.py 常駐 WS，永續前 80 名（99.7% 成交額）；不可回填（2026-09-15 起在 arb/recorders/）。"
      "含雙方帳戶、實付費率、成交前部位、微秒級 transaction_time"),
     # 2026-09-12：Lighter 分鐘級中價與深度（D 槽）。**不可回填**。
     # 與 HL 的能力差異兩個方向都有，都寫在 lighter_mid.py 的檔頭：
@@ -96,7 +96,7 @@ REGISTRY = [
     #   多了整本簿口（BTC 549 檔買 vs HL 端點只給 20 檔）
     #        -> 深度帶拉到 100 bps 還是實數
     ("lighter 中價與深度", "D:/flowbot_data/lighter/mid/*/*.parquet", "append",
-     "lighter_mid.py 牆鐘 60 秒取樣永續前 80；不可回填。"
+     "lighter_mid.py 牆鐘 60 秒取樣永續前 80；不可回填（2026-09-15 起在 arb/recorders/）。"
      "minute_ts 是明確桶鍵（不靠 ts 整除，取樣可能早醒 0.2 秒）"),
     ("§1.25 宇宙級分鐘簿口", "../arb/engine/logs/universe/*/minutes.csv", "append",
      "record_universe.py：126 個 ticker、150 個配對的逐分鐘頂檔。"

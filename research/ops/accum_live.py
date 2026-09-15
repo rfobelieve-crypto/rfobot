@@ -47,17 +47,18 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, ROOT)
+from research import arb_home  # noqa: E402  2026-09-15: the four WS recorders live in arb/recorders
 
 # (顯示名, 小時分檔根目錄, 旗標)
 RECORDERS = [
     ("Lighter 逐筆成交帶", "D:/flowbot_data/lighter/trades",
-     "research/results/lighter_tape_last.json"),
+     str(arb_home.RESULTS / "lighter_tape_last.json")),
     ("Lighter 中價與深度", "D:/flowbot_data/lighter/mid",
-     "research/results/lighter_mid_last.json"),
+     str(arb_home.RESULTS / "lighter_mid_last.json")),
     ("HL 逐筆成交帶", "D:/flowbot_data/hl/trades",
-     "research/results/hl_tape_last.json"),
+     str(arb_home.RESULTS / "hl_tape_last.json")),
     ("HL 中價與佇列", "D:/flowbot_data/hl/mid",
-     "research/results/hl_mid_last.json"),
+     str(arb_home.RESULTS / "hl_mid_last.json")),
 ]
 FLUSH_SEC = 300
 

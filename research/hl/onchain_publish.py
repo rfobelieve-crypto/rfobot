@@ -22,6 +22,7 @@ from __future__ import annotations
 import glob
 import json
 import time
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -29,6 +30,8 @@ ROOT = HERE.parents[1]
 OUT = ROOT / "assets" / "onchain_status.json"
 RES = ROOT / "research" / "results"
 DATA = HERE / "data"
+sys.path.insert(0, str(ROOT / "research"))
+import arb_home  # noqa: E402  2026-09-15: hl_tape moved to arb/recorders
 
 
 def jread(p, default=None):
@@ -41,9 +44,9 @@ def jread(p, default=None):
 def main():
     fuel = jread(RES / "hl_fuel_last.json", {}) or {}
     ver = jread(RES / "hl_verify_last.json", {}) or {}
-    tape = jread(RES / "hl_tape_last.json", {}) or {}
+    tape = jread(arb_home.RESULTS / "hl_tape_last.json", {}) or {}
     addr = jread(DATA / "addresses.json", {}) or {}
-    addr_t = jread(DATA / "addresses_tape.json", {}) or {}
+    addr_t = jread(arb_home.HOME / "recorders" / "data" / "addresses_tape.json", {}) or {}
 
     snaps = len(glob.glob(str(DATA / "snapshots" / "*.json")))
     mkt = jread(sorted(glob.glob(str(DATA / "market" / "*.json")))[-1]

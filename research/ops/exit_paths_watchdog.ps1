@@ -24,18 +24,15 @@ function Say($m) { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Add-Content
 # 本支 5 分鐘），修法寫在 hl_tape.write_flag 的 docstring 裡。
 $Jobs = @(
   @{ name = 'liq';     script = 'research\exit_paths\liq_recorder.py';     flag = 'research\results\liq_last.json';     log = 'research\exit_paths\logs\liq_recorder.log' },
-  @{ name = 'lighter'; script = 'research\exit_paths\lighter_recorder.py'; flag = 'research\results\lighter_last.json'; log = 'research\exit_paths\logs\lighter_recorder.log' },
+  @{ name = 'lighter'; script = 'research\exit_paths\lighter_recorder.py'; flag = 'research\results\lighter_last.json'; log = 'research\exit_paths\logs\lighter_recorder.log' }
+  # 2026-09-15：hl_tape / hl_mid / lighter_tape / lighter_mid 四支搬到 arb/recorders/，由 arb/ops/recorder_watchdog.ps1（排程 Arb_RecorderWatchdog）管。D: 上的資料路徑沒變。一個錄製器只能有一個看門狗，所以從這張表拿掉。
   # 2026-09-11 加入：HL 全市場成交帶。它是常駐 WS，斷線自己會重連，
   # 但行程整個死掉就沒人管 —— 實際發生過（UTC 23:36 死、兩小時後才發現）。
   # 接在這裡而不是另寫一支看門狗：同一個判準（旗標的 asof，不是行程在不在）。
-  @{ name = 'hl_tape';  script = 'research\hl\hl_tape.py';  flag = 'research\results\hl_tape_last.json'; log = 'research\hl\logs\hl_tape.log' },
   # 2026-09-11 加入：分鐘級中價與佇列。同樣是常駐 WS、同樣不可回填。
-  @{ name = 'hl_mid';   script = 'research\hl\hl_mid.py';   flag = 'research\results\hl_mid_last.json'; log = 'research\hl\logs\hl_mid.log' },
   # 2026-09-12 加入：Lighter 全市場逐筆成交帶。同樣是常駐 WS、同樣不可回填。
   # 它自己有檔案鎖，所以本支重複拉起也只會有一個實例在寫。
-  @{ name = 'lighter_tape'; script = 'research\lighter\lighter_tape.py'; flag = 'research\results\lighter_tape_last.json'; log = 'research\lighter\logs\lighter_tape.log' },
   # 2026-09-12 加入：Lighter 分鐘級中價。成交帶的必要配套（markout 要中價不要成交價），同樣常駐 WS、同樣不可回填。
-  @{ name = 'lighter_mid'; script = 'research\lighter\lighter_mid.py'; flag = 'research\results\lighter_mid_last.json'; log = 'research\lighter\logs\lighter_mid.log' }
   # **§1.25 的宇宙錄製器刻意不在這張表裡。** 它歸 `../arb/ops/arb_watchdog.ps1`
   # 管（那支 2026-09-11 就加了 'universe' 這一員）。2026-09-11 我一度把它加
   # 進來，因為 grep 這個 repo 的看門狗找不到它 —— 那正是 mistake.md 2026-09-04

@@ -236,13 +236,13 @@ REGISTRY = [
     # 簿口沒有歷史端點 -> 不可回填 -> 停一小時永久少一小時。
     # 門檻 0.6h：取樣 60 秒、落盤 5 分鐘，36 分鐘沒動就是死了不是慢。
     ("hl mid/queue", "json_flag",
-     "research/results/hl_mid_last.json:ok", 0.6,
+     "../arb/results/hl_mid_last.json:ok", 0.6,
      "hl_mid.py 常駐自報；紅 = 行程死了或 WS 卡住。宇宙是量能前 40 名"
-     "（98.3% 的日成交額），重啟由 exit_paths_watchdog.ps1 負責"),
+     "（98.3% 的日成交額）。2026-09-15 起錄製器在 arb/recorders/，重啟由 arb/ops/recorder_watchdog.ps1 負責"),
     ("hl trade tape", "json_flag",
-     "research/results/hl_tape_last.json:ok", 0.6,
+     "../arb/results/hl_tape_last.json:ok", 0.6,
      "hl_tape.py 常駐自報；紅 = 行程死了或卡在 WS 讀取上。"
-     "重啟由 exit_paths_watchdog.ps1 負責（每 5 分鐘），"
+     "2026-09-15 起在 arb/recorders/，重啟由 arb/ops/recorder_watchdog.ps1 負責（每 5 分鐘，60 分鐘內最多 3 次），"
      "所以這一列紅超過一輪代表**重啟也失敗**，不只是剛好死掉"),
     # 2026-09-12：Lighter 全市場逐筆成交帶。**兩個開著的問題都卡在它身上**
     # （TODO §1.29 Lighter 上的做市毛利、§1.31 300ms 值幾 bps），而它跟
@@ -252,10 +252,10 @@ REGISTRY = [
     # `arblib/fee_receipts.py` 一直拿不到的收據查證，以及區分
     # 「在管庫存的人」與「在下方向的人」所需的欄位。
     ("lighter trade tape", "json_flag",
-     "research/results/lighter_tape_last.json:ok", 0.6,
+     "../arb/results/lighter_tape_last.json:ok", 0.6,
      "lighter_tape.py 常駐自報；紅 = 行程死了或卡在 WS 讀取上。"
      "宇宙是永續日成交額前 80 名（99.7% 的成交額，量測出來的）；"
-     "重啟由 exit_paths_watchdog.ps1 負責"),
+     "2026-09-15 起在 arb/recorders/，重啟由 arb/ops/recorder_watchdog.ps1 負責"),
     # 2026-09-12：Lighter 分鐘級中價與深度。**它是成交帶的必要配套不是選配**
     # —— markout 必須用中價，成交價在薄標的上自帶負自相關、會偽裝成均值回歸
     # （mistake.md 2026-09-11）。簿口沒有歷史端點 -> 不可回填。
@@ -263,9 +263,9 @@ REGISTRY = [
     # 它自己帶兩道自曝關：best_bid < best_ask（交錯就不寫那一列並計數）、
     # 以及 nonce 斷裂計數（斷了就清簿重訂閱，寧可空著不報假頂檔）。
     ("lighter mid/depth", "json_flag",
-     "research/results/lighter_mid_last.json:ok", 0.6,
+     "../arb/results/lighter_mid_last.json:ok", 0.6,
      "lighter_mid.py 常駐自報；紅 = 行程死了、WS 卡住、或所有市場都沒簿口。"
-     "宇宙與 lighter_tape 同一組（永續前 80，刻意相同才 join 得起來）"),
+     "宇宙與 lighter_tape 同一組（永續前 80，刻意相同才 join 得起來）。2026-09-15 起在 arb/recorders/"),
     ("product live fills", "json_flag",
      "research/results/product_fills_last.json:ok", 26.0,
      "check_product_fills.py 每日自報；量的是**宣告與實際的落差**："
