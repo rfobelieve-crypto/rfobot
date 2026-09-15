@@ -109,6 +109,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -116,14 +117,19 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-DATA = HERE / "data"
+# 2026-09-15：錄製器搬上 Railway（hl_record_service.py），因為它每小時 28 分鐘
+# 約 400 req/分，跟 HMM 引擎的 HL 腿共用本機 IP 的限流額度 —— MON 的 HL 429
+# 274/274 行全落在它執行的 :05–:33 之間。雲端把資料寫到 volume，所以兩個路徑
+# 可覆寫；**沒設環境變數時行為與搬家前逐位元組相同**。
+DATA = Path(os.environ["HL_DATA_DIR"]) if os.environ.get("HL_DATA_DIR") else HERE / "data"
 ADDR_FILE = DATA / "addresses.json"
 SNAP_DIR = DATA / "snapshots"          # fuel 直方圖（監看用，可從 POS_DIR 推導）
 POS_DIR = DATA / "positions"           # **逐部位明細，真相源**
 MKT_DIR = DATA / "market"              # 每幣 OI/funding/premium
 BOOK_DIR = DATA / "book"               # L2 兩側 20 檔
 ORD_DIR = DATA / "orders"              # 掛單 + 觸發單
-FLAG = ROOT / "research" / "results" / "hl_fuel_last.json"
+FLAG = (Path(os.environ["HL_FLAG_PATH"]) if os.environ.get("HL_FLAG_PATH")
+        else ROOT / "research" / "results" / "hl_fuel_last.json")
 API = "https://api.hyperliquid.xyz/info"
 
 # 凍結的分桶邊界（清算價離現價的 % 距離）

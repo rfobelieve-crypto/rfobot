@@ -1,0 +1,28 @@
+# Railway service "hl-record": Hyperliquid fuel recorder + read-only file endpoint (2026-09-15)
+#
+# Why this runs in the cloud: locally the recorder shared the machine's IP with the
+# HMM engine's HL leg, and HL rate-limits per IP. All 274 HL-side 429s in the MON
+# engine log fell inside the recorder's :05-:33 window. See the header of
+# research/hl/hl_record_service.py.
+#
+# NO credentials of any kind. HL's info endpoint is public. The only secret is
+# HL_RECORD_TOKEN, which guards the read-only endpoint.
+#
+# The address universe (addresses.json) is NOT in this image: rfobot is a public repo.
+# It is uploaded once to the volume via POST /seed (research/hl/hl_record_pull.py --seed).
+#
+# Railway settings for this service:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.hlrecord
+#   HL_RECORD_TOKEN=<same value as HL_RECORD_TOKEN in the local .env>
+#   volume mounted at /data
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 HL_ROOT=/data
+
+WORKDIR /app
+RUN pip install --no-cache-dir "pandas==2.2.2" "pyarrow==16.1.0"
+
+COPY research/hl/hl_fuel_recorder.py  research/hl/hl_fuel_recorder.py
+COPY research/hl/hl_record_service.py research/hl/hl_record_service.py
+
+CMD ["python", "research/hl/hl_record_service.py"]
