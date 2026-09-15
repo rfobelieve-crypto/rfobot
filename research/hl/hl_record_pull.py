@@ -53,6 +53,12 @@ FLAG = RESULTS / "hl_record_pull_last.json"
 # 別的旗標，遠端不可以有機會覆寫它們。
 RESULT_WHITELIST = {"hl_fuel_last.json", "hl_record_service.json"}
 TIMEOUT = 120
+# **切換點（UTC 小時，檔名格式）。** 早於它的每小時檔是本機錄製器寫的，永不覆寫。
+# 理由：雲端上線當天的驗收試跑寫的是 20260915_09，而本機 17:05（09 UTC）那一輪
+# 已經寫了同名檔；本機 18:05（10 UTC）那一輪也照跑。拉回來會把一個小時的真實
+# 快照換成另一個時點的，而那兩份檔名一模一樣 —— 事後分不出來。
+CUTOVER_HOUR = "20260915_11"
+HOURLY_DIRS = ("snapshots", "positions", "market", "book", "orders")
 
 
 def _dotenv() -> dict:
@@ -89,6 +95,15 @@ def local_path(remote: str):
     return None
 
 
+def _merge_addresses(local_file: Path, remote_body: bytes) -> bytes:
+    remote = json.loads(remote_body.decode("utf-8"))
+    local = json.loads(local_file.read_text(encoding="utf-8"))
+    union = sorted(set(remote.get("addresses", [])) | set(local.get("addresses", [])))
+    remote["addresses"] = union
+    remote["n"] = len(union)
+    return json.dumps(remote, ensure_ascii=False).encode("utf-8")
+
+
 def _flag(ok: bool, reason: str, **kw) -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     FLAG.write_text(json.dumps(dict(ok=ok, reason=reason,
@@ -112,10 +127,15 @@ def pull() -> int:
     except Exception:                                        # noqa: BLE001
         state = {}
 
-    got, nbytes, errs = 0, 0, []
+    got, nbytes, errs, skipped_pre = 0, 0, [], 0
     for f in listing.get("files", []):
         dst = local_path(f["path"])
         if dst is None:
+            continue
+        parts = f["path"].split("/")
+        if (len(parts) == 3 and parts[1] in HOURLY_DIRS
+                and dst.stem[:11] < CUTOVER_HOUR):
+            skipped_pre += 1
             continue
         sig = [f["size"], f["mtime"]]
         if state.get(f["path"]) == sig and dst.exists():
@@ -124,6 +144,10 @@ def pull() -> int:
             body = _req("/file?path=" + urllib.parse.quote(f["path"]))
             if len(body) != f["size"]:
                 raise IOError("size %d != listed %d" % (len(body), f["size"]))
+            if f["path"] == "hl/addresses.json" and dst.exists():
+                # **地址宇宙取聯集，不覆寫。** 它的定義是只增不減；切換那一小時
+                # 本機錄製器還在跑、還在擴充本機這份，直接覆寫會丟掉那些地址。
+                body = _merge_addresses(dst, body)
             dst.parent.mkdir(parents=True, exist_ok=True)
             tmp = dst.with_name(dst.name + ".part")
             tmp.write_bytes(body)
@@ -144,6 +168,7 @@ def pull() -> int:
     if errs:
         reason = "**%d 個檔拉取失敗**：%s" % (len(errs), errs[0][:120])
     _flag(ok, reason, pulled=got, bytes=nbytes, errors=errs[:10],
+          skipped_pre_cutover=skipped_pre,
           remote_last=last, remote_files=len(listing.get("files", [])))
     print(reason)
     return 0 if ok else 1

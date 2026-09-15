@@ -214,7 +214,16 @@ REGISTRY = [
     ("hl onchain recorder", "json_flag",
      "research/results/hl_fuel_last.json:ok", 2.5,
      "hl_fuel_recorder.py 每小時自報；紅 = 覆蓋率掉到 1% 以下、清算價少於 100 筆、"
-     "或幾何違反不為 0（多單清算價必在現價之下）"),
+     "或幾何違反不為 0（多單清算價必在現價之下）。**2026-09-15 起錄製器在 Railway**"
+     "（服務 hl-record），這個檔是拉回來的，而拉取保留遠端 mtime —— 所以雲端"
+     "錄製器停了這一列照樣會紅，不會被「拉取還在跑」蓋住"),
+    # 2026-09-15：錄製器搬上 Railway 之後，本機多了一段「拉回來」。拉取斷了而
+    # 雲端活著時，上面那一列的檔案不會更新 -> 也會紅，但原因會被讀成「錄製器
+    # 死了」。這一列讓兩者分得開。門檻 1.5h：拉取每小時 :45 跑一次。
+    ("hl onchain 拉取 (Railway)", "json_flag",
+     "research/results/hl_record_pull_last.json:ok", 1.5,
+     "hl_record_pull.py 每小時 :45 自報；紅 = 連不到 hl-record、token 錯、"
+     "或有檔案拉取失敗。搬上雲的理由：本機錄製器跟 HMM 引擎的 HL 腿共用 IP 限流"),
     # 2026-09-11：全市場成交帶。**沒有被註冊是怎麼被發現的**——它在
     # UTC 23:36 死掉，兩小時後我去查覆蓋率才看到，而看板全程 0 red。
     # hl_tape.py 的檔頭早就寫著「判準看旗標不看行程」，但那條線沒接上來。
@@ -409,6 +418,26 @@ REGISTRY = [
      "tracked_signals:signal_time", 336.0,
      ">=14d without ANY signal = decode locked again (TODO rule 7)"),
 ]
+
+# 2026-09-15：註冊表裡的 `../arb/` 是**佔位前綴**，不是真的相對路徑。
+# 這裡統一換成 research/arb_home.py 的 HOME（ARB_HOME 可覆寫）——
+# arb 在哪只有那一個檔案知道（使用者：「有沒有那種把路徑寫死的，要記得處理」）。
+def _arb_remap(reg):
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "research"))
+    import arb_home as _ah
+    base = _ah.HOME.as_posix() + "/"
+    out = []
+    for row in reg:
+        row = list(row)
+        for i, v in enumerate(row[:3]):
+            if isinstance(v, str) and v.startswith("../arb/"):
+                row[i] = base + v[len("../arb/"):]
+        out.append(tuple(row))
+    return out
+
+
+REGISTRY = _arb_remap(REGISTRY)
 
 
 def age_file(rel: str) -> float | None:

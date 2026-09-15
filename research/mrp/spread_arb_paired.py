@@ -40,7 +40,10 @@ import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(0, "C:/Users/rfo/Desktop/flowbot/arb")
+# 2026-09-15: arb location comes from research/arb_home.py (ARB_HOME overrides), not a hardcoded path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import arb_home  # noqa: E402
+arb_home.add_to_path()
 
 BAR_SEC = 180
 MIN_BOTH = 1000        # 兩邊同時有報價的最少格數

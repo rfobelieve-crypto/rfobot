@@ -55,7 +55,10 @@ SITE = ROOT.parent / "product-site" / "content" / "research_charts.json"
 
 R = ROOT / "research" / "results"
 POC = ROOT / "research" / "poc" / "data" / "results"
-ARB = ROOT.parent / "arb" / "results"
+# 2026-09-15: arb location from research/arb_home.py, not ROOT.parent / "arb"
+sys.path.insert(0, str(ROOT / "research"))
+import arb_home  # noqa: E402
+ARB = arb_home.RESULTS
 
 
 def load(p: Path):

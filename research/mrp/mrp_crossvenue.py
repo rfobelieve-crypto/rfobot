@@ -155,7 +155,10 @@ def _load():
     它帶兩道已凍結的儀器修正（丟同場館配對、丟修正前的 Bitget 列），
     自己重寫一次就是 mistake.md 2026-09-07 那個病。
     """
-    sys.path.insert(0, "C:/Users/rfo/Desktop/flowbot/arb")
+    # 2026-09-15: arb location comes from research/arb_home.py (ARB_HOME overrides), not a hardcoded path
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import arb_home  # noqa: E402
+    arb_home.add_to_path()
     from arblib import scan_rank
     d = scan_rank.load()
     parts = []
@@ -176,7 +179,10 @@ def _load():
 
 
 def _fees(venues):
-    sys.path.insert(0, "C:/Users/rfo/Desktop/flowbot/arb")
+    # 2026-09-15: arb location comes from research/arb_home.py (ARB_HOME overrides), not a hardcoded path
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import arb_home  # noqa: E402
+    arb_home.add_to_path()
     from arblib import fees
     return {v: fees.fee_bps(v, maker=False, rebate=True) for v in venues}
 

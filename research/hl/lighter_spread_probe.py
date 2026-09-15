@@ -21,7 +21,10 @@ import statistics as st
 import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
-ROOT = "C:/Users/rfo/Desktop/flowbot/arb/engine/logs"
+# 2026-09-15: arb location comes from research/arb_home.py (ARB_HOME overrides), not a hardcoded path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import arb_home  # noqa: E402
+ROOT = str(arb_home.LOGS)
 
 BOTH_LIGHTER = {"GOLD_LL", "NVDA_LL"}
 

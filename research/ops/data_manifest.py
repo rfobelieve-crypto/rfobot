@@ -59,7 +59,8 @@ REGISTRY = [
     ("poc/data 清算", "research/poc/data/liq/*.parquet", "append",
      "小時級，2026-03-11 起"),
     ("hl 清算價直方圖", "research/hl/data/snapshots/*.json", "append",
-     "hl_fuel_recorder.py 每小時。**沒有歷史端點**，停了就永久缺那一小時"),
+     "hl_fuel_recorder.py 每小時。**沒有歷史端點**，停了就永久缺那一小時。"
+     "2026-09-15 起錄製在 Railway（hl-record），本機由 hl_record_pull.py 每小時 :45 拉回"),
     ("hl 逐部位明細", "research/hl/data/positions/*.parquet", "append",
      "**真相源**。清算事件在公開端點沒有旗標，唯一判定是「部位在下一個快照"
      "消失且期間價格穿過它的清算價」—— 那需要逐部位明細。直方圖由它推導"),
@@ -113,6 +114,27 @@ REGISTRY = [
     ("poc/data 掃單快照", "research/poc/data/sweep_snapshot.parquet", "derived",
      "sweep_snapshot.py 整份重生；筆數變動是正常的，只記錄"),
 ]
+
+
+# 2026-09-15：註冊表裡的 `../arb/` 是**佔位前綴**，不是真的相對路徑。
+# 這裡統一換成 research/arb_home.py 的 HOME（ARB_HOME 可覆寫）——
+# arb 在哪只有那一個檔案知道（使用者：「有沒有那種把路徑寫死的，要記得處理」）。
+def _arb_remap(reg):
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "research"))
+    import arb_home as _ah
+    base = _ah.HOME.as_posix() + "/"
+    out = []
+    for row in reg:
+        row = list(row)
+        for i, v in enumerate(row[:3]):
+            if isinstance(v, str) and v.startswith("../arb/"):
+                row[i] = base + v[len("../arb/"):]
+        out.append(tuple(row))
+    return out
+
+
+REGISTRY = _arb_remap(REGISTRY)
 TS_COLS = ("ts", "time", "create_time", "entry_ms")
 
 
