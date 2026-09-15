@@ -42,6 +42,8 @@
 | `COINGLASS_API_KEY` | Railway／`.env` |
 | ~~`NANSEN_API_KEY`~~ | **2026-09-10 同日移除**（使用者決定不走這條線）：已從 `.env` 與 MCP 設定刪除。**但逐字稿裡的明文仍在，所以仍應輪替** |
 | 四支 Telegram bot token（`TELEGRAM_BOT_TOKEN`、`CANCEL_TG_BOT_TOKEN`、`INDICATOR_BOT_TOKEN`、`AGENT_BOT_TOKEN`） | Railway。**2026-09-05 起一律視為已外洩** |
+| `DISCORD_WEBHOOK_URL`（能往告警頻道貼文） | 本機 `flow_system/.env`（`research/ops/notify.py`）。**2026-09-15 補登**：09-13 加的時候沒登記 |
+| `ARB_DISCORD_WEBHOOK_URL`（同一個 webhook 的第二份拷貝） | 本機 `arb/.env`（`arb/ops/alert.py`，HMM 看護）。**2026-09-15 新增**：HMM 看護搬進 arb，而 arb 不准讀 flow_system 的 .env。**輪替時兩份都要換** |
 
 **版控狀態**：`.env` 與 `config.json` **從未進過 git**（`git log --all -- .env` 為空），
 現行程式碼無寫死金鑰。

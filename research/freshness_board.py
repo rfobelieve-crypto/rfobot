@@ -63,37 +63,9 @@ OUT = ROOT / "research" / "results" / "freshness_board.json"
 H = 3600.0
 
 
-def _live_hmm_pair():
-    """現在真正在跑的那支 HMM live 引擎的代號,或 None。
-
-    **為什麼要算而不是寫死（2026-09-14）**：這一列原本寫死 `GMX`,而 GMX
-    當天退場,於是看板掛著一盞永遠紅的燈。同一天這個形狀出現四次
-    （AERO 的 Discord 看護、XPL 的看護、重啟 MON 的空窗、和這裡）,
-    而代價不是噪音 —— **真的紅燈會被埋在假的紅燈裡**:scan_pull 連死
-    31 次的那個下午,唯一在響的頻道報的是別的東西。
-
-    真相源是看門狗的 `$Members` 減去 `logs/stop/*.stop`,也就是今天為
-    「停止」建立的那個單一狀態。這裡是它的第四個讀者（.bat 的迴圈、
-    arb_watchdog.ps1、account_budget.py，加上這支）。
-
-    **解析不出來時回 None,而呼叫端會留一列紅的** —— 一列消失的守衛會被
-    讀成「有人採用了它」,而不是「它壞了」（mistake.md 2026-09-04）。
-    """
-    # **實作搬到 `research/ops/live_hmm.py`（2026-09-14 稍晚）。**
-    # 理由:`hmm_watch.py` 變成排程之後也要問同一個問題,而兩份實作會安靜地
-    # 不同意 —— 那正是這個專案被咬過最多次的形狀（mistake.md 2026-08-26）。
-    # 上面那段 docstring 留著,它記的是**為什麼要算而不是寫死**,而那件事
-    # 不會因為實作搬家而改變。這裡只保留「取第一個」這個此處專屬的決定。
-    try:
-        sys.path.insert(0, str(ROOT / "research" / "ops"))
-        from live_hmm import live_hmm_pairs
-        ps = live_hmm_pairs()
-        return ps[0] if ps else None
-    except Exception:
-        return None
-
-
-_HMM = _live_hmm_pair()
+# 2026-09-15：`_live_hmm_pair()` 與 `_HMM` 拿掉了。使用者訂的分工是
+# 「flowsystem 報 v7，arb 報 HMM」—— 盯 HMM 引擎、HMM 錄製、帳戶額度（B6）
+# 的三列搬到 `../arb/ops/hmm_watch.py`，本看板不再需要知道哪個標的在跑。
 
 # ── the frozen registry ──────────────────────────────────────────────────
 # kind: file  = mtime of one file
@@ -217,6 +189,24 @@ REGISTRY = [
      "research/results/alert_last.json:ok", 26.0,
      "notify.py 每次投遞後自報；紅 = 沒有設定任何管道、或投遞失敗。"
      "管道是 Discord（主）與 Telegram（備），設定走 env 或 .env"),
+    # 2026-09-15：HMM 看護搬進 arb，改用 arb 自己的投遞層（`arb/ops/alert.py`，
+    # 憑證 ARB_DISCORD_WEBHOOK_URL），所以它的嘴不再是上面那一列。
+    # **門檻 720h 是刻意的**：看護是 transition-only 沒有心跳，旗標只在
+    # 真的有東西要送時才更新，安靜一週是合法狀態。這一列判的是
+    # 「最近一次投遞有沒有送達主管道」，不是新鮮度 —— ok=False 才是紅的理由。
+    ("HMM 告警管道 (arb)", "json_flag",
+     "../arb/results/hmm_alert_last.json:ok", 720.0,
+     "arb/ops/alert.py 每次投遞後自報；紅 = ARB_DISCORD_WEBHOOK_URL 沒設定、"
+     "或最近一次沒送達 Discord（只靠 arb 的 Telegram 備援送達也算紅）"),
+    # 看護本身有沒有在跑。**這是唯一留在本看板的 HMM 相關項，而且它盯的是
+    # 看護不是 HMM**：arb 的看護是排程，排程死掉時它什麼都不會送 ——
+    # 安靜跟健康長得一模一樣，所以要一個外面的人看它的產物。
+    # 看護每 5 分鐘寫一次狀態檔（連沒有 live 標的時也寫，2026-09-15 改的）。
+    ("HMM 看護存活 (arb)", "file",
+     "../arb/results/hmm_watch_last.json", 0.5,
+     "arb/ops/hmm_watch.py 由排程 Arb_HmmWatch 每 5 分鐘跑一次並寫這個檔。"
+     "紅 = 排程沒在跑。HMM 本身的告警（HALT、帳戶額度、裸曝險）由它自己送，"
+     "本看板不重複報（2026-09-15 使用者：flowsystem 報 v7，arb 報 HMM）"),
     ("hl 單位驗證", "json_flag",
      "research/results/hl_verify_last.json:ok", 26.0,
      "hl_verify.py 每日自報十關；紅 = 名目與 |數量|x價格 不符、szDecimals 違反、"
@@ -327,31 +317,6 @@ REGISTRY = [
      "ok 的語意是「連得上且設定對」不是「有資料」——啟動那一瞬間就寫 ok=True，"
      "否則看門狗會殺掉剛起來的行程（mistake.md 2026-09-11）。"
      "重啟由 ../arb/ops/arb_watchdog.ps1 負責"),
-    ("HMM 引擎 %s (§1.41)" % (_HMM or "**解析不出來**"), "json_flag",
-     "../arb/engine/logs/%s/status.json:ok" % (_HMM or "__NO_LIVE_HMM__"), 0.2,
-     # 標的**不寫死**（2026-09-14）：這一列原本寫 GMX,而 GMX 當天退場,
-     # 於是看板掛著一盞永遠紅的燈 —— 而永遠紅的燈跟壞掉的燈一樣沒用
-     # （mistake.md 2026-09-03）。現在從看門狗註冊表減去 STOP 檔算出來,
-     # 見本檔的 _live_hmm_pair()。算不出來時路徑會指向一個不存在的目錄,
-     # 那一列因此變紅 —— **那是要的**:沒有 live HMM 引擎、或解析壞了,
-     # 兩者都該被看見,而不是讓這一列安靜消失。
-     "HMM（對沖做市）的引擎自報。**盯的是引擎不是錄製器** —— 看板既有那幾列"
-     "讀的是 minutes.csv，而那是 recorder 寫的，引擎的策略層死掉它照樣更新。"
-     "ok 的語意是「連得上且設定對」不是「有成交」：只有 RED guard 會讓它 false，"
-     "所以安靜的市場不會看起來像故障（mistake.md 2026-09-03）。"
-     "帳戶級閘門（B6）擋住開倉時會在這裡以 ACCOUNT OUT OF MARGIN / "
-     "ACCOUNT CAP HIT 現形 —— 那是「引擎跑著但什麼都不送」唯一看得見的地方。"
-     "重啟由 ../arb/ops/arb_watchdog.ps1 的 HMM_GMX 負責。"
-     "**另外九支錄製器還沒加**：它們跑的是沒有 ok 欄位的舊碼，現在加會誤報紅"),
-    ("arb 帳戶額度加總 (B6)", "json_flag",
-     "../arb/results/account_budget.json:ok", 0.5,
-     "引擎的每一道風控閘門都是**逐行程**的（cap_usd 逐場館、max_gross_usd "
-     "逐行程），而一個行程只跑一個 ticker —— N 個市場 = N 個行程共用同一個 "
-     "Lighter/HL 帳號，五個各守 $1,000 的行程在帳戶層可以是 $5,000。"
-     "`engine/tools/account_budget.py` 每 5 分鐘由 arb_watchdog 跑一次，"
-     "把 live 行程的額度按資金池加總（B1 開關齊全 / B2 同池同天花板 / "
-     "B3 Σ 不超過天花板 / B4 沒有不在註冊表裡的 live 啟動器）。"
-     "執行期那一半在 entropy_arb/account.py（讀交易所回報的帳戶層曝險）"),
     ("arb recorder (§0.75)", "file",
      "../arb/engine/logs/minutes.csv", 1.0,
      "two-venue premium recording; silence = the week of data quietly stops"),
@@ -385,15 +350,6 @@ REGISTRY = [
     ("arb recorder NVDA_LL (§1.02)", "file",
      "../arb/engine/logs/NVDA_LL/minutes.csv", 1.0,
      "zero-fee control: lighter NVDA vs lighter-rh NVDA"),
-    ("arb recorder %s (§1.41b)" % (_HMM or "**解析不出來**"), "file",
-     "../arb/engine/logs/%s/minutes.csv" % (_HMM or "__NO_LIVE_HMM__"), 1.0,
-     # 同樣不寫死（2026-09-14）：原本是 MET,而 MET 當天退場 -> 永遠紅。
-     "HMM 候選，2026-09-14 開錄。它要回答 GMX 死掉的那一關：premium 會不會"
-     "震盪（GMX 173 分鐘裡 96% 為負 -> 只能單邊賣 -> 4 張滿了就卡住）。"
-     "判準凍結在 arb/arblib/hmm_screen.py。**它的 samples 跟凍結的九支不可比**"
-     "——MET 用 HMM 的條件錄（staleness 30s ＋ 5 秒心跳），因為用錄製家族的"
-     "條件會跳過約 40% 的秒，而被跳過的正好是安靜的那些，那會讓 premium 的"
-     "符號分佈偏向活躍時段。要跟那九支比的是 GMX，不是 MET"),
     ("arb scanner (§0.75b)", "glob_newest",
      "../arb/engine/logs/scan/scan_*.csv", 0.5,
      "跨場館 REST 掃描器。**2026-09-13 起它跑在 Railway 上**，本機這些檔是"
