@@ -23,8 +23,12 @@ function Say($m) { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Add-Content
 # 無限重啟迴圈。hl_tape 2026-09-11 就這樣被殺過一次（落盤週期 300 秒 vs
 # 本支 5 分鐘），修法寫在 hl_tape.write_flag 的 docstring 裡。
 $Jobs = @(
-  @{ name = 'liq';     script = 'research\exit_paths\liq_recorder.py';     flag = 'research\results\liq_last.json';     log = 'research\exit_paths\logs\liq_recorder.log' },
-  @{ name = 'lighter'; script = 'research\exit_paths\lighter_recorder.py'; flag = 'research\results\lighter_last.json'; log = 'research\exit_paths\logs\lighter_recorder.log' }
+  @{ name = 'liq';     script = 'research\exit_paths\liq_recorder.py';     flag = 'research\results\liq_last.json';     log = 'research\exit_paths\logs\liq_recorder.log' }
+  # 2026-09-21 整合清理：lighter_recorder（路徑 A，Lighter 零費率影子執行）從這張表拿掉。
+  # 前提「Lighter 零費率」已被 TODO §1.31/§1.33 推翻（我們的帳戶是 Premium：taker 2.80 / maker 0.40 bps），
+  # §1.44 自己寫「重寫或關掉」。使用者 2026-09-21 決定清掉不必要的東西。看板那一列同日 retired。
+  # 要復活：把下面這行的 '# ' 拿掉，並把 freshness_board 那列門檻改回 1.0。
+  # @{ name = 'lighter'; script = 'research\exit_paths\lighter_recorder.py'; flag = 'research\results\lighter_last.json'; log = 'research\exit_paths\logs\lighter_recorder.log' }
   # 2026-09-15：hl_tape / hl_mid / lighter_tape / lighter_mid 四支搬到 arb/recorders/，由 arb/ops/recorder_watchdog.ps1（排程 Arb_RecorderWatchdog）管。D: 上的資料路徑沒變。一個錄製器只能有一個看門狗，所以從這張表拿掉。
   # 2026-09-11 加入：HL 全市場成交帶。它是常駐 WS，斷線自己會重連，
   # 但行程整個死掉就沒人管 —— 實際發生過（UTC 23:36 死、兩小時後才發現）。

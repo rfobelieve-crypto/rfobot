@@ -89,15 +89,21 @@ REGISTRY = [
     ("weather station row", "db",
      "weather_station:updated_at", 2.5,
      "site survival card upstream"),
-    ("raid signals row", "db",
-     "raid_signals_live:updated_at", 2.5,
-     "follow-bot signal surface"),
-    ("v7 veto clock row", "db",
-     "v7_veto_clock:updated_at", 2.5,
-     "site trigger countdown (build-time-snapshot family)"),
-    ("raid outcomes row", "db",
-     "raid_outcomes:updated_at", 2.5,
-     "skip-vs-taken scoring surface; silent staleness = consumer silently scores against stale outcomes"),
+    # 2026-09-20 瘦身：下面三列的寫入端已在 shadow_engine.bat 停用（獵取舊線
+    # 2026-09-07 結案、地形扳機 2026-09-04 結案）。照 okx balance snapshots
+    # (retired 09-06) 的先例：**門檻拉到永不紅、列保留**，不刪除。
+    # 理由是 mistake.md 2026-09-14——停掉被監控的東西而不停監控，真紅燈會被
+    # 假紅燈蓋掉；而刪掉列會讓「有人把它重新打開了」變成看不見。
+    # 要復活這三條線時，把 24 * 3650 改回 2.5，並在 bat 裡還原對應步驟。
+    ("raid signals row (retired 09-20)", "db",
+     "raid_signals_live:updated_at", 24 * 3650,
+     "follow-bot signal surface；獵取舊線 09-07 結案，publisher 09-20 停用"),
+    ("v7 veto clock row (retired 09-20)", "db",
+     "v7_veto_clock:updated_at", 24 * 3650,
+     "site trigger countdown；地形扳機 09-04 結案（無效判決），publisher 09-20 停用"),
+    ("raid outcomes row (retired 09-20)", "db",
+     "raid_outcomes:updated_at", 24 * 3650,
+     "skip-vs-taken scoring surface；與 raid signals 同一條死線，09-20 停用"),
     # Cadence corrected 2026-09-03: the recorder rides the HOURLY train
     # (shadow_engine.bat), not a 10-min loop — with max 1.0h this row sat at
     # exactly 1.0h before every train and would have flapped red each hour
@@ -211,8 +217,13 @@ REGISTRY = [
      "research/results/hl_verify_last.json:ok", 26.0,
      "hl_verify.py 每日自報十關；紅 = 名目與 |數量|x價格 不符、szDecimals 違反、"
      "成交量對不上交易所公布值、時間戳單位錯、現貨混進永續、或止損方向反了"),
-    ("hl onchain recorder", "json_flag",
-     "research/results/hl_fuel_last.json:ok", 2.5,
+    # 2026-09-21 整合清理：hl-record 這個 Railway 服務被砍，本機拉取排程 FlowBot_HLRecord 同日停用。
+    # HL 燃料錄製器的**歸屬移交 arb**（HMM 整條線 09-15 已在那邊；搬上雲的理由本來就是跟 arb 引擎搶 IP）。
+    # 本 repo 不再有能讓這兩列變綠的東西，所以照 retired 先例拉到永不紅、列保留。
+    # ⚠ 資料缺口是真的：不可回填，每停一小時永久少一小時。要恢復從 arb session 開；
+    # 本機最後一份資料到 2026-09-19 17:00 UTC（research/hl/data/，478 MB）。
+    ("hl onchain recorder (moved to arb 09-21)", "json_flag",
+     "research/results/hl_fuel_last.json:ok", 24 * 3650,
      "hl_fuel_recorder.py 每小時自報；紅 = 覆蓋率掉到 1% 以下、清算價少於 100 筆、"
      "或幾何違反不為 0（多單清算價必在現價之下）。**2026-09-15 起錄製器在 Railway**"
      "（服務 hl-record），這個檔是拉回來的，而拉取保留遠端 mtime —— 所以雲端"
@@ -220,10 +231,19 @@ REGISTRY = [
     # 2026-09-15：錄製器搬上 Railway 之後，本機多了一段「拉回來」。拉取斷了而
     # 雲端活著時，上面那一列的檔案不會更新 -> 也會紅，但原因會被讀成「錄製器
     # 死了」。這一列讓兩者分得開。門檻 1.5h：拉取每小時 :45 跑一次。
-    ("hl onchain 拉取 (Railway)", "json_flag",
-     "research/results/hl_record_pull_last.json:ok", 1.5,
+    # ⚠ 2026-09-20：Railway 服務全部被移除，hl-record 在內 —— **上面那一列與
+    # 這一列現在是真紅燈，不是儀器問題，也不是我們決定不做**。它錄的是逐地址
+    # 部位／清算價／簿口／觸發單，**沒有歷史端點，每停一小時就永久少一小時**，
+    # 而它餵的鏈上 §1.10 是還活著的線。本機已有 478 MB 到 09-19 17:00 UTC。
+    # 這兩列刻意**不 retire**（對照 raid/veto/parity 那三列是我們決定停的）：
+    # 紅著才看得到那個時鐘在走。決定要不要把錄製器搬回本機、或搬去 arb，
+    # 登記在 docs/INVENTORY_2026_09_20.md 的待決事項。
+    # 2026-09-21：拉取排程 FlowBot_HLRecord 已停用（它每小時打一個被砍掉的服務）。同上，移交 arb。
+    ("hl onchain 拉取 (moved to arb 09-21)", "json_flag",
+     "research/results/hl_record_pull_last.json:ok", 24 * 3650,
      "hl_record_pull.py 每小時 :45 自報；紅 = 連不到 hl-record、token 錯、"
-     "或有檔案拉取失敗。搬上雲的理由：本機錄製器跟 HMM 引擎的 HL 腿共用 IP 限流"),
+     "或有檔案拉取失敗。搬上雲的理由：本機錄製器跟 HMM 引擎的 HL 腿共用 IP 限流。"
+     "**2026-09-20 起紅是因為服務被移除**"),
     # 2026-09-11：全市場成交帶。**沒有被註冊是怎麼被發現的**——它在
     # UTC 23:36 死掉，兩小時後我去查覆蓋率才看到，而看板全程 0 red。
     # hl_tape.py 的檔頭早就寫著「判準看旗標不看行程」，但那條線沒接上來。
@@ -283,9 +303,11 @@ REGISTRY = [
     ("liq recorder flag (路徑C)", "json_flag",
      "research/results/liq_last.json:ok", 1.0,
      "OKX+Bybit 強平推送錄製器自報；紅 = WS 斷或 DB 寫入失敗"),
-    ("lighter recorder flag (路徑A)", "json_flag",
-     "research/results/lighter_last.json:ok", 1.0,
-     "Lighter L2 × Binance 現貨 250ms 取樣；紅 = 任一側無幀"),
+    # 2026-09-21 整合清理：路徑 A 的前提（Lighter 零費率）已被 §1.31/§1.33 推翻，
+    # 錄製器已從 exit_paths_watchdog 的 $Jobs 拿掉並停掉。照 retired 先例：門檻永不紅、列保留。
+    ("lighter recorder flag (路徑A, retired 09-21)", "json_flag",
+     "research/results/lighter_last.json:ok", 24 * 3650,
+     "路徑 A 前提已推翻，錄製器 09-21 停用；復活要同時還原 watchdog $Jobs 那行與本列門檻 1.0"),
     ("v7 export pipe (§0.81)", "json_flag",
      "research/results/v7_product_trades_status.json:ok", 2.5,
      "product-side /export/v7 reachable AND configured (not: has rows)"),
@@ -317,9 +339,12 @@ REGISTRY = [
     ("okx balance snapshots (retired 09-06)", "db",
      "v7_okx_balance_snapshots:ts", 24 * 3650,
      "OKX 帳戶 08-18 起 $0、executor 09-05 DEMOTED；入金重啟後把門檻改回 1.5h"),
-    ("cloud train parity", "db",
-     "train_parity:updated_at", 2.5,
-     "cloud recorder alive (weakness-#1 migration; RED until service up)"),
+    # 2026-09-20 瘦身：cloud_train 這個 Railway 服務要退役（本機 SweepShadow
+    # 每小時跑同一件事，雲端那份是 TRAIN_PHASE=parallel 的影子，本機才是
+    # authority——純重複）。對照檢查 train_parity_check.py 已在 bat 停用。
+    ("cloud train parity (retired 09-20)", "db",
+     "train_parity:updated_at", 24 * 3650,
+     "cloud_train 服務退役；本機 shadow_engine 才是 authority，對照已無對象"),
     ("arb universe recorder (§1.25)", "json_flag",
      "../arb/engine/logs/universe/_flag.json:ok", 0.6,
      "record_universe.py 常駐自報（150 個配對、264 個訂閱、三條 WS）。"

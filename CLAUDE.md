@@ -4,6 +4,34 @@
 
 ## 現況速覽（快照 2026-08-05）
 
+> ### 🛑 **2026-09-20：Railway 服務全部被移除，本節以下的雲端敘述全部過時**
+>
+> 使用者主動移除，理由是「沒有用的東西太多，每個月花一堆錢什麼都沒有」。
+> **實測**：`grid`（jarvis 產品端）、`enchanting-emotion`（indicator）、
+> `agent-mcp`、`hl-record` 全部 404；**MySQL 停機**（TCP 通但握手即斷，
+> 使用者確認服務仍在清單裡、非刪除）；`scanner`（arb）401 還活著。
+>
+> **沒有真錢風險**：jarvis 已查證無人持倉；OKX executor 09-05 就 DEMOTED、
+> 帳戶 08-18 起 $0。**HL 燃料本機有**（478 MB 到 09-19 17:00 UTC）。
+>
+> **🚫 在使用者於 Railway 後台真的刪掉服務之前，這個 repo 不可以 push。**
+> 使用者 2026-09-20：「都先不要重新部署不然服務器都會回來」。
+> `architecture.md` 寫著 push 到 main 觸發自動部署，而 mistake.md 2026-09-15
+> 記著它會重新部署**這個 repo 的全部服務**。**本機 commit 不觸發任何東西，
+> push 才會**——所以可以 commit，不可以 push。
+> 另外：**那五個 404 不代表服務被刪了，Railway 上停機的服務網域也回 404**。
+> 它們很可能跟 MySQL 一樣只是停著、還在清單裡，一 push 就全部回來。
+>
+> **不可逆的那一條**：`tracked_signals`（Gate A/B 全部證據）、
+> `indicator_history`（V7 解碼 buffer 唯一重建來源）、`flow_bars_1m`、
+> `orderbook_snapshots_1m`、`cancel_playbook_events` 都在那個 MySQL 裡，
+> **本機沒有任何 dump**。**匯出之前不要刪它。**
+>
+> 全部清點、逐服務與逐研究線的去留、建議順序在
+> **`docs/INVENTORY_2026_09_20.md`**。一句話版：錢不是花在沒用的地方，
+> 是花在**已經判過死刑的東西**上——資料庫 56% 的列（588 萬）在餵
+> 撤單流（08-10 FAIL）與 OKX executor（08-21 不再重啟）。
+
 > 這一節是「**現在在哪**」。底下的歷史章節是「**怎麼走到這裡**」，**不要
 > 拿歷史章節的數字當現行值**——很多已被後面的決策取代。
 > 下面的數字全是**快照**，活數字請跑：`python research/portfolio_clocks.py`
@@ -168,6 +196,7 @@ exit` 的列是真前瞻，判 Gate 只能用前者」——**這條是錯的，
 
 | 想知道 | 看這裡 |
 |---|---|
+| **2026-09-20 整理整合這一輪（三份一組，開工前先看）**：清點事實 → 策略方向 → 重啟與整合 | `docs/INVENTORY_2026_09_20.md`（服務與研究線的去留、不可逆清單）→ `docs/STRATEGY_PLAN_2026_09_20.md`（唯一有機會的兩條、三條候選路徑）→ **`docs/RESTART_PLAN_2026_09_20.md`（執行順序、上雲的兩個理由、防復發）** |
 | 策略分工、風控階段、**現行** override、網站呈現面 | **本檔（CLAUDE.md）** |
 | **已被取代的 override 全文**（10 條，2026-09-11 搬出） | `docs/DECISION_HISTORY.md` |
 | **HMM（對沖做市）的一切**：override 全文、命名、判準、TODO、看護（2026-09-15 搬出） | `../arb/docs/HMM.md`、`../arb/TODO.md`，**從 arb 開 session**。告警分工：**本 repo 報 V7、arb 報 HMM**（同一個 Discord webhook；本看板只盯 arb 看護活不活著） |

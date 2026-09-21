@@ -14,26 +14,38 @@ python research\weather_station_publish.py >> research\results\sweep_shadow_run.
 REM 2026-08-20: publish live raid signals to MySQL for the follow-bot
 REM endpoint. The agent used to read the CSV baked into its image, which
 REM is only as fresh as the last git push (it was 8 days stale).
-python research\raid_signals_publish.py >> research\results\sweep_shadow_run.log 2>&1
+REM [DISABLED 2026-09-20 slim-down] research\raid_signals_publish.py
+REM   why: sweep-failure old line CLOSED 2026-09-07 (TODO 1.02): fill assumption unreachable
+REM   restore: re-add the command: python research\raid_signals_publish.py  (append stdout+stderr to research\results\sweep_shadow_run.log)
 REM 2026-08-24 (TODO 0.57): publish ARMED levels, not just filled signals.
 REM Batch-publishing fills costs 0.1328 R/trade (158% of variant B's edge)
 REM -- the consumer must learn a level is armed BEFORE the retest.
-python research\raid_pending_publish.py >> research\results\sweep_shadow_run.log 2>&1
+REM [DISABLED 2026-09-20 slim-down] research\raid_pending_publish.py
+REM   why: same dead line as raid_signals_publish above
+REM   restore: re-add the command: python research\raid_pending_publish.py  (append stdout+stderr to research\results\sweep_shadow_run.log)
 REM 2026-08-18 M1: unified ledger mirror (v7_okx_positions -> pf_positions,
 REM idempotent upsert, zero live-code change). See TODO §0.5.
-python research\pf_mirror.py >> research\results\sweep_shadow_run.log 2>&1
+REM [DISABLED 2026-09-20 slim-down] research\pf_mirror.py
+REM   why: mirrors v7_okx_positions, frozen at 21 rows since 2026-08-11 (Bitget migration)
+REM   restore: re-add the command: python research\pf_mirror.py  (append stdout+stderr to research\results\sweep_shadow_run.log)
 REM 2026-08-18 M3: dry-run intent flow (fresh variant-B fills -> risk engine
 REM -> pf_intents with decisions). No orders; decisions are the deliverable.
-python research\pf_dry_intents.py >> research\results\sweep_shadow_run.log 2>&1
+REM [DISABLED 2026-09-20 slim-down] research\pf_dry_intents.py
+REM   why: consumes variant-B fills; B was voided 2026-09-02 (TODO 0.92)
+REM   restore: re-add the command: python research\pf_dry_intents.py  (append stdout+stderr to research\results\sweep_shadow_run.log)
 REM 2026-08-20: v7 veto-clock publish -- the cloud route cannot compute it
 REM (needs the local kline cache, not in the image); the site card sat at a
 REM build-time snapshot (asof 08-10, trigger 4/60 vs truth 34/60). Same
 REM off-cloud-recorder fix family as raid_signals_publish above.
-python research\v7_veto_publish.py >> research\results\sweep_shadow_run.log 2>&1
+REM [DISABLED 2026-09-20 slim-down] research\v7_veto_publish.py
+REM   why: terrain adoption trigger CLOSED 2026-09-04 as inconclusive-by-design
+REM   restore: re-add the command: python research\v7_veto_publish.py  (append stdout+stderr to research\results\sweep_shadow_run.log)
 REM 2026-08-21: cloud-train parity check (weakness-#1 migration) -- compares
 REM the local ledger hash vs the cloud recorder's train_parity row. Log-only;
 REM 7 consecutive MATCH days unlock the cutover (rule frozen in the script).
-python research\train_parity_check.py >> research\results\sweep_shadow_run.log 2>&1
+REM [DISABLED 2026-09-20 slim-down] research\train_parity_check.py
+REM   why: compares against cloud_train, which is being retired (INVENTORY_2026_09_20)
+REM   restore: re-add the command: python research\train_parity_check.py  (append stdout+stderr to research\results\sweep_shadow_run.log)
 REM 2026-08-26: publish the pre-registration board (open hypotheses +
 REM progress + settled verdicts). Progress only -- every verdict keeps
 REM its single owning scorer, so nothing here can drift from the number
@@ -44,7 +56,9 @@ REM carries OPEN signals, so a follower could log 'the slot cap blocked
 REM this one' but never find out what it would have done -- and scoring
 REM their real fills against research numbers is the asymmetry that made
 REM blocked signals look 4.3x better. Same ruler on both arms.
-python research\raid_outcomes_publish.py >> research\results\sweep_shadow_run.log 2>&1
+REM [DISABLED 2026-09-20 slim-down] research\raid_outcomes_publish.py
+REM   why: same dead line as raid_signals_publish above
+REM   restore: re-add the command: python research\raid_outcomes_publish.py  (append stdout+stderr to research\results\sweep_shadow_run.log)
 REM 2026-08-31: pull jarvis V7Bot executions for the chart overlay
 REM (user: charts must mark real entries/exits; v7_okx_positions froze
 REM 08-11 at the Bitget migration). Same export token as the mill
