@@ -4,33 +4,30 @@
 
 ## 現況速覽（快照 2026-08-05）
 
-> ### 🛑 **2026-09-20：Railway 服務全部被移除，本節以下的雲端敘述全部過時**
+> ### 🗄 **2026-09-30 起：作品集模式。Railway 上沒有任何 flow_system 服務，本節以下的雲端與實盤敘述全部過時**
 >
-> 使用者主動移除，理由是「沒有用的東西太多，每個月花一堆錢什麼都沒有」。
-> **實測**：`grid`（jarvis 產品端）、`enchanting-emotion`（indicator）、
-> `agent-mcp`、`hl-record` 全部 404；**MySQL 停機**（TCP 通但握手即斷，
-> 使用者確認服務仍在清單裡、非刪除）；`scanner`（arb）401 還活著。
+> 使用者 2026-09-30：「這邊主要是讓他變成作品集的概念，因為這系統短時間內要變能賺錢不太可能」，
+> 並要求 Railway 花費壓到最低。**Coinglass 10 月不續訂**——V7 之後無法即時推論
+> （`feature_builder_live.py` 有 162 處 `cg_`），所以 V7 凍結成歷史展示，不再每小時跑。
 >
-> **沒有真錢風險**：jarvis 已查證無人持倉；OKX executor 09-05 就 DEMOTED、
-> 帳戶 08-18 起 $0。**HL 燃料本機有**（478 MB 到 09-19 17:00 UTC）。
+> **現況（已查證）**
+> - Railway：`訂單流量化預測指標`、`bitget-grid-bot` 兩個專案**完全空的**（jarvis 也關了，
+>   理由是「跑了也不會賺錢」）。`flowbot-arb/scanner` 屬於 arb，沒有接 git，push 不會觸發它。
+> - **舊 MySQL 永久遺失**：服務與 volume 在 09-20 之後被刪、超過 48 小時還原期；
+>   `D:\flowbot_data\db_export\20260920` 是空的，匯出從未執行。`tracked_signals`（Gate A/B 證據）、
+>   `indicator_history`、`flow_bars_1m` 等全部沒了。唯一救回的是 V7 track-record 與最近 6 筆實盤平倉
+>   （從 Vercel 舊部署的 ISR 快取），原始檔在 `D:\flowbot_data\site_cache_rescue\`。
+> - **本機排程全部 Disabled**（09-21 起）；它們大多寫 MySQL，不要重新打開。arb 的排程與錄製器照常在跑。
+> - **push 已經安全**：沒有任何 Railway 服務接在這個 repo 上。09-20 那條「不可以 push」已解除。
 >
-> **🚫 在使用者於 Railway 後台真的刪掉服務之前，這個 repo 不可以 push。**
-> 使用者 2026-09-20：「都先不要重新部署不然服務器都會回來」。
-> `architecture.md` 寫著 push 到 main 觸發自動部署，而 mistake.md 2026-09-15
-> 記著它會重新部署**這個 repo 的全部服務**。**本機 commit 不觸發任何東西，
-> push 才會**——所以可以 commit，不可以 push。
-> 另外：**那五個 404 不代表服務被刪了，Railway 上停機的服務網域也回 404**。
-> 它們很可能跟 MySQL 一樣只是停著、還在清單裡，一 push 就全部回來。
+> **網站（作品集主體）**：`product-site-green.vercel.app`（Vercel，無自訂網域，`../product-site`
+> 的 master）。已改成**不依賴任何後端**：圖表是 `public/archive/*.html`（研究機產生的最後一版），
+> 資料面板讀 `content/archive/*.json`。要更新數字：`python research/site_export.py`
+> （sweep-status 那包要用 `C:\Users\rfo\Desktop\flowbot\venv_indicator` 跑）→ commit → push master。
+> `lib/*` 只有在設了環境變數時才會打 live 端點。
 >
-> **不可逆的那一條**：`tracked_signals`（Gate A/B 全部證據）、
-> `indicator_history`（V7 解碼 buffer 唯一重建來源）、`flow_bars_1m`、
-> `orderbook_snapshots_1m`、`cancel_playbook_events` 都在那個 MySQL 裡，
-> **本機沒有任何 dump**。**匯出之前不要刪它。**
->
-> 全部清點、逐服務與逐研究線的去留、建議順序在
-> **`docs/INVENTORY_2026_09_20.md`**。一句話版：錢不是花在沒用的地方，
-> 是花在**已經判過死刑的東西**上——資料庫 56% 的列（588 萬）在餵
-> 撤單流（08-10 FAIL）與 OKX executor（08-21 不再重啟）。
+> **不要再照 `docs/RESTART_PLAN_2026_09_20.md` 重建 MySQL / agent-mcp**——那份計畫已被取代。
+> 09-20 的清點（`docs/INVENTORY_2026_09_20.md`）仍是「系統原本長什麼樣」的最好紀錄。
 
 > 這一節是「**現在在哪**」。底下的歷史章節是「**怎麼走到這裡**」，**不要
 > 拿歷史章節的數字當現行值**——很多已被後面的決策取代。
